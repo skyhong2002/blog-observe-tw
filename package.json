@@ -12,6 +12,8 @@
     "db:migrate": "node tools/migrate.mjs",
     "feed:once": "node tools/crawl-feeds.mjs",
     "worker": "node tools/crawl-worker.mjs",
+    "discover:blogblog": "node tools/discover-blogblog.mjs",
+    "discover:similar": "node tools/discover-similar.mjs",
     "test": "node --test"
   },
   "dependencies": {
