@@ -3,6 +3,7 @@ import { createHash, randomBytes } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
+import { createDb } from "./src/db.mjs";
 
 const HOST = process.env.HOSTNAME || "127.0.0.1";
 const PORT = Number(process.env.PORT || 18160);
@@ -15,9 +16,19 @@ const FLOW_COOKIE = "blog_oauth";
 const SESSION_DAYS = 30;
 const FLOW_SECONDS = 600;
 const startedAt = new Date().toISOString();
-const sessions = new Map();
 const root = path.dirname(fileURLToPath(import.meta.url));
-const blogs = JSON.parse(await readFile(path.join(root, "data/blogs.json"), "utf8"));
+const seedBlogs = JSON.parse(await readFile(path.join(root, "data/blogs.json"), "utf8"));
+const dbStore = process.env.BLOG_DB_URL ? createDb() : null;
+let blogs = seedBlogs;
+
+if (dbStore) {
+  try {
+    const [rows] = await dbStore.pool.execute("SELECT id,slug,name,url,category,status,status_label AS statusLabel,description,source_name AS sourceLabel,source_row AS sourceRow FROM blogs ORDER BY (status='verified') DESC, name ASC");
+    blogs = rows.map((row) => ({ ...row, source: { label: row.sourceLabel || "seed", row: row.sourceRow || null } }));
+  } catch (error) {
+    console.error("database catalog unavailable; using seed fallback:", error instanceof Error ? error.message : "unknown error");
+  }
+}
 
 const escapeHtml = (value) => String(value)
   .replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;")
@@ -39,13 +50,12 @@ function safeNext(value) {
   if (value.startsWith("/auth/") || value.length > 512 || /[\u0000-\u001f]/.test(value)) return "/";
   return value;
 }
-function currentUser(request) {
+async function currentUser(request) {
   const session = readCookie(request, SESSION_COOKIE);
   if (!session || session.length > 100) return null;
-  const key = hash(session);
-  const record = sessions.get(key);
-  if (!record || record.expiresAt <= Date.now()) { if (record) sessions.delete(key); return null; }
-  return record.user;
+  if (!dbStore) return null;
+  const [rows] = await dbStore.pool.execute("SELECT u.id,u.email,u.name,u.picture FROM user_sessions s JOIN users u ON u.id=s.user_id WHERE s.token_hash=? AND s.expires_at>UTC_TIMESTAMP()", [hash(session)]);
+  return rows[0] || null;
 }
 function responseHeaders(type, length, extra = {}) {
   return { "Content-Type": type, "Content-Length": length, "Cache-Control": "no-store",
@@ -80,13 +90,14 @@ function blogIndex(url, user) {
   const category = (url.searchParams.get("category") || "").trim();
   const filtered = blogs.filter((blog) => (!query || `${blog.name} ${blog.description} ${blog.category}`.toLowerCase().includes(query)) && (!category || blog.category === category));
   const categories = [...new Set(blogs.map((blog) => blog.category))];
-  const cards = filtered.map((blog) => `<article class="card"><div class="meta"><span class="pill">${escapeHtml(blog.category)}</span><span>${escapeHtml(blog.statusLabel)}</span></div><h3><a href="/blogs/${encodeURIComponent(blog.slug)}">${escapeHtml(blog.name)}</a></h3><p>${escapeHtml(blog.description)}</p><div class="meta"><span>${escapeHtml(blog.url.replace(/^https?:\/\//, "").replace(/\/$/, ""))}</span></div></article>`).join("");
+  const cards = filtered.map((blog) => `<article class="card"><div class="meta"><span class="pill">${escapeHtml(blog.category)}</span><span>${escapeHtml(blog.statusLabel)}</span></div><h3><a href="/blogs/${encodeURIComponent(blog.slug)}">${escapeHtml(blog.name)}</a></h3><p>${escapeHtml(blog.description || "尚未提供網站簡介。")}</p><div class="meta"><span>${escapeHtml(blog.url ? blog.url.replace(/^https?:\/\//, "").replace(/\/$/, "") : "網址待核對")}</span></div></article>`).join("");
   return layout("探索部落格", `<section class="section" style="padding-top:56px"><div class="sectionhead"><div><div class="eyebrow">Directory</div><h1 style="margin:10px 0 0;font-size:clamp(2rem,5vw,3.5rem);letter-spacing:-.055em">探索部落格</h1></div><span class="muted">${filtered.length} 個結果</span></div><form class="toolbar" method="get"><input class="search" type="search" name="q" value="${escapeHtml(url.searchParams.get("q") || "")}" placeholder="搜尋網站名稱或主題"><select class="search" name="category" aria-label="分類"><option value="">全部分類</option>${categories.map((item) => `<option value="${escapeHtml(item)}"${item === category ? " selected" : ""}>${escapeHtml(item)}</option>`).join("")}</select><button type="submit">搜尋</button></form><div class="grid">${cards || `<div class="notice">找不到符合條件的網站。</div>`}</div></section>`, user);
 }
 function blogDetail(slug, user) {
   const blog = blogs.find((item) => item.slug === slug);
   if (!blog) return null;
-  return layout(blog.name, `<section class="section" style="padding-top:56px"><a class="back" href="/blogs">← 返回部落格目錄</a><article class="detail"><div class="meta"><span class="pill">${escapeHtml(blog.category)}</span><span>${escapeHtml(blog.statusLabel)}</span></div><h1>${escapeHtml(blog.name)}</h1><p>${escapeHtml(blog.description)}</p><dl class="meta"><dt>網站</dt><dd><a href="${escapeHtml(blog.url)}" rel="noopener noreferrer">${escapeHtml(blog.url)}</a></dd><dt>資料來源</dt><dd>${escapeHtml(blog.source.label)} · 第 ${blog.source.row} 列</dd></dl><a class="button external" href="${escapeHtml(blog.url)}" rel="noopener noreferrer">前往原站閱讀 ↗</a></article></section>`, user);
+  const external = blog.url ? `<a class="button external" href="${escapeHtml(blog.url)}" rel="noopener noreferrer">前往原站閱讀 ↗</a>` : `<div class="notice">這個網站已列入 seed，網址仍待核對。</div>`;
+  return layout(blog.name, `<section class="section" style="padding-top:56px"><a class="back" href="/blogs">← 返回部落格目錄</a><article class="detail"><div class="meta"><span class="pill">${escapeHtml(blog.category)}</span><span>${escapeHtml(blog.statusLabel)}</span></div><h1>${escapeHtml(blog.name)}</h1><p>${escapeHtml(blog.description || "目前只有來源名單資料，待完成網址核對與 RSS 偵測。")}</p><dl class="meta"><dt>網站</dt><dd>${blog.url ? `<a href="${escapeHtml(blog.url)}" rel="noopener noreferrer">${escapeHtml(blog.url)}</a>` : "待核對"}</dd><dt>資料來源</dt><dd>${escapeHtml(blog.source.label)} · 第 ${blog.source.row || "?"} 列</dd></dl>${external}</article></section>`, user);
 }
 async function exchangeGoogleCode(code, verifier) {
   const response = await fetch("https://oauth2.googleapis.com/token", { method: "POST", headers: { "content-type": "application/x-www-form-urlencoded" }, body: new URLSearchParams({ code, code_verifier: verifier, client_id: GOOGLE_CLIENT_ID, client_secret: GOOGLE_CLIENT_SECRET, redirect_uri: GOOGLE_CALLBACK, grant_type: "authorization_code" }), signal: AbortSignal.timeout(15000) });
@@ -119,7 +130,11 @@ async function handleOAuthCallback(request, res, url) {
     if (!["https://accounts.google.com", "accounts.google.com"].includes(claims.iss) || claims.aud !== GOOGLE_CLIENT_ID || (claims.azp && claims.azp !== GOOGLE_CLIENT_ID) || claims.nonce !== flow.nonce || Number(claims.exp) * 1000 <= Date.now() || ![true, "true"].includes(claims.email_verified) || typeof claims.sub !== "string" || typeof claims.email !== "string") return fail("invalid");
     const user = { sub: claims.sub, email: claims.email.toLowerCase(), name: claims.name || null, picture: typeof claims.picture === "string" ? claims.picture : null };
     const session = token();
-    sessions.set(hash(session), { user, expiresAt: Date.now() + SESSION_DAYS * 86400000 });
+    if (!dbStore) return fail("database");
+    const now = new Date();
+    await dbStore.pool.execute("INSERT INTO users (google_sub,email,name,picture,created_at,last_login_at) VALUES (?,?,?,?,?,?) ON DUPLICATE KEY UPDATE email=VALUES(email),name=VALUES(name),picture=VALUES(picture),last_login_at=VALUES(last_login_at)", [user.sub, user.email, user.name, user.picture, now, now]);
+    const [userRows] = await dbStore.pool.execute("SELECT id FROM users WHERE google_sub=?", [user.sub]);
+    await dbStore.pool.execute("INSERT INTO user_sessions (token_hash,user_id,created_at,expires_at) VALUES (?,?,?,?)", [hash(session), userRows[0].id, now, new Date(now.getTime() + SESSION_DAYS * 86400000)]);
     return redirect(res, safeNext(flow.next), 303, { "Set-Cookie": [clear, cookie(SESSION_COOKIE, session, SESSION_DAYS * 86400)] });
   } catch (error) {
     console.warn("google login exchange failed:", error instanceof Error ? error.message : "unknown error");
@@ -128,13 +143,13 @@ async function handleOAuthCallback(request, res, url) {
 }
 const server = http.createServer(async (request, res) => {
   const url = new URL(request.url || "/", `http://${request.headers.host || HOST}`);
-  const user = currentUser(request);
+  const user = await currentUser(request);
   try {
     if (request.method === "GET" && url.pathname === "/healthz") return send(res, 200, "application/json; charset=utf-8", { ok: true, service: "blog.observe.tw", port: PORT, startedAt, auth: Boolean(GOOGLE_CLIENT_ID && GOOGLE_CLIENT_SECRET), blogs: blogs.length });
     if (request.method === "GET" && url.pathname === "/auth/me") return send(res, 200, "application/json; charset=utf-8", { enabled: Boolean(GOOGLE_CLIENT_ID && GOOGLE_CLIENT_SECRET), user });
     if (request.method === "GET" && url.pathname === "/auth/google") return oauthStart(res, url);
     if (request.method === "GET" && url.pathname === "/auth/google/callback") return handleOAuthCallback(request, res, url);
-    if (request.method === "POST" && url.pathname === "/auth/logout") { const session = readCookie(request, SESSION_COOKIE); if (session) sessions.delete(hash(session)); return redirect(res, "/", 303, { "Set-Cookie": cookie(SESSION_COOKIE, "", 0) }); }
+    if (request.method === "POST" && url.pathname === "/auth/logout") { const session = readCookie(request, SESSION_COOKIE); if (session && dbStore) await dbStore.pool.execute("DELETE FROM user_sessions WHERE token_hash=?", [hash(session)]); return redirect(res, "/", 303, { "Set-Cookie": cookie(SESSION_COOKIE, "", 0) }); }
     if (request.method === "GET" && url.pathname === "/login") return send(res, 200, "text/html; charset=utf-8", layout("登入", `<section class="section" style="padding-top:72px"><div class="detail"><div class="eyebrow">Google sign-in</div><h1>登入 blog.observe.tw</h1><p>登入後可以在後續版本保存追蹤中的部落格與閱讀清單。</p>${url.searchParams.get("error") ? `<div class="notice">登入未完成（${escapeHtml(url.searchParams.get("error"))}），請重新嘗試。</div>` : ""}<a class="button external" href="/auth/google?next=%2Fblogs">使用 Google 登入</a></div></section>`, user));
     if (request.method === "GET" && url.pathname === "/about") return send(res, 200, "text/html; charset=utf-8", layout("關於", `<section class="section" style="padding-top:56px"><article class="detail"><div class="eyebrow">About</div><h1>透明地觀察部落格。</h1><p>本站第一版先提供可追溯的網站目錄與原站入口。收錄狀態、分類與來源列號會保留在資料中，後續再加入 RSS 抓取、文章索引與訂閱。</p></article></section>`, user));
     if (request.method === "GET" && url.pathname === "/api/blogs") return send(res, 200, "application/json; charset=utf-8", { blogs });
