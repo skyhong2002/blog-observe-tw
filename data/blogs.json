@@ -1,6 +1,0 @@
-[
-  {"slug":"kocpc","name":"電腦王阿達","url":"https://www.kocpc.com.tw/","category":"科技","status":"verified","statusLabel":"已核對網站","description":"科技、消費電子、3C 與生活工具的長期介紹與教學。","source":{"label":"Similar Web 新聞 - 2025_12.csv","row":1}},
-  {"slug":"soft4fun","name":"硬是要學","url":"https://www.soft4fun.net/","category":"科技","status":"verified","statusLabel":"已核對網站","description":"軟體、網路服務與數位工具的實用教學與整理。","source":{"label":"Similar Web 新聞 - 2025_12.csv","row":2}},
-  {"slug":"dacota","name":"雲爸 dacota.tw","url":"https://dacota.tw/","category":"生活","status":"verified","statusLabel":"已核對網站","description":"科技產品、生活觀察與使用心得，從作者視角持續記錄。","source":{"label":"Similar Web 新聞 - 2025_12.csv","row":3}},
-  {"slug":"saydigi","name":"點子生活 saydigi","url":"https://www.saydigi.com/","category":"生活","status":"verified","statusLabel":"已核對網站","description":"科技、生活與消費趨勢的內容整理，提供原站文章入口。","source":{"label":"Similar Web 新聞 - 2025_12.csv","row":4}}
-]

@@ -18,7 +18,7 @@
     "db:migrate": "node tools/migrate-drizzle.mjs",
     "crawl:once": "node --env-file-if-exists=.env tools/crawl-once.ts",
     "seed:import": "node tools/import-seeds.mjs",
-    "feed:once": "node tools/crawl-feeds.mjs",
+    "feed:once": "node --env-file-if-exists=.env tools/crawl-once.ts",
     "discover:blogblog": "node --env-file-if-exists=.env tools/discover-blogblog.ts",
     "discover:similar": "node --env-file-if-exists=.env tools/discover-similar.ts",
     "web:build": "npm --prefix web run build",

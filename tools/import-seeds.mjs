@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import mysql from "mysql2/promise";
-import { parseDbUrl } from "../src/db.mjs";
+import { parseDbUrl } from "../app/src/db/client.ts";
 
 const input = process.argv[2] || "/home/deck/.t3/userdata/attachments/40e782cd-402d-4d62-892f-cd434b5ae862-a56fb4e7-3a53-4331-ab96-c2969bbdb069-csv.csv";
 const source = await readFile(input);
