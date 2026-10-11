@@ -19,8 +19,8 @@
     "crawl:once": "node --env-file-if-exists=.env tools/crawl-once.ts",
     "seed:import": "node tools/import-seeds.mjs",
     "feed:once": "node tools/crawl-feeds.mjs",
-    "discover:blogblog": "node tools/discover-blogblog.mjs",
-    "discover:similar": "node tools/discover-similar.mjs",
+    "discover:blogblog": "node --env-file-if-exists=.env tools/discover-blogblog.ts",
+    "discover:similar": "node --env-file-if-exists=.env tools/discover-similar.ts",
     "web:build": "npm --prefix web run build",
     "web:start": "npm --prefix web run start"
   },
