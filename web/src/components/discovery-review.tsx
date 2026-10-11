@@ -12,6 +12,21 @@ type Candidate = {
   discoveredAt: string;
 };
 
+function evidenceText(value: Candidate['sourceEvidence']) {
+  if (!value) return 'RSS 偵測：待執行';
+  const evidence =
+    typeof value === 'string'
+      ? (() => {
+          try {
+            return JSON.parse(value) as Record<string, unknown>;
+          } catch {
+            return {};
+          }
+        })()
+      : value;
+  return `RSS 偵測：${String(evidence.rssDetection || '待執行')} · 路徑：${String(evidence.discoveryPath || evidence.sourceUrl || '待補')}`;
+}
+
 export default function DiscoveryReview() {
   const [items, setItems] = useState<Candidate[]>([]);
   const [selected, setSelected] = useState<number[]>([]);
@@ -79,6 +94,7 @@ export default function DiscoveryReview() {
                 <small>
                   {item.sourceType} · {item.sourceUrl || '來源頁待補'}
                 </small>
+                <small>{evidenceText(item.sourceEvidence)}</small>
               </span>
             </label>
           ))}
