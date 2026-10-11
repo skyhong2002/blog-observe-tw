@@ -35,6 +35,7 @@ const worker = new Worker(
       const similar = await discoverSimilar(
         store.pool,
         domains.map((row) => row.domain),
+        config.similarWeb,
       );
       return { blogblog, similar };
     }

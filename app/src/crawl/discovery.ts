@@ -49,10 +49,10 @@ export async function discoverBlogblog(pool: Pool, userAgent?: string) {
   return { source: 'blogblog-club', results };
 }
 
-export async function discoverSimilar(pool: Pool, domains: string[]) {
+export async function discoverSimilar(pool: Pool, domains: string[], options: Parameters<typeof discoverSimilarSites>[1] = {}) {
   const results = [];
   for (const domain of [...new Set(domains)].slice(0, 10)) {
-    const result = await discoverSimilarSites(domain);
+    const result = await discoverSimilarSites(domain, options);
     let inserted = 0;
     for (const host of result.candidates)
       inserted += await saveCandidate(pool, `https://${host}`, host, 'similarweb-similar-sites', `similarweb://${domain}`, {

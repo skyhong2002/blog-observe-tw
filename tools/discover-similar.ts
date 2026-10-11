@@ -13,6 +13,7 @@ try {
       await discoverSimilar(
         store.pool,
         rows.map((row) => row.domain),
+        config.similarWeb,
       ),
       null,
       2,
