@@ -73,11 +73,21 @@ export function verifiedIdentity(
   now = Date.now(),
 ): GoogleIdentity | null {
   const { iss, aud, azp, exp, sub, email, email_verified: verified, name, picture } = claims;
-  if (!['https://accounts.google.com', 'accounts.google.com'].includes(String(iss))) return null;
+  if (typeof iss !== 'string' || !['https://accounts.google.com', 'accounts.google.com'].includes(iss)) return null;
   if (aud !== config.clientId || (azp !== undefined && azp !== config.clientId)) return null;
-  if (typeof exp !== 'number' || exp * 1000 <= now || claims.nonce !== nonce) return null;
+  const expiry =
+    typeof exp === 'number' && Number.isFinite(exp)
+      ? exp
+      : typeof exp === 'string' && /^\d+(?:\.\d+)?$/.test(exp.trim())
+        ? Number(exp)
+        : Number.NaN;
+  // Google's tokeninfo endpoint serializes numeric claims and email_verified
+  // as strings, while a decoded JWT has number/boolean values. Accept only
+  // those two documented shapes; do not coerce arbitrary truthy values.
+  const emailVerified = verified === true || (typeof verified === 'string' && verified.trim().toLowerCase() === 'true');
+  if (!Number.isFinite(expiry) || expiry * 1000 <= now || claims.nonce !== nonce || !emailVerified) return null;
   if (typeof sub !== 'string' || !sub || sub.length > 255) return null;
-  if (verified !== true || typeof email !== 'string' || !email || email.length > 255) return null;
+  if (typeof email !== 'string' || !email || email.length > 255) return null;
   return {
     sub,
     email: email.toLowerCase(),

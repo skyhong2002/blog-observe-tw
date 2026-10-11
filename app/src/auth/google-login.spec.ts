@@ -33,4 +33,29 @@ describe('blog OAuth contract', () => {
     expect(verifiedIdentity({ ...claims, aud: 'other' }, config!, 'ok')).toBeNull();
     expect(verifiedIdentity(claims, config!, 'ok')?.email).toBe('reader@example.com');
   });
+
+  it('accepts the string claim shapes returned by Google tokeninfo', () => {
+    const config = loginConfig(env)!;
+    const tokeninfoFixture = {
+      iss: 'https://accounts.google.com',
+      aud: 'blog-client',
+      azp: 'blog-client',
+      // tokeninfo returns exp and email_verified as JSON strings.
+      exp: String(Math.floor(Date.now() / 1000) + 60),
+      nonce: 'tokeninfo-nonce',
+      sub: 'google-sub-123',
+      email: 'reader@example.com',
+      email_verified: 'true',
+      name: 'Reader',
+      picture: 'https://lh3.googleusercontent.com/avatar',
+    };
+    expect(verifiedIdentity(tokeninfoFixture, config, 'tokeninfo-nonce')).toMatchObject({
+      sub: 'google-sub-123',
+      email: 'reader@example.com',
+      name: 'Reader',
+    });
+    expect(verifiedIdentity({ ...tokeninfoFixture, exp: 'not-a-number' }, config, 'tokeninfo-nonce')).toBeNull();
+    expect(verifiedIdentity({ ...tokeninfoFixture, email_verified: 'false' }, config, 'tokeninfo-nonce')).toBeNull();
+    expect(verifiedIdentity({ ...tokeninfoFixture, iss: 'https://accounts.google.com.evil.test' }, config, 'tokeninfo-nonce')).toBeNull();
+  });
 });
