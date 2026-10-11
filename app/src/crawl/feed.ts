@@ -519,13 +519,13 @@ export async function crawlBlog(
         }
         await pool.execute(
           `INSERT INTO blog_authors (blog_id,author_id,role,status,is_primary,source_type,source_url,source_evidence,first_seen_at,last_seen_at,created_at,updated_at)
-           VALUES (?,?,?,?,?,?,?,?,?,?,?,?) ON DUPLICATE KEY UPDATE last_seen_at=IF(source_type IN ('manual','community'),last_seen_at,VALUES(last_seen_at)),updated_at=VALUES(updated_at)`,
+           VALUES (?,?,?,?,?,?,?,?,?,?,?,?) ON DUPLICATE KEY UPDATE last_seen_at=IF(blog_authors.source_type IN ('manual','community'),blog_authors.last_seen_at,VALUES(last_seen_at)),updated_at=VALUES(updated_at)`,
           [blog.id, authorId, 'author', 'active', false, 'crawler', source.url, JSON.stringify({ guid: entry.guid }), now, now, now, now],
         );
         await pool.execute(
           `INSERT INTO post_authors (post_id,author_id,position,source_type,source_url,source_evidence,first_seen_at,last_seen_at,created_at,updated_at)
            SELECT id,?,?,?,?,?,?,?,?,? FROM posts WHERE blog_id=? AND guid=?
-           ON DUPLICATE KEY UPDATE last_seen_at=IF(source_type IN ('manual','community'),last_seen_at,VALUES(last_seen_at)),updated_at=VALUES(updated_at)`,
+           ON DUPLICATE KEY UPDATE last_seen_at=IF(post_authors.source_type IN ('manual','community'),post_authors.last_seen_at,VALUES(last_seen_at)),updated_at=VALUES(updated_at)`,
           [
             authorId,
             0,
@@ -552,13 +552,13 @@ export async function crawlBlog(
             .slice(0, 180) || `tag-${shortHash(normalized).slice(0, 12)}`;
         await pool.execute(
           `INSERT INTO tags (slug,label,normalized_label,kind,visibility,status,source_type,source_url,source_evidence,first_seen_at,last_seen_at,created_at,updated_at)
-           VALUES (?,?,?,'topic','public','active','crawler',?,?,?,?,?,?) ON DUPLICATE KEY UPDATE last_seen_at=IF(source_type IN ('manual','community'),last_seen_at,VALUES(last_seen_at)),updated_at=VALUES(updated_at)`,
+           VALUES (?,?,?,'topic','public','active','crawler',?,?,?,?,?,?) ON DUPLICATE KEY UPDATE last_seen_at=IF(tags.source_type IN ('manual','community'),tags.last_seen_at,VALUES(last_seen_at)),updated_at=VALUES(updated_at)`,
           [slug, label, normalized, source.url, JSON.stringify({ guid: entry.guid }), now, now, now, now],
         );
         await pool.execute(
           `INSERT INTO post_tags (post_id,tag_id,source_type,source_url,source_evidence,first_seen_at,last_seen_at,created_at,updated_at)
            SELECT id,(SELECT id FROM tags WHERE slug=?),?,?,?,?,?,?,? FROM posts WHERE blog_id=? AND guid=?
-           ON DUPLICATE KEY UPDATE last_seen_at=IF(source_type IN ('manual','community'),last_seen_at,VALUES(last_seen_at)),updated_at=VALUES(updated_at)`,
+           ON DUPLICATE KEY UPDATE last_seen_at=IF(post_tags.source_type IN ('manual','community'),post_tags.last_seen_at,VALUES(last_seen_at)),updated_at=VALUES(updated_at)`,
           [slug, 'crawler', source.url, JSON.stringify({ guid: entry.guid }), now, now, now, now, blog.id, entry.guid.slice(0, 1024)],
         );
       }
