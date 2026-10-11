@@ -10,6 +10,8 @@
     "dev": "node --watch --env-file-if-exists=.env server.mjs",
     "seed:import": "node tools/import-seeds.mjs",
     "db:migrate": "node tools/migrate.mjs",
+    "feed:once": "node tools/crawl-feeds.mjs",
+    "worker": "node tools/crawl-worker.mjs",
     "test": "node --test"
   },
   "dependencies": {

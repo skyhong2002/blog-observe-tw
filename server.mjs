@@ -93,11 +93,16 @@ function blogIndex(url, user) {
   const cards = filtered.map((blog) => `<article class="card"><div class="meta"><span class="pill">${escapeHtml(blog.category)}</span><span>${escapeHtml(blog.statusLabel)}</span></div><h3><a href="/blogs/${encodeURIComponent(blog.slug)}">${escapeHtml(blog.name)}</a></h3><p>${escapeHtml(blog.description || "尚未提供網站簡介。")}</p><div class="meta"><span>${escapeHtml(blog.url ? blog.url.replace(/^https?:\/\//, "").replace(/\/$/, "") : "網址待核對")}</span></div></article>`).join("");
   return layout("探索部落格", `<section class="section" style="padding-top:56px"><div class="sectionhead"><div><div class="eyebrow">Directory</div><h1 style="margin:10px 0 0;font-size:clamp(2rem,5vw,3.5rem);letter-spacing:-.055em">探索部落格</h1></div><span class="muted">${filtered.length} 個結果</span></div><form class="toolbar" method="get"><input class="search" type="search" name="q" value="${escapeHtml(url.searchParams.get("q") || "")}" placeholder="搜尋網站名稱或主題"><select class="search" name="category" aria-label="分類"><option value="">全部分類</option>${categories.map((item) => `<option value="${escapeHtml(item)}"${item === category ? " selected" : ""}>${escapeHtml(item)}</option>`).join("")}</select><button type="submit">搜尋</button></form><div class="grid">${cards || `<div class="notice">找不到符合條件的網站。</div>`}</div></section>`, user);
 }
-function blogDetail(slug, user) {
+async function blogDetail(slug, user) {
   const blog = blogs.find((item) => item.slug === slug);
   if (!blog) return null;
   const external = blog.url ? `<a class="button external" href="${escapeHtml(blog.url)}" rel="noopener noreferrer">前往原站閱讀 ↗</a>` : `<div class="notice">這個網站已列入 seed，網址仍待核對。</div>`;
-  return layout(blog.name, `<section class="section" style="padding-top:56px"><a class="back" href="/blogs">← 返回部落格目錄</a><article class="detail"><div class="meta"><span class="pill">${escapeHtml(blog.category)}</span><span>${escapeHtml(blog.statusLabel)}</span></div><h1>${escapeHtml(blog.name)}</h1><p>${escapeHtml(blog.description || "目前只有來源名單資料，待完成網址核對與 RSS 偵測。")}</p><dl class="meta"><dt>網站</dt><dd>${blog.url ? `<a href="${escapeHtml(blog.url)}" rel="noopener noreferrer">${escapeHtml(blog.url)}</a>` : "待核對"}</dd><dt>資料來源</dt><dd>${escapeHtml(blog.source.label)} · 第 ${blog.source.row || "?"} 列</dd></dl>${external}</article></section>`, user);
+  let postHtml = "";
+  if (dbStore && blog.id) {
+    const [posts] = await dbStore.pool.execute("SELECT title,url,summary,published_at AS publishedAt,source_type AS sourceType FROM posts WHERE blog_id=? ORDER BY COALESCE(published_at,updated_at,created_at) DESC LIMIT 20", [blog.id]);
+    postHtml = posts.length ? `<section class="section"><div class="sectionhead"><h2>最近收錄文章</h2><span class="muted">${posts.length} 篇</span></div><div class="grid">${posts.map((post) => `<article class="card"><div class="meta"><span class="pill">${escapeHtml(post.sourceType)}</span><span>${post.publishedAt ? escapeHtml(new Date(post.publishedAt).toLocaleDateString("zh-TW")) : "日期待確認"}</span></div><h3><a href="${escapeHtml(post.url)}" rel="noopener noreferrer">${escapeHtml(post.title)}</a></h3><p>${escapeHtml((post.summary || "").replace(/<[^>]+>/g, "").slice(0, 180))}</p></article>`).join("")}</div></section>` : "";
+  }
+  return layout(blog.name, `<section class="section" style="padding-top:56px"><a class="back" href="/blogs">← 返回部落格目錄</a><article class="detail"><div class="meta"><span class="pill">${escapeHtml(blog.category)}</span><span>${escapeHtml(blog.statusLabel)}</span></div><h1>${escapeHtml(blog.name)}</h1><p>${escapeHtml(blog.description || "目前只有來源名單資料，待完成網址核對與 RSS 偵測。")}</p><dl class="meta"><dt>網站</dt><dd>${blog.url ? `<a href="${escapeHtml(blog.url)}" rel="noopener noreferrer">${escapeHtml(blog.url)}</a>` : "待核對"}</dd><dt>資料來源</dt><dd>${escapeHtml(blog.source.label)} · 第 ${blog.source.row || "?"} 列</dd></dl>${external}</article></section>${postHtml}`, user);
 }
 async function exchangeGoogleCode(code, verifier) {
   const response = await fetch("https://oauth2.googleapis.com/token", { method: "POST", headers: { "content-type": "application/x-www-form-urlencoded" }, body: new URLSearchParams({ code, code_verifier: verifier, client_id: GOOGLE_CLIENT_ID, client_secret: GOOGLE_CLIENT_SECRET, redirect_uri: GOOGLE_CALLBACK, grant_type: "authorization_code" }), signal: AbortSignal.timeout(15000) });
@@ -155,7 +160,7 @@ const server = http.createServer(async (request, res) => {
     if (request.method === "GET" && url.pathname === "/api/blogs") return send(res, 200, "application/json; charset=utf-8", { blogs });
     if (request.method === "GET" && url.pathname === "/") return send(res, 200, "text/html; charset=utf-8", home(user));
     if (request.method === "GET" && url.pathname === "/blogs") return send(res, 200, "text/html; charset=utf-8", blogIndex(url, user));
-    if (request.method === "GET" && url.pathname.startsWith("/blogs/")) { const page = blogDetail(decodeURIComponent(url.pathname.slice("/blogs/".length)), user); return page ? send(res, 200, "text/html; charset=utf-8", page) : send(res, 404, "text/plain; charset=utf-8", "Not Found\n"); }
+    if (request.method === "GET" && url.pathname.startsWith("/blogs/")) { const page = await blogDetail(decodeURIComponent(url.pathname.slice("/blogs/".length)), user); return page ? send(res, 200, "text/html; charset=utf-8", page) : send(res, 404, "text/plain; charset=utf-8", "Not Found\n"); }
     return send(res, 404, "text/plain; charset=utf-8", "Not Found\n");
   } catch (error) {
     console.error("request failed:", error);

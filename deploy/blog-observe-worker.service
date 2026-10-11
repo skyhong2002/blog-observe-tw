@@ -1,0 +1,18 @@
+[Unit]
+Description=blog.observe.tw feed crawler worker
+After=network-online.target blog-observe.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/home/deck/.t3/projects/blog-observe-tw
+ExecStart=/home/deck/.local/bin/node /home/deck/.t3/projects/blog-observe-tw/tools/crawl-worker.mjs
+EnvironmentFile=-/home/deck/.config/blog-observe.env
+Environment=NODE_ENV=production
+Restart=always
+RestartSec=10
+PrivateTmp=yes
+NoNewPrivileges=yes
+
+[Install]
+WantedBy=default.target
