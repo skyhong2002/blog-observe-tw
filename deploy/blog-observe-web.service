@@ -4,13 +4,10 @@ After=network-online.target
 
 [Service]
 Type=simple
-WorkingDirectory=%h/.t3/projects/blog-observe-tw/web
-EnvironmentFile=-%h/.config/blog-observe.env
+WorkingDirectory=%h/.t3/projects/blog-observe-tw/web/.next/standalone/web
+EnvironmentFile=-%h/.config/blog-observe-web.env
 Environment=NODE_ENV=production
-Environment=PORT=18162
-Environment=HOSTNAME=127.0.0.1
-Environment=BLOG_GATEWAY_INTERNAL_URL=http://127.0.0.1:18160
-ExecStart=%h/.local/bin/npm run start -- --hostname 127.0.0.1 --port 18162
+ExecStart=%h/.local/bin/node server.js --hostname 127.0.0.1 --port 18162
 Restart=always
 RestartSec=5
 NoNewPrivileges=true
