@@ -1,18 +1,18 @@
 [Unit]
-Description=blog.observe.tw feed crawler worker
-After=network-online.target blog-observe.service
-Wants=network-online.target
+Description=blog.observe.tw BullMQ worker
+After=network-online.target
 
 [Service]
 Type=simple
-WorkingDirectory=/home/deck/.t3/projects/blog-observe-tw
-ExecStart=/home/deck/.local/bin/node /home/deck/.t3/projects/blog-observe-tw/tools/crawl-worker.mjs
-EnvironmentFile=-/home/deck/.config/blog-observe.env
+WorkingDirectory=%h/.t3/projects/blog-observe-tw
+EnvironmentFile=-%h/.config/blog-observe.env
 Environment=NODE_ENV=production
+Environment=BLOG_QUEUE_NAME=blog-observe-crawl
+Environment=BLOG_QUEUE_PREFIX=blog-observe
+ExecStart=%h/.local/bin/node app/src/worker.ts
 Restart=always
 RestartSec=10
-PrivateTmp=yes
-NoNewPrivileges=yes
+NoNewPrivileges=true
 
 [Install]
 WantedBy=default.target

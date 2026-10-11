@@ -1,20 +1,19 @@
 [Unit]
-Description=blog.observe.tw web service
+Description=blog.observe.tw Fastify gateway
 After=network-online.target
-Wants=network-online.target
 
 [Service]
 Type=simple
-WorkingDirectory=/home/deck/.t3/projects/blog-observe-tw
-ExecStart=/home/deck/.local/bin/node /home/deck/.t3/projects/blog-observe-tw/server.mjs
-EnvironmentFile=-/home/deck/.config/blog-observe.env
+WorkingDirectory=%h/.t3/projects/blog-observe-tw
+EnvironmentFile=-%h/.config/blog-observe.env
 Environment=NODE_ENV=production
 Environment=PORT=18160
 Environment=HOSTNAME=127.0.0.1
+Environment=BLOG_UI_ORIGIN=http://127.0.0.1:18162
+ExecStart=%h/.local/bin/node app/src/server.js
 Restart=always
-RestartSec=3
-PrivateTmp=yes
-NoNewPrivileges=yes
+RestartSec=5
+NoNewPrivileges=true
 
 [Install]
 WantedBy=default.target

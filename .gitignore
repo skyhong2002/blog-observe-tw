@@ -2,3 +2,9 @@
 .env.*
 !.env.example
 node_modules/
+
+tools/opus-review.py
+
+web/.next/
+web/out/
+web/.env

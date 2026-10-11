@@ -1,27 +1,47 @@
 {
   "name": "blog-observe-tw",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
-  "type": "module",
   "license": "MIT",
-  "engines": {"node": ">=24 <25"},
+  "type": "module",
+  "engines": {
+    "node": ">=24 <25"
+  },
   "scripts": {
-    "start": "node --env-file-if-exists=.env server.mjs",
-    "dev": "node --watch --env-file-if-exists=.env server.mjs",
+    "start": "node --env-file-if-exists=.env app/src/server.js",
+    "dev": "node --watch --env-file-if-exists=.env app/src/server.js",
+    "worker": "node --env-file-if-exists=.env app/src/worker.ts",
+    "test": "npx vitest run",
+    "typecheck": "npx tsc -p tsconfig.json && npx tsc -p web/tsconfig.json",
+    "lint": "npx biome check .",
+    "db:generate": "npx drizzle-kit generate",
+    "db:migrate": "node tools/migrate-drizzle.mjs",
+    "crawl:once": "node --env-file-if-exists=.env tools/crawl-once.ts",
     "seed:import": "node tools/import-seeds.mjs",
-    "db:migrate": "node tools/migrate.mjs",
     "feed:once": "node tools/crawl-feeds.mjs",
-    "worker": "node tools/crawl-worker.mjs",
-    "test": "node --test"
+    "discover:blogblog": "node tools/discover-blogblog.mjs",
+    "discover:similar": "node tools/discover-similar.mjs",
+    "web:build": "npm --prefix web run build",
+    "web:start": "npm --prefix web run start"
   },
   "dependencies": {
     "@fastify/rate-limit": "^11.2.0",
-    "bullmq": "^5.63.0",
-    "cheerio": "^1.1.2",
+    "@fastify/reply-from": "^12.6.5",
+    "bullmq": "^6.3.9",
+    "cheerio": "^1.2.0",
     "drizzle-orm": "^0.45.3",
-    "fast-xml-parser": "^5.3.0",
-    "fastify": "^5.6.1",
-    "ioredis": "^5.7.0",
-    "mysql2": "^3.15.3"
+    "fast-xml-parser": "^5.11.1",
+    "fastify": "^5.12.5",
+    "ioredis": "^6.0.0",
+    "mysql2": "^3.24.4",
+    "pino": "^10.3.1",
+    "undici": "^8.11.2"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.5.14",
+    "@types/node": "^26.6.3",
+    "drizzle-kit": "^0.31.11",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.2"
   }
 }

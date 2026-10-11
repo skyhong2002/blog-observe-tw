@@ -1,0 +1,8 @@
+-- Blog Observe baseline (legacy schema 001_init.sql).
+--
+-- This file intentionally contains no CREATE/ALTER statements.  The
+-- production database was provisioned by db/001_init.sql before Drizzle was
+-- introduced.  It is retained as a migration history marker only; do not run
+-- this baseline against a fresh database and do not use it to change the
+-- existing blog_observe schema.  Future changes must be additive migrations
+-- reviewed against the live schema first.

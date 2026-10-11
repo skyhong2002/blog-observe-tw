@@ -1,6 +1,6 @@
 # 從新文易數建立部落格觀察
 
-查核日期：2026-10-12（Asia/Taipei）。這份文件是依正式網站、正式 release 原始碼、會議記錄及使用者提供的種子 CSV 做的移植評估；下列新站設計是建議，尚未實作。
+查核日期：2026-10-12（Asia/Taipei）。這份文件是依正式網站、正式 release 原始碼、會議記錄及使用者提供的種子 CSV 做的移植評估；目前實作已依固定 commit 建立同套技術骨架，後續功能仍按下列階段逐步移植。
 
 ## 結論
 
@@ -161,4 +161,4 @@
 
 ## 本次執行範圍
 
-評估階段已完成正式站瀏覽、部署版本辨識、程式與資料模型查核及移植方案。第一版已另建零依賴 Node 服務，使用獨立的 `blog-observe.service`、18160 埠與私有 OAuth 環境檔；目前只放入四個已核對 seed 網站，未宣稱 136 筆種子已全部匯入，也未修改 tag.observe.tw 或 youtube.observe.tw。RSS 抓取、來源探索、持久化資料庫與訂閱功能仍待後續實作。
+評估階段已完成正式站瀏覽、部署版本辨識、程式與資料模型查核及移植方案。現在的 blog-observe 使用與新文易數相同的 Node 24/TypeScript/Fastify/Drizzle/BullMQ/Next 骨架、獨立的 gateway/web/worker services、18160 埠、`blog_observe` DB、17379 Redis 與私有 OAuth 環境檔；136 列種子已保留來源欄位，四個已核對網站已接通 RSS/Atom/sitemap 抓取，追蹤/RSS/OPML 與 guarded discovery 已完成最小可用版。尚待完成作者與標籤模型、搬家合併、低頻歷史索引、推薦 UI，以及 Similarweb 與 tag 的正式共用速率協調；未修改 tag.observe.tw 或 youtube.observe.tw。
