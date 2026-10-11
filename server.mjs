@@ -4,6 +4,7 @@ import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 import { createDb } from "./src/db.mjs";
+import * as cheerio from "cheerio";
 
 const HOST = process.env.HOSTNAME || "127.0.0.1";
 const PORT = Number(process.env.PORT || 18160);
@@ -73,7 +74,7 @@ function redirect(res, location, status = 302, extra = {}) {
 }
 function layout(title, content, user = null) {
   const auth = user
-    ? `<span class="user">${escapeHtml(user.name || user.email)}</span><form method="post" action="/auth/logout"><button class="ghost">登出</button></form>`
+    ? `<a class="muted" href="/me/feed.xml">我的 RSS</a><a class="muted" href="/me/opml">OPML</a><span class="user">${escapeHtml(user.name || user.email)}</span><form method="post" action="/auth/logout"><button class="ghost">登出</button></form>`
     : `<a class="button small" href="/auth/google?next=%2Fblogs">使用 Google 登入</a>`;
   return `<!doctype html><html lang="zh-Hant"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>${escapeHtml(title)} · blog.observe.tw</title><meta name="description" content="部落格觀察與閱讀入口">
@@ -98,11 +99,27 @@ async function blogDetail(slug, user) {
   if (!blog) return null;
   const external = blog.url ? `<a class="button external" href="${escapeHtml(blog.url)}" rel="noopener noreferrer">前往原站閱讀 ↗</a>` : `<div class="notice">這個網站已列入 seed，網址仍待核對。</div>`;
   let postHtml = "";
+  let followHtml = "";
+  if (user && dbStore && blog.id) {
+    const [followRows] = await dbStore.pool.execute("SELECT 1 FROM user_follows WHERE user_id=? AND blog_id=?", [user.id, blog.id]);
+    followHtml = followRows.length ? `<form method="post" action="/api/blogs/${encodeURIComponent(blog.slug)}/follow"><button class="button" type="submit">已追蹤 · 取消追蹤</button></form>` : `<form method="post" action="/api/blogs/${encodeURIComponent(blog.slug)}/follow"><button class="button" type="submit">追蹤這個部落格</button></form>`;
+  }
   if (dbStore && blog.id) {
     const [posts] = await dbStore.pool.execute("SELECT title,url,summary,published_at AS publishedAt,source_type AS sourceType FROM posts WHERE blog_id=? ORDER BY COALESCE(published_at,updated_at,created_at) DESC LIMIT 20", [blog.id]);
     postHtml = posts.length ? `<section class="section"><div class="sectionhead"><h2>最近收錄文章</h2><span class="muted">${posts.length} 篇</span></div><div class="grid">${posts.map((post) => `<article class="card"><div class="meta"><span class="pill">${escapeHtml(post.sourceType)}</span><span>${post.publishedAt ? escapeHtml(new Date(post.publishedAt).toLocaleDateString("zh-TW")) : "日期待確認"}</span></div><h3><a href="${escapeHtml(post.url)}" rel="noopener noreferrer">${escapeHtml(post.title)}</a></h3><p>${escapeHtml((post.summary || "").replace(/<[^>]+>/g, "").slice(0, 180))}</p></article>`).join("")}</div></section>` : "";
   }
-  return layout(blog.name, `<section class="section" style="padding-top:56px"><a class="back" href="/blogs">← 返回部落格目錄</a><article class="detail"><div class="meta"><span class="pill">${escapeHtml(blog.category)}</span><span>${escapeHtml(blog.statusLabel)}</span></div><h1>${escapeHtml(blog.name)}</h1><p>${escapeHtml(blog.description || "目前只有來源名單資料，待完成網址核對與 RSS 偵測。")}</p><dl class="meta"><dt>網站</dt><dd>${blog.url ? `<a href="${escapeHtml(blog.url)}" rel="noopener noreferrer">${escapeHtml(blog.url)}</a>` : "待核對"}</dd><dt>資料來源</dt><dd>${escapeHtml(blog.source.label)} · 第 ${blog.source.row || "?"} 列</dd></dl>${external}</article></section>${postHtml}`, user);
+  return layout(blog.name, `<section class="section" style="padding-top:56px"><a class="back" href="/blogs">← 返回部落格目錄</a><article class="detail"><div class="meta"><span class="pill">${escapeHtml(blog.category)}</span><span>${escapeHtml(blog.statusLabel)}</span></div><h1>${escapeHtml(blog.name)}</h1><p>${escapeHtml(blog.description || "目前只有來源名單資料，待完成網址核對與 RSS 偵測。")}</p><dl class="meta"><dt>網站</dt><dd>${blog.url ? `<a href="${escapeHtml(blog.url)}" rel="noopener noreferrer">${escapeHtml(blog.url)}</a>` : "待核對"}</dd><dt>資料來源</dt><dd>${escapeHtml(blog.source.label)} · 第 ${blog.source.row || "?"} 列</dd></dl><div class="toolbar">${external}${followHtml}</div></article></section>${postHtml}`, user);
+}
+
+function xmlEscape(value) { return String(value || "").replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&apos;"); }
+function xmlFeed(posts, title, link) {
+  const items = posts.map((post) => `<item><title>${xmlEscape(post.title)}</title><link>${xmlEscape(post.url)}</link><guid isPermaLink="false">${xmlEscape(post.guid || post.url)}</guid><description>${xmlEscape((post.summary || "").replace(/<[^>]+>/g, "").slice(0, 1000))}</description>${post.publishedAt ? `<pubDate>${new Date(post.publishedAt).toUTCString()}</pubDate>` : ""}</item>`).join("");
+  return `<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"><channel><title>${xmlEscape(title)}</title><link>${xmlEscape(link)}</link><description>blog.observe.tw 個人閱讀清單</description>${items}</channel></rss>`;
+}
+async function readBody(request, limit = 1_000_000) {
+  const chunks = []; let length = 0;
+  for await (const chunk of request) { length += chunk.length; if (length > limit) throw new Error("request body too large"); chunks.push(chunk); }
+  return Buffer.concat(chunks).toString("utf8");
 }
 async function exchangeGoogleCode(code, verifier) {
   const response = await fetch("https://oauth2.googleapis.com/token", { method: "POST", headers: { "content-type": "application/x-www-form-urlencoded" }, body: new URLSearchParams({ code, code_verifier: verifier, client_id: GOOGLE_CLIENT_ID, client_secret: GOOGLE_CLIENT_SECRET, redirect_uri: GOOGLE_CALLBACK, grant_type: "authorization_code" }), signal: AbortSignal.timeout(15000) });
@@ -155,6 +172,49 @@ const server = http.createServer(async (request, res) => {
     if (request.method === "GET" && url.pathname === "/auth/google") return oauthStart(res, url);
     if (request.method === "GET" && url.pathname === "/auth/google/callback") return handleOAuthCallback(request, res, url);
     if (request.method === "POST" && url.pathname === "/auth/logout") { const session = readCookie(request, SESSION_COOKIE); if (session && dbStore) await dbStore.pool.execute("DELETE FROM user_sessions WHERE token_hash=?", [hash(session)]); return redirect(res, "/", 303, { "Set-Cookie": cookie(SESSION_COOKIE, "", 0) }); }
+    if (url.pathname.startsWith("/api/blogs/") && url.pathname.endsWith("/follow") && ["POST", "DELETE"].includes(request.method)) {
+      if (!user) return send(res, 401, "application/json; charset=utf-8", { error: "sign in first" });
+      if (request.headers.origin && request.headers.origin !== PUBLIC_ORIGIN) return send(res, 403, "application/json; charset=utf-8", { error: "same-origin requests only" });
+      const slug = decodeURIComponent(url.pathname.slice("/api/blogs/".length, -"/follow".length));
+      const blog = blogs.find((item) => item.slug === slug);
+      if (!blog?.id || !dbStore) return send(res, 404, "application/json; charset=utf-8", { error: "blog not found" });
+      if (request.method === "POST") await dbStore.pool.execute("INSERT IGNORE INTO user_follows (user_id,blog_id,created_at) VALUES (?,?,?)", [user.id, blog.id, new Date()]);
+      else await dbStore.pool.execute("DELETE FROM user_follows WHERE user_id=? AND blog_id=?", [user.id, blog.id]);
+      if (request.headers.accept?.includes("text/html")) return redirect(res, "/blogs/" + encodeURIComponent(slug), 303);
+      return send(res, 200, "application/json; charset=utf-8", { following: request.method === "POST", slug });
+    }
+    if (request.method === "GET" && url.pathname === "/api/me/follows") {
+      if (!user || !dbStore) return send(res, 401, "application/json; charset=utf-8", { error: "sign in first" });
+      const [follows] = await dbStore.pool.execute("SELECT b.slug,b.name,b.url,b.category FROM user_follows f JOIN blogs b ON b.id=f.blog_id WHERE f.user_id=? ORDER BY b.name", [user.id]);
+      return send(res, 200, "application/json; charset=utf-8", { follows });
+    }
+    if (request.method === "GET" && url.pathname === "/me/feed.xml") {
+      if (!user || !dbStore) return send(res, 401, "text/plain; charset=utf-8", "Sign in first\n");
+      const [items] = await dbStore.pool.execute("SELECT p.guid,p.title,p.url,p.summary,p.published_at AS publishedAt FROM posts p JOIN user_follows f ON f.blog_id=p.blog_id WHERE f.user_id=? ORDER BY COALESCE(p.published_at,p.updated_at,p.created_at) DESC LIMIT 100", [user.id]);
+      return send(res, 200, "application/rss+xml; charset=utf-8", xmlFeed(items, "我的 blog.observe.tw 閱讀清單", PUBLIC_ORIGIN + "/me/feed.xml"), { "Content-Disposition": "inline; filename=blog-observe-feed.xml" });
+    }
+    if (request.method === "GET" && url.pathname === "/me/opml") {
+      if (!user || !dbStore) return send(res, 401, "text/plain; charset=utf-8", "Sign in first\n");
+      const [follows] = await dbStore.pool.execute("SELECT b.name,b.url FROM user_follows f JOIN blogs b ON b.id=f.blog_id WHERE f.user_id=? ORDER BY b.name", [user.id]);
+      const outlines = follows.filter((item) => item.url).map((item) => `<outline type="rss" text="${xmlEscape(item.name)}" title="${xmlEscape(item.name)}" htmlUrl="${xmlEscape(item.url)}" xmlUrl="${xmlEscape(item.url)}"/>`).join("");
+      const body = `<?xml version="1.0" encoding="UTF-8"?><opml version="2.0"><head><title>blog.observe.tw subscriptions</title></head><body>${outlines}</body></opml>`;
+      return send(res, 200, "text/x-opml; charset=utf-8", body, { "Content-Disposition": "attachment; filename=blog-observe.opml" });
+    }
+    if (request.method === "POST" && url.pathname === "/api/me/opml") {
+      if (!user || !dbStore) return send(res, 401, "application/json; charset=utf-8", { error: "sign in first" });
+      if (request.headers.origin && request.headers.origin !== PUBLIC_ORIGIN) return send(res, 403, "application/json; charset=utf-8", { error: "same-origin requests only" });
+      const body = await readBody(request);
+      const $ = cheerio.load(body, { xmlMode: true });
+      let followed = 0, candidates = 0;
+      for (const element of $("outline").toArray()) {
+        const xmlUrl = $(element).attr("xmlUrl") || $(element).attr("htmlUrl");
+        if (!xmlUrl) continue;
+        const [known] = await dbStore.pool.execute("SELECT blog_id FROM blog_urls WHERE url=?", [xmlUrl]);
+        if (known.length) { await dbStore.pool.execute("INSERT IGNORE INTO user_follows (user_id,blog_id,created_at) VALUES (?,?,?)", [user.id, known[0].blog_id, new Date()]); followed += 1; }
+        else { await dbStore.pool.execute("INSERT IGNORE INTO discovery_candidates (url,name,source_type,source_url,source_evidence,discovered_at) VALUES (?,?,?,?,?,?)", [xmlUrl, $(element).attr("text") || $(element).attr("title") || null, "opml-import", "/api/me/opml", JSON.stringify({ userId: user.id }), new Date()]); candidates += 1; }
+      }
+      return send(res, 200, "application/json; charset=utf-8", { followed, candidates });
+    }
     if (request.method === "GET" && url.pathname === "/login") return send(res, 200, "text/html; charset=utf-8", layout("登入", `<section class="section" style="padding-top:72px"><div class="detail"><div class="eyebrow">Google sign-in</div><h1>登入 blog.observe.tw</h1><p>登入後可以在後續版本保存追蹤中的部落格與閱讀清單。</p>${url.searchParams.get("error") ? `<div class="notice">登入未完成（${escapeHtml(url.searchParams.get("error"))}），請重新嘗試。</div>` : ""}<a class="button external" href="/auth/google?next=%2Fblogs">使用 Google 登入</a></div></section>`, user));
     if (request.method === "GET" && url.pathname === "/about") return send(res, 200, "text/html; charset=utf-8", layout("關於", `<section class="section" style="padding-top:56px"><article class="detail"><div class="eyebrow">About</div><h1>透明地觀察部落格。</h1><p>本站第一版先提供可追溯的網站目錄與原站入口。收錄狀態、分類與來源列號會保留在資料中，後續再加入 RSS 抓取、文章索引與訂閱。</p></article></section>`, user));
     if (request.method === "GET" && url.pathname === "/api/blogs") return send(res, 200, "application/json; charset=utf-8", { blogs });
