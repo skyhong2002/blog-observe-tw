@@ -1,14 +1,14 @@
 import { createHash } from 'node:crypto';
 import * as cheerio from 'cheerio';
 import type { Pool } from 'mysql2/promise';
-import { politeFetch } from './feed.ts';
+import { isAllowedCrawlUrl, politeFetch } from './feed.ts';
 import { discoverSimilarSites } from './similarweb.ts';
 
 const BLOGROLL_PAGES = ['https://blogblog.club/blogrollroll', 'https://blogblog.club/party', 'https://blogblog.club/random'];
 const normalize = (value: string, base: string) => {
   try {
     const url = new URL(value, base);
-    if (!['http:', 'https:'].includes(url.protocol)) return null;
+    if (!isAllowedCrawlUrl(url.toString())) return null;
     url.hash = '';
     return url.toString().replace(/\/$/, '');
   } catch {
