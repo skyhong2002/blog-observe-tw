@@ -16,6 +16,7 @@ export type FeedEntry = {
   publishedAt: Date | null;
   updatedAt: Date | null;
   imageUrl: string | null;
+  categories: string[];
 };
 export type BlogToCrawl = { id: number; slug: string; url: string };
 export type HostResolver = (hostname: string) => Promise<string[]>;
@@ -27,6 +28,7 @@ export type FeedCrawlerOptions = {
   /** Test seam; production always uses the system resolver and fetch. */
   resolveHost?: HostResolver;
   fetcher?: FeedFetcher;
+  historyImport?: boolean;
 };
 
 const DEFAULT_USER_AGENT = 'blog.observe.tw/1.0 (+https://blog.observe.tw/about; mailto:b@blog.observe.tw)';
@@ -164,7 +166,10 @@ export async function validateCrawlUrl(value: string, resolveHost: HostResolver 
 
 async function limitedResponse(response: Response): Promise<Response> {
   const declared = Number(response.headers.get('content-length'));
-  if (Number.isFinite(declared) && declared > MAX_RESPONSE_BYTES) throw new Error(`crawl response exceeds ${MAX_RESPONSE_BYTES} bytes`);
+  if (Number.isFinite(declared) && declared > MAX_RESPONSE_BYTES) {
+    await response.body?.cancel().catch(() => undefined);
+    throw new Error(`crawl response exceeds ${MAX_RESPONSE_BYTES} bytes`);
+  }
   if (!response.body) return response;
   const reader = response.body.getReader();
   const chunks: Uint8Array[] = [];
@@ -342,6 +347,7 @@ export function parseFeed(xml: string, baseUrl: string): FeedEntry[] {
               (object.image as Record<string, unknown> | undefined)?.url,
             baseUrl,
           ),
+          categories: asArray(object.category).map(textOf).filter(Boolean).slice(0, 20),
         };
       })
       .filter((item): item is FeedEntry => Boolean(item));
@@ -364,6 +370,7 @@ export function parseFeed(xml: string, baseUrl: string): FeedEntry[] {
           publishedAt: dateOf(object.published || object.updated),
           updatedAt: dateOf(object.updated || object.published),
           imageUrl: null,
+          categories: asArray(object.category).map(textOf).filter(Boolean).slice(0, 20),
         };
       })
       .filter((item): item is FeedEntry => Boolean(item));
@@ -389,9 +396,12 @@ export function parseSitemap(xml: string, baseUrl: string): FeedEntry[] {
             title: url.split('/').filter(Boolean).at(-1) || url,
             summary: '',
             author: null,
-            publishedAt: dateOf(object.lastmod),
+            // Sitemap lastmod is a modification hint, not proof of original
+            // publication. Keep it out of lastPublishedAt calculations.
+            publishedAt: null,
             updatedAt: dateOf(object.lastmod),
             imageUrl: null,
+            categories: [],
           }
         : null;
     })
@@ -439,7 +449,14 @@ export async function crawlBlog(
       );
       continue;
     }
-    if (response.status === 304) continue;
+    if (response.status === 304) {
+      await pool.execute('UPDATE feed_sources SET last_success_at=?,last_error_at=NULL,consecutive_failures=0 WHERE url=?', [
+        now,
+        source.url,
+      ]);
+      sourceCount += 1;
+      continue;
+    }
     if (!response.ok) {
       await pool.execute(
         'INSERT INTO feed_sources (blog_id,url,type,last_error_at,consecutive_failures) VALUES (?,?,?,?,1) ON DUPLICATE KEY UPDATE last_error_at=VALUES(last_error_at),consecutive_failures=consecutive_failures+1',
@@ -475,12 +492,84 @@ export async function crawlBlog(
           now,
         ],
       );
+      // A pen name is resolved within this blog only. Matching names on two
+      // sites therefore create two author identities until a human explicitly
+      // merges them. Crawler updates never replace manual/community links.
+      if (entry.author?.trim()) {
+        const displayName = entry.author.trim().slice(0, 255);
+        const normalized = displayName.normalize('NFKC').toLocaleLowerCase('zh-TW').replace(/\s+/g, ' ').trim();
+        const [existing] = await pool.execute(
+          `SELECT a.id FROM authors a JOIN blog_authors ba ON ba.author_id=a.id
+           WHERE ba.blog_id=? AND a.normalized_name=? LIMIT 1`,
+          [blog.id, normalized],
+        );
+        let authorId = Array.isArray(existing) && existing[0] ? (existing[0] as { id: number }).id : null;
+        if (!authorId) {
+          const [result] = await pool.execute(
+            `INSERT INTO authors (display_name,normalized_name,source_type,source_url,source_evidence,first_seen_at,last_seen_at,created_at,updated_at)
+             VALUES (?,?,?,?,?,?,?,?,?)`,
+            [displayName, normalized, 'crawler', source.url, JSON.stringify({ guid: entry.guid }), now, now, now, now],
+          );
+          authorId = (result as { insertId: number }).insertId;
+        } else {
+          await pool.execute(
+            "UPDATE authors SET last_seen_at=?,last_published_at=COALESCE(?,last_published_at),updated_at=? WHERE id=? AND source_type NOT IN ('manual','community')",
+            [now, entry.publishedAt, now, authorId],
+          );
+        }
+        await pool.execute(
+          `INSERT INTO blog_authors (blog_id,author_id,role,status,is_primary,source_type,source_url,source_evidence,first_seen_at,last_seen_at,created_at,updated_at)
+           VALUES (?,?,?,?,?,?,?,?,?,?,?,?) ON DUPLICATE KEY UPDATE last_seen_at=IF(source_type IN ('manual','community'),last_seen_at,VALUES(last_seen_at)),updated_at=VALUES(updated_at)`,
+          [blog.id, authorId, 'author', 'active', false, 'crawler', source.url, JSON.stringify({ guid: entry.guid }), now, now, now, now],
+        );
+        await pool.execute(
+          `INSERT INTO post_authors (post_id,author_id,position,source_type,source_url,source_evidence,first_seen_at,last_seen_at,created_at,updated_at)
+           SELECT id,?,?,?,?,?,?,?,?,? FROM posts WHERE blog_id=? AND guid=?
+           ON DUPLICATE KEY UPDATE last_seen_at=IF(source_type IN ('manual','community'),last_seen_at,VALUES(last_seen_at)),updated_at=VALUES(updated_at)`,
+          [
+            authorId,
+            0,
+            'crawler',
+            source.url,
+            JSON.stringify({ guid: entry.guid }),
+            now,
+            now,
+            now,
+            now,
+            blog.id,
+            entry.guid.slice(0, 1024),
+          ],
+        );
+      }
+      for (const rawTag of entry.categories) {
+        const label = rawTag.trim().slice(0, 255);
+        if (!label) continue;
+        const normalized = label.normalize('NFKC').toLocaleLowerCase('zh-TW').replace(/\s+/g, ' ').trim();
+        const slug =
+          normalized
+            .replace(/[^\p{Letter}\p{Number}]+/gu, '-')
+            .replace(/^-|-$/g, '')
+            .slice(0, 180) || `tag-${shortHash(normalized).slice(0, 12)}`;
+        await pool.execute(
+          `INSERT INTO tags (slug,label,normalized_label,kind,visibility,status,source_type,source_url,source_evidence,first_seen_at,last_seen_at,created_at,updated_at)
+           VALUES (?,?,?,'topic','public','active','crawler',?,?,?,?,?,?) ON DUPLICATE KEY UPDATE last_seen_at=IF(source_type IN ('manual','community'),last_seen_at,VALUES(last_seen_at)),updated_at=VALUES(updated_at)`,
+          [slug, label, normalized, source.url, JSON.stringify({ guid: entry.guid }), now, now, now, now],
+        );
+        await pool.execute(
+          `INSERT INTO post_tags (post_id,tag_id,source_type,source_url,source_evidence,first_seen_at,last_seen_at,created_at,updated_at)
+           SELECT id,(SELECT id FROM tags WHERE slug=?),?,?,?,?,?,?,? FROM posts WHERE blog_id=? AND guid=?
+           ON DUPLICATE KEY UPDATE last_seen_at=IF(source_type IN ('manual','community'),last_seen_at,VALUES(last_seen_at)),updated_at=VALUES(updated_at)`,
+          [slug, 'crawler', source.url, JSON.stringify({ guid: entry.guid }), now, now, now, now, blog.id, entry.guid.slice(0, 1024)],
+        );
+      }
       total += 1;
     }
   }
   await pool.execute(
-    'UPDATE blogs SET last_crawled_at=?,last_published_at=COALESCE((SELECT MAX(published_at) FROM posts WHERE blog_id=?),last_published_at) WHERE id=?',
-    [now, blog.id, blog.id],
+    `UPDATE blogs SET last_crawled_at=?,last_crawl_success_at=IF(?, ?, last_crawl_success_at),
+     last_published_at=COALESCE((SELECT MAX(published_at) FROM posts WHERE blog_id=?),last_published_at),
+     history_imported_at=IF(?, COALESCE(history_imported_at, ?), history_imported_at) WHERE id=?`,
+    [now, sourceCount > 0, now, blog.id, Boolean(options.historyImport), now, blog.id],
   );
   return { blog: blog.slug, sources: sourceCount, posts: total };
 }

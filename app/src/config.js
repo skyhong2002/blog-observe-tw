@@ -32,6 +32,12 @@ export function loadConfig(env = process.env) {
       budgetPath: env.BLOG_SIMILARWEB_BUDGET_PATH || '/home/deck/.local/share/observe-similarweb-rate-budget.json',
       maxPerDay: Math.max(1, Math.min(20, Number(env.BLOG_SIMILARWEB_MAX_PER_DAY || 10))),
     },
+    adminEmails: new Set(
+      (env.BLOG_ADMIN_EMAILS || '')
+        .split(',')
+        .map((email) => email.trim().toLowerCase())
+        .filter(Boolean),
+    ),
     login: loginConfig(env),
   };
 }

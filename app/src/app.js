@@ -23,7 +23,13 @@ export async function buildApp(config, { logger = false, store = null } = {}) {
     global: true,
     timeWindow: '1 minute',
     max: 240,
-    allowList: (request) => !request.headers['cf-connecting-ip'],
+    // Cloudflare terminates the public tunnel. Use its client address when
+    // present, otherwise Fastify's peer address; never bypass the limiter
+    // merely because a header is absent.
+    keyGenerator: (request) => {
+      const forwarded = request.headers['cf-connecting-ip'];
+      return typeof forwarded === 'string' && forwarded.length <= 64 ? forwarded : request.ip;
+    },
   });
   for (const type of ['application/xml', 'text/xml', 'application/x-opml']) {
     app.addContentTypeParser(type, { parseAs: 'string', bodyLimit: 1024 * 1024 }, (_request, body, done) => done(null, body));
@@ -49,14 +55,14 @@ export async function buildApp(config, { logger = false, store = null } = {}) {
   app.get('/api/blogs', async (request) => {
     const limit = Math.min(200, Math.max(1, Number(request.query?.limit || 200)));
     const [rows] = await pool.query(
-      'SELECT id,slug,name,url,canonical_host AS canonicalHost,category,status,status_label AS statusLabel,description,last_crawled_at AS lastCrawledAt,last_published_at AS lastPublishedAt FROM blogs ORDER BY name LIMIT ?',
+      'SELECT id,slug,name,url,canonical_host AS canonicalHost,category,status,status_label AS statusLabel,description,last_crawled_at AS lastCrawledAt,last_crawl_success_at AS lastCrawlSuccessAt,last_published_at AS lastPublishedAt,expected_interval_hours AS expectedIntervalHours,stale_policy AS stalePolicy FROM blogs ORDER BY name LIMIT ?',
       [limit],
     );
     return { blogs: rows };
   });
   app.get('/api/blogs/:slug', async (request, reply) => {
     const [blogs] = await pool.query(
-      'SELECT id,slug,name,url,canonical_host AS canonicalHost,category,status,status_label AS statusLabel,description,source_name AS sourceName,source_row AS sourceRow,last_crawled_at AS lastCrawledAt,last_published_at AS lastPublishedAt FROM blogs WHERE slug=? LIMIT 1',
+      'SELECT id,slug,name,url,canonical_host AS canonicalHost,category,status,status_label AS statusLabel,description,source_name AS sourceName,source_row AS sourceRow,last_crawled_at AS lastCrawledAt,last_crawl_success_at AS lastCrawlSuccessAt,last_published_at AS lastPublishedAt,expected_interval_hours AS expectedIntervalHours,stale_policy AS stalePolicy,history_imported_at AS historyImportedAt FROM blogs WHERE slug=? LIMIT 1',
       [request.params.slug],
     );
     if (!blogs.length) return reply.code(404).send({ error: 'blog not found' });
@@ -64,7 +70,17 @@ export async function buildApp(config, { logger = false, store = null } = {}) {
       'SELECT guid,title,url,summary,author,published_at AS publishedAt,updated_at AS updatedAt,image_url AS imageUrl FROM posts WHERE blog_id=? ORDER BY COALESCE(published_at,updated_at,created_at) DESC LIMIT 50',
       [blogs[0].id],
     );
-    return { blog: blogs[0], posts };
+    const [authors] = await pool.query(
+      `SELECT a.id,a.display_name AS displayName,a.bio,a.homepage_url AS homepageUrl,ba.role,ba.is_primary AS isPrimary
+       FROM blog_authors ba JOIN authors a ON a.id=ba.author_id WHERE ba.blog_id=? AND ba.status <> 'rejected' ORDER BY ba.is_primary DESC,a.display_name`,
+      [blogs[0].id],
+    );
+    const [tags] = await pool.query(
+      `SELECT t.slug,t.label,t.kind,t.visibility,bt.role FROM blog_tags bt JOIN tags t ON t.id=bt.tag_id
+       WHERE bt.blog_id=? AND bt.status <> 'rejected' ORDER BY t.label`,
+      [blogs[0].id],
+    );
+    return { blog: { ...blogs[0], authors, tags }, posts };
   });
 
   const login = registerLogin(app, config.login ? dbLoginStore(own.db) : null, config.login);
@@ -72,6 +88,15 @@ export async function buildApp(config, { logger = false, store = null } = {}) {
     const user = await login.currentUser(request);
     if (!user) {
       reply.code(401).send({ error: 'login required' });
+      return null;
+    }
+    return user;
+  };
+  const requireAdmin = async (request, reply) => {
+    const user = await requireUser(request, reply);
+    if (!user) return null;
+    if (!(config.adminEmails ?? new Set()).has(user.email.toLowerCase())) {
+      reply.code(403).send({ error: 'admin access required' });
       return null;
     }
     return user;
@@ -145,9 +170,14 @@ export async function buildApp(config, { logger = false, store = null } = {}) {
     const $ = cheerio.load(xml, { xmlMode: true });
     let followed = 0;
     let candidates = 0;
-    for (const element of $('outline')) {
-      const url = $(element).attr('xmlUrl') || $(element).attr('htmlUrl');
+    const outlines = $('outline').toArray();
+    if (outlines.length > 500) return reply.code(413).send({ error: 'OPML contains too many subscriptions (maximum 500)' });
+    for (const element of outlines) {
+      const rawUrl = $(element).attr('xmlUrl') || $(element).attr('htmlUrl');
+      const url = rawUrl?.trim();
+      if (url && url.length > 1024) continue;
       if (!url || !/^https?:\/\//i.test(url)) continue;
+      const name = ($(element).attr('text') || $(element).attr('title') || '').slice(0, 255) || null;
       const [known] = await pool.query('SELECT blog_id FROM blog_urls WHERE url=? LIMIT 1', [url]);
       if (known.length) {
         await pool.execute('INSERT IGNORE INTO user_follows (user_id,blog_id,created_at) VALUES (?,?,?)', [
@@ -159,19 +189,81 @@ export async function buildApp(config, { logger = false, store = null } = {}) {
       } else {
         await pool.execute(
           'INSERT IGNORE INTO discovery_candidates (url,name,source_type,source_url,source_evidence,discovered_at) VALUES (?,?,?,?,?,?)',
-          [
-            url,
-            $(element).attr('text') || $(element).attr('title') || null,
-            'opml-import',
-            '/api/me/opml',
-            JSON.stringify({ userId: user.id }),
-            new Date(),
-          ],
+          [url, name, 'opml-import', '/api/me/opml', JSON.stringify({ userId: user.id }), new Date()],
         );
         candidates += 1;
       }
     }
     return { followed, candidates };
+  });
+
+  // Candidate review is deliberately an allow-listed operator surface. Every
+  // decision leaves an immutable audit row so discovery provenance survives a
+  // later approval or rejection.
+  app.get('/api/admin/discovery', async (request, reply) => {
+    const admin = await requireAdmin(request, reply);
+    if (!admin) return;
+    const query = request.query ?? {};
+    const limit = Math.min(200, Math.max(1, Number(query.limit || 100)));
+    const status = typeof query.status === 'string' && /^(candidate|approved|rejected)$/.test(query.status) ? query.status : 'candidate';
+    const [rows] = await pool.query(
+      `SELECT id,url,name,source_type AS sourceType,source_url AS sourceUrl,source_evidence AS sourceEvidence,status,discovered_at AS discoveredAt
+       FROM discovery_candidates WHERE status=? ORDER BY discovered_at DESC LIMIT ?`,
+      [status, limit],
+    );
+    return { candidates: rows, status, reviewer: { id: admin.id, email: admin.email } };
+  });
+  app.post('/api/admin/discovery/review', async (request, reply) => {
+    if (!sameOrigin(request, config.publicOrigin)) return reply.code(403).send({ error: 'same-origin requests only' });
+    const admin = await requireAdmin(request, reply);
+    if (!admin) return;
+    const body = request.body && typeof request.body === 'object' ? request.body : {};
+    const ids = Array.isArray(body.ids)
+      ? [...new Set(body.ids.map(Number).filter((id) => Number.isInteger(id) && id > 0))].slice(0, 100)
+      : [];
+    const nextStatus = body.status === 'approved' || body.status === 'rejected' ? body.status : '';
+    if (!ids.length || !nextStatus) return reply.code(400).send({ error: 'ids and status are required' });
+    const note = typeof body.note === 'string' ? body.note.slice(0, 1000) : null;
+    const connection = await pool.getConnection();
+    let changed = 0;
+    try {
+      await connection.beginTransaction();
+      for (const id of ids) {
+        const [rows] = await connection.query(
+          'SELECT id,status,url,source_type,source_url,source_evidence FROM discovery_candidates WHERE id=? FOR UPDATE',
+          [id],
+        );
+        const candidate = rows[0];
+        if (!candidate || candidate.status === nextStatus) continue;
+        await connection.execute('UPDATE discovery_candidates SET status=? WHERE id=?', [nextStatus, id]);
+        await connection.execute(
+          `INSERT INTO discovery_candidate_audits
+           (candidate_id,action,previous_status,next_status,source_type,source_actor_id,source_url,source_evidence,note,occurred_at,created_at)
+           VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
+          [
+            id,
+            nextStatus === 'approved' ? 'approve' : 'reject',
+            candidate.status,
+            nextStatus,
+            'human-review',
+            admin.id,
+            candidate.source_url,
+            candidate.source_evidence,
+            note,
+            new Date(),
+            new Date(),
+          ],
+        );
+        changed += 1;
+      }
+      await connection.commit();
+    } catch (error) {
+      await connection.rollback();
+      throw error;
+    } finally {
+      connection.release();
+    }
+    return { changed, status: nextStatus };
   });
 
   const proxyToUi = createUiProxy(config.uiOrigin);

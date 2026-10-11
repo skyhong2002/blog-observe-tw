@@ -8,7 +8,18 @@ export type Blog = {
   description?: string | null;
   latestPosts?: Post[];
   posts?: Post[];
+  authors?: Author[];
+  tags?: Tag[];
 };
+export type Author = {
+  id: number;
+  displayName: string;
+  bio?: string | null;
+  homepageUrl?: string | null;
+  role?: string;
+  isPrimary?: boolean;
+};
+export type Tag = { slug: string; label: string; kind: string; visibility: string; role?: string };
 
 export type Post = {
   guid?: string;

@@ -8,6 +8,13 @@
       "when": 1760215200000,
       "tag": "0000_blog_observe_baseline",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "5",
+      "when": 1791754741731,
+      "tag": "0001_authors_tags_discovery_audits",
+      "breakpoints": true
     }
   ]
 }

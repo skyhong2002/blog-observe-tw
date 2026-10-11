@@ -66,6 +66,22 @@ export default async function BlogDetailPage({ params }: Props) {
           )}
           <FollowButton slug={slug} />
         </div>
+        {blog.authors?.length || blog.tags?.length ? (
+          <div className="detail-taxonomy">
+            {blog.authors?.length ? (
+              <div>
+                <strong>作者</strong>
+                <span>{blog.authors.map((author) => author.displayName).join('、')}</span>
+              </div>
+            ) : null}
+            {blog.tags?.length ? (
+              <div>
+                <strong>標籤</strong>
+                <span>{blog.tags.map((tag) => tag.label).join('、')}</span>
+              </div>
+            ) : null}
+          </div>
+        ) : null}
       </article>
       <section className="posts-section" aria-labelledby="posts-title">
         <div className="section-heading">

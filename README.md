@@ -15,6 +15,8 @@ Created in [T3 Code](https://t3.codes).
 - 登入後可追蹤部落格，透過 `/me/feed.xml` 匯出個人 RSS，並以 `/me/opml` 匯出、`POST /api/me/opml` 匯入 OPML；未知 OPML 網址只進候選清單，不會自動公開收錄。
 - 專案骨架跟隨 tag.observe.tw 固定 commit `afe0a653fa8aae7e25a04a1d9fe87bf0400a2a39`：Fastify、Drizzle、BullMQ、Next 16、React 19、Tailwind 4、Biome、Vitest；`NOTICE` 保留移植來源與 MIT 聲明。
 - RSS/Atom/sitemap 抓取遵守 robots、識別 User-Agent、每站延遲和 ETag/Last-Modified；blogblog.club discovery 每週執行，Similarweb Similar Sites 預設關閉且有主機級 budget/lock。
+- 作者身份以部落格範圍分開保存，爬蟲標籤與社群／人工標籤有 provenance，不會覆蓋人工修訂；部落格另外保存最後抓取成功、最後發文、預期更新頻率與歷史匯入時間，低頻站不因沒有近期文章被判 stale。
+- 管理員可在 `/admin/discovery/` 查看候選來源、發現路徑與 RSS 偵測狀態並批次核准／拒絕；設定檔以 `BLOG_ADMIN_EMAILS`（逗號分隔）指定帳號，所有決定寫入 audit。
 
 seed 匯入：
 
@@ -22,6 +24,8 @@ seed 匯入：
 set -a; . /home/deck/.config/blog-observe.env; set +a
 npm run db:migrate
 npm run seed:import /path/to/Similar-Web.csv
+# 歷史匯入模式：保留舊文，不把 sitemap lastmod 當原始發文時間
+npm run crawl:once -- --history
 ```
 
 網址搬家或合併先以 dry-run 檢查，確認不是 Blogger、WordPress.com、Medium、Pixnet 等共用平台後才加 `--apply`：

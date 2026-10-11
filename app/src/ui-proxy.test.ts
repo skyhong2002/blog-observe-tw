@@ -1,3 +1,4 @@
+// biome-ignore-all lint/suspicious/noExplicitAny: Fastify request/reply test doubles
 import { describe, expect, it, vi } from 'vitest';
 import { createUiProxy } from './ui-proxy.js';
 
@@ -17,7 +18,12 @@ describe('UI proxy path isolation', () => {
     const proxy = createUiProxy('http://127.0.0.1:18162', { request });
     const reply: any = { code: vi.fn().mockReturnThis(), send: vi.fn(), header: vi.fn().mockReturnThis() };
     await proxy(
-      { raw: { url: '/blogs/' }, headers: { cookie: 'blog_session=secret', authorization: 'Bearer secret', host: 'blog.observe.tw' }, method: 'GET', log: { warn: vi.fn() } } as any,
+      {
+        raw: { url: '/blogs/' },
+        headers: { cookie: 'blog_session=secret', authorization: 'Bearer secret', host: 'blog.observe.tw' },
+        method: 'GET',
+        log: { warn: vi.fn() },
+      } as any,
       reply,
     );
     expect(request.mock.calls[0][1].headers).not.toHaveProperty('cookie');
