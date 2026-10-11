@@ -7,7 +7,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "postbuild": "mkdir -p .next/standalone/web/.next/static .next/standalone/web/public && cp -a .next/static/. .next/standalone/web/.next/static/ && cp -a public/. .next/standalone/web/public/"
   },
   "dependencies": {
     "echarts": "^6.1.0",
