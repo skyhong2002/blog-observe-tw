@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import FollowButton from '@/components/follow-button';
 import { getBlog, type Post } from '@/lib/api';
 
 export const dynamic = 'force-dynamic';
@@ -63,9 +64,7 @@ export default async function BlogDetailPage({ params }: Props) {
               前往原站閱讀 ↗
             </a>
           )}
-          <a className="button secondary" href={`/auth/google?next=${encodeURIComponent(`/blogs/${slug}/`)}`}>
-            登入後追蹤
-          </a>
+          <FollowButton slug={slug} />
         </div>
       </article>
       <section className="posts-section" aria-labelledby="posts-title">
