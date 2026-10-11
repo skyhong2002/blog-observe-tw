@@ -44,7 +44,15 @@ def main():
         if data.get('model') != 'claude-opus-5-5':
             sys.exit('CLI Proxy returned a different model; this does not count as the requested review.')
         choices = data.get('choices', [])
-        if not choices or any(c.get('finish_reason') != 'stop' or not isinstance(c.get('message', {}).get('content'), str) or not c['message']['content'].strip() for c in choices):
+        def usable(choice):
+            content = choice.get('message', {}).get('content')
+            if choice.get('finish_reason') != 'stop' or not isinstance(content, str):
+                return False
+            text = content.strip()
+            # The proxy may return an internal reasoning marker without a
+            # review body. Treat that as incomplete instead of counting it.
+            return bool(text) and not (text.startswith('<reasoning_effort>') and text.endswith('</reasoning_effort>'))
+        if not choices or any(not usable(c) for c in choices):
             sys.exit('CLI Proxy returned an incomplete or truncated review; this does not count as completed review.')
         print(json.dumps({
             'requested_model': payload['model'], 'response_model': data.get('model'),
