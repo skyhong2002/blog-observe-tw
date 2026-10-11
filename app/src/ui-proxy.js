@@ -16,13 +16,39 @@ const HOP = new Set([
 export function createUiProxy(origin, { request = undiciRequest, timeout = 15000 } = {}) {
   const base = new URL(origin);
   return async function proxyToUi(req, reply) {
+    // Fastify's catch-all also receives path-preserving requests.  Never let
+    // WHATWG URL parsing reinterpret `//host` as a new origin, and do not
+    // carry gateway credentials into the UI origin (or an attacker-controlled
+    // URL if a future route regresses this guard).
+    const rawPath = String(req.raw.url ?? req.url ?? '');
+    let decodedPath = rawPath;
+    try {
+      decodedPath = decodeURIComponent(rawPath);
+    } catch {
+      return reply.code(400).send({ error: 'invalid path' });
+    }
+    if (
+      !rawPath.startsWith('/') ||
+      rawPath.startsWith('//') ||
+      rawPath.startsWith('/\\') ||
+      /^\/[%2f\\]/i.test(rawPath) ||
+      decodedPath.startsWith('//') ||
+      decodedPath.startsWith('/\\') ||
+      /^[a-z][a-z\d+.-]*:/i.test(rawPath)
+    ) {
+      return reply.code(400).send({ error: 'invalid path' });
+    }
+    const path = rawPath.startsWith('/') ? rawPath : `/${rawPath}`;
+    const target = new URL(`${base.origin}${path}`);
+    if (target.host !== base.host) return reply.code(400).send({ error: 'invalid upstream' });
     const headers = {};
-    for (const [key, value] of Object.entries(req.headers)) if (!HOP.has(key) && key !== 'host') headers[key] = value;
+    for (const [key, value] of Object.entries(req.headers))
+      if (!HOP.has(key) && key !== 'host' && key !== 'cookie' && key !== 'authorization') headers[key] = value;
     headers['x-forwarded-host'] = req.headers.host ?? '';
     headers['x-forwarded-proto'] = req.headers['x-forwarded-proto'] ?? 'https';
     let upstream;
     try {
-      upstream = await request(new URL(req.raw.url, base), { method: req.method, headers, headersTimeout: timeout, bodyTimeout: timeout });
+      upstream = await request(target, { method: req.method, headers, headersTimeout: timeout, bodyTimeout: timeout });
     } catch (error) {
       req.log.warn({ err: error?.message }, 'ui origin unavailable');
       return reply

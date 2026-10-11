@@ -3,7 +3,7 @@
 !.env.example
 node_modules/
 
-tools/opus-review.py
+.reviews/
 
 web/.next/
 web/out/
