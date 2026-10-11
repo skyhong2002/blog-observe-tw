@@ -22,7 +22,8 @@
     "discover:blogblog": "node --env-file-if-exists=.env tools/discover-blogblog.ts",
     "discover:similar": "node --env-file-if-exists=.env tools/discover-similar.ts",
     "web:build": "npm --prefix web run build",
-    "web:start": "npm --prefix web run start"
+    "web:start": "npm --prefix web run start",
+    "blogs:merge": "node --env-file-if-exists=.env tools/merge-blog-urls.ts"
   },
   "dependencies": {
     "@fastify/rate-limit": "^11.2.0",

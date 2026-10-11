@@ -24,6 +24,13 @@ npm run db:migrate
 npm run seed:import /path/to/Similar-Web.csv
 ```
 
+網址搬家或合併先以 dry-run 檢查，確認不是 Blogger、WordPress.com、Medium、Pixnet 等共用平台後才加 `--apply`：
+
+```sh
+npm run blogs:merge -- old-slug new-slug
+npm run blogs:merge -- old-slug new-slug --apply
+```
+
 目前附件已匯入 136 列、135 個不重複名稱；原始 CSV 不在 repository，匯入摘要保存在 Steam Machine 的 `/home/deck/.local/share/blog-observe/seed-import-manifest.json`。
 
 完整的來源探索設計（`blogblog.club`、Similarweb Similar Sites、速率限制與和 tag 的協調方式）見 [`docs/discovery.md`](docs/discovery.md)。正式 Google 帳號登入仍需使用者本人在瀏覽器完成；Similarweb 跨服務共用鎖與 tag 端排程整合仍是後續工作。
