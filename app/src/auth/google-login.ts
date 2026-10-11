@@ -107,11 +107,17 @@ function googleExchange(config: LoginConfig, fetcher: typeof fetch = fetch): Cod
     if (!response.ok) throw new Error(`token endpoint ${response.status}`);
     const { id_token: idToken } = (await response.json()) as { id_token?: string };
     if (typeof idToken !== 'string') throw new Error('no id_token');
-    // The ID token came directly from Google's TLS token endpoint. Decode only
-    // claims here; issuer/audience/nonce/expiry checks happen below.
-    const encoded = idToken.split('.')[1];
-    if (!encoded) throw new Error('malformed id_token');
-    return JSON.parse(Buffer.from(encoded, 'base64url').toString('utf8')) as Record<string, unknown>;
+    // Ask Google's tokeninfo endpoint to validate the signed token before
+    // reading claims; verifiedIdentity still enforces this app's audience,
+    // nonce, expiry and email policy.
+    if (idToken.split('.').length !== 3) throw new Error('malformed id_token');
+    const verified = await fetcher(`https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(idToken)}`, {
+      signal: AbortSignal.timeout(15_000),
+    });
+    if (!verified.ok) throw new Error(`tokeninfo endpoint ${verified.status}`);
+    const claims = (await verified.json()) as Record<string, unknown>;
+    if (!claims.iss) throw new Error('tokeninfo missing issuer');
+    return claims;
   };
 }
 
