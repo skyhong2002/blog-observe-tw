@@ -561,6 +561,12 @@ export async function crawlBlog(
            ON DUPLICATE KEY UPDATE last_seen_at=IF(post_tags.source_type IN ('manual','community'),post_tags.last_seen_at,VALUES(last_seen_at)),updated_at=VALUES(updated_at)`,
           [slug, 'crawler', source.url, JSON.stringify({ guid: entry.guid }), now, now, now, now, blog.id, entry.guid.slice(0, 1024)],
         );
+        await pool.execute(
+          `INSERT INTO blog_tags (blog_id,tag_id,role,status,source_type,source_url,source_evidence,first_seen_at,last_seen_at,created_at,updated_at)
+           SELECT ?,id,'topic','active','crawler',?,?,?,?,?,? FROM tags WHERE slug=?
+           ON DUPLICATE KEY UPDATE last_seen_at=IF(blog_tags.source_type IN ('manual','community'),blog_tags.last_seen_at,VALUES(last_seen_at)),updated_at=VALUES(updated_at)`,
+          [blog.id, source.url, JSON.stringify({ guid: entry.guid }), now, now, now, now, slug],
+        );
       }
       total += 1;
     }
