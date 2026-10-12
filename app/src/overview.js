@@ -37,7 +37,7 @@ async function loadProjection(pool) {
   const [postRows, tagRows, authorRows, blogRows, totalRows, recentRows] = await Promise.all([
     pool.query(`SELECT p.id,p.guid,p.title,p.url,p.summary,p.author,p.published_at AS publishedAt,p.image_url AS imageUrl,
       b.slug AS blogSlug,b.name AS blogName FROM posts p JOIN blogs b ON b.id=p.blog_id
-      WHERE b.status <> 'moved' ORDER BY p.published_at DESC,p.id DESC LIMIT 200`),
+      WHERE b.status <> 'moved' AND (p.published_at IS NULL OR p.published_at<=UTC_TIMESTAMP()) ORDER BY p.published_at DESC,p.id DESC LIMIT 200`),
     pool.query(`SELECT t.slug,t.label,COUNT(DISTINCT p.id) AS postCount,COUNT(DISTINCT p.blog_id) AS blogCount
       FROM tags t JOIN post_tags pt ON pt.tag_id=t.id JOIN posts p ON p.id=pt.post_id JOIN blogs b ON b.id=p.blog_id
       WHERE b.status <> 'moved' AND t.visibility='public' AND t.status='active' AND pt.status='active'

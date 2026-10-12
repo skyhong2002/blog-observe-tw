@@ -102,7 +102,7 @@ export async function buildApp(config, { logger = false, store = null } = {}) {
     const [posts] = await pool.query(
       `SELECT p.id,p.guid,p.title,p.url,p.summary,p.author,p.published_at AS publishedAt,p.image_url AS imageUrl,
       b.slug AS blogSlug,b.name AS blogName FROM posts p JOIN post_tags pt ON pt.post_id=p.id JOIN blogs b ON b.id=p.blog_id
-      WHERE pt.tag_id=? AND pt.status='active' AND b.status <> 'moved' ORDER BY p.published_at DESC,p.id DESC LIMIT 200`,
+      WHERE pt.tag_id=? AND pt.status='active' AND b.status <> 'moved' AND (p.published_at IS NULL OR p.published_at<=UTC_TIMESTAMP()) ORDER BY p.published_at DESC,p.id DESC LIMIT 200`,
       [tags[0].id],
     );
     const [blogs] = await pool.query(
@@ -129,7 +129,7 @@ export async function buildApp(config, { logger = false, store = null } = {}) {
     );
     if (!blogs.length) return reply.code(404).send({ error: 'blog not found' });
     const [posts] = await pool.query(
-      'SELECT id,guid,title,url,summary,author,published_at AS publishedAt,updated_at AS updatedAt,image_url AS imageUrl FROM posts WHERE blog_id=? ORDER BY COALESCE(published_at,updated_at,created_at) DESC LIMIT 50',
+      'SELECT id,guid,title,url,summary,author,published_at AS publishedAt,updated_at AS updatedAt,image_url AS imageUrl FROM posts WHERE blog_id=? AND (published_at IS NULL OR published_at<=UTC_TIMESTAMP()) ORDER BY COALESCE(published_at,updated_at,created_at) DESC LIMIT 50',
       [blogs[0].id],
     );
     const [authors] = await pool.query(
@@ -192,7 +192,7 @@ export async function buildApp(config, { logger = false, store = null } = {}) {
     const user = await requireUser(request, reply);
     if (!user) return;
     const [items] = await pool.query(
-      'SELECT p.guid,p.title,p.url,p.summary,p.published_at AS publishedAt FROM posts p JOIN user_follows f ON f.blog_id=p.blog_id WHERE f.user_id=? ORDER BY COALESCE(p.published_at,p.updated_at,p.created_at) DESC LIMIT 100',
+      'SELECT p.guid,p.title,p.url,p.summary,p.published_at AS publishedAt FROM posts p JOIN user_follows f ON f.blog_id=p.blog_id WHERE f.user_id=? AND (p.published_at IS NULL OR p.published_at<=UTC_TIMESTAMP()) ORDER BY COALESCE(p.published_at,p.updated_at,p.created_at) DESC LIMIT 100',
       [user.id],
     );
     return reply

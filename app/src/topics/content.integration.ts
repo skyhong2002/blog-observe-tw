@@ -22,7 +22,7 @@ export async function runContentTopicsIntegration(pool: Pool) {
     version = randomUUID(),
     now = new Date();
   const [[previous]] = await pool.query<RowDataPacket[]>('SELECT snapshot_id FROM topic_current WHERE source=?', [SOURCE]);
-  let blogId: number | undefined, postId: number | undefined, userId: number | undefined;
+  let blogId: number | undefined, postId: number | undefined, userId: number | undefined, futurePostId: number | undefined;
   let gateway: FastifyInstance | undefined;
   const app = Fastify();
   try {
@@ -96,7 +96,27 @@ export async function runContentTopicsIntegration(pool: Pool) {
     assert.ok(search.items[0].snippet.includes('私藏綠茶'));
     assert.ok(!JSON.stringify(search).includes('PRIVATE_FULL_BODY_TAIL'));
     assert.ok(Array.from(search.items[0].snippet).length <= 240);
+    const [future] = await pool.execute<ResultSetHeader>(
+      'INSERT INTO posts(blog_id,guid,url,title,summary,published_at,created_at) VALUES (?,?,?,?,?,?,?)',
+      [
+        blogId,
+        token + '-future',
+        'https://content-fixture.example/pinned',
+        'FUTURE_PINNED_2115',
+        '置頂原始資料',
+        new Date('2115-02-02T00:00:00Z'),
+        now,
+      ],
+    );
+    futurePostId = future.insertId;
     const overview = await loadOverview(pool);
+    assert.equal(
+      overview.posts.some((row: { id: number }) => row.id === futurePostId),
+      false,
+    );
+    assert.equal(overview.posts[0].id, postId);
+    assert.equal(overview.blogs.find((row: { slug: string }) => row.slug === slug)?.postCount, 2);
+    assert.ok(overview.totals.posts >= 2);
     const recent = overview.recentBlogs.find((row: { slug: string }) => row.slug === slug);
     assert.equal(recent?.latestPost.id, postId);
     assert.ok(!JSON.stringify(overview).includes('PRIVATE_FULL_BODY_TAIL'));
@@ -139,7 +159,7 @@ export async function runContentTopicsIntegration(pool: Pool) {
         headers: { cookie: `blog_session=${cookie}` },
       });
       assert.equal(response.statusCode, 200, response.body);
-      assert.ok(!/PRIVATE_SUMMARY_TAIL|PRIVATE_FULL_BODY_TAIL|body_text|body_html/.test(response.body));
+      assert.ok(!/PRIVATE_SUMMARY_TAIL|PRIVATE_FULL_BODY_TAIL|body_text|body_html|FUTURE_PINNED_2115/.test(response.body));
     }
     const path = `/api/blogs/${slug}/topics`;
     assert.equal(
@@ -168,6 +188,8 @@ export async function runContentTopicsIntegration(pool: Pool) {
       recentBlogLatestPost: true,
       publicMetadataOnly: true,
       authenticatedRssExcerptOnly: true,
+      futurePinnedExcludedFromLatest: true,
+      futureDateAndIndexCountsPreserved: true,
     };
   } finally {
     await app.close();
@@ -182,6 +204,13 @@ export async function runContentTopicsIntegration(pool: Pool) {
     if (postId)
       for (const table of ['topic_matches', 'topic_post_indexes', 'content_post_bodies', 'relation_observations'])
         await pool.execute(`DELETE FROM ${table} WHERE post_id=?`, [postId]);
+    if (futurePostId) {
+      const [[raw]] = await pool.query<RowDataPacket[]>('SELECT published_at FROM posts WHERE id=?', [futurePostId]);
+      assert.equal(new Date(raw.published_at).getUTCFullYear(), 2115);
+      for (const table of ['topic_matches', 'topic_post_indexes'])
+        await pool.execute(`DELETE FROM ${table} WHERE post_id=?`, [futurePostId]);
+      await pool.execute('DELETE FROM posts WHERE id=?', [futurePostId]);
+    }
     if (postId) await pool.execute('DELETE FROM posts WHERE id=?', [postId]);
     if (blogId) await pool.execute('DELETE FROM blogs WHERE id=?', [blogId]);
     await pool.execute('DELETE FROM topic_terms WHERE snapshot_id=?', [version]);
