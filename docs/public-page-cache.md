@@ -3,8 +3,10 @@
 Public pages are prerendered and regenerated in the background every
 **120 seconds** (`PUBLIC_REVALIDATE_SECONDS`, `web/src/lib/public-paths.ts`).
 Next.js answers them from its ISR cache with
-`Cache-Control: s-maxage=120, stale-while-revalidate=…`, which the gateway
-passes through. Nothing is forced: the cache headers come from real ISR
+`Cache-Control: s-maxage=120, stale-while-revalidate=180`, which the gateway
+passes through. The 180 s is `expireTime: 300` in `web/next.config.ts` minus
+the 120 s revalidate; without it Next 16 defaults `expireTime` to one year
+(`stale-while-revalidate=31535880`). Nothing is forced: the cache headers come from real ISR
 entries in `.next/prerender-manifest.json`.
 
 ## Edge (Cloudflare) and what the HTML may contain
@@ -39,7 +41,10 @@ real-time guarantee:
 3. The ISR page is regenerated in the background on the first request after
    120 s; that request and any others during regeneration get the previous
    page (`stale-while-revalidate`).
-4. The edge may keep the page per the origin headers.
+4. The edge honours the origin headers: fresh for 120 s, then it may serve
+   the stale copy for up to 180 s more while it revalidates.
+   Edge and ISR staleness windows stack on top of the data-layer TTLs above,
+   so a change can take several minutes to reach readers.
 5. In the browser, query answers are remembered for 120 s (below).
 
 A failed regeneration keeps the previous page, so during gateway trouble a
