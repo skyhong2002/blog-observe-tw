@@ -181,6 +181,8 @@ freshgate20:22:33Z：load3.76/6.01/6.32、blog final200 TTFB1.226s、otherbrowse
 
 ## 話題方法說明收合：程式修正完成，candidate 畫面待驗
 
+程式修正 commit：`8afc698`；未部署。
+
 本批以 `origin/main` 的 `0b7d42e`（先前實作起點 `3ad4191`，差異只有證據文件）為基礎。Opus 5.5 實作將長方法、上游窗口、品質與容量資訊移入既有「本頁資料來源與計算方式」原生 details；手機先呈現文章，保留必要來源與確認狀態。error／404 的 topic-only fallback 也補上通用方法區塊。
 
 - 實作原始紀錄：`/home/deck/.t3/projects/blog-observe-tw/.reviews/topic-method-ui/opus-implementation.jsonl`、`opus-fixes.jsonl`；兩者實際 model `claude-opus-5-5`，result success。
