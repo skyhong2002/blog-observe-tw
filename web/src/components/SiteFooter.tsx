@@ -70,8 +70,11 @@ const ICONS = {
 
 /** Collection totals use only the blog gateway. */
 async function FooterStats() {
-  const response = await fetch(`${API_ORIGIN}/healthz`, { next: { revalidate: 300 }, signal: AbortSignal.timeout(4000) }).catch(() => null);
-  const totals: { blogs?: number } | undefined = response?.ok ? await response.json() : undefined;
+  const response = await fetch(`${API_ORIGIN}/api/catalog?limit=1`, { next: { revalidate: 300 }, signal: AbortSignal.timeout(4000) }).catch(
+    () => null,
+  );
+  const catalog: { totals?: { blogs?: number } } | undefined = response?.ok ? await response.json() : undefined;
+  const totals = catalog?.totals;
   if (!totals?.blogs) return null;
   return (
     <Link href="/blogs/" className="group inline-flex items-center gap-2 text-[13px] text-zinc-600 dark:text-zinc-400">
