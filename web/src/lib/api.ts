@@ -81,39 +81,8 @@ export type Catalog = {
     limit: number;
   };
 };
-export async function catalog(query: CatalogQuery): Promise<Catalog> {
-  const params = new URLSearchParams();
-  for (const key of ['q', 'category', 'status', 'sort', 'dir', 'page', 'limit'] as const) {
-    if (typeof query[key] === 'string') params.set(key, query[key]);
-  }
-  const data = await gateway<Catalog>(`/api/catalog?${params}`);
-  if (!data) throw new Error('Blog catalog unavailable');
-  return data;
-}
-function origin() {
-  return process.env.BLOG_GATEWAY_INTERNAL_URL ?? 'http://127.0.0.1:18160';
-}
-export async function gateway<T>(path: string, init?: RequestInit): Promise<T | null> {
-  try {
-    const response = await fetch(`${origin()}${path}`, { ...init, cache: 'no-store', signal: AbortSignal.timeout(10000) });
-    return response.ok ? ((await response.json()) as T) : null;
-  } catch {
-    return null;
-  }
-}
-export async function listBlogs(): Promise<Blog[]> {
-  const payload = await gateway<{ blogs: Blog[] }>('/api/blogs');
-  return payload?.blogs ?? [];
-}
-export async function getBlog(slug: string): Promise<Blog | null> {
-  const data = await gateway<{ blog: Blog; posts: Post[] }>(`/api/blogs/${encodeURIComponent(slug)}`);
-  return data?.blog ? { ...data.blog, posts: data.posts ?? [] } : null;
-}
-export async function overview(): Promise<Overview> {
-  const data = await gateway<Overview>('/api/overview');
-  if (!data) throw new Error('Blog overview unavailable');
-  return data;
-}
+// Types and formatting only, so client components may import this file. Gateway
+// reads live in server-only modules: public-api.ts (ISR) and server-gateway.ts (private).
 export function taipei(value?: string | null) {
   return value && Number.isFinite(Date.parse(value))
     ? new Date(value).toLocaleString('zh-TW', {
@@ -146,12 +115,3 @@ export type AuthorCatalog = {
   pagination: { page: number; pages: number; pageSize: number; total: number };
   filters: { author: number | null; page: number; limit: number };
 };
-export async function authorCatalog(query: AuthorCatalogQuery): Promise<AuthorCatalog> {
-  const params = new URLSearchParams();
-  for (const key of ['author', 'page', 'limit'] as const) {
-    if (typeof query[key] === 'string') params.set(key, query[key]);
-  }
-  const data = await gateway<AuthorCatalog>(`/api/catalog/authors?${params}`);
-  if (!data) throw new Error('Author catalog unavailable');
-  return data;
-}

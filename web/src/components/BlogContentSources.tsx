@@ -1,5 +1,5 @@
 // Sidebar section in the SourceProfile 部落格資料 style (tag /media/[media]/ sidebar, afe0a65).
-import { gateway, taipei } from '@/lib/api';
+import { taipei } from '@/lib/api';
 import {
   completenessLabel,
   contentStatusText,
@@ -8,13 +8,19 @@ import {
   platformLabel,
   sourceText,
 } from '@/lib/content-sources';
+import { publicJsonOrNull } from '@/lib/public-api';
 
 const box = 'rounded-lg border border-zinc-200 p-3 text-xs dark:border-zinc-800';
 const note = '取得的內文只用於關鍵字、文章關係與站內搜尋；本站公開只顯示摘要與原文連結，全文請至原站閱讀。';
 const recorded = (value: string | null) => (value ? taipei(value) : '尚未記錄');
 
+/** The content route's own slug rule (app/src/content/routes.ts); it answers 400 to anything else. */
+const contentSlug = /^[a-z0-9][a-z0-9-]{0,199}$/;
+
 export default async function BlogContentSources({ slug }: { slug: string }) {
-  const data = normalizeContent(await gateway<unknown>(`/api/blogs/${encodeURIComponent(slug)}/content`));
+  // null: the gateway's real 404, or a slug the route never looks up. A wrong-shaped 200 throws in public-read.ts.
+  const raw = contentSlug.test(slug) ? await publicJsonOrNull<unknown>(`/api/blogs/${encodeURIComponent(slug)}/content`) : null;
+  const data = raw === null ? null : normalizeContent(raw);
   if (!data)
     return (
       <section id="content-source" className={box}>

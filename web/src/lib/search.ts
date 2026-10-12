@@ -20,6 +20,8 @@ export type SearchResult = {
   generatedAt: string | null;
 };
 export type SearchParams = { q: string; page: number; blog: string | null };
+/** What /articles/ shows without a query: the latest posts, no search. */
+export const NO_SEARCH: SearchParams = { q: '', page: 1, blog: null };
 
 const record = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value);
 const count = (value: unknown) => (typeof value === 'number' && Number.isInteger(value) && value >= 0 ? value : null);

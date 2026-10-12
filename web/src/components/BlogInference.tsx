@@ -1,4 +1,5 @@
-import { gateway, taipei } from '@/lib/api';
+import { taipei } from '@/lib/api';
+import { publicJsonOrNull } from '@/lib/public-api';
 
 type Inference = {
   label: string;
@@ -8,7 +9,7 @@ type Inference = {
   topics: Array<{ postId: number; title: string; topics: string[]; coverage: string; updatedAt: string; label: string }>;
 };
 export default async function BlogInference({ slug }: { slug: string }) {
-  const data = await gateway<Inference>(`/api/blogs/${encodeURIComponent(slug)}/inference`);
+  const data = await publicJsonOrNull<Inference>(`/api/blogs/${encodeURIComponent(slug)}/inference`);
   if (!data) return <p className="mt-8 text-sm text-zinc-500">AI 閱讀線索暫時無法讀取。</p>;
   if (!data.profile?.bio && !data.topics?.length) return null;
   return (

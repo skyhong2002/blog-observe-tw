@@ -1,8 +1,8 @@
 import Link from 'next/link';
-import { gateway } from '@/lib/api';
+import { publicJsonOrNull } from '@/lib/public-api';
 import type { Topics } from '@/lib/topics';
 export default async function BlogTopics({ slug }: { slug: string }) {
-  const data = await gateway<Topics>(`/api/blogs/${encodeURIComponent(slug)}/topics?days=90`);
+  const data = await publicJsonOrNull<Topics>(`/api/blogs/${encodeURIComponent(slug)}/topics?days=90`);
   return (
     <section className="mt-8 space-y-3">
       <h2 className="text-lg font-semibold">最近常寫的話題</h2>

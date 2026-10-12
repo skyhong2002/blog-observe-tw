@@ -13,6 +13,15 @@ export type VocabularyStatus = {
   tagNormalization?: string | null;
 };
 export type Topic = { id: string; label: string; source: 'rss-category' | 'tag-vocabulary'; score: number; posts: number; blogs: number };
+/** /api/topics/:id — one topic's blogs and articles in a period. */
+export type TopicDetail = {
+  days: number;
+  vocabulary: VocabularyStatus;
+  topic: { id: string; label: string; source: string } | null;
+  blogs: Array<{ id: number; slug: string; name: string; posts: number; score: number }>;
+  articles: Array<{ id: number; title: string; url: string; publishedAt: string | null; blogSlug: string; blogName: string }>;
+  truncated: boolean;
+};
 export type Topics = {
   days: number;
   vocabulary: VocabularyStatus;

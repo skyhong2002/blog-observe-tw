@@ -1,45 +1,27 @@
 // Server entry for blog traffic: /traffic/ gets tag's TrafficComparison layout
 // (BlogTrafficComparison), /blogs/[slug]/ gets the MediaTrafficProfile layout
 // (BlogTrafficProfile). Reads only the local gateway's /api/traffic.
+import { Suspense } from 'react';
 import BlogTrafficComparison from '@/components/BlogTrafficComparison';
 import BlogTrafficProfile from '@/components/BlogTrafficProfile';
-import { gateway } from '@/lib/api';
+import TrafficComparisonFromUrl from '@/components/public/TrafficComparisonFromUrl';
+import { publicJson } from '@/lib/public-api';
+import { PublicGatewayError } from '@/lib/public-read';
 import { normalizeTraffic } from '@/lib/traffic';
 
-const box = 'rounded-lg border border-zinc-200 p-3 text-xs dark:border-zinc-800';
+const NO_QUERY: Record<string, string | undefined> = {};
 
-export default async function SimilarwebTraffic({
-  slug,
-  compact = false,
-  initial = {},
-}: {
-  slug?: string;
-  compact?: boolean;
-  /** /traffic/'s search params (sort, month, q, state, view, page, compare). */
-  initial?: Record<string, string | undefined>;
-}) {
-  const data = normalizeTraffic(await gateway<unknown>(`/api/traffic${slug ? `?${new URLSearchParams({ blog: slug })}` : ''}`));
+export default async function SimilarwebTraffic({ slug, compact = false }: { slug?: string; compact?: boolean }) {
+  const path = `/api/traffic${slug ? `?${new URLSearchParams({ blog: slug })}` : ''}`;
+  const data = normalizeTraffic(await publicJson<unknown>(path));
+  // public-contracts.ts already requires `blogs`; an unreadable payload must not be cached as a "no data" page.
+  if (!data) throw new PublicGatewayError(path, 200, 'unexpected traffic payload');
   if (compact || slug) {
-    if (!data)
-      return (
-        <section id="traffic" aria-label="網站流量" className={box}>
-          <h2 className="mb-2 text-sm font-semibold">網站流量</h2>
-          <p role="status" className="leading-5 text-zinc-500 dark:text-zinc-400">
-            流量資料暫時無法取得，請稍後再試。
-          </p>
-        </section>
-      );
     const blog = data.blogs.find((b) => b.slug === slug);
     // Not listed: unverified, or a shared platform whose domain-wide figures are not one writer's.
     if (!blog) return null;
     return <BlogTrafficProfile blog={blog} limitations={data.limitations} />;
   }
-  if (!data)
-    return (
-      <p role="status" className="rounded-xl border border-zinc-300 p-6 text-sm text-zinc-600 dark:border-zinc-800 dark:text-zinc-400">
-        流量資料暫時無法取得，請稍後再試。這不表示部落格沒有讀者。
-      </p>
-    );
   if (!data.blogs.length)
     return (
       <p className="rounded-xl border border-zinc-300 p-6 text-sm text-zinc-600 dark:border-zinc-800 dark:text-zinc-400">
@@ -48,7 +30,10 @@ export default async function SimilarwebTraffic({
     );
   return (
     <div className="space-y-4">
-      <BlogTrafficComparison data={data} initial={initial} />
+      {/* The page is prerendered without a query; the URL's own (sort, month, q, state, view, page, compare) is read in the browser. */}
+      <Suspense fallback={<BlogTrafficComparison data={data} initial={NO_QUERY} />}>
+        <TrafficComparisonFromUrl data={data} />
+      </Suspense>
       <section aria-labelledby="traffic-notes" className="rounded-xl border border-zinc-300 p-4 text-xs leading-6 dark:border-zinc-800">
         <h2 id="traffic-notes" className="mb-2 text-sm font-semibold">
           怎麼讀這些數字

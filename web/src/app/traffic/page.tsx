@@ -2,12 +2,12 @@
 import Link from 'next/link';
 import MediaTabs from '@/components/MediaTabs';
 import SimilarwebTraffic from '@/components/SimilarwebTraffic';
-export const dynamic = 'force-dynamic';
+
+// ISR (PUBLIC_REVALIDATE_SECONDS): one prerendered table of every listed blog;
+// the comparison's URL state is applied in the browser (TrafficComparisonFromUrl).
+export const revalidate = 120;
 export const metadata = { title: '部落格流量與排名', description: '對照已核准部落格的網域流量估算、排名與資料時間；估算不代表文章品質。' };
-export default async function TrafficPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
-  const params = Object.fromEntries(
-    Object.entries(await searchParams).map(([key, value]) => [key, (Array.isArray(value) ? value[0] : value)?.slice(0, 300)]),
-  );
+export default function TrafficPage() {
   return (
     <div className="space-y-5 pb-8">
       <header>
@@ -20,7 +20,7 @@ export default async function TrafficPage({ searchParams }: { searchParams: Prom
           </Link>
         </p>
       </header>
-      <SimilarwebTraffic initial={params} />
+      <SimilarwebTraffic />
     </div>
   );
 }

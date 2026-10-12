@@ -1,19 +1,17 @@
 // Profile grid and sidebar copied from tag.observe.tw /media/[media]/ (afe0a65).
 
 import Link from 'next/link';
-import type { ReactNode } from 'react';
+import { type ReactNode, Suspense } from 'react';
 import BlogIcon from '@/components/BlogIcon';
+import ProfilePostsView, { ProfilePostsFromUrl } from '@/components/public/ProfilePosts';
 import { type Blog, taipei } from '@/lib/api';
-import ArticleListItem from './ArticleListItem';
 import FollowButton from './follow-button';
 import MediaSidebar from './MediaSidebar';
 import MediaWordCloud from './MediaWordCloud';
 import SectionTabs from './SectionTabs';
-export default function SourceProfile({ blog, query = '', sidebar }: { blog: Blog; query?: string; sidebar?: ReactNode }) {
+export default function SourceProfile({ blog, sidebar }: { blog: Blog; sidebar?: ReactNode }) {
   const allPosts = blog.posts ?? [];
-  const posts = query
-    ? allPosts.filter((post) => `${post.title} ${post.summary ?? ''}`.toLocaleLowerCase().includes(query.toLocaleLowerCase()))
-    : allPosts;
+  const owner = { slug: blog.slug, name: blog.name };
   return (
     <div className="pb-4">
       <nav aria-label="麵包屑" className="mb-3 text-xs text-zinc-500 dark:text-zinc-400">
@@ -127,50 +125,9 @@ export default function SourceProfile({ blog, query = '', sidebar }: { blog: Blo
             <h2 className="text-sm font-semibold">最新收錄</h2>
             <p className="text-xs text-zinc-500">依發文時間排列 · 完整內容請至原站閱讀</p>
           </div>
-          <form action={`/blogs/${blog.slug}/`} className="mb-1 flex gap-2">
-            <input
-              name="q"
-              defaultValue={query}
-              maxLength={100}
-              aria-label="搜尋這個部落格的文章"
-              placeholder="搜尋這個部落格的文章"
-              className="min-w-0 flex-1 rounded border border-zinc-300 bg-white px-2.5 py-1.5 text-xs dark:border-zinc-700 dark:bg-zinc-950"
-            />
-            <button
-              type="submit"
-              className="rounded border border-zinc-300 px-3 py-1.5 text-xs hover:bg-zinc-100 dark:border-zinc-700 dark:hover:bg-zinc-900"
-            >
-              搜尋
-            </button>
-          </form>
-          <p className="text-xs text-zinc-500 dark:text-zinc-400">
-            本頁 {posts.length} 篇 · 搜尋最新收錄的 {allPosts.length} 篇文章的標題與摘要
-            {query && (
-              <>
-                {' · '}
-                <Link
-                  href={`/articles/?${new URLSearchParams({ q: query, blog: blog.slug })}`}
-                  className="text-brand-700 hover:underline dark:text-brand-400"
-                >
-                  搜尋這個部落格的內文 →
-                </Link>
-              </>
-            )}
-          </p>
-          {posts.length ? (
-            <ul className="divide-y divide-zinc-200 dark:divide-zinc-800">
-              {posts.map((post) => (
-                <ArticleListItem
-                  key={post.id ?? post.guid ?? post.url}
-                  post={{ ...post, blogSlug: post.blogSlug ?? blog.slug, blogName: post.blogName ?? blog.name }}
-                />
-              ))}
-            </ul>
-          ) : (
-            <p className="py-8 text-zinc-600 dark:text-zinc-400">
-              {query ? '沒有符合搜尋條件的文章。' : '尚未收錄文章，會依禮貌頻率重新檢查訂閱來源。'}
-            </p>
-          )}
+          <Suspense fallback={<ProfilePostsView blog={owner} posts={allPosts} query="" />}>
+            <ProfilePostsFromUrl blog={owner} posts={allPosts} />
+          </Suspense>
         </section>
       </div>
     </div>

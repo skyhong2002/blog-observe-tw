@@ -2,16 +2,20 @@
 
 import Link from 'next/link';
 import BlogIcon from '@/components/BlogIcon';
-import { gateway, overview, plainText, taipei } from '@/lib/api';
+import { plainText, taipei } from '@/lib/api';
 import { recentBlogRows } from '@/lib/home';
 import { externalHref } from '@/lib/images';
+import { overview, publicJson } from '@/lib/public-api';
+import { topicsApiPath } from '@/lib/public-query';
 import type { Topics } from '@/lib/topics';
 import styles from './_home/home.module.css';
 import MastheadCloud from './_home/MastheadCloud';
 import NewsImage from './_home/NewsImage';
-export const dynamic = 'force-dynamic';
+// ISR (PUBLIC_REVALIDATE_SECONDS). A failed gateway read throws, so a
+// regeneration keeps the last good page instead of caching an empty one.
+export const revalidate = 120;
 export default async function HomePage() {
-  const [data, topics] = await Promise.all([overview(), gateway<Topics>('/api/topics?days=30')]);
+  const [data, topics] = await Promise.all([overview(), publicJson<Topics>(topicsApiPath('30'))]);
   const [lead, ...rest] = data.posts;
   const recentBlogs = recentBlogRows(data, 10);
   const postHref = (post: { url?: string | null; blogSlug?: string }) => externalHref(post.url) ?? `/blogs/${post.blogSlug}/`;

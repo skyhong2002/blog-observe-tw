@@ -1,8 +1,6 @@
 import Link from 'next/link';
 import { Suspense } from 'react';
-
-const API_ORIGIN = process.env.BLOG_GATEWAY_INTERNAL_URL ?? 'http://127.0.0.1:18160';
-
+import { catalog } from '@/lib/public-api';
 import { METHOD_HREF } from '@/lib/site-nav';
 import BackToTop from './BackToTop';
 import FooterMethod from './FooterMethod';
@@ -68,13 +66,12 @@ const ICONS = {
   install: 'M12 4v11m0 0-4-4m4 4 4-4M5 20h14',
 };
 
-/** Collection totals use only the blog gateway. */
+/** Collection totals use only the blog gateway's public catalog. Best effort:
+ *  the footer is on every page, private ones included, and never fails one. */
 async function FooterStats() {
-  const response = await fetch(`${API_ORIGIN}/api/catalog?limit=1`, { next: { revalidate: 300 }, signal: AbortSignal.timeout(4000) }).catch(
-    () => null,
-  );
-  const catalog: { totals?: { blogs?: number } } | undefined = response?.ok ? await response.json() : undefined;
-  const totals = catalog?.totals;
+  const totals = await catalog({ limit: '1' })
+    .then((data) => data.totals as { blogs?: number } | undefined)
+    .catch(() => undefined);
   if (!totals?.blogs) return null;
   return (
     <Link href="/blogs/" className="group inline-flex items-center gap-2 text-[13px] text-zinc-600 dark:text-zinc-400">

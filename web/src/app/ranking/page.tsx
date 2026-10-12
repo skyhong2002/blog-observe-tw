@@ -2,9 +2,11 @@ import Link from 'next/link';
 import SectionTabs from '@/components/SectionTabs';
 import TableScroller from '@/components/TableScroller';
 import TagCountChartLoader from '@/components/TagCountChartLoader';
-import { overview, taipei } from '@/lib/api';
+import { taipei } from '@/lib/api';
+import { overview } from '@/lib/public-api';
 import { table } from '@/lib/table-styles';
-export const dynamic = 'force-dynamic';
+// ISR (PUBLIC_REVALIDATE_SECONDS).
+export const revalidate = 120;
 export default async function RankingPage() {
   const data = await overview();
   return (

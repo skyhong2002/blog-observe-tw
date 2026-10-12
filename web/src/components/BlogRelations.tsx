@@ -1,9 +1,9 @@
 import Link from 'next/link';
-import { gateway } from '@/lib/api';
+import { publicJsonOrNull } from '@/lib/public-api';
 import { type Relations, shareExplanation } from '@/lib/relations';
 import RelationLists from './RelationLists';
 export default async function BlogRelations({ slug }: { slug: string }) {
-  const data = await gateway<Relations>(`/api/blogs/${encodeURIComponent(slug)}/relations?days=90`);
+  const data = await publicJsonOrNull<Relations>(`/api/blogs/${encodeURIComponent(slug)}/relations?days=90`);
   return (
     <section className="mt-8 space-y-4">
       <div className="flex items-center justify-between">
