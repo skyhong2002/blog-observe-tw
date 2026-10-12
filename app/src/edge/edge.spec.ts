@@ -61,6 +61,24 @@ afterEach(async () => {
   await Promise.all(directories.splice(0).map((path) => rm(path, { recursive: true, force: true })));
 });
 
+describe('host-only HSTS', () => {
+  it('sets exactly one day on HTTPS HTML, API, static and errors, never plain HTTP', async () => {
+    const gateway = await listen(createServer((req, res) => {
+      res.writeHead(req.url === '/missing' ? 404 : 200, { 'strict-transport-security': 'max-age=31536000; includeSubDomains; preload' });
+      res.end('body');
+    }));
+    const assets = await temp();
+    await writeFile(join(assets, 'fixture.js'), 'console.log(1)');
+    const port = await listen(createEdge({ state: { get: async () => blue }, assets, request: redirectTransport({ 18174: gateway }) }));
+    for (const path of ['/', '/api/v1/openapi.json', '/_next/static/fixture.js', '/missing', '//invalid']) {
+      const secure = await get(port, path, 'GET', { 'x-forwarded-proto': 'https' });
+      expect(secure.headers['strict-transport-security']).toBe('max-age=86400');
+      const plain = await get(port, path);
+      expect(plain.headers['strict-transport-security']).toBeUndefined();
+    }
+  });
+});
+
 describe('visibility cache boundary', () => {
   it('does not let gateway/CDN cache headers retain mutable HTML, API or XML', async () => {
     const gateway = await listen(createServer((_req, res) => {

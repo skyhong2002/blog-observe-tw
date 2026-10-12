@@ -46,6 +46,8 @@ export function createEdge({
   request?: typeof httpRequest;
 }) {
   const server = createServer(async (req, res) => {
+    const https = req.headers['x-forwarded-proto'] === 'https';
+    if (https) res.setHeader('strict-transport-security', 'max-age=86400');
     const mutable = !immutableAssetPath(req.url ?? '');
     if (mutable) res.setHeader('cache-control', 'private, no-store');
     if (!safePath(req.url ?? '')) {
@@ -88,6 +90,8 @@ export function createEdge({
             headers['cache-control'] = 'private, no-store';
             for (const key of ['cdn-cache-control', 'cloudflare-cdn-cache-control', 'surrogate-control', 'expires']) delete headers[key];
           }
+          // This edge owns host-only HSTS; an upstream must not widen the scope.
+          delete headers['strict-transport-security'];
           delete headers['x-blog-edge-generation'];
           delete headers['x-blog-release'];
           res.writeHead(response.statusCode ?? 502, headers);
