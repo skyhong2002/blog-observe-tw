@@ -1,5 +1,5 @@
 import { taipei } from '@/lib/api';
-import type { VocabularyStatus } from '@/lib/topics';
+import { exclusionRows, type VocabularyStatus } from '@/lib/topics';
 
 const normalizationLabels: Record<string, string> = {
   'boundary-whitespace-v1': '去除標籤前後空白',
@@ -10,6 +10,8 @@ const recorded = (value: number | null | undefined) => (typeof value === 'number
 function TagQuality({ data }: { data: VocabularyStatus }) {
   const invalid = recorded(data.invalidTagCount);
   const normalized = recorded(data.normalizedTagCount);
+  const excluded = recorded(data.excludedTermCount);
+  const reasons = exclusionRows(data.exclusionReasons);
   const rule = data.tagNormalization ?? null;
   const pending = '此快照尚未記錄';
   return (
@@ -35,7 +37,21 @@ function TagQuality({ data }: { data: VocabularyStatus }) {
             pending
           )}
         </dd>
+        <dt>不參與比對的詞</dt>
+        <dd className="min-w-0 break-words tabular-nums">{excluded === null ? pending : `${excluded.toLocaleString('zh-TW')} 個`}</dd>
       </dl>
+      <p className="mt-2">
+        格式正常但不適合當話題的詞（單一字元、純數字或日期、雜訊與沿用來源排除清單的詞）仍保留在快照中，只是不參與比對；與上面的壞標籤分開計算。
+      </p>
+      {reasons.length ? (
+        <ul aria-label="不參與比對的原因" className="mt-1 flex flex-wrap gap-x-3 gap-y-1">
+          {reasons.map((r) => (
+            <li key={r.reason} className="tabular-nums">
+              {r.label} {r.count.toLocaleString('zh-TW')} 個
+            </li>
+          ))}
+        </ul>
+      ) : null}
     </div>
   );
 }
@@ -44,17 +60,17 @@ export default function VocabularyNotice({ data }: { data: VocabularyStatus }) {
   return (
     <div className="min-w-0 space-y-1 text-xs text-zinc-500">
       <p>
-        站內標籤來自部落格 RSS 的自訂分類；共同關鍵字取自
+        話題只使用取自
         <a href="https://tag.observe.tw" className="underline">
           新文易數
         </a>
-        ，兩種來源分開標示。
+        的共同關鍵字；部落格 RSS 的自訂分類仍保留為原始資料，但不另外組成話題詞庫。只差在大小寫或全半形的寫法（如 AI／ai）合併為一列。
       </p>
       {data.status === 'ready' ? (
         <>
           <p>
             {data.coverage === 'observed-article-window'
-              ? '共同關鍵字涵蓋上游文章觀測窗口，不代表完整詞庫。'
+              ? '共同關鍵字僅涵蓋上游文章觀測窗口，屬部分快照，不代表完整詞庫。'
               : '共同關鍵字涵蓋上游目前索引文章的標籤，不代表人工編輯詞庫。'}{' '}
             {data.syncedAt ? taipei(data.syncedAt) + ' 同步。' : ''}
           </p>

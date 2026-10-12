@@ -8,7 +8,7 @@ import SectionTabs from '@/components/SectionTabs';
 import VocabularyNotice from '@/components/VocabularyNotice';
 import { taipei } from '@/lib/api';
 import { type Period, periodOf, TOPICS_PERIOD, topicApiPath } from '@/lib/public-query';
-import type { TopicDetail } from '@/lib/topics';
+import { exclusionReasonLabel, matchingPolicyText, type TopicDetail } from '@/lib/topics';
 import { asIs, type PublicLoad, usePublicJson } from '@/lib/use-public-json';
 
 /** `label` titles the page while another period loads (the topic itself does not change). */
@@ -40,8 +40,31 @@ export default function TopicDetailView({
           current: String(d) === days,
         }))}
       />
-      {data?.topic ? (
+      {data?.topic?.excludedReason ? (
         <>
+          <section role="status" className="rounded-xl border border-zinc-300 p-4 text-sm dark:border-zinc-800">
+            <h2 className="font-semibold">此詞不參與話題比對</h2>
+            <p className="mt-2 text-zinc-600 dark:text-zinc-400">
+              原因：{exclusionReasonLabel(data.topic.excludedReason)}
+              。這個詞仍保留在來源資料中，但不會用來比對文章，所以這裡沒有部落格與文章。
+            </p>
+          </section>
+          <VocabularyNotice data={data.vocabulary} />
+        </>
+      ) : data?.topic ? (
+        <>
+          {data.topic.canonicalId && data.topic.canonicalId !== data.topic.id ? (
+            <p className="text-sm text-zinc-600 dark:text-zinc-400">
+              {data.topic.source === 'rss-category' ? '此 RSS 標籤對應到共同關鍵字' : '這個寫法已與只差在大小寫或全半形的寫法合併為'}「
+              <Link
+                className="text-brand-700 hover:underline dark:text-brand-400"
+                href={`/topics/${encodeURIComponent(data.topic.canonicalId)}/?days=${days}`}
+              >
+                {data.topic.label}
+              </Link>
+              」，以下為合併後的結果。
+            </p>
+          ) : null}
           <div className="grid gap-5 lg:grid-cols-[1fr_2fr]">
             <section className="rounded-xl border border-zinc-300 p-4 dark:border-zinc-800">
               <h2 className="font-semibold">哪些部落格在寫</h2>
@@ -52,7 +75,14 @@ export default function TopicDetailView({
                       <BlogIcon media={b.slug} title={b.name} size={18} />
                       {b.name}
                     </Link>
-                    <span className="shrink-0">{b.posts} 篇</span>
+                    <span className="shrink-0 tabular-nums">
+                      {b.posts} 篇
+                      {typeof b.titlePosts === 'number' && typeof b.bodyOnlyPosts === 'number' ? (
+                        <span className="ml-1 text-xs text-zinc-500">
+                          （標題 {b.titlePosts}／僅正文 {b.bodyOnlyPosts}）
+                        </span>
+                      ) : null}
+                    </span>
                   </li>
                 ))}
               </ul>
@@ -79,6 +109,7 @@ export default function TopicDetailView({
               {!data.articles.length ? <p className="py-6 text-zinc-500">此期間尚無已比對文章。</p> : null}
             </section>
           </div>
+          <p className="text-xs text-zinc-500">{matchingPolicyText(data.matchingPolicy)}</p>
           <VocabularyNotice data={data.vocabulary} />
           {data.truncated ? <p className="text-xs text-zinc-500">僅顯示部分來源與文章。</p> : null}
         </>

@@ -21,7 +21,7 @@
 - 部落格文章、標題與圖片著作權屬原作者。API 只提供標題、原文連結、統計及最多 500 字元的短摘要，不提供全文；私人追蹤、個人 RSS、候選證據、管理及 AI 原始輸入不在公開 API。使用統計請註明「資料來源：部落格觀察 blog.observe.tw」，閱讀文章請連回原站。
 - 不寫程式也能追：訂閱各部落格原站提供的 RSS／Atom；登入 `/my/` 可管理追蹤與匯出 `/me/opml` 給閱讀器，OPML 只包含已成功抓取的 RSS／Atom，沒有可用 feed 的站會略過，請到原站確認訂閱方式。`/me/feed.xml` 是需要瀏覽器登入 session 的私人摘要 RSS，不是可公開分享或以 API 金鑰讀取的 feed。
 - 正文提及是交流訊號，不是抄襲或背書判斷。引用占比的分母為來源站在窗口內所有已解析、指向已收錄目標的「文章—目標部落格」提及數；一篇提及三站會計三筆，不是占全站文章的百分比。覆蓋與截斷欄位應與排行一起閱讀。
-- 話題包含原站 RSS category 與新文易數同步詞庫。詞庫的版本、同步時間與 coverage 隨回應提供；observed-article-window 僅代表觀測窗口內出現的詞，不代表完整詞庫。每站同詞文章依 1、0.5、0.25… 遞減計分。
+- 話題詞條以新文易數維護的標籤池為唯一來源；目前 observed-article-window 僅代表觀測窗口內出現的詞，不代表完整詞庫。NFKC 與大小寫正規化後合併，顯示文字取同快照中上游文章出現次數最多的寫法。只比對標題與清理後正文；同篇取標題權重 2 或正文權重 1，依權重由高到低排列後，同站後續文章貢獻依序乘上 0.5。只命中正文時即 1、0.5、0.25…；2 篇標題加 1 篇正文合計 3.25。排除詞保留原始資料與原因，可透過話題詳情查詢；RSS 分類不另建排行詞庫。
 
 ## 快速開始
 
@@ -467,12 +467,14 @@ curl --fail-with-body -sS 'https://blog.observe.tw/api/v1/topics'
 | 欄位 | 型別 | 說明 |
 | --- | --- | --- |
 | `items` | object[] |  |
-| `items[].id` | string | rss:<數字> 或 tag:<版本內詞彙 ID> |
+| `items[].id` | string | tag:<NFKC／大小寫正規化詞條 SHA-256>；舊 tag／rss ID 可在詳情解析 |
 | `items[].label` | string |  |
 | `items[].source` | "rss-category" \| "tag-vocabulary" |  |
-| `items[].score` | number | 各站依 1、0.5、0.25… 加總 |
+| `items[].score` | number | 同篇取標題 2 或正文 1；同站按權重排序後依序減半加總 |
 | `items[].posts` | integer |  |
 | `items[].blogs` | integer |  |
+| `items[].titlePosts` | integer |  |
+| `items[].bodyOnlyPosts` | integer |  |
 | `nextCursor` | null | 排行僅提供有界快照，不提供游標續頁 |
 | `hours` | integer |  |
 | `vocabulary` | object |  |
@@ -488,6 +490,15 @@ curl --fail-with-body -sS 'https://blog.observe.tw/api/v1/topics'
 | `vocabulary.normalizedTagCount` | integer \| null |  |
 | `vocabulary.tagNormalization` | string \| null |  |
 | `vocabulary.upstreamSnapshotConsistent` | boolean |  |
+| `vocabulary.excludedTermCount` | integer | 保留但不參與比對的 canonical 詞條數 |
+| `vocabulary.exclusionReasons` | object | 排除原因與詞條數 |
+| `matchingPolicy` | object |  |
+| `matchingPolicy.version` | string |  |
+| `matchingPolicy.policyVersion` | string |  |
+| `matchingPolicy.titleWeight` | number |  |
+| `matchingPolicy.bodyWeight` | number |  |
+| `matchingPolicy.sameBlogDecay` | number |  |
+| `matchingPolicy.sources` | "title" \| "body"[] |  |
 | `minimumBlogs` | integer |  |
 | `generatedAt` | string (ISO 時間) |  |
 | `truncated` | boolean |  |
@@ -525,6 +536,8 @@ curl --fail-with-body -sS 'https://blog.observe.tw/api/v1/topics/rss%3A1'
 | `topic.id` | string |  |
 | `topic.label` | string |  |
 | `topic.source` | string |  |
+| `topic.canonicalId` | string \| null |  |
+| `topic.excludedReason` | string \| null | too-short、pure-number、pure-date、tag-noise、no-equal、upstream-noise、invalid-label 或 not-in-tag-vocabulary |
 | `vocabulary` | object |  |
 | `vocabulary.status` | "ready" \| "unavailable" |  |
 | `vocabulary.source` | string |  |
@@ -538,12 +551,23 @@ curl --fail-with-body -sS 'https://blog.observe.tw/api/v1/topics/rss%3A1'
 | `vocabulary.normalizedTagCount` | integer \| null |  |
 | `vocabulary.tagNormalization` | string \| null |  |
 | `vocabulary.upstreamSnapshotConsistent` | boolean |  |
+| `vocabulary.excludedTermCount` | integer | 保留但不參與比對的 canonical 詞條數 |
+| `vocabulary.exclusionReasons` | object | 排除原因與詞條數 |
+| `matchingPolicy` | object |  |
+| `matchingPolicy.version` | string |  |
+| `matchingPolicy.policyVersion` | string |  |
+| `matchingPolicy.titleWeight` | number |  |
+| `matchingPolicy.bodyWeight` | number |  |
+| `matchingPolicy.sameBlogDecay` | number |  |
+| `matchingPolicy.sources` | "title" \| "body"[] |  |
 | `blogs` | object[] |  |
 | `blogs[].id` | integer |  |
 | `blogs[].slug` | string |  |
 | `blogs[].name` | string |  |
 | `blogs[].posts` | integer |  |
 | `blogs[].score` | number |  |
+| `blogs[].titlePosts` | integer |  |
+| `blogs[].bodyOnlyPosts` | integer |  |
 | `articles` | object[] |  |
 | `articles[].id` | integer |  |
 | `articles[].title` | string |  |

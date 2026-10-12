@@ -23,6 +23,9 @@ export default function AboutPage() {
         <p className="text-sm leading-7 text-zinc-600 dark:text-zinc-400">
           部落格有不同的更新步調。我們分開顯示最後發文與抓取成功時間，歷史文章也可匯入。標籤排行先依參與部落格數，再依已收錄文章數排列，不是升溫、品質或人氣評分。
         </p>
+        <p className="text-sm leading-7 text-zinc-600 dark:text-zinc-400">
+          話題排行只使用新文易數的共同關鍵字，比對文章標題與清理後的正文：標題出現的權重高於只在正文出現，同一篇只算一次，同站多篇逐篇遞減。單一字元、純數字或日期、雜訊與沿用來源排除清單的詞不參與比對；在上游宣布完整快照之前，共同關鍵字只涵蓋部分文章觀測窗口，不代表完整詞庫。
+        </p>
       </section>
       <section className="space-y-2">
         <h2 className="text-lg font-semibold">作者與標籤</h2>

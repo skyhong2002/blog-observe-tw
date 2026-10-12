@@ -5,6 +5,7 @@ import { reserveBudget } from '../jobs/budget.ts';
 import type { BatchOptions } from '../jobs/contracts.ts';
 import { withJobLease } from '../jobs/lease.ts';
 import { digest, normalizeTerm, TopicMatcher } from './matcher.ts';
+import { writeTopicPolicy } from './policy-store.ts';
 import { type ExportManifest, HttpSnapshotSource, type SnapshotSource, SOURCE, validateManifest, validatePage } from './snapshot-client.ts';
 import { TAG_NORMALIZATION } from './tag-normalization.ts';
 import { TagArticleSource, TagSourceSchemaError } from './tag-source.ts';
@@ -64,6 +65,7 @@ async function publish(
           [batch.map((t) => [manifest.id, t.id, t.label, normalizeTerm(t.label), JSON.stringify(t.payload)])],
         );
     }
+    await writeTopicPolicy(c, manifest.id, terms);
     const [[count]] = await c.query<RowDataPacket[]>('SELECT COUNT(*) n FROM topic_terms WHERE snapshot_id=?', [manifest.id]);
     if (Number(count.n) !== manifest.total) throw Error('staged term count mismatch');
     const [[current]] = await c.query<RowDataPacket[]>(

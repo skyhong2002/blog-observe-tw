@@ -59,6 +59,7 @@ try {
     ['relation-visibility', '../app/src/relations/visibility.integration.ts', 'runRelationVisibilityIntegration'],
     ['relations-quality', '../app/src/relations/quality.integration.ts', 'runRelationQualityIntegration'],
     ['topics', '../tests/integration/topics.mjs', 'runTopicsIntegration'],
+    ['topics-ranking', '../app/src/topics/ranking.integration.ts', 'runTopicRankingIntegration'],
     ['topics-quality', '../app/src/topics/integration.ts', 'runTopicsQualityIntegration'],
     ['content-topics', '../app/src/topics/content.integration.ts', 'runContentTopicsIntegration'],
     ['content-feed', '../app/src/crawl/feed-content.integration.ts', 'runFeedContentIntegration'],

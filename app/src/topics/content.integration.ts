@@ -86,7 +86,7 @@ export async function runContentTopicsIntegration(pool: Pool) {
         JSON.stringify({ label }),
       ]);
     await runTopicsBatch(pool, { limit: 200 });
-    let [hits] = await pool.query<RowDataPacket[]>('SELECT term_id,source FROM topic_matches WHERE post_id=?', [postId]);
+    let [hits] = await pool.query<RowDataPacket[]>('SELECT term_id,source FROM topic_matches_v2 WHERE post_id=?', [postId]);
     assert.deepEqual(
       hits.map((r) => [r.term_id, r.source]),
       [[digest('私藏綠茶'), 'body']],
@@ -166,18 +166,18 @@ export async function runContentTopicsIntegration(pool: Pool) {
       (await app.inject(path)).json().items.some((row: { label: string }) => row.label === '私藏綠茶'),
       true,
     );
-    await pool.execute("UPDATE content_post_bodies SET body_text='改寫正文',content_hash=?,revision=revision+1 WHERE post_id=?", [
-      digest('改寫正文'),
-      postId,
-    ]);
+    await pool.execute(
+      "UPDATE content_post_bodies SET body_text='改寫正文',body_html='<p>改寫正文</p>',content_hash=?,revision=revision+1 WHERE post_id=?",
+      [digest('改寫正文'), postId],
+    );
     invalidateTopicCache(pool);
     assert.equal((await app.inject(path)).json().items.length, 0, 'changed stored body immediately invalidates previous match');
     await runTopicsBatch(pool, { limit: 200 });
-    [hits] = await pool.query<RowDataPacket[]>('SELECT term_id FROM topic_matches WHERE post_id=?', [postId]);
+    [hits] = await pool.query<RowDataPacket[]>('SELECT term_id FROM topic_matches_v2 WHERE post_id=?', [postId]);
     assert.equal(hits.length, 0);
     await pool.execute("UPDATE content_post_bodies SET status='partial',completeness='partial' WHERE post_id=?", [postId]);
     await runTopicsBatch(pool, { limit: 200 });
-    [hits] = await pool.query<RowDataPacket[]>('SELECT term_id FROM topic_matches WHERE post_id=?', [postId]);
+    [hits] = await pool.query<RowDataPacket[]>('SELECT term_id FROM topic_matches_v2 WHERE post_id=?', [postId]);
     assert.equal(hits[0]?.term_id, digest('舊版紅茶'));
     return {
       privateBodyMatched: true,
@@ -202,17 +202,19 @@ export async function runContentTopicsIntegration(pool: Pool) {
     if (previous) await pool.execute('UPDATE topic_current SET snapshot_id=? WHERE source=?', [previous.snapshot_id, SOURCE]);
     else await pool.execute('DELETE FROM topic_current WHERE source=?', [SOURCE]);
     if (postId)
-      for (const table of ['topic_matches', 'topic_post_indexes', 'content_post_bodies', 'relation_observations'])
+      for (const table of ['topic_matches_v2', 'topic_post_indexes_v2', 'content_post_bodies', 'relation_observations'])
         await pool.execute(`DELETE FROM ${table} WHERE post_id=?`, [postId]);
     if (futurePostId) {
       const [[raw]] = await pool.query<RowDataPacket[]>('SELECT published_at FROM posts WHERE id=?', [futurePostId]);
       assert.equal(new Date(raw.published_at).getUTCFullYear(), 2115);
-      for (const table of ['topic_matches', 'topic_post_indexes'])
+      for (const table of ['topic_matches_v2', 'topic_post_indexes_v2'])
         await pool.execute(`DELETE FROM ${table} WHERE post_id=?`, [futurePostId]);
       await pool.execute('DELETE FROM posts WHERE id=?', [futurePostId]);
     }
     if (postId) await pool.execute('DELETE FROM posts WHERE id=?', [postId]);
     if (blogId) await pool.execute('DELETE FROM blogs WHERE id=?', [blogId]);
+    await pool.execute('DELETE FROM topic_term_aliases WHERE snapshot_id=?', [version]);
+    await pool.execute('DELETE FROM topic_canonical_terms WHERE snapshot_id=?', [version]);
     await pool.execute('DELETE FROM topic_terms WHERE snapshot_id=?', [version]);
     await pool.execute('DELETE FROM topic_snapshots WHERE id=?', [version]);
   }

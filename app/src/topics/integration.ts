@@ -143,19 +143,24 @@ export async function runTopicsQualityIntegration(pool: Pool) {
     const concurrent = await Promise.all(Array.from({ length: 12 }, () => app.inject('/api/topics?days=7')));
     for (const r of concurrent) assert.equal(r.statusCode, 200, r.body);
     const firstQueries = queries;
-    assert.ok(firstQueries <= 7, `cold singleflight queried ${firstQueries} times`);
+    assert.ok(firstQueries <= 8, `cold singleflight queried ${firstQueries} times`);
     await app.inject('/api/topics?days=7');
     assert.equal(queries, firstQueries);
     const result = concurrent[0].json();
     const topic = result.items.find((x: { id: string }) => x.id === `rss:${tagId}`);
-    assert.equal(topic.posts, 3);
-    assert.equal(topic.blogs, 2);
-    assert.equal(topic.score, 2.5);
+    assert.equal(topic, undefined, 'feed categories must not create a parallel ranking dictionary');
+    const nativeDetail = await app.inject(`/api/topics/rss:${tagId}?days=7`);
+    assert.equal(nativeDetail.statusCode, 200);
+    assert.equal(nativeDetail.json().topic.excludedReason, 'not-in-tag-vocabulary');
+    assert.deepEqual(nativeDetail.json().blogs, []);
     assert.equal(result.vocabulary.invalidTagCount, 3);
     assert.equal(result.cacheSeconds, 120);
     const profile = await app.inject(`/api/blogs/topic-quality-${successId}-0/topics?days=7`);
     assert.equal(profile.statusCode, 200, profile.body);
-    assert.equal(profile.json().items.find((x: { id: string }) => x.id === `rss:${tagId}`).posts, 2);
+    assert.equal(
+      profile.json().items.find((x: { id: string }) => x.id === `rss:${tagId}`),
+      undefined,
+    );
     assert.ok(
       statements.some((sql) => sql.startsWith('WITH scoped_posts') && sql.includes('AND b.slug=?), evidence')),
       'blog scope must be inside pre-union source',
@@ -184,8 +189,19 @@ export async function runTopicsQualityIntegration(pool: Pool) {
       await pool.query('DELETE FROM blogs WHERE id IN (?)', [blogIds]);
     }
     if (tagId) await pool.execute('DELETE FROM tags WHERE id=?', [tagId]);
-    for (const table of ['topic_terms', 'topic_snapshots', 'topic_window_articles', 'topic_window_runs']) {
-      const key = table === 'topic_terms' ? 'snapshot_id' : table === 'topic_window_articles' ? 'run_id' : 'id';
+    for (const table of [
+      'topic_term_aliases',
+      'topic_canonical_terms',
+      'topic_terms',
+      'topic_snapshots',
+      'topic_window_articles',
+      'topic_window_runs',
+    ]) {
+      const key = ['topic_terms', 'topic_term_aliases', 'topic_canonical_terms'].includes(table)
+        ? 'snapshot_id'
+        : table === 'topic_window_articles'
+          ? 'run_id'
+          : 'id';
       await pool.query(`DELETE FROM ${table} WHERE ${key} IN (?)`, [[failedId, successId]]);
     }
     await pool.execute("DELETE FROM work_budgets WHERE day IN (?,?) AND scope LIKE 'topics:%'", [budgetDay, usedDay]);

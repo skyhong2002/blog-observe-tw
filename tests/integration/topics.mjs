@@ -10,6 +10,10 @@ export async function runTopicsIntegration(pool) {
   assertEphemeralDatabase(pool);
   assert.equal(pool.pool.config.connectionConfig.port, 18169, 'clone-only integration');
   for (const table of [
+    'topic_matches_v2',
+    'topic_post_indexes_v2',
+    'topic_term_aliases',
+    'topic_canonical_terms',
     'topic_matches',
     'topic_post_indexes',
     'topic_terms',
@@ -34,11 +38,11 @@ export async function runTopicsIntegration(pool) {
       assert.deepEqual(w, window);
       return cursor
         ? {
-            articles: [{ id: '800002', media: 'fixture2', publishedAt: published.toISOString(), tags: ['旅行', '科技'] }],
+            articles: [{ id: '800002', media: 'fixture2', publishedAt: published.toISOString(), tags: ['登山', '科技'] }],
             nextCursor: null,
           }
         : {
-            articles: [{ id: '800003', media: 'fixture', publishedAt: published.toISOString(), tags: ['旅行', 'AI'] }],
+            articles: [{ id: '800003', media: 'fixture', publishedAt: published.toISOString(), tags: ['登山', 'AI'] }],
             nextCursor: '123_800003',
           };
     },
@@ -82,7 +86,7 @@ export async function runTopicsIntegration(pool) {
     [2, 1],
     [3, 1],
   ]) {
-    const title = `旅行測試 ${i}`;
+    const title = `登山測試 ${i}`;
     const [post] = await pool.execute(
       'INSERT INTO posts(blog_id,guid,url,title,summary,content_hash,published_at,created_at) VALUES (?,?,?,?,?,?,?,?)',
       [
@@ -99,7 +103,7 @@ export async function runTopicsIntegration(pool) {
     postIds.push(post.insertId);
   }
   const [tag] = await pool.execute(
-    "INSERT INTO tags(slug,label,normalized_label,status,source_type,first_seen_at,last_seen_at,created_at,updated_at) VALUES ('topic-native-fixture','旅行','旅行','active','manual',?,?,?,?)",
+    "INSERT INTO tags(slug,label,normalized_label,status,source_type,first_seen_at,last_seen_at,created_at,updated_at) VALUES ('topic-native-fixture','登山','登山','active','manual',?,?,?,?)",
     [now, now, now, now],
   );
   for (const [postId, sourceType] of [
@@ -124,7 +128,7 @@ export async function runTopicsIntegration(pool) {
     const dto = response.json();
     assert.equal(dto.vocabulary.coverage, 'observed-article-window');
     assert.equal(dto.vocabulary.upstreamSnapshotConsistent, false);
-    const topicId = 'tag:' + hash('旅行');
+    const topicId = 'tag:' + hash('登山');
     const row = dto.items.find((t) => t.id === topicId);
     assert.ok(row, JSON.stringify(dto));
     assert.ok(row.blogs >= 2);
@@ -133,7 +137,7 @@ export async function runTopicsIntegration(pool) {
     assert.equal(detail.statusCode, 200, detail.body);
     const fixtureBlog = detail.json().blogs.find((b) => b.id === blogIds[0]);
     assert.equal(fixtureBlog.posts, 2);
-    assert.equal(fixtureBlog.score, 1.5);
+    assert.equal(fixtureBlog.score, 3);
     const fixture2 = detail.json().blogs.find((b) => b.id === blogIds[1]);
     assert.equal(fixture2.posts, 1, 'unknown dates excluded');
     assert.equal((await app.inject('/api/topics?days=1')).statusCode, 400);
@@ -156,7 +160,11 @@ export async function runTopicsIntegration(pool) {
   } finally {
     await app.close();
     for (const table of [
-      'topic_matches',
+      'topic_matches_v2',
+    'topic_post_indexes_v2',
+    'topic_term_aliases',
+    'topic_canonical_terms',
+    'topic_matches',
       'topic_post_indexes',
       'topic_terms',
       'topic_current',

@@ -88,16 +88,24 @@ export async function runPublicApiIntegration(pool: Pool) {
     const topics = await app.inject('/api/v1/topics?limit=200');
     assert.equal(topics.statusCode, 200);
     const topic = topics.json().items.find((t: { id: string }) => t.id === `rss:${tags[0]}`);
-    assert.equal(topic.blogs, 2);
-    assert.equal(topic.posts, 4);
-    assert.equal(topic.score, 3);
+    assert.equal(topic, undefined, 'RSS tags do not form a separate topic dictionary');
+    assert.equal(topics.json().matchingPolicy.titleWeight, 2);
+    assert.equal(topics.json().matchingPolicy.bodyWeight, 1);
     assert.ok(!topics.json().items.some((t: { id: string }) => t.id === `rss:${tags[1]}`));
     const detail = await app.inject(`/api/v1/topics/rss%3A${tags[0]}`);
     assert.equal(detail.statusCode, 200);
-    assert.equal(detail.json().blogs.length, 2);
-    assert.equal(detail.json().articles.length, 4);
+    assert.equal(detail.json().blogs.length, 0);
+    assert.equal(detail.json().articles.length, 0);
+    assert.equal(detail.json().topic.excludedReason, 'not-in-tag-vocabulary');
+    assert.equal(detail.json().topic.canonicalId, null);
     assert.equal((await app.inject(`/api/v1/topics/rss%3A${tags[1]}`)).statusCode, 404);
-    return { paginationRows: ids.length, verifiedBlogs: 2, privateBlogsExcluded: 1, topicScore: topic.score };
+    return {
+      paginationRows: ids.length,
+      verifiedBlogs: 2,
+      privateBlogsExcluded: 1,
+      nativeDetailCompatible: true,
+      nativeRankingExcluded: true,
+    };
   } finally {
     await app.close();
     if (posts.length) {

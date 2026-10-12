@@ -28,3 +28,7 @@ Copyright (c) 2026 Sky Hong
 Public API OpenAPI metadata, generated documentation, API key lifecycle, API tabs,
 page outline and schema field rendering selectively ported from tag.observe.tw
 at afe0a653fa8aae7e25a04a1d9fe87bf0400a2a39. Copyright (c) 2026 Sky Hong.
+
+Topic matching noise policy copies app/src/tag-noise.ts and app/data/no-equal-tags.json
+verbatim from tag.observe.tw afe0a653fa8aae7e25a04a1d9fe87bf0400a2a39.
+Copyright (c) 2026 Sky Hong

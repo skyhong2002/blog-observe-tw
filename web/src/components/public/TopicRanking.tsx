@@ -8,7 +8,7 @@ import TableScroller from '@/components/TableScroller';
 import VocabularyNotice from '@/components/VocabularyNotice';
 import { type Period, periodOf, TOPICS_PERIOD, topicsApiPath } from '@/lib/public-query';
 import { table } from '@/lib/table-styles';
-import type { Topics } from '@/lib/topics';
+import { matchingPolicyText, matchSplit, type Topics } from '@/lib/topics';
 import { asIs, type PublicLoad, usePublicJson } from '@/lib/use-public-json';
 
 export default function TopicRankingView({ days, load }: { days: Period; load: PublicLoad<Topics> }) {
@@ -17,7 +17,7 @@ export default function TopicRankingView({ days, load }: { days: Period; load: P
       <header>
         <h1 className="text-2xl font-semibold">大家正在寫什麼</h1>
         <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
-          從不同部落格的文章，看持續被書寫的話題。同站對同一詞依序貢獻 1、0.5、0.25…，讓大量發文的站不會獨占排行。
+          從不同部落格的文章，看持續被書寫的話題。同站對同一詞的貢獻逐篇遞減，讓大量發文的站不會獨占排行。
         </p>
       </header>
       <SectionTabs
@@ -57,6 +57,9 @@ function TopicRows({ days, data }: { days: Period; data: Topics }) {
                 文章
               </th>
               <th scope="col" className={table.num}>
+                標題／僅正文
+              </th>
+              <th scope="col" className={table.num}>
                 加權貢獻
               </th>
             </tr>
@@ -80,6 +83,7 @@ function TopicRows({ days, data }: { days: Period; data: Topics }) {
                 </td>
                 <td className={table.num}>{t.blogs.toLocaleString('zh-TW')}</td>
                 <td className={table.num}>{t.posts.toLocaleString('zh-TW')}</td>
+                <td className={table.num}>{matchSplit(t)}</td>
                 <td className={table.num}>{Number(t.score).toFixed(2)}</td>
               </tr>
             ))}
@@ -89,10 +93,11 @@ function TopicRows({ days, data }: { days: Period; data: Topics }) {
       {!data.items.length ? (
         <p className="py-8 text-zinc-500">這段期間尚無跨至少 {data.minimumBlogs} 個部落格的共同話題；個別站的主題可在部落格頁查看。</p>
       ) : null}
+      <p className="text-xs text-zinc-500">{matchingPolicyText(data.matchingPolicy)}</p>
       <VocabularyNotice data={data.vocabulary} />
       {data.coverage ? (
         <p className="text-xs text-zinc-500">
-          期間內 {data.coverage.datedPosts} 篇；可辨識正文 {data.coverage.bodyObservedPosts} 篇，有 RSS 標籤或共同詞彙線索{' '}
+          期間內 {data.coverage.datedPosts} 篇；可辨識正文 {data.coverage.bodyObservedPosts} 篇，標題或正文命中共同關鍵字{' '}
           {data.coverage.matchedPosts} 篇。比對達上限 {data.coverage.cappedPosts} 篇保留未完整標記。日期未知{' '}
           {data.coverage.unknownDatePosts} 篇不列入期間排行。
           {data.truncated ? '僅顯示前 100 項。' : ''}

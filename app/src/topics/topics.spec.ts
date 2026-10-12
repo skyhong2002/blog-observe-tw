@@ -54,14 +54,14 @@ describe('literal bounded blog keyword matching', () => {
       { id: 'b', label: '格' },
       { id: 'c', label: '落格觀察' },
     ]);
-    expect(matcher.match('部落格觀察 部落格').ids.sort()).toEqual(['a', 'b', 'c']);
+    expect(matcher.match('部落格觀察 部落格').ids.sort()).toEqual(['a', 'c']);
   });
   it('bounds text and output to report partial extraction', () => {
     expect(
       new TopicMatcher([
-        { id: 'x', label: '貓' },
-        { id: 'y', label: '狗' },
-      ]).match('貓狗', 1).truncated,
+        { id: 'x', label: '貓咪' },
+        { id: 'y', label: '小狗' },
+      ]).match('貓咪小狗', 1).truncated,
     ).toBe(true);
     expect(new TopicMatcher([]).match('x'.repeat(60001)).truncated).toBe(true);
   });

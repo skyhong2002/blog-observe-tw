@@ -1,18 +1,28 @@
-import { createHash } from 'node:crypto';
+import { exclusionReason, normalizeTerm } from './policy.ts';
 
-export const normalizeTerm = (value: string) => value.normalize('NFKC').toLocaleLowerCase('en-US').replace(/\s+/gu, ' ').trim();
-export const digest = (value: string) => createHash('sha256').update(value).digest('hex');
+export { digest, MATCHER_VERSION, normalizeTerm, POLICY_VERSION } from './policy.ts';
+
 const latin = (value: string | undefined) => Boolean(value && /[\p{Script=Latin}\p{Number}_]/u.test(value));
 type Node = { next: Map<string, number>; failure: number; terminal: string[]; output: number };
 /** Bounded Aho-Corasick trie: no terms × articles regular-expression scan. */
 export class TopicMatcher {
   private readonly nodes: Node[] = [{ next: new Map(), failure: 0, terminal: [], output: 0 }];
   private readonly labels = new Map<string, string>();
-  constructor(terms: { id: string; label: string }[]) {
+  constructor(terms: { id: string; label: string; payload?: unknown }[]) {
     if (terms.length > 250_000) throw Error('topic term cap');
+    const unique = new Map<string, { id: string; label: string; excluded: boolean }>();
     for (const term of terms) {
       const label = normalizeTerm(term.label);
-      if (!label || label.length > 255) continue;
+      const previous = unique.get(label);
+      unique.set(label, {
+        id: previous && previous.id < term.id ? previous.id : term.id,
+        label,
+        excluded: Boolean(exclusionReason(term.label, term.payload)) || Boolean(previous?.excluded),
+      });
+    }
+    for (const term of unique.values()) {
+      const label = term.label;
+      if (term.excluded) continue;
       this.labels.set(term.id, label);
       let state = 0;
       for (const char of label) {

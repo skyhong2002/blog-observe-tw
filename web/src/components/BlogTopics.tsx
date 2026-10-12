@@ -6,7 +6,9 @@ export default async function BlogTopics({ slug }: { slug: string }) {
   return (
     <section className="mt-8 space-y-3">
       <h2 className="text-lg font-semibold">最近常寫的話題</h2>
-      <p className="text-sm text-zinc-500">近 90 天文章的 RSS 標籤與共同關鍵字；是文章內容線索，不是作者身分分類。</p>
+      <p className="text-sm text-zinc-500">
+        近 90 天文章標題或正文出現的共同關鍵字；是文章內容線索，不是作者身分分類。RSS 自訂分類保留為原始資料，不另列話題。
+      </p>
       {!data ? (
         <p className="text-sm text-zinc-500">話題資料暫時無法讀取，請稍後再試。</p>
       ) : data.items.length ? (
