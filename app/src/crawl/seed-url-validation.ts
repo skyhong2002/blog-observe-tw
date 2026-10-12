@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import * as cheerio from 'cheerio';
 import { XMLParser, XMLValidator } from 'fast-xml-parser';
-import { type FeedCrawlerOptions, type FeedLink, isAllowedCrawlUrl, politeFetch, readFeedBody } from './feed.ts';
+import { type FeedCrawlerOptions, type FeedLink, isAllowedCrawlUrl, politeFetch, rankedSitemapUrls, readFeedBody } from './feed.ts';
 
 export type SeedResearchEvidence = { alias: string; sourceUrl: string; excerpt: string };
 export type SeedUrlInput = {
@@ -402,9 +402,11 @@ export async function validateSeedUrl(input: SeedUrlInput, options: SeedValidati
         continue;
       }
       if (info.indexUrls) {
-        const child = info.indexUrls.find((childUrl) => inPublication(childUrl, result.finalUrl!) && !seen.has(childUrl));
-        if (child) queue.splice(index + 1, 0, child);
-        check.reason = child ? 'sitemap_index_follow_child' : 'sitemap_index_without_scoped_child';
+        const children = rankedSitemapUrls(info.indexUrls)
+          .filter((childUrl) => inPublication(childUrl, result.finalUrl!) && !seen.has(childUrl))
+          .slice(0, Math.max(0, limit - seen.size));
+        if (children.length) queue.splice(index + 1, 0, ...children);
+        check.reason = children.length ? 'sitemap_index_follow_child' : 'sitemap_index_without_scoped_child';
         continue;
       }
       if (!sourceInScope(info, check.finalUrl, result.finalUrl)) {

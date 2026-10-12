@@ -307,3 +307,69 @@ describe('automatic identity binding safeguards', () => {
     expect(result.evidence.sourceChecks.some((check) => check.url.includes('/comments/'))).toBe(false);
   });
 });
+
+describe('article-oriented sitemap discovery', () => {
+  const sitemapIndex = (home: string, files: string[]) =>
+    `<sitemapindex>${files.map((file) => `<sitemap><loc>${home}${file}</loc></sitemap>`).join('')}</sitemapindex>`;
+  const urlset = (home: string) => `<urlset><url><loc>${home}article</loc></url></urlset>`;
+  it('prefers post partitions over the first misc sitemap, without fetching the misc source', async () => {
+    const home = 'https://post-priority.test/';
+    const options = fixture({
+      [home]: page('小林筆記', '/sitemap.xml'),
+      [`${home}sitemap.xml`]: sitemapIndex(home, ['sitemap-misc.xml', 'post-sitemap.xml']),
+      [`${home}sitemap-misc.xml`]: urlset(home),
+      [`${home}post-sitemap.xml`]: urlset(home),
+    });
+    const result = await validateSeedUrl({ id: 40, name: '小林筆記', url: home }, options);
+    expect(result.feedSources).toEqual([{ url: `${home}post-sitemap.xml`, type: 'sitemap' }]);
+    expect(options.fetcher.mock.calls.some(([url]) => String(url).includes('sitemap-misc'))).toBe(false);
+    expect(result.evidence.sourceChecks).toHaveLength(2);
+  });
+
+  it('prioritizes latest dated article partitions and demotes post-tag/page partitions', async () => {
+    const home = 'https://dated-priority.test/';
+    const result = await validateSeedUrl(
+      { id: 41, name: '小林筆記', url: home },
+      fixture({
+        [home]: page('小林筆記', '/sitemap.xml'),
+        [`${home}sitemap.xml`]: sitemapIndex(home, [
+          'post_tag-2026-10.xml',
+          'posts-page-2026-11.xml',
+          'post-2024-12.xml',
+          'post-2026-09.xml',
+          'post-2026-10.xml',
+        ]),
+        [`${home}post-2026-10.xml`]: urlset(home),
+      }),
+    );
+    expect(result.feedSources[0]?.url).toBe(`${home}post-2026-10.xml`);
+  });
+
+  it('continues to the next article child after an invalid child without increasing request budget', async () => {
+    const home = 'https://fallback-child.test/';
+    const options = fixture({
+      [home]: page('小林筆記', '/sitemap.xml'),
+      [`${home}sitemap.xml`]: sitemapIndex(home, ['misc.xml', 'article-2026-10.xml', 'article-2026-09.xml']),
+      [`${home}article-2026-10.xml`]: '<html>Not XML sitemap</html>',
+      [`${home}article-2026-09.xml`]: urlset(home),
+    });
+    const result = await validateSeedUrl({ id: 42, name: '小林筆記', url: home }, { ...options, maxSourceRequests: 3 });
+    expect(result.feedSources[0]?.url).toBe(`${home}article-2026-09.xml`);
+    expect(result.evidence.sourceChecks).toHaveLength(3);
+    expect(options.fetcher.mock.calls.some(([url]) => String(url).includes('misc.xml'))).toBe(false);
+  });
+});
+
+it('resolves relative sitemap child locs and discards malformed locs before ranking', async () => {
+  const home = 'https://relative-index.test/';
+  const options = fixture({
+    [home]: page('小林筆記', '/sitemap/index.xml'),
+    [`${home}sitemap/index.xml`]:
+      '<sitemapindex><sitemap><loc>http://[</loc></sitemap><sitemap><loc>http://127.0.0.1/private.xml</loc></sitemap><sitemap><loc>../post-current.xml</loc></sitemap></sitemapindex>',
+    [`${home}post-current.xml`]: `<urlset><url><loc>${home}post</loc></url></urlset>`,
+  });
+  const result = await validateSeedUrl({ id: 46, name: '小林筆記', url: home }, options);
+  expect(result.validated).toBe(true);
+  expect(result.feedSources).toEqual([{ url: `${home}post-current.xml`, type: 'sitemap' }]);
+  expect(options.fetcher.mock.calls.some(([url]) => String(url).includes('127.0.0.1'))).toBe(false);
+});

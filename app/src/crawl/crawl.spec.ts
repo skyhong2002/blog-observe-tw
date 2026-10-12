@@ -156,3 +156,126 @@ describe('crawl integration', () => {
     expect(fixture.fetcher.mock.calls.some(([url]) => String(url) === `${host}/p30`)).toBe(false);
   }, 15000);
 });
+
+function durableFixture(name: string, xml: string, failAt?: string, status = 200) {
+  const url = `https://${name}.test/feed`;
+  const execute = vi.fn(async (sql: string, _values?: unknown[]) => {
+    if (failAt && sql.startsWith(failAt)) throw new Error('simulated database failure');
+    if (sql.startsWith('SELECT url,type')) return [[{ url, type: 'rss' }], []];
+    if (sql.startsWith('SELECT * FROM feed_sources')) return [[{ etag: 'old-etag', last_modified: 'Mon, 01 Jan 2024 00:00:00 GMT' }], []];
+    if (sql.startsWith('SELECT')) return [[], []];
+    return [{ insertId: 1, affectedRows: 1 }, []];
+  });
+  const fetcher = vi.fn<FeedFetcher>(async (input) =>
+    String(input).endsWith('/robots.txt')
+      ? new Response('')
+      : new Response(status === 304 ? null : xml, {
+          status,
+          headers: { etag: 'new-etag', 'last-modified': 'Mon, 01 Jun 2026 00:00:00 GMT', 'content-type': 'application/rss+xml' },
+        }),
+  );
+  return {
+    url,
+    execute,
+    fetcher,
+    pool: { execute: execute as unknown as Pool['execute'] },
+    blog: { id: 42, slug: name, url: `https://${name}.test/` },
+    options: { fetcher, resolveHost: async () => ['93.184.216.34'], delayMs: 250 },
+  };
+}
+const metadataRss =
+  '<rss><channel><title>Blog</title><item><guid>durable-post</guid><title>文章</title><link>https://metadata.test/post</link><author>作者</author><category>分類</category></item></channel></rss>';
+
+describe('durable feed import and schema bounds', () => {
+  it('bounds UTF-8 summaries without splitting Unicode, and limits author/image fields', async () => {
+    const summary = '😀界'.repeat(12000);
+    const author = '😀'.repeat(300);
+    const longImage = `https://images.test/${'x'.repeat(1100)}`;
+    const xml = `<rss><channel><title>Blog</title><item><guid>bounded</guid><title>短文</title><link>https://bounded-text.test/post</link><description><![CDATA[${summary}]]></description><author>${author}</author><enclosure url="${longImage}"/></item></channel></rss>`;
+    const f = durableFixture('bounded-text', xml);
+    await crawlBlog({ pool: f.pool }, f.blog, f.options);
+    const values = f.execute.mock.calls.find(([sql]) => sql.startsWith('INSERT INTO posts'))?.[1];
+    const stored = String(values?.[4]);
+    expect(Buffer.byteLength(stored, 'utf8')).toBeLessThanOrEqual(60 * 1024);
+    expect(Buffer.byteLength(stored, 'utf8')).toBeGreaterThan(60 * 1024 - 4);
+    expect(stored.isWellFormed()).toBe(true);
+    expect(summary.startsWith(stored)).toBe(true);
+    expect(Array.from(String(values?.[5]))).toHaveLength(255);
+    expect(String(values?.[5]).isWellFormed()).toBe(true);
+    expect(values?.[8]).toBeNull();
+  });
+
+  it.each(['INSERT INTO posts', 'INSERT INTO authors', 'INSERT INTO post_tags'])(
+    'does not acknowledge new validators when %s fails',
+    async (failAt) => {
+      const f = durableFixture(`fail-${failAt.split(' ').at(-1)}`, metadataRss, failAt);
+      await expect(crawlBlog({ pool: f.pool }, f.blog, f.options)).rejects.toThrow('simulated database failure');
+      expect(f.execute.mock.calls.some(([sql]) => sql.includes('etag,last_modified,last_success_at'))).toBe(false);
+      expect(f.execute.mock.calls.some(([sql]) => sql.startsWith('UPDATE feed_sources SET last_success_at'))).toBe(false);
+    },
+  );
+
+  it('acknowledges feed validators only after post and relationship writes succeed', async () => {
+    const f = durableFixture('durable-order', metadataRss);
+    await crawlBlog({ pool: f.pool }, f.blog, f.options);
+    const sql = f.execute.mock.calls.map(([statement]) => statement);
+    const accepted = sql.findIndex((statement) => statement.includes('etag,last_modified,last_success_at'));
+    expect(accepted).toBeGreaterThan(sql.findIndex((statement) => statement.startsWith('INSERT INTO posts')));
+    expect(accepted).toBeGreaterThan(sql.findIndex((statement) => statement.startsWith('INSERT INTO post_authors')));
+    expect(accepted).toBeGreaterThan(sql.findIndex((statement) => statement.startsWith('INSERT INTO blog_tags')));
+    expect(f.execute.mock.calls[accepted][1]?.[3]).toBe('new-etag');
+  });
+
+  it('omits conditional headers for history replay but preserves normal caching', async () => {
+    for (const historyImport of [false, true]) {
+      const f = durableFixture(`history-headers-${historyImport}`, metadataRss);
+      await crawlBlog({ pool: f.pool }, f.blog, { ...f.options, historyImport });
+      const headers = f.fetcher.mock.calls.find(([url]) => String(url) === f.url)?.[1]?.headers as Record<string, string>;
+      if (historyImport) {
+        expect(headers['if-none-match']).toBeUndefined();
+        expect(headers['if-modified-since']).toBeUndefined();
+      } else {
+        expect(headers['if-none-match']).toBe('old-etag');
+        expect(headers['if-modified-since']).toBe('Mon, 01 Jan 2024 00:00:00 GMT');
+      }
+    }
+  });
+
+  it('does not claim a historical import when the server sends an unsolicited 304', async () => {
+    const f = durableFixture('history-bad304', metadataRss, undefined, 304);
+    const result = await crawlBlog({ pool: f.pool }, f.blog, { ...f.options, historyImport: true });
+    expect(result.sources).toBe(0);
+    expect(result.posts).toBe(0);
+    expect(f.execute.mock.calls.some(([sql]) => sql.startsWith('UPDATE feed_sources SET last_success_at'))).toBe(false);
+    const update = f.execute.mock.calls.find(([sql]) => sql.includes('history_imported_at=IF'));
+    expect(update?.[1]?.[4]).toBe(false);
+  });
+});
+
+describe('registered source priority', () => {
+  it('processes RSS and article sitemap before an older 30-URL miscellaneous sitemap', async () => {
+    const home = 'https://registered-priority.test';
+    const misc = `${home}/sitemap-misc.xml`;
+    const posts = `${home}/post-sitemap.xml`;
+    const rss = `${home}/feed/`;
+    const sources: FeedLink[] = [
+      { url: misc, type: 'sitemap' },
+      { url: posts, type: 'sitemap' },
+      { url: rss, type: 'rss' },
+    ];
+    const f = setup(sources, {
+      [misc]: `<urlset>${Array.from({ length: 30 }, (_, i) => `<url><loc>${home}/misc${i}</loc></url>`).join('')}</urlset>`,
+      [posts]: `<urlset><url><loc>${home}/real-post</loc></url></urlset>`,
+      [rss]: '<rss><channel><title>Empty RSS</title></channel></rss>',
+      [`${home}/real-post`]: article({ '@type': 'BlogPosting', headline: '真正的文章' }),
+    });
+    const result = await crawlBlog({ pool: f.pool }, { id: 80, slug: 'priority', url: `${home}/` }, f.options);
+    expect(result.posts).toBe(1);
+    expect(result.sources).toBe(3);
+    const requested = f.fetcher.mock.calls.map(([url]) => String(url));
+    expect(requested.filter((url) => [misc, posts, rss].includes(url))).toEqual([rss, posts, misc]);
+    expect(requested).toContain(`${home}/real-post`);
+    expect(requested.filter((url) => /\/(?:real-post|misc\d+)$/.test(url))).toHaveLength(30);
+    expect(requested).not.toContain(`${home}/misc29`);
+  }, 15000);
+});

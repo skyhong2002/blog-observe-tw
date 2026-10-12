@@ -86,6 +86,26 @@ const dateOf = (value: unknown): Date | null => {
   const date = new Date(textOf(value));
   return Number.isNaN(date.getTime()) ? null : date;
 };
+const truncateCharacters = (value: string, limit: number): string => {
+  let result = '';
+  let count = 0;
+  for (const character of value) {
+    if (count++ >= limit) break;
+    result += character;
+  }
+  return result;
+};
+const truncateUtf8 = (value: string, maxBytes: number): string => {
+  let result = '';
+  let bytes = 0;
+  for (const character of value) {
+    const size = Buffer.byteLength(character, 'utf8');
+    if (bytes + size > maxBytes) break;
+    result += character;
+    bytes += size;
+  }
+  return result;
+};
 const shortHash = (value: string) => createHash('sha256').update(value).digest('hex');
 const hostnameOf = (url: URL): string => url.hostname.replace(/^\[|\]$/g, '');
 
@@ -577,6 +597,30 @@ async function verifySitemapArticles(entries: FeedEntry[], blogUrl: string, opti
   return verified;
 }
 
+/** Prefer article partitions over the often-first miscellaneous/taxonomy sitemap.
+ * This only orders bounded source validation; URL names never prove an article exists. */
+export function rankedSitemapUrls(urls: string[]): string[] {
+  const rank = (value: string) => {
+    const url = new URL(value);
+    const name = `${url.pathname}${url.search}`.toLowerCase();
+    const secondary =
+      /(?:^|[/_.?=&-])(?:misc|pages?|categor(?:y|ies)|tags?|post_tag|taxonomies|authors?|products?|attachments?)(?=[/_.?=&\d-]|$)/.test(
+        name,
+      );
+    const articles = /(?:^|[/_.?=&-])(?:posts?|articles?|news)(?=[/_.?=&\d-]|$)/.test(name);
+    const dates = [...name.matchAll(/(?:^|\D)((?:19|20)\d{2})[-_/.]?(0[1-9]|1[0-2])(?:[-_/.]?(0[1-9]|[12]\d|3[01]))?(?=\D|$)/g)].map(
+      (match) => Number(`${match[1]}${match[2]}${match[3] || '01'}`),
+    );
+    const date = Math.max(0, ...dates);
+    return { priority: secondary ? 3 : articles ? 0 : date ? 1 : 2, date };
+  };
+  return [...new Set(urls)]
+    .filter(isAllowedCrawlUrl)
+    .map((url) => ({ url, ...rank(url) }))
+    .sort((a, b) => a.priority - b.priority || b.date - a.date || a.url.localeCompare(b.url))
+    .map(({ url }) => url);
+}
+
 export async function discoverFeedUrls(blogUrl: string, options: FeedCrawlerOptions = {}): Promise<FeedLink[]> {
   const response = await politeFetch(blogUrl, {}, options);
   if (!response.ok) throw new Error(`homepage ${response.status}`);
@@ -602,7 +646,14 @@ export async function crawlBlog(
       [blog.id],
     );
     const known = Array.isArray(registered) ? (registered as FeedLink[]) : [];
-    links = known.filter((source) => ['rss', 'atom', 'sitemap'].includes(source.type) && isAllowedCrawlUrl(source.url));
+    const valid = known.filter((source) => ['rss', 'atom', 'sitemap'].includes(source.type) && isAllowedCrawlUrl(source.url));
+    const sitemaps = new Map(valid.filter((source) => source.type === 'sitemap').map((source) => [source.url, source]));
+    // Older miscellaneous sources remain recorded, but cannot exhaust the page
+    // budget before a newly verified article partition is visited.
+    links = [
+      ...valid.filter((source) => source.type !== 'sitemap'),
+      ...rankedSitemapUrls([...sitemaps.keys()]).map((url) => sitemaps.get(url)!),
+    ];
     if (!links.length) links = await discoverFeedUrls(blog.url, options);
   } catch (error) {
     await pool.execute('UPDATE blogs SET last_crawled_at=? WHERE id=?', [now, blog.id]);
@@ -615,8 +666,10 @@ export async function crawlBlog(
     const [savedResult] = await pool.execute('SELECT * FROM feed_sources WHERE url=?', [source.url]);
     const saved = (Array.isArray(savedResult) ? savedResult[0] : null) as { etag?: string; last_modified?: string } | undefined;
     const headers: Record<string, string> = {};
-    if (saved?.etag) headers['if-none-match'] = saved.etag;
-    if (saved?.last_modified) headers['if-modified-since'] = saved.last_modified;
+    // History replay deliberately downloads content again to recover previous
+    // partial imports, including validators saved by an older release.
+    if (!options.historyImport && saved?.etag) headers['if-none-match'] = saved.etag;
+    if (!options.historyImport && saved?.last_modified) headers['if-modified-since'] = saved.last_modified;
     let response: Response;
     try {
       response = await politeFetch(source.url, headers, options);
@@ -627,7 +680,7 @@ export async function crawlBlog(
       );
       continue;
     }
-    if (response.status === 304) {
+    if (response.status === 304 && !options.historyImport) {
       await pool.execute('UPDATE feed_sources SET last_success_at=?,last_error_at=NULL,consecutive_failures=0 WHERE url=?', [
         now,
         source.url,
@@ -671,14 +724,14 @@ export async function crawlBlog(
       sitemapBudget -= candidates.length;
       entries = await verifySitemapArticles(candidates, blog.url, options);
     } else entries = parseFeed(body, response.url || source.url);
-    await pool.execute(
-      'INSERT INTO feed_sources (blog_id,url,type,etag,last_modified,last_success_at,consecutive_failures) VALUES (?,?,?,?,?,?,0) ON DUPLICATE KEY UPDATE etag=VALUES(etag),last_modified=VALUES(last_modified),last_success_at=VALUES(last_success_at),consecutive_failures=0',
-      [blog.id, source.url, source.type, response.headers.get('etag'), response.headers.get('last-modified'), now],
-    );
-    sourceCount += 1;
     for (const entry of entries) {
-      const title = entry.title.slice(0, 512);
-      const summary = entry.summary || '';
+      const title = truncateCharacters(entry.title, 512);
+      // MariaDB TEXT is limited in bytes. Chinese/emoji summaries can exceed
+      // it long before a JavaScript string reaches 65k characters.
+      const summary = truncateUtf8(entry.summary || '', 60 * 1024);
+      const author = entry.author ? truncateCharacters(entry.author.trim(), 255) || null : null;
+      // Truncating a URL creates a different resource; omit an oversized image.
+      const imageUrl = entry.imageUrl && entry.imageUrl.length <= 1024 ? entry.imageUrl : null;
       const contentHash = shortHash(`${title}\n${summary}`);
       await pool.execute(
         'INSERT INTO posts (blog_id,guid,url,title,summary,author,published_at,updated_at,image_url,content_hash,source_type,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?) ON DUPLICATE KEY UPDATE url=VALUES(url),title=VALUES(title),summary=VALUES(summary),author=VALUES(author),published_at=VALUES(published_at),updated_at=VALUES(updated_at),image_url=VALUES(image_url),content_hash=VALUES(content_hash)',
@@ -688,10 +741,10 @@ export async function crawlBlog(
           entry.url.slice(0, 1024),
           title,
           summary || null,
-          entry.author,
+          author,
           entry.publishedAt,
           entry.updatedAt,
-          entry.imageUrl,
+          imageUrl,
           contentHash,
           source.type,
           now,
@@ -700,9 +753,9 @@ export async function crawlBlog(
       // A pen name is resolved within this blog only. Matching names on two
       // sites therefore create two author identities until a human explicitly
       // merges them. Crawler updates never replace manual/community links.
-      if (entry.author?.trim()) {
-        const displayName = entry.author.trim().slice(0, 255);
-        const normalized = displayName.normalize('NFKC').toLocaleLowerCase('zh-TW').replace(/\s+/g, ' ').trim();
+      if (author) {
+        const displayName = author;
+        const normalized = truncateCharacters(displayName.normalize('NFKC').toLocaleLowerCase('zh-TW').replace(/\s+/g, ' ').trim(), 255);
         const [existing] = await pool.execute(
           `SELECT a.id FROM authors a JOIN blog_authors ba ON ba.author_id=a.id
            WHERE ba.blog_id=? AND a.normalized_name=? LIMIT 1`,
@@ -775,12 +828,28 @@ export async function crawlBlog(
       }
       total += 1;
     }
+    // A validator acknowledges durable import of the entire source, including
+    // author/tag links. Persist it last so a failed write is replayable.
+    const etag = response.headers.get('etag');
+    const lastModified = response.headers.get('last-modified');
+    await pool.execute(
+      'INSERT INTO feed_sources (blog_id,url,type,etag,last_modified,last_success_at,consecutive_failures) VALUES (?,?,?,?,?,?,0) ON DUPLICATE KEY UPDATE etag=VALUES(etag),last_modified=VALUES(last_modified),last_success_at=VALUES(last_success_at),last_error_at=NULL,consecutive_failures=0',
+      [
+        blog.id,
+        source.url,
+        source.type,
+        etag && etag.length <= 512 ? etag : null,
+        lastModified && lastModified.length <= 255 ? lastModified : null,
+        now,
+      ],
+    );
+    sourceCount += 1;
   }
   await pool.execute(
     `UPDATE blogs SET last_crawled_at=?,last_crawl_success_at=IF(?, ?, last_crawl_success_at),
      last_published_at=COALESCE((SELECT MAX(published_at) FROM posts WHERE blog_id=?),last_published_at),
      history_imported_at=IF(?, COALESCE(history_imported_at, ?), history_imported_at) WHERE id=?`,
-    [now, sourceCount > 0, now, blog.id, Boolean(options.historyImport), now, blog.id],
+    [now, sourceCount > 0, now, blog.id, Boolean(options.historyImport && sourceCount > 0), now, blog.id],
   );
   return { blog: blog.slug, sources: sourceCount, posts: total };
 }
