@@ -70,7 +70,9 @@ const worker = new Worker(
           });
           results.push(result);
           if (result.status === 'busy') break;
-        } catch {
+        } catch (error) {
+          const code = error && typeof error === 'object' && 'code' in error ? String(error.code) : '';
+          log.warn({ blogId: blog.id, code: /^[A-Z0-9_]{1,64}$/.test(code) ? code : 'HISTORY_BATCH_FAILED' }, 'history batch failed');
           results.push({ blogId: blog.id, status: 'batch-failed' });
         }
       }

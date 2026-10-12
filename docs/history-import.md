@@ -45,3 +45,12 @@ metadata 工作完成代表所有子工作已持久化，並不代表文章已�
 `blogs-history` 每五分鐘取最久未處理的五站，各最多五頁、三十篇、四十五秒。`BLOG_HISTORY_ENABLED=false` 可停用並移除 repeat scheduler；既有游標保留。候選驗證每三十分鐘、缺漏圖示每十五分鐘，均在 blog 專屬 concurrency=1 的 worker 閒置後依序執行；上述為排程間隔，長批次會使實際開始時間延後。worker CPU 上限 35%、MemoryHigh 512 MiB／MemoryMax 768 MiB，避免歷史回補占用姊妹站資源。
 
 SIGTERM 後不再啟動下一個一般抓取或歷史站點，等待目前有界批次清理 lease／圖示 lock；systemd `TimeoutStopSec=600` 容許清理完成。圖示鎖不自動搶占；非正常斷電／OOM 後須先確認鎖內 PID 已停止、沒有任何 cache writer，再移除持久目錄的 `app/data/.favicon-refresh.lock`。回滾先停止新版 worker，恢復前版 release drop-in，保留新增資料表與圖示檔，不執行舊版 `--history`。
+
+回滾必須依序：
+
+1. 在新版 `TimeoutStopSec=600` 仍生效時 `systemctl --user stop blog-observe-worker`，確認 active 工作已結束。
+2. 用新版工具 `node --env-file="$HOME/.config/blog-observe.env" tools/pause-background.ts` 移除這三個新增 scheduler 及其 waiting/delayed jobs；工具發現 active jobs 會拒絕，保留原 feed/discovery/Similarweb 任務。
+3. 恢復舊 release drop-in，daemon-reload 後 restart web/gateway/start worker；不可先恢復舊90秒設定再停止新版 worker。
+4. 檢查 restart exit code、三服務狀態、healthz/首頁/API/OAuth/SSRF guard，以及 tag/youtube200；失敗必須明確回報，不把回滾當作已成功。
+
+正式部署 drop-in 明確寫入三個 `BLOG_*_ENABLED=true`，可切為 false 停用。新版本保留舊 job 未知名稱直接 skipped 的相容行為，仍在回滾時清理多餘排程以免無意義喚醒。
