@@ -25,8 +25,9 @@ export const MAX_PIXELS = 16_777_216;
 export const MONTH_MS = 30 * 86_400_000;
 export type FaviconTarget = { slug: string; url: string | null; title: string; kind: 'blog' | 'candidate'; id: number };
 type Icon = { png: Buffer; sourceWidth: number; sourceHeight: number; transparent: boolean };
-type Cache = { etag?: string; lastModified?: string; links?: PageLinks; icons?: string[] };
+type Cache = { etag?: string; lastModified?: string; links?: PageLinks; linksVersion?: number; icons?: string[] };
 type PageLinks = { icons: string[]; manifests: string[]; images: string[] };
+type IconSourceCheck = { url: string; status?: number; finalUrl?: string; reason: string };
 export type CatalogEntry = FaviconTarget & {
   icon: string | null;
   verified: boolean;
@@ -35,6 +36,7 @@ export type CatalogEntry = FaviconTarget & {
   reason?: string;
   sources: string[];
   cache: Record<string, Cache>;
+  sourceChecks?: IconSourceCheck[];
 };
 export type LocalIcon = {
   revision: string;
@@ -57,6 +59,7 @@ export type RefreshOptions = FeedCrawlerOptions & {
   maxTargetMs?: number;
 };
 const ROOT = process.env.BLOG_FAVICON_ROOT || new URL('../../../', import.meta.url).pathname;
+const ICON_DISCOVERY_VERSION = 2;
 
 // ICO: pick the largest entry; PNG entries go to sharp as-is, BMP entries
 // (32/24/8/4/1-bit, bottom-up, with a 1-bit transparency mask) become RGBA.
@@ -329,6 +332,21 @@ export function declaredIcons(html: string, base: string): PageLinks {
   const icons: Array<{ url: string; priority: number; size: number }> = [];
   const manifests: string[] = [];
   const images: string[] = [];
+  const normalizedName = (value: string) =>
+    value
+      .normalize('NFKC')
+      .toLowerCase()
+      .replace(/[^\p{L}\p{N}]/gu, '');
+  const siteNames = [$('meta[property="og:site_name"]').attr('content'), $('.site-title').first().text(), $('title').first().text()]
+    .filter((name): name is string => Boolean(name))
+    .map(normalizedName)
+    .filter((name) => name.length >= 3);
+  const addImage = (element: Parameters<typeof $>[0]) => {
+    const node = $(element);
+    // Lazy-loading placeholders are not author images; only explicitly declared URLs are considered.
+    const url = ['data-src', 'data-lazy-src', 'src'].map((attribute) => absolute(node.attr(attribute), base)).find(Boolean);
+    if (url) images.push(url);
+  };
   $('link[href]').each((_index, element) => {
     const node = $(element);
     const url = absolute(node.attr('href'), base);
@@ -340,12 +358,29 @@ export function declaredIcons(html: string, base: string): PageLinks {
     const size = Number((node.attr('sizes') ?? '').match(/\d+/)?.[0] ?? (kind === 1 ? 180 : 32));
     icons.push({ url, priority: kind, size: size >= SIZE ? 1000 - Math.abs(size - SIZE) : size });
   });
+  $('img[itemprop="logo"], img[rel="logo"]').each((_index, element) => addImage(element));
+  // Keep the logo selector inside site/navigation branding; never take arbitrary article or sponsor images.
+  $('header img, [role="banner"] img, .site-branding img, nav.logo img, nav .logo img, a[rel="home"] img').each((_index, element) => {
+    const node = $(element);
+    const mark = `${node.attr('class') ?? ''} ${node.attr('id') ?? ''} ${node.attr('alt') ?? ''}`;
+    if (/(?:^|[\s_-])logo(?:$|[\s_-])/i.test(mark) || node.closest('.logo, .site-branding, a[rel="home"]').length) addImage(element);
+  });
+  // Author/about widgets carry first-party attribution. Generic sidebar thumbnails/advertisements do not.
+  $('aside .widget, #secondary .widget, .sidebar .widget').each((_index, element) => {
+    const widget = $(element);
+    const title = widget.find('.widget-title').first().text().trim();
+    const isAbout =
+      widget.hasClass('widget_blogimoveaboutme') || /^(?:關於(?:我|作者|本站|本網站)|我是)|^about\s+(?:me|the\s+author)\b/i.test(title);
+    const isSitePortrait = widget.hasClass('widget_media_image') && siteNames.includes(normalizedName(title));
+    if (!isAbout && !isSitePortrait) return;
+    widget
+      .find('img')
+      .not('.wp-post-image, [fifu-featured]')
+      .slice(0, 3)
+      .each((_i, image) => addImage(image));
+  });
   $('meta[property="og:image"], meta[name="og:image"], meta[itemprop="logo"]').each((_index, element) => {
     const url = absolute($(element).attr('content'), base);
-    if (url) images.push(url);
-  });
-  $('img[itemprop="logo"], img[rel="logo"]').each((_index, element) => {
-    const url = absolute($(element).attr('src'), base);
     if (url) images.push(url);
   });
   return {
@@ -433,6 +468,7 @@ export async function refreshFavicon(target: FaviconTarget, options: RefreshOpti
     checkedAt: now.toISOString(),
     status: 'failure',
     sources: [],
+    sourceChecks: [],
     cache: old?.url === target.url ? (old.cache ?? {}) : {},
   };
   state.catalog[target.slug] = entry;
@@ -465,11 +501,12 @@ export async function refreshFavicon(target: FaviconTarget, options: RefreshOpti
   };
   let links: PageLinks = { icons: [], manifests: [], images: [] };
   try {
-    const home = await get(target.url, 'text/html,application/xhtml+xml');
+    const home = await get(target.url, 'text/html,application/xhtml+xml', entry.cache[target.url]?.linksVersion === ICON_DISCOVERY_VERSION);
     if (home.status === 304) links = entry.cache[target.url]?.links ?? links;
     else if (home.ok && /(?:text\/html|application\/xhtml\+xml)/i.test(home.headers.get('content-type') ?? '')) {
       links = declaredIcons(await home.text(), home.url || target.url);
       entry.cache[target.url].links = links;
+      entry.cache[target.url].linksVersion = ICON_DISCOVERY_VERSION;
     }
   } catch (error) {
     entry.reason = (error as Error).message.slice(0, 180);
@@ -500,18 +537,37 @@ export async function refreshFavicon(target: FaviconTarget, options: RefreshOpti
   );
   entry.sources = candidates;
   for (const source of candidates) {
+    const check: IconSourceCheck = { url: source, reason: 'fetch-failed' };
+    entry.sourceChecks?.push(check);
     try {
       const response = await get(source, 'image/*', exists && previous?.source === source && previous.targetUrl === target.url);
+      check.status = response.status;
+      check.finalUrl = response.url || source;
       if (response.status === 304 && exists && previous?.source === source && previous.targetUrl === target.url) {
+        check.reason = 'verified-not-modified';
         state.local[target.slug] = { ...previous, fetchedAt: now.toISOString() };
         entry.icon = source;
         entry.verified = true;
         return finish('success');
       }
-      if (!response.ok || !/^image\//i.test(response.headers.get('content-type') ?? '')) continue;
-      if (response.url && isPlatformGenericIcon(target.url, response.url)) continue;
+      if (!response.ok) {
+        check.reason = `http-${response.status}`;
+        continue;
+      }
+      if (!/^image\//i.test(response.headers.get('content-type') ?? '')) {
+        check.reason = 'not-image-content-type';
+        continue;
+      }
+      if (response.url && isPlatformGenericIcon(target.url, response.url)) {
+        check.reason = 'shared-platform-default-rejected';
+        continue;
+      }
       const icon = await toPng(Buffer.from(await response.arrayBuffer()));
-      if (!icon) continue;
+      if (!icon) {
+        check.reason = 'image-decode-or-safety-limit';
+        continue;
+      }
+      check.reason = 'verified-image';
       await atomicWrite(output, icon.png);
       state.local[target.slug] = {
         source,
@@ -527,6 +583,7 @@ export async function refreshFavicon(target: FaviconTarget, options: RefreshOpti
       entry.verified = true;
       return finish('success');
     } catch (error) {
+      check.reason = (error as Error).message.slice(0, 180);
       entry.reason = (error as Error).message.slice(0, 180);
     }
   }

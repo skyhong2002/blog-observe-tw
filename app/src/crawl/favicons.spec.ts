@@ -64,6 +64,80 @@ describe('favicon conversion and discovery', () => {
     expect(isPlatformGenericIcon('https://writer.wordpress.com', 'https://s0.wp.com/i/favicon.ico')).toBe(true);
     expect(isPlatformGenericIcon('https://writer.wordpress.com', 'https://wordpress.com/favicon.ico')).toBe(true);
   });
+  it('finds declared header marks and attributed author widgets without taking article or sponsor images', () => {
+    const links = declaredIcons(
+      `<title>Writer</title><meta property="og:site_name" content="Writer">
+      <img alt="logo" src="/ad.png"><article><img class="logo" src="/story.png"></article>
+      <nav class="logo"><a href="/"><img data-src="/brand.png" src="data:image/png;base64,AA=="></a></nav>
+      <aside>
+        <div class="widget widget_media_image"><h2 class="widget-title">Writer</h2><img src="/portrait.png"></div>
+        <div class="widget"><h2 class="widget-title">合作平台</h2><img src="/sponsor.png"></div>
+        <div class="widget"><h2 class="widget-title">熱門文章</h2><img src="/popular.png"></div>
+        <div class="widget"><h2 class="widget-title">我是作者</h2><img data-lazy-src="/author.png"><img class="wp-post-image" src="/post.png"></div>
+      </aside>`,
+      target.url,
+    );
+    expect(links.images).toEqual([
+      'https://writer.example/brand.png',
+      'https://writer.example/portrait.png',
+      'https://writer.example/author.png',
+    ]);
+  });
+  it('falls back from an oversized declared image to a verified author mark and keeps source reasons', async () => {
+    const directory = await root();
+    const oversized = Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="4199" height="4199"/>');
+    vi.mocked(politeFetch)
+      .mockResolvedValueOnce(
+        new Response(
+          '<link rel="icon" href="/huge.svg"><aside><div class="widget widget_blogimoveaboutme"><img src="/portrait.png"></div></aside>',
+          { headers: { 'content-type': 'text/html' } },
+        ),
+      )
+      .mockResolvedValueOnce(new Response(oversized, { headers: { 'content-type': 'image/svg+xml' } }))
+      .mockResolvedValueOnce(new Response(await png(), { headers: { 'content-type': 'image/png' } }));
+    expect((await refreshFavicon(target, { root: directory })).status).toBe('success');
+    const state = await loadFaviconState(directory);
+    expect(state.catalog.writer.sourceChecks?.map((check) => check.reason)).toEqual(['image-decode-or-safety-limit', 'verified-image']);
+    expect(state.local.writer.source).toBe('https://writer.example/portrait.png');
+  });
+  it('records robots and HTTP failures without retrying a blocked source through another host', async () => {
+    const directory = await root();
+    vi.mocked(politeFetch)
+      .mockResolvedValueOnce(
+        new Response('<link rel="icon" href="https://cdn.example/mark.png">', { headers: { 'content-type': 'text/html' } }),
+      )
+      .mockRejectedValueOnce(new Error('robots disallow https://cdn.example/mark.png'))
+      .mockResolvedValueOnce(new Response('', { status: 404 }));
+    expect((await refreshFavicon(target, { root: directory })).status).toBe('failure');
+    expect((await loadFaviconState(directory)).catalog.writer.sourceChecks?.map((check) => check.reason)).toEqual([
+      'robots disallow https://cdn.example/mark.png',
+      'http-404',
+    ]);
+    expect(politeFetch).toHaveBeenCalledTimes(3);
+  });
+  it('refetches old parsed HTML caches when discovery gains new author-image selectors', async () => {
+    const directory = await root();
+    const state = await loadFaviconState(directory);
+    state.catalog.writer = {
+      ...target,
+      icon: null,
+      verified: false,
+      checkedAt: '2026-01-01T00:00:00Z',
+      status: 'failure',
+      sources: [],
+      cache: { [target.url]: { etag: 'old-home', links: { icons: [], manifests: [], images: [] } } },
+    };
+    vi.mocked(politeFetch)
+      .mockResolvedValueOnce(
+        new Response('<aside><div class="widget widget_blogimoveaboutme"><img src="/author.png"></div></aside>', {
+          headers: { 'content-type': 'text/html' },
+        }),
+      )
+      .mockResolvedValueOnce(new Response(await png(), { headers: { 'content-type': 'image/png' } }));
+    expect((await refreshFavicon(target, { root: directory, state })).status).toBe('success');
+    expect(vi.mocked(politeFetch).mock.calls[0][1]).not.toHaveProperty('if-none-match');
+    expect(state.local.writer.source).toBe('https://writer.example/author.png');
+  });
   it('rejects truncated ICO headers and oversized bitmaps before allocating pixels', () => {
     expect(icoToImage(Buffer.from([0, 0, 1]))).toBeNull();
     const icon = Buffer.alloc(62);
