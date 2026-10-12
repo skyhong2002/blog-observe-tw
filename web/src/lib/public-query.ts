@@ -111,7 +111,14 @@ export function periodOf(query: QueryReader, fallback: Period): Period {
 
 export const topicsApiPath = (days: Period) => `/api/topics?days=${days}`;
 export const relationsApiPath = (days: Period) => `/api/relations?days=${days}`;
-export const topicApiPath = (id: string, days: Period) => `/api/topics/${encodeURIComponent(id)}?days=${days}`;
+/** `id` is always the stable topic id (never the readable canonical path); `historyCursor` asks for the next history page. */
+export function topicApiPath(id: string, days: Period, historyCursor?: string) {
+  const path = `/api/topics/${encodeURIComponent(id)}?days=${days}`;
+  return historyCursor === undefined ? path : `${path}&historyCursor=${encodeURIComponent(historyCursor)}`;
+}
+
+/** An opaque gateway history cursor worth sending back: base64url of at most 256 characters, as app/src/topics/history-read.ts accepts. */
+export const isHistoryCursor = (cursor: unknown): cursor is string => typeof cursor === 'string' && /^[A-Za-z0-9_-]{1,256}$/.test(cursor);
 
 /** The gateway's topic id shapes (app/src/topics/routes.ts). */
 export const isTopicId = (id: string) => /^(rss:[1-9]\d{0,9}|tag:[0-9a-f]{64})$/.test(id);

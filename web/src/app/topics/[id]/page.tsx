@@ -6,23 +6,23 @@ import { TOPIC_DETAIL_PERIOD } from '@/lib/page-links';
 import { getPublicPage, publicJsonOrNull } from '@/lib/public-api';
 import { topicApiPath } from '@/lib/public-query';
 import { breadcrumbSchema, pageMetadata, serializeJsonLd, shortText } from '@/lib/seo';
-import type { TopicDetail } from '@/lib/topics';
+import { type TopicDetail, topicPageDescription } from '@/lib/topics';
 import type { PublicLoad } from '@/lib/use-public-json';
 
-// ISR (PUBLIC_REVALIDATE_SECONDS), generated on first request and never at build:
-// the page is the 30-day view; ?days=7|90 are read in the browser from /api/topics/:id.
-export const revalidate = 120;
-export const dynamicParams = true;
-export function generateStaticParams() {
-  return [];
-}
+// Rendered on every request, never cached or built: which of a topic's articles may be shown is decided
+// by the gateway per request (an article hidden on one site must not live on in a stored page), so unlike
+// the other public pages this one is not ISR, and its page-registry and topic reads are no-store (public-read.ts).
+// The page is the 30-day view; ?days=7|90 and further history pages are read in the browser from /api/topics/:id.
+// When the period has no articles, the payload's `history` (articles the topic matched before) is shown instead.
+export const dynamic = 'force-dynamic';
 
 type Props = { params: Promise<{ id: string }> };
 /**
  * The segment is a readable key or a legacy tag:/rss: id, which Next passes
  * percent-encoded; getPublicPage decodes it exactly once. The page registry resolves it to the stable
  * tag:<hash> that the topic API is read by. Unknown keys and a gateway 404
- * are the page's 404; generateMetadata and the page share both reads, so a
+ * are the page's 404; so is a 410 (all evidence revoked) that reaches a render
+ * at all, since the gateway answers 410 for the page URL first. generateMetadata and the page share both reads, so a
  * missing topic is never streamed as a 200.
  */
 async function topicOf(params: Props['params']) {
@@ -36,7 +36,7 @@ async function topicOf(params: Props['params']) {
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { page, topic } = await topicOf(params);
   const label = shortText(topic.label, 60);
-  return pageMetadata(page.canonicalPath, `「${label}」話題`, `近 30 天台灣部落格中提到「${label}」的文章與部落格，依共同關鍵字整理。`);
+  return pageMetadata(page.canonicalPath, `「${label}」話題`, topicPageDescription(label));
 }
 
 export default async function Page({ params }: Props) {

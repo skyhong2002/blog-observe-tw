@@ -8,6 +8,10 @@
  * - Answers are remembered for PUBLIC_REVALIDATE_SECONDS (the pages' own ISR
  *   period), at most CLIENT_CACHE_MAX paths, least recently used first out.
  *   An expired answer is read again the next time its query is shown.
+ *   Topic detail answers (NO_STORE_KINDS in public-read.ts) are never
+ *   remembered and are fetched with `cache: 'no-store'`: every view of a topic
+ *   asks the gateway again, so an article it has since hidden does not live on
+ *   in memory or in the browser's HTTP cache.
  * - Each read has its own timeout, separate from the caller's abort: a timeout
  *   is an error the page shows; an abort (the query changed or the view went
  *   away) settles nothing and remembers nothing.
@@ -16,8 +20,15 @@
  */
 import { validPublicPayload } from './public-contracts.ts';
 import { PUBLIC_REVALIDATE_SECONDS, publicKindOf } from './public-paths.ts';
+import { isNoStoreKind } from './public-read.ts';
 
-export type PublicLoad<T> = { status: 'pending' } | { status: 'ready'; data: T } | { status: 'missing' } | { status: 'error' };
+/** gone: the gateway's 410 (a topic whose evidence was all revoked), apart from an unknown path's missing. */
+export type PublicLoad<T> =
+  | { status: 'pending' }
+  | { status: 'ready'; data: T }
+  | { status: 'missing' }
+  | { status: 'gone' }
+  | { status: 'error' };
 /** Turns a contract-checked payload into what the view renders; null is an error. */
 export type PublicParser<T> = (raw: unknown, path: string) => T | null;
 
@@ -38,6 +49,7 @@ export type LoaderOptions = {
 
 const ERROR = { status: 'error' } as const;
 const MISSING = { status: 'missing' } as const;
+const GONE = { status: 'gone' } as const;
 
 export function createPublicLoader(options: LoaderOptions = {}) {
   const {
@@ -51,8 +63,9 @@ export function createPublicLoader(options: LoaderOptions = {}) {
   } = options;
   const entries = new Map<string, { data: unknown; at: number }>();
 
-  /** A remembered answer still inside its TTL (expired ones are dropped). */
+  /** A remembered answer still inside its TTL (expired ones are dropped); never one for a no-store kind. */
   function fresh<T>(path: string): { data: T } | undefined {
+    if (isNoStoreKind(publicKindOf(path))) return undefined;
     const entry = entries.get(path);
     if (!entry) return undefined;
     if (now() - entry.at >= ttlMs) {
@@ -64,6 +77,7 @@ export function createPublicLoader(options: LoaderOptions = {}) {
 
   function remember(path: string, data: unknown) {
     entries.delete(path);
+    if (isNoStoreKind(publicKindOf(path))) return;
     entries.set(path, { data, at: now() });
     while (entries.size > max) entries.delete(entries.keys().next().value as string);
   }
@@ -77,11 +91,13 @@ export function createPublicLoader(options: LoaderOptions = {}) {
     signal.addEventListener('abort', stop);
     const timer = setTimer(stop, timeoutMs);
     try {
-      const response = await fetcher(path, { credentials: 'omit', headers: { accept: 'application/json' }, signal: request.signal });
+      const init: RequestInit = { credentials: 'omit', headers: { accept: 'application/json' }, signal: request.signal };
+      if (isNoStoreKind(kind)) init.cache = 'no-store';
+      const response = await fetcher(path, init);
       if (signal.aborted) return null;
       if (!response.ok) {
         await response.body?.cancel().catch(() => {});
-        return response.status === 404 ? MISSING : ERROR;
+        return response.status === 404 ? MISSING : response.status === 410 ? GONE : ERROR;
       }
       const raw: unknown = await response.json();
       if (signal.aborted) return null;

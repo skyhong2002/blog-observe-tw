@@ -7,6 +7,7 @@ import { relationsDto } from '../public-api/relations.ts';
 import { listTopics, topicDetail } from '../public-api/topics.ts';
 import { readBlogRelations, readPublicRelations } from '../relations/routes.ts';
 import { TopicResponseCache } from '../topics/cache.ts';
+import { historyReadsEnabled } from '../topics/history-contracts.ts';
 
 /** Public reads never authenticate sessions, expose crawler bodies, or invoke remote services. */
 export function registerPublicApi(app: FastifyInstance, pool: Pool) {
@@ -19,7 +20,14 @@ export function registerPublicApi(app: FastifyInstance, pool: Pool) {
         return await handler(req, reply);
       } catch (error) {
         const message = error instanceof Error ? error.message : '';
-        const status = message === 'not_found' ? 404 : ['invalid_query', 'invalid_cursor'].includes(message) ? 400 : 503;
+        const status =
+          message === 'topic_gone'
+            ? 410
+            : message === 'not_found'
+              ? 404
+              : ['invalid_query', 'invalid_cursor', 'invalid_history_cursor'].includes(message)
+                ? 400
+                : 503;
         return reply
           .header('cache-control', 'private, no-store')
           .code(status)
@@ -126,9 +134,16 @@ export function registerPublicApi(app: FastifyInstance, pool: Pool) {
     '/api/v1/topics/:id',
     options,
     safe<{ Params: { id: string } }>(async (req, reply) => {
-      const hours = hoursValue(queryValues(req.query, ['hours']).hours),
+      const query = queryValues(req.query, historyReadsEnabled() ? ['hours', 'historyCursor'] : ['hours']);
+      const hours = hoursValue(query.hours),
         id = req.params.id;
       if (!/^(rss:[1-9]\d{0,9}|tag:[0-9a-f]{64})$/.test(id)) throw badQuery();
+      if (historyReadsEnabled()) {
+        reply.header('cache-control', 'no-store');
+        const result = await topicDetail(pool, id, hours, query.historyCursor);
+        if (!result) throw missing();
+        return reply.send(result);
+      }
       const result = await cached(`topic:${hours}:${id}`, () => topicDetail(pool, id, hours));
       if (!result) throw missing();
       reply.header('cache-control', API_CACHE);

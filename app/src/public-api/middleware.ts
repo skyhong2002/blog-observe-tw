@@ -114,7 +114,8 @@ export function installPublicApiPolicy(app: FastifyInstance, keys: Keys, now = D
     if (request.headers['x-api-key'] !== undefined || request.headers.authorization !== undefined || request.headers.cookie !== undefined) {
       reply.header('cache-control', 'private, no-store');
     } else if (reply.statusCode >= 400 || request.method === 'OPTIONS') reply.header('cache-control', 'no-store');
-    else reply.header('cache-control', API_CACHE);
+    else if (!String(reply.getHeader('cache-control') ?? '').toLowerCase().includes('no-store'))
+      reply.header('cache-control', API_CACHE);
     return payload;
   });
 }

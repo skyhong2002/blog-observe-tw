@@ -16,12 +16,13 @@
 - 部落格 `slug` 與話題 `id` 是穩定 API 識別碼，不因網頁網址改名而變動。已建立可讀網頁網址時，項目另附選用的 `canonicalPath`，文章附 `blogCanonicalPath`；以基底網址加上此相對路徑即可分享。欄位暫缺時仍可使用原識別碼網址，網頁會 301 到正式網址；不要拿可讀 slug 取代 API 參數。
 - 匿名成功回應帶 `cache-control: public, max-age=0, s-maxage=120, stale-while-revalidate=180`。文章依各站 RSS／抓取排程分批更新，關係快照約每 5 分鐘，話題查詢快取約 2 分鐘；低頻部落格不因久未發文而失效。請至少間隔 120 秒輪詢，關係以 5 分鐘以上為宜。更新與歷史回補有延遲，不保證每輪都有新資料。
 - 帶 `x-api-key` 或 `Authorization` 的請求與錯誤回應為 `private, no-store` 或 `no-store`，不得進共享快取。快取標頭不代表 CDN 已快取該端點；目前 Cloudflare 的專用 HTML 規則只涵蓋首頁。
-- 錯誤格式為 `{"error":"..."}`：`400` 參數／游標錯誤、`401` 無效金鑰、`404` 找不到、`405` 不支援的方法、`429` 太頻繁、`503` 暫時無法提供服務。未知參數、重複參數與不合法的時間窗口會回 `400`。
+- 錯誤格式為 `{"error":"..."}`：`400` 參數／游標錯誤、`401` 無效金鑰、`404` 找不到、`410` 話題證據已全部撤銷、`405` 不支援的方法、`429` 太頻繁、`503` 暫時無法提供服務。未知參數、重複參數與不合法的時間窗口會回 `400`。
 - 路徑參數請 URL 編碼（例如話題 `rss:1` 寫成 `rss%3A1`），路徑結尾不要加 `/`。文章與目錄使用 `limit`、`cursor`／`nextCursor`；游標是不透明字串，請原樣傳回並保持原查詢條件。`nextCursor: null` 表示這個結果已到尾頁。
 - 變更紀錄（2026-10-12，已核准的破壞性變更）：`GET /api/v1/blogs` 的 `items[].url` 與 `GET /api/v1/blogs/{slug}` 的 `blog.url` 改為本站可讀網頁絕對網址；原站首頁移至同物件的 `sourceUrl`（可為 null）。原先使用 blog.url 前往原站的程式請改讀 sourceUrl。`GET /api/v1/topics` 的 `items[].url` 及 `GET /api/v1/topics/{id}` 的 `topic.url` 為新增的本站網頁網址。ID／slug／favicon 識別碼不變，文章 url 仍是原文；內部 /api/* 的原站 url 不改。缺少 registry 時，本站 url 暫用可轉址的舊識別碼路徑；純標點話題不提供網址。不提供 pageUrl 系列欄位。
 - 除上述明列的已核准變更外，`v1` 內只做向後相容的變更（新增欄位、新增端點）；移除或改名會先公告。客戶端應忽略未知的新欄位。既有站內 `/api/*` 介面保留給網站使用，不是本文件的穩定公開契約；本站沒有舊版 PHP API。
 - 部落格文章、標題與圖片著作權屬原作者。API 只提供標題、原文連結、統計及最多 500 字元的短摘要，不提供全文；私人追蹤、個人 RSS、候選證據、管理及 AI 原始輸入不在公開 API。使用統計請註明「資料來源：部落格觀察 blog.observe.tw」，閱讀文章請連回原站。
 - 不寫程式也能追：訂閱各部落格原站提供的 RSS／Atom；登入 `/my/` 可管理追蹤與匯出 `/me/opml` 給閱讀器，OPML 只包含已成功抓取的 RSS／Atom，沒有可用 feed 的站會略過，請到原站確認訂閱方式。`/me/feed.xml` 是需要瀏覽器登入 session 的私人摘要 RSS，不是可公開分享或以 API 金鑰讀取的 feed。
+- 變更紀錄（2026-10-13）：話題詳情新增選用 history 累積歷史清單與 historyCursor 分頁。話題曾有有效比對證據就保留，不因退出每日詞庫窗口消失；只公開標題、原文連結及觀測狀態，絕不提供全文。全部證據明確撤銷時回 410，合併網頁一次 301 到最終話題。
 - 正文提及是交流訊號，不是抄襲或背書判斷。引用占比的分母為來源站在窗口內所有已解析、指向已收錄目標的「文章—目標部落格」提及數；一篇提及三站會計三筆，不是占全站文章的百分比。覆蓋與截斷欄位應與排行一起閱讀。
 - 話題詞條以新文易數維護的標籤池為唯一來源；目前 observed-article-window 僅代表觀測窗口內出現的詞，不代表完整詞庫。NFKC 與大小寫正規化後合併，顯示文字取同快照中上游文章出現次數最多的寫法。只比對標題與清理後正文；同篇取標題權重 2 或正文權重 1，依權重由高到低排列後，同站後續文章貢獻依序乘上 0.5。只命中正文時即 1、0.5、0.25…；2 篇標題加 1 篇正文合計 3.25。排除詞保留原始資料與原因，可透過話題詳情查詢；RSS 分類不另建排行詞庫。
 
@@ -560,12 +561,13 @@ curl --fail-with-body -sS 'https://blog.observe.tw/api/v1/topics'
 
 **某話題有哪些部落格在寫**
 
-最多 100 個部落格與 100 篇文章；請檢查 truncated。
+近期最多 100 個部落格與 100 篇文章；請檢查 truncated。history 是累積曾有比對證據的公開文章，獨立於 hours 與每日來源窗口；近期為空時仍可讀歷史。pending 僅表示過去觀測、待重新確認，不代表現在仍命中。全部證據明確撤銷回 410；不存在或暫不可公開回 404。
 
 | 參數 | 位置 | 型別 | 說明 |
 | --- | --- | --- | --- |
 | id | 路徑 | string | 從話題排行取得的 ID，請 URL 編碼 |
 | hours | query | 168 \| 720 \| 2160 | 最近 7／30／90 天；預設 720 |
+| historyCursor | query | string | history.nextCursor；累積歷史文章續頁，保持同一話題 ID |
 
 範例：
 
@@ -655,8 +657,24 @@ curl --fail-with-body -sS 'https://blog.observe.tw/api/v1/topics/rss%3A1'
 | `articles[].blogName` | string |  |
 | `articles[].blogCanonicalPath` | string | 本站可讀網頁相對路徑；選用 |
 | `truncated` | boolean |  |
+| `history` | object |  |
+| `history.articles` | object[] |  |
+| `history.articles[].id` | integer |  |
+| `history.articles[].title` | string |  |
+| `history.articles[].url` | string | 原文連結；不提供全文 |
+| `history.articles[].publishedAt` | string (ISO 時間) \| null |  |
+| `history.articles[].blogSlug` | string |  |
+| `history.articles[].blogName` | string |  |
+| `history.articles[].blogCanonicalPath` | string | 可讀部落格路徑 |
+| `history.articles[].evidenceState` | "confirmed" \| "pending" | confirmed 為已確認；pending 為過去觀測、待重新確認 |
+| `history.articles[].observedAt` | string (ISO 時間) | 本站最後觀測到提及的時間 |
+| `history.nextCursor` | string \| null | 歷史清單下一頁游標；傳入 historyCursor，綁定話題不可跨用 |
+| `history.confirmed` | integer | 累積已確認的公開文章數 |
+| `history.pending` | integer | 累積待重新確認的公開文章數 |
+| `history.lastObservedAt` | string (ISO 時間) \| null |  |
+| `history.total` | integer | 累積不同公開文章數 |
 
-錯誤：`400` invalid_query／invalid_cursor；`401` invalid_api_key；`404` not_found；`405` method_not_allowed；`429` rate_limit_exceeded（請依 Retry-After 退避）；`503` unavailable。
+錯誤：`400` invalid_query／invalid_cursor；`401` invalid_api_key；`404` not_found；`405` method_not_allowed；`410` gone（累積證據已全部撤銷）；`429` rate_limit_exceeded（請依 Retry-After 退避）；`503` unavailable。
 
 快取：`public, max-age=0, s-maxage=120, stale-while-revalidate=180`（僅匿名成功回應）。
 

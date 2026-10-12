@@ -2,6 +2,7 @@ import { stat } from 'node:fs/promises';
 import type { FastifyInstance } from 'fastify';
 import type { Pool } from 'mysql2/promise';
 import { TopicResponseCache } from '../topics/cache.ts';
+import { historyReadsEnabled } from '../topics/history-contracts.ts';
 import { getIndexablePages } from './indexability.ts';
 
 export const SEO_ORIGIN = 'https://blog.observe.tw';
@@ -133,7 +134,7 @@ export function registerSeoRoutes(app: FastifyInstance, pool: Pool) {
             import.meta.url,
           ),
         )) ?? (await fileDate(new URL('./routes.ts', import.meta.url)));
-      return sitemapXml(rows.map((row) => ({ loc: SEO_ORIGIN + row.canonicalPath, lastmod: iso(row.lastmod) ?? iso(fallback) })));
+      return sitemapXml(rows.map((row) => ({ loc: SEO_ORIGIN + row.canonicalPath, lastmod: kind === 'topics' && historyReadsEnabled() ? iso(row.lastmod) : iso(row.lastmod) ?? iso(fallback) })));
     });
     return reply.type('application/xml; charset=utf-8').header('cache-control', CACHE).send(xml);
   });

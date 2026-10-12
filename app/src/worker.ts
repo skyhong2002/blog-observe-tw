@@ -19,6 +19,9 @@ import { backfillPublicRoutes, backfillTopicRouteAliases } from './seo/page-rout
 import { runTopicsBatch } from './topics/batch.ts';
 import { refreshTopicFrequencies } from './topics/frequency.ts';
 import { syncVocabulary } from './topics/sync.ts';
+import { historyWritesEnabled } from './topics/history-contracts.ts';
+import { backfillTopicHistory } from './topics/history-backfill.ts';
+import { revalidateTopicHistory } from './topics/history-worker.ts';
 
 const config = loadConfig();
 const log = pino({ level: config.logLevel });
@@ -60,6 +63,7 @@ for (const [name, every, enabled] of [
   ['blogs-publication-discovery', 30 * 60_000, relationsEnabled],
   ['blogs-ai', 60 * 60_000, aiEnabled],
   ['blogs-topics', 10 * 60_000, topicsEnabled],
+  ['blogs-topic-history', 5 * 60_000, historyWritesEnabled()],
   ['blogs-topic-frequencies', 60 * 60_000, topicsEnabled],
   ['blogs-vocabulary', 15 * 60_000, vocabularyEnabled],
   ['blogs-history', 5 * 60_000, historyEnabled],
@@ -101,6 +105,12 @@ const worker = new Worker(
       const result = await runTopicsBatch(store.pool, { ...batchOptions, limit: 200 });
       if (result.processed) await refreshTopicFrequencies(store.pool, { force: true });
       return result;
+    }
+    if (job.name === 'blogs-topic-history') {
+      if (!historyWritesEnabled()) return { skipped: 'disabled' };
+      const capture = await backfillTopicHistory(store.pool, { signal: shutdown.signal, limit: 500, maxDurationMs: 30_000 });
+      const revalidation = await revalidateTopicHistory(store.pool, { signal: shutdown.signal, limit: 50, maxDurationMs: 30_000 });
+      return { capture, revalidation };
     }
     if (job.name === 'blogs-topic-frequencies') return topicsEnabled ? refreshTopicFrequencies(store.pool) : { skipped: 'disabled' };
     if (job.name === 'blogs-vocabulary')

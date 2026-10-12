@@ -3,6 +3,9 @@ import { domainToUnicode } from 'node:url';
 import type { Pool, PoolConnection, RowDataPacket } from 'mysql2/promise';
 import { withJobLease } from '../jobs/lease.ts';
 import { publicationHome } from '../relations/identity.ts';
+import { historyReadsEnabled } from '../topics/history-contracts.ts';
+import { historyPublicTopicSql, topicHistoryDisposition } from '../topics/history-read.ts';
+import { exclusionReason } from '../topics/policy.ts';
 import { publicationLabelSql } from '../topics/publication-noise.ts';
 import { SOURCE } from '../topics/snapshot-client.ts';
 
@@ -76,6 +79,21 @@ export async function getPublicPages(pool: Pool, kind: PublicPageKind, entityIds
   const ids = [...new Set(entityIds.filter((id) => entityPattern(kind).test(id)))];
   if (ids.length > 1000) throw Error('public_page_lookup_limit');
   if (!ids.length) return new Map();
+  if (kind === 'topic' && historyReadsEnabled()) {
+    const [rows] = await pool.query<RowDataPacket[]>(
+      `SELECT r.entity_id,r.canonical_key,t.label,CONCAT('tag:',r.entity_id) stable_id
+     FROM public_page_routes r JOIN topic_pages t ON t.canonical_id=r.entity_id
+     WHERE r.kind='topic' AND r.entity_id IN (?) AND t.state IN ('active','pending') AND ${historyPublicTopicSql('t')}
+     AND EXISTS(SELECT 1 FROM topic_article_evidence e JOIN posts p ON p.id=e.post_id JOIN blogs b ON b.id=p.blog_id
+       WHERE e.canonical_id=t.canonical_id AND e.state<>'revoked' AND b.status='verified' AND (p.published_at IS NULL OR p.published_at<=UTC_TIMESTAMP()))`,
+      [ids],
+    );
+    return new Map(
+      rows
+        .filter((r) => isPublicRouteKey(kind, r.canonical_key) && !exclusionReason(r.label))
+        .map((r) => [String(r.entity_id), page(kind, r)]),
+    );
+  }
   const [rows] = await pool.query<RowDataPacket[]>(
     kind === 'blog'
       ? `SELECT r.entity_id,r.canonical_key,b.slug stable_id FROM public_page_routes r JOIN blogs b ON b.id=r.entity_id WHERE r.kind='blog' AND r.entity_id IN (?) AND b.status<>'moved'`
@@ -86,6 +104,11 @@ export async function getPublicPages(pool: Pool, kind: PublicPageKind, entityIds
 }
 export async function resolvePublicPage(pool: Pool, kind: PublicPageKind, key: string): Promise<PublicPage | null> {
   if (!isPublicRouteKey(kind, key)) return null;
+  if (kind === 'topic' && historyReadsEnabled()) {
+    const result = await topicHistoryDisposition(pool, key);
+    if (result.status !== 'available') return null;
+    return (await getPublicPages(pool, kind, [result.canonicalId])).get(result.canonicalId) ?? null;
+  }
   const [[registered]] = await pool.query<RowDataPacket[]>('SELECT entity_id FROM public_route_keys WHERE kind=? AND route_key=?', [
     kind,
     key,
@@ -210,11 +233,14 @@ export async function backfillPublicRoutes(pool: Pool, options: BackfillOptions 
       const [rows] = await pool.query<RowDataPacket[]>(
         kind === 'blog'
           ? `SELECT b.id,b.slug,b.name,b.url FROM blogs b WHERE b.status<>'moved' AND b.id>? ${options.missingOnly ? "AND NOT EXISTS (SELECT 1 FROM public_page_routes r WHERE r.kind='blog' AND r.entity_id=CAST(b.id AS CHAR))" : ''} ORDER BY b.id LIMIT ${limit}`
-          : `SELECT t.id,t.label FROM topic_canonical_terms_v3 t JOIN topic_current c ON c.snapshot_id=t.snapshot_id AND c.source=? WHERE t.id>? AND ${publicationLabelSql('t.label')} ${options.missingOnly ? "AND NOT EXISTS (SELECT 1 FROM public_page_routes r WHERE r.kind='topic' AND r.entity_id=t.id)" : ''} ORDER BY t.id LIMIT ${limit}`,
-        kind === 'blog' ? [afterId || '0'] : [SOURCE, afterId],
+          : historyReadsEnabled()
+            ? `SELECT t.canonical_id id,t.label FROM topic_pages t WHERE t.canonical_id>? AND t.state IN ('active','pending') AND ${historyPublicTopicSql('t')} AND EXISTS(SELECT 1 FROM topic_article_evidence e WHERE e.canonical_id=t.canonical_id AND e.state<>'revoked') ${options.missingOnly ? "AND NOT EXISTS (SELECT 1 FROM public_page_routes r WHERE r.kind='topic' AND r.entity_id=t.canonical_id)" : ''} ORDER BY t.canonical_id LIMIT ${limit}`
+            : `SELECT t.id,t.label FROM topic_canonical_terms_v3 t JOIN topic_current c ON c.snapshot_id=t.snapshot_id AND c.source=? WHERE t.id>? AND ${publicationLabelSql('t.label')} ${options.missingOnly ? "AND NOT EXISTS (SELECT 1 FROM public_page_routes r WHERE r.kind='topic' AND r.entity_id=t.id)" : ''} ORDER BY t.id LIMIT ${limit}`,
+        kind === 'blog' ? [afterId || '0'] : historyReadsEnabled() ? [afterId] : [SOURCE, afterId],
       );
       for (const row of rows) {
         await assertLease();
+        if (kind === 'topic' && historyReadsEnabled() && exclusionReason(row.label)) continue;
         await register(
           pool,
           kind,

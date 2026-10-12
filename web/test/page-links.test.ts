@@ -227,6 +227,25 @@ test('page API contract: every field is checked, canonicalPath must match the sl
   assert.equal(pageInfoOf('topic', page('topicPage'))?.stableId, `tag:${'a'.repeat(64)}`);
 });
 
+test('page API contract: a topic window is 90 days or null (cumulative history); a blog window is always 90', () => {
+  // app/src/seo/indexability.ts getPageIndexability with history reads on.
+  const cumulative = page('topicPage', { windowDays: null, currentVersion: null, posts: 12, blogs: 3 });
+  assert.ok(validPublicPayload('topicPage', cumulative));
+  assert.deepEqual(
+    { windowDays: pageInfoOf('topic', cumulative)?.windowDays, currentVersion: pageInfoOf('topic', cumulative)?.currentVersion },
+    { windowDays: null, currentVersion: null },
+    'null is kept, never rewritten to 90',
+  );
+  assert.equal(pageInfoOf('topic', page('topicPage'))?.windowDays, 90);
+  assert.equal(pageInfoOf('topic', page('topicPage', { currentVersion: 'v1' }))?.currentVersion, 'v1');
+  assert.equal(pageInfoOf('blog', page('blogPage'))?.windowDays, 90);
+  assert.equal(validPublicPayload('blogPage', page('blogPage', { windowDays: null })), false);
+  assert.equal(pageInfoOf('blog', page('blogPage', { windowDays: null })), null);
+  for (const windowDays of [undefined, 0, 30, 365, '90', Number.NaN])
+    for (const kind of ['blogPage', 'topicPage'] as const)
+      assert.equal(validPublicPayload(kind, page(kind, { windowDays })), false, `${kind} ${String(windowDays)}`);
+});
+
 test('page API reads: unknown is a 404 (null), a wrong-shaped 200 throws, no cookies are sent', async () => {
   const seen: RequestInit[] = [];
   const fetcher = (status: number, body?: unknown) => async (_url: string, init: RequestInit) => {
@@ -252,12 +271,16 @@ test('metadata: canonical, OG and JSON-LD use canonicalPath; every registered pa
     assert.match(text, /breadcrumbSchema\(\[\s*\[[^\]]+\],\s*\[page\.canonicalPath,/, file);
     // No robots decision from counts, blog status or term activity: unknown/noise keys are the gateway's 404.
     assert.ok(!/robots|indexab|noindex|\.posts|\.blogs/.test(text), file);
-    // Unknown keys and gateway 404s are real 404s; ISR, no request-time reads.
+    // Unknown keys and gateway 404s are real 404s.
     assert.match(text, /if \(!page\) notFound\(\);/, file);
-    assert.match(text, /export const revalidate = 120;/, file);
   }
+  // Blog detail stays ISR; topic detail renders per request so the gateway's article visibility is never stale.
+  assert.match(source('app/blogs/[slug]/page.tsx'), /export const revalidate = 120;/);
+  assert.match(source('app/topics/[id]/page.tsx'), /export const dynamic = 'force-dynamic';/);
+  assert.doesNotMatch(source('app/topics/[id]/page.tsx'), /export const revalidate/);
   assert.match(source('app/topics/[id]/page.tsx'), /topicApiPath\(page\.stableId, TOPIC_DETAIL_PERIOD\)/);
-  assert.match(source('app/topics/[id]/page.tsx'), /近 30 天台灣部落格中提到/);
+  // The page carries recent and accumulated articles: its description names no fixed period.
+  assert.match(source('app/topics/[id]/page.tsx'), /topicPageDescription\(label\)/);
   assert.match(source('app/blogs/[slug]/page.tsx'), /getBlog\(page\.stableId\)/);
   for (const file of ['components/SourceProfile.tsx', 'components/public/TopicDetail.tsx', 'lib/seo.ts', 'lib/page-links.ts'])
     assert.ok(!/indexabilityNote|detailPageMetadata|搜尋引擎索引/.test(source(file)), file);

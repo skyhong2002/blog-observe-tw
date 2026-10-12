@@ -3,7 +3,7 @@ import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { test } from 'node:test';
 import { assertPublicApiPath, isPublicApiPath, PUBLIC_KINDS, PUBLIC_REVALIDATE_SECONDS } from '../src/lib/public-paths.ts';
-import { PUBLIC_RETRY_MS, PublicGatewayError, publicInit, readPublic } from '../src/lib/public-read.ts';
+import { NO_STORE_KINDS, PUBLIC_RETRY_MS, PublicGatewayError, publicInit, readPublic } from '../src/lib/public-read.ts';
 import { EMPTY, json, PATHS } from './public-payloads.ts';
 
 const SRC = join(import.meta.dirname, '../src');
@@ -92,7 +92,7 @@ test('public gateway paths: no other origin, route, key or encoding trick', () =
 
 function fakeFetch(...answers: Array<Response | Error>) {
   const calls: Array<{ url: string; init: RequestInit & { next?: { revalidate?: number } } }> = [];
-  const fetcher = async (url: string, init: RequestInit & { next: { revalidate: number } }) => {
+  const fetcher = async (url: string, init: RequestInit & { next?: { revalidate: number } }) => {
     calls.push({ url, init });
     const answer = answers.shift();
     if (!answer) throw new Error('unexpected fetch');
@@ -117,6 +117,28 @@ test('public read: a fixed cookie-free GET, cached for the ISR period', async ()
   assert.deepEqual(Object.keys(init.headers as Record<string, string>), ['accept']);
   assert.equal(PUBLIC_REVALIDATE_SECONDS, 120);
   assert.deepEqual(Object.keys(publicInit()).sort(), ['headers', 'method', 'next', 'redirect', 'signal']);
+});
+
+test('public read: topic detail and topic page-info are no-store; every other kind keeps the ISR period', async () => {
+  for (const kind of PUBLIC_KINDS) {
+    const { calls, fetcher } = fakeFetch(json(200, EMPTY[kind]));
+    assert.deepEqual(await readPublic('http://gw', PATHS[kind], fetcher, noWait), { found: true, body: EMPTY[kind] }, kind);
+    const { init } = calls[0];
+    assert.equal(init.method, 'GET', kind);
+    assert.equal(init.credentials, undefined, kind);
+    if (kind === 'topic' || kind === 'topicPage') {
+      assert.equal(init.cache, 'no-store', kind);
+      assert.equal(init.next, undefined, `${kind}: no revalidate beside no-store`);
+    } else {
+      assert.equal(init.next?.revalidate, PUBLIC_REVALIDATE_SECONDS, kind);
+      assert.equal(init.cache, undefined, kind);
+    }
+  }
+  assert.deepEqual([...NO_STORE_KINDS].sort(), ['topic', 'topicPage']);
+  // History pages and every period are the same kind, so no-store as well.
+  const { calls, fetcher } = fakeFetch(json(200, EMPTY.topic));
+  await readPublic('http://gw', '/api/topics/rss%3A1?days=90&historyCursor=abc', fetcher, noWait);
+  assert.equal(calls[0].init.cache, 'no-store');
 });
 
 test('public read: 404 is "not found", never an empty success', async () => {
@@ -211,7 +233,6 @@ const ISR_PAGES = [
   'app/authors/page.tsx',
   'app/articles/page.tsx',
   'app/topics/page.tsx',
-  'app/topics/[id]/page.tsx',
   'app/relations/page.tsx',
   'app/tags/page.tsx',
 ];
@@ -224,12 +245,21 @@ test('route contract: public pages are ISR for PUBLIC_REVALIDATE_SECONDS and rea
   }
 });
 
+test('route contract: the topic detail page is force-dynamic, never ISR, and reads no request data', () => {
+  const source = read('app/topics/[id]/page.tsx');
+  assert.match(source, /^export const dynamic = 'force-dynamic';$/m);
+  assert.doesNotMatch(source, /export const revalidate|generateStaticParams|force-static/);
+  assert.doesNotMatch(source, /searchParams|next\/headers|server-gateway|cookies\(/);
+  // Its only gateway reads are the page registry and the topic detail, both no-store kinds in public-read.ts.
+  assert.match(source, /getPublicPage\('topic', /);
+  assert.match(source, /publicJsonOrNull<TopicDetail>\(topicApiPath\(/);
+  assert.doesNotMatch(source, /\b(?:publicJson|overview|catalog|authorCatalog|getBlog)\(/);
+});
+
 test('route contract: dynamic public routes render on demand, none at build', () => {
-  for (const page of ['app/blogs/[slug]/page.tsx', 'app/topics/[id]/page.tsx']) {
-    const source = read(page);
-    assert.match(source, /^export const dynamicParams = true;$/m, page);
-    assert.match(source, /export function generateStaticParams\(\) \{\n\s+return \[\];\n\}/, page);
-  }
+  const source = read('app/blogs/[slug]/page.tsx');
+  assert.match(source, /^export const dynamicParams = true;$/m);
+  assert.match(source, /export function generateStaticParams\(\) \{\n\s+return \[\];\n\}/);
 });
 
 test('route contract: server components reach the gateway only through the public helper', () => {

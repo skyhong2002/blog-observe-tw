@@ -5,6 +5,7 @@ import type { BatchOptions } from '../jobs/contracts.ts';
 import { withJobLease } from '../jobs/lease.ts';
 import { topicDeferredReason } from './deferred-reason.ts';
 import { carryTopicIndexes } from './index-carry.ts';
+import { historyWritesEnabled } from './history-contracts.ts';
 import { digest } from './matcher.ts';
 import { storedNormalizedLabel } from './policy.ts';
 import { writeTopicPolicy } from './policy-store.ts';
@@ -117,7 +118,12 @@ export async function syncVocabulary(pool: Pool, options: SyncOptions = {}) {
     (await withJobLease(pool, 'topics', async (assertLease) => {
       const timeout = Math.max(1, Math.min(600_000, options.maxDurationMs ?? 120_000));
       const signal = AbortSignal.any([AbortSignal.timeout(timeout), ...(options.signal ? [options.signal] : [])]);
-      const snapshotCleanup = await cleanupTopicSnapshots(pool, assertLease);
+      // Never retire the only source of historical observations before durable capture finishes.
+      const [uncaptured] = historyWritesEnabled() ? await pool.query<RowDataPacket[]>(
+        `SELECT s.id FROM topic_snapshots s LEFT JOIN topic_history_backfill_runs h ON h.id=CONCAT('snapshot:',s.id)
+         WHERE s.status IN ('published','retiring') AND (h.status IS NULL OR h.status<>'complete')`,
+      ) : [[]];
+      const snapshotCleanup = await cleanupTopicSnapshots(pool, assertLease, { pinnedSnapshotIds: uncaptured.map((r) => String(r.id)) });
       const beforeRequest = async () => {
         await assertLease();
         if (

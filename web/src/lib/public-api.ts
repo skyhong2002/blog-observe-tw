@@ -9,7 +9,9 @@ import { gatewayOrigin } from './server-gateway';
 /**
  * Shared reads for ISR pages: GETs of the public, cookie-free gateway paths in
  * public-paths.ts, kept in Next's fetch cache for PUBLIC_REVALIDATE_SECONDS
- * (only 200s are stored). There is no init or header parameter.
+ * (only 200s are stored). There is no init or header parameter. Topic detail
+ * and topic page-registry reads are the exception: public-read.ts sends them
+ * with `cache: 'no-store'` (NO_STORE_KINDS), and /topics/[id] is force-dynamic.
  *
  * Failures, including a 200 missing the fields public-contracts.ts requires,
  * throw instead of returning empty data (rules in public-read.ts): a
@@ -18,7 +20,7 @@ import { gatewayOrigin } from './server-gateway';
  * from a path where 404 means "no such thing", into data (null).
  */
 
-/** One read per path per render (generateMetadata and the page share it). */
+/** One read per path per render (generateMetadata and the page share it); React's cache never spans requests. */
 const read = cache((path: string) => readPublic(gatewayOrigin(), path));
 
 /** A public read that must succeed; any non-2xx (404 included) throws. */
@@ -28,7 +30,7 @@ export async function publicJson<T>(path: string): Promise<T> {
   return result.body as T;
 }
 
-/** A public read where 404 means "not there" (null); every other failure throws. */
+/** A public read where 404 or 410 means "not there" (null); every other failure throws. */
 export async function publicJsonOrNull<T>(path: string): Promise<T | null> {
   const result = await read(path);
   return result.found ? (result.body as T) : null;

@@ -144,5 +144,5 @@ export function AuthorCatalogFromUrl({ baseline }: { baseline: AuthorCatalog }) 
   if (invalid) return <AuthorCatalogView selected status="missing" />;
   if (!load) return <AuthorCatalogView selected={false} status="ready" data={baseline} />;
   if (load.status === 'ready') return <AuthorCatalogView selected={load.data.filters.author !== null} status="ready" data={load.data} />;
-  return <AuthorCatalogView selected={selected} status={load.status} />;
+  return <AuthorCatalogView selected={selected} status={load.status === 'gone' ? 'missing' : load.status} />;
 }

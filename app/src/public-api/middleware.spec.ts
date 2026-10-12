@@ -12,6 +12,7 @@ async function fixture() {
   await app.register(rateLimit, { max: 240, timeWindow: '1 minute', allowList: (r) => publicApiPath(r.url) });
   app.get('/api/v1/articles', async () => ({ items: [], nextCursor: null }));
   app.get('/api/v1/fail', async (_req, reply) => reply.code(400).send({ error: 'invalid_query' }));
+  app.get('/api/v1/history', async (_req, reply) => reply.header('cache-control', 'no-store').send({ ok: true }));
   app.get('/api/v1x', async () => ({ ok: true }));
   return { app, identify };
 }
@@ -57,6 +58,7 @@ describe('public API gateway policy', () => {
     for (const headers of [{ 'x-api-key': 'valid' }, { authorization: 'Bearer irrelevant' }, { cookie: 'blog_session=fake' }]) {
       expect((await app.inject({ url: '/api/v1/articles', headers })).headers['cache-control']).toBe('private, no-store');
     }
+    expect((await app.inject('/api/v1/history')).headers['cache-control']).toBe('no-store');
     const head = await app.inject({ url: '/api/v1/articles', method: 'HEAD' });
     expect(head.body).toBe('');
     expect((await app.inject('/api/v1/fail')).headers['cache-control']).toBe('no-store');

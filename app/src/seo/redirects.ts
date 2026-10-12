@@ -1,6 +1,8 @@
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import type { Pool } from 'mysql2/promise';
 import { TopicResponseCache } from '../topics/cache.ts';
+import { historyReadsEnabled } from '../topics/history-contracts.ts';
+import { topicHistoryDisposition } from '../topics/history-read.ts';
 import { isPublicRouteKey, type PublicPageKind, resolvePublicPage } from './page-routes.ts';
 
 /** Only a single public page segment is eligible. Never normalize a raw URL into another origin. */
@@ -27,7 +29,21 @@ export function createPublicPageRedirect(pool: Pool, { legacyUiPaths = false } =
     if (request.method !== 'GET' && request.method !== 'HEAD') return false;
     const route = publicPageRequest(String(request.raw.url ?? request.url));
     if (!route) return false;
-    const page = await cache.get(`${route.kind}:${route.key}`, () => resolvePublicPage(pool, route.kind, route.key));
+    const durable = route.kind === 'topic' && historyReadsEnabled();
+    if (durable) {
+      const state = await topicHistoryDisposition(pool, route.key);
+      if (state.status !== 'available') {
+        reply
+          .code(state.status === 'gone' ? 410 : 404)
+          .header('cache-control', 'no-store')
+          .type('text/plain; charset=utf-8')
+          .send(state.status === 'gone' ? '此話題的公開證據已撤銷。' : '找不到此話題。');
+        return true;
+      }
+    }
+    const page = durable
+      ? await resolvePublicPage(pool, route.kind, route.key)
+      : await cache.get(`${route.kind}:${route.key}`, () => resolvePublicPage(pool, route.kind, route.key));
     if (!page) return false;
     if (page.canonicalPath === route.path) {
       // Emergency web-only rollback: keep the public canonical URL, but render

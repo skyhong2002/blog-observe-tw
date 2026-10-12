@@ -4,6 +4,8 @@ import type { BatchOptions, BatchResult } from '../jobs/contracts.ts';
 import { withJobLease } from '../jobs/lease.ts';
 import { topicBodyHash, topicBodyHtml, topicBodyJoins, topicBodyObtainedAt, topicBodyText } from './body.ts';
 import { digest, TopicMatcher } from './matcher.ts';
+import { historyWritesEnabled, type HistoryEvidenceSource } from './history-contracts.ts';
+import { recordTopicHistory } from './history-store.ts';
 import { CLEANUP_VERSION, cleanTopicBody } from './matching-body.ts';
 import { ACTIVE_TOPIC_LIMITS, MATCHER_VERSION, POLICY_VERSION } from './policy.ts';
 import { ensureTopicPolicy } from './policy-store.ts';
@@ -119,6 +121,19 @@ export async function runTopicsBatch(
               p.body_obtained_at,
             ],
           );
+          if (historyWritesEnabled() && !capped) {
+            await recordTopicHistory(c, {
+              snapshotId: current.snapshot_id,
+              postId: Number(p.id),
+              postHash: p.content_hash,
+              bodyHash: p.body_hash,
+              matchedAt: now,
+              records: hits.flatMap((h) => h.ids.map((termId) => ({ termId, source: h.source as HistoryEvidenceSource }))),
+              complete: true,
+              bodyCovered: body.kind !== 'none',
+            }, assertLease);
+          }
+          await assertLease();
           await c.commit();
           result.processed++;
         } catch (e) {

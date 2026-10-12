@@ -12,9 +12,9 @@ export async function listTopics(pool: Pool, hours: number, limit: number) {
     generatedAt: new Date().toISOString(),
   };
 }
-export async function topicDetail(pool: Pool, id: string, hours: number) {
+export async function topicDetail(pool: Pool, id: string, hours: number, historyCursor?: string) {
   const now = new Date();
-  const detail = await topicEvidenceDetail(pool, id, hours / 24, true, now);
+  const detail = await topicEvidenceDetail(pool, id, hours / 24, true, now, historyCursor);
   if (!detail) return null;
   return {
     ...detail,

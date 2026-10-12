@@ -241,4 +241,24 @@ describe('bounded API canonical links', () => {
     const payload = { blogs: [{ slug: 'writer', name: '作者' }] };
     expect(await enrichPageLinks(pool, '/api/blogs', payload)).toBe(payload);
   });
+  it('enriches nested history articles with the blog canonical path without changing original URLs', async () => {
+    const { pool } = fixture();
+    const payload = {
+      history: {
+        articles: [
+          {
+            id: 9,
+            title: '歷史文章',
+            url: 'https://writer.example/post',
+            blogSlug: 'writer',
+            evidenceState: 'pending',
+            observedAt: '2026-01-01T00:00:00.000Z',
+          },
+        ],
+      },
+    };
+    const output = await enrichPageLinks(pool, '/api/topics/tag:' + term, payload);
+    expect(output).toMatchObject({ history: { articles: [{ blogCanonicalPath: canonical, url: 'https://writer.example/post' }] } });
+    expect(payload.history.articles[0]).not.toHaveProperty('blogCanonicalPath');
+  });
 });

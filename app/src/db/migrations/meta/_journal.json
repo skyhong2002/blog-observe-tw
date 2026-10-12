@@ -134,6 +134,13 @@
       "when": 1791815796577,
       "tag": "0018_public_page_routes",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "5",
+      "when": 1791826753315,
+      "tag": "0019_durable_topic_history",
+      "breakpoints": true
     }
   ]
 }

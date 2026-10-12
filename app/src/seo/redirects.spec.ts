@@ -1,9 +1,11 @@
+import { createRequire } from 'node:module';
 import Fastify from 'fastify';
 import type { Pool } from 'mysql2/promise';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('./page-routes.ts', async (original) => ({ ...(await original<typeof import('./page-routes.ts')>()), resolvePublicPage: vi.fn() }));
 
+import { buildApp } from '../app.js';
 import { resolvePublicPage } from './page-routes.ts';
 import { createPublicPageRedirect, publicPageRequest } from './redirects.ts';
 
@@ -125,6 +127,44 @@ describe('canonical public page redirects', () => {
       return { upstream: redirect.uiPath(req) ?? null };
     });
     expect((await app.inject('/blogs/skyhong.tw/')).json().upstream).toBeNull();
+    await app.close();
+  });
+  it('returns the real gateway reply after a 301 without a second send or reply-already-sent log', async () => {
+    vi.mocked(resolvePublicPage).mockResolvedValue({
+      entityId: '1',
+      stableId: 'discovered-abc',
+      slug: 'skyhong.tw',
+      canonicalPath: '/blogs/skyhong.tw/',
+    });
+    const logs: string[] = [];
+    const app = await buildApp(
+      { port: 18165, uiOrigin: 'http://127.0.0.1:1', publicOrigin: 'https://blog.observe.tw', login: null },
+      {
+        // @ts-expect-error JS config accepts a pino stream at runtime.
+        logger: {
+          level: 'trace',
+          stream: {
+            write: (chunk: string) => {
+              logs.push(chunk);
+            },
+          },
+        },
+        // @ts-expect-error Read-only fake database supports only the paths used by this fixture.
+        store: { pool: { query: async () => [[]] } },
+      },
+    );
+    const Reply = createRequire(import.meta.url)('fastify/lib/reply.js');
+    const send = vi.spyOn(Reply.prototype, 'send');
+    for (const method of ['GET', 'HEAD'] as const) {
+      const response = await app.inject({ method, url: '/blogs/discovered-abc/' });
+      expect(response.statusCode).toBe(301);
+      expect(response.headers.location).toBe('/blogs/skyhong.tw/');
+    }
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    expect(send).toHaveBeenCalledTimes(2);
+    send.mockRestore();
+    expect(logs.join('')).not.toContain('FST_ERR_REP_ALREADY_SENT');
+    expect(logs.join('')).not.toContain('Reply was already sent');
     await app.close();
   });
 });

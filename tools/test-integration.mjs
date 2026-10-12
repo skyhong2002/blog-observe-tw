@@ -60,6 +60,8 @@ try {
     ['relations-quality', '../app/src/relations/quality.integration.ts', 'runRelationQualityIntegration'],
     ['topics', '../tests/integration/topics.mjs', 'runTopicsIntegration'],
     ['topic-frequency', '../app/src/topics/frequency.integration.ts', 'runTopicFrequencyIntegration'],
+    ['topic-history', '../app/src/topics/history.integration.ts', 'runTopicHistoryIntegration'],
+    ['topic-history-read', '../app/src/topics/history-read.integration.ts', 'runTopicHistoryReadIntegration'],
     ['index-carry', '../app/src/topics/index-carry.integration.ts', 'runIndexCarryIntegration'],
     ['window-incremental', '../app/src/topics/window-incremental.integration.ts', 'runWindowIncrementalIntegration'],
     ['snapshot-retention', '../app/src/topics/snapshot-retention.integration.ts', 'runSnapshotRetentionIntegration'],

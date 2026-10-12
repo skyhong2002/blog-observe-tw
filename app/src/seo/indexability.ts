@@ -1,6 +1,8 @@
 import type { Pool, RowDataPacket } from 'mysql2/promise';
 import { TopicResponseCache } from '../topics/cache.ts';
-import { POLICY_VERSION } from '../topics/policy.ts';
+import { historyReadsEnabled } from '../topics/history-contracts.ts';
+import { historyEvidenceSql, historyPublicTopicSql, topicHistoryDisposition } from '../topics/history-read.ts';
+import { exclusionReason, POLICY_VERSION } from '../topics/policy.ts';
 import { publicationExclusionReason } from '../topics/publication-noise.ts';
 import { evidence } from '../topics/routes.ts';
 import { SOURCE } from '../topics/snapshot-client.ts';
@@ -11,7 +13,7 @@ export const INDEXABILITY_CACHE_MS = 300_000;
 export type PageIndexability = {
   indexable: boolean;
   indexabilityReason: string | null;
-  windowDays: 90;
+  windowDays: 90 | null;
   posts: number;
   blogs: number;
   currentVersion: string | null;
@@ -154,12 +156,80 @@ function store(pool: Pool) {
   }
   return value;
 }
-export const getPageIndexability = (pool: Pool, kind: PublicPageKind, entityId: string) => store(pool).page(kind, entityId);
-export const getIndexablePages = (pool: Pool, kind: PublicPageKind) => store(pool).sitemap(kind);
+async function cumulativeTopics(pool: Pool, ids?: string[]) {
+  const [rows] = await pool.query<RowDataPacket[]>(
+    `WITH ${historyEvidenceSql(ids ? 'many' : false)}
+ SELECT h.canonical_id entity_id,t.label,COUNT(*) posts,COUNT(DISTINCT h.blog_id) blogs,MAX(h.published_at) lastmod
+ FROM historical h JOIN topic_pages t ON t.canonical_id=h.canonical_id
+ WHERE t.state IN ('active','pending') AND ${historyPublicTopicSql('t')}
+ GROUP BY h.canonical_id,t.label`,
+    ids ? [ids] : [],
+  );
+  return rows.filter((row) => !exclusionReason(row.label));
+}
+export async function getPageIndexability(pool: Pool, kind: PublicPageKind, entityId: string): Promise<PageIndexability> {
+  if (kind !== 'topic' || !historyReadsEnabled()) return store(pool).page(kind, entityId);
+  const disposition = await topicHistoryDisposition(pool, entityId);
+  const [counts] = disposition.status === 'available' ? await cumulativeTopics(pool, [disposition.canonicalId]) : [];
+  return {
+    indexable: disposition.status === 'available',
+    indexabilityReason: disposition.status === 'available' ? null : disposition.status,
+    windowDays: null,
+    posts: Number(counts?.posts ?? 0),
+    blogs: Number(counts?.blogs ?? 0),
+    currentVersion: null,
+  };
+}
+export async function getIndexablePages(pool: Pool, kind: PublicPageKind): Promise<IndexablePage[]> {
+  if (kind !== 'topic' || !historyReadsEnabled()) return store(pool).sitemap(kind);
+  const rows = await cumulativeTopics(pool),
+    result: IndexablePage[] = [];
+  for (let offset = 0; offset < rows.length; offset += 500) {
+    const batch = rows.slice(offset, offset + 500),
+      pages = await getPublicPages(
+        pool,
+        'topic',
+        batch.map((r) => r.entity_id),
+      );
+    for (const row of batch) {
+      const page = pages.get(row.entity_id);
+      if (page)
+        result.push({
+          ...page,
+          indexable: true,
+          indexabilityReason: null,
+          windowDays: null,
+          posts: Number(row.posts),
+          blogs: Number(row.blogs),
+          currentVersion: null,
+          lastmod: row.lastmod,
+        });
+    }
+  }
+  return result.sort((a, b) => a.entityId.localeCompare(b.entityId, 'en'));
+}
 /** Bulk metadata enrichment reuses one projection and the bounded per-term cache. */
 export async function getPageMetadata(pool: Pool, kind: PublicPageKind, entityIds: string[]) {
   const registry = await getPublicPages(pool, kind, entityIds);
   const result = new Map<string, PublicPage & PageIndexability>();
+  if (kind === 'topic' && historyReadsEnabled()) {
+    if (!registry.size) return result;
+    const counts = await cumulativeTopics(pool, [...registry.keys()]);
+    for (const row of counts) {
+      const page = registry.get(row.entity_id);
+      if (page)
+        result.set(row.entity_id, {
+          ...page,
+          indexable: true,
+          indexabilityReason: null,
+          windowDays: null,
+          posts: Number(row.posts),
+          blogs: Number(row.blogs),
+          currentVersion: null,
+        });
+    }
+    return result;
+  }
   // Sequential reads keep metadata enrichment within the shared DB concurrency budget.
   for (const [id, page] of registry) result.set(id, { ...page, ...(await getPageIndexability(pool, kind, id)) });
   return result;

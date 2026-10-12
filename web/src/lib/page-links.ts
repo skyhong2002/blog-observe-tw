@@ -119,8 +119,10 @@ export const pageApiPath = (kind: PageKind, key: string) => `/api/pages/${kind =
 /**
  * GET /api/pages/... `page` (app/src/seo/page-api.ts). A registered page gets
  * the same indexable metadata as any public page; unknown or noise keys are the
- * gateway's 404. The 90-day counts are descriptive only and never drive robots;
- * any indexable/indexabilityReason fields in the answer are ignored.
+ * gateway's 404. The counts are descriptive only and never drive robots; any
+ * indexable/indexabilityReason fields in the answer are ignored. Blog counts
+ * cover 90 days; topic counts cover 90 days, or with windowDays null the whole
+ * durable history (history reads on).
  */
 export type PublicPageInfo = {
   entityId: string;
@@ -128,7 +130,8 @@ export type PublicPageInfo = {
   stableId: string;
   slug: string;
   canonicalPath: string;
-  windowDays: 90;
+  /** null: cumulative, no window (topics only). */
+  windowDays: 90 | null;
   posts: number;
   blogs: number;
   currentVersion: string | null;
@@ -137,6 +140,7 @@ export type PublicPageInfo = {
 const count = (value: unknown) => typeof value === 'number' && Number.isSafeInteger(value) && value >= 0;
 const STABLE: Record<PageKind, RegExp> = { blog: /^[a-z0-9][a-z0-9_-]{0,179}$/, topic: /^tag:[a-f0-9]{64}$/ };
 const ENTITY: Record<PageKind, RegExp> = { blog: /^[1-9]\d{0,14}$/, topic: /^[a-f0-9]{64}$/ };
+const windowOf = (kind: PageKind, value: unknown): value is 90 | null => value === 90 || (kind === 'topic' && value === null);
 
 /** The validated `page` of a page API answer, or null for any other shape. */
 export function pageInfoOf(kind: PageKind, raw: unknown): PublicPageInfo | null {
@@ -148,14 +152,14 @@ export function pageInfoOf(kind: PageKind, raw: unknown): PublicPageInfo | null 
   if (typeof stableId !== 'string' || !STABLE[kind].test(stableId)) return null;
   if (kind === 'topic' && stableId !== `tag:${entityId}`) return null;
   if (typeof slug !== 'string' || pageKeyOf(kind, canonicalPath) !== slug) return null;
-  if (windowDays !== 90 || !count(posts) || !count(blogs)) return null;
+  if (!windowOf(kind, windowDays) || !count(posts) || !count(blogs)) return null;
   if (!(currentVersion === null || typeof currentVersion === 'string')) return null;
   return {
     entityId,
     stableId,
     slug,
     canonicalPath: canonicalPath as string,
-    windowDays: 90,
+    windowDays,
     posts: posts as number,
     blogs: blogs as number,
     currentVersion: currentVersion as string | null,

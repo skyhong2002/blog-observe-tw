@@ -3,6 +3,8 @@ import type { Pool, RowDataPacket } from 'mysql2/promise';
 import { topicBodyHash, topicBodyJoins } from './body.ts';
 import { TopicResponseCache } from './cache.ts';
 import { FREQUENCY_POLICY } from './frequency.ts';
+import { historyReadsEnabled } from './history-contracts.ts';
+import { durableTopicDetail } from './history-read.ts';
 import { digest, MATCHER_VERSION, normalizeTerm, POLICY_VERSION } from './policy.ts';
 import { PUBLICATION_NOISE_VERSION, publicationExclusionReason, publicationLabelSql } from './publication-noise.ts';
 import { SOURCE } from './snapshot-client.ts';
@@ -202,7 +204,15 @@ export async function resolveTopic(pool: Pool, id: string) {
       }
     : null;
 }
-export async function topicEvidenceDetail(pool: Pool, id: string, days: number, verifiedOnly = true, now = new Date()) {
+export async function topicEvidenceDetail(
+  pool: Pool,
+  id: string,
+  days: number,
+  verifiedOnly = true,
+  now = new Date(),
+  historyCursor?: string,
+) {
+  if (historyReadsEnabled()) return durableTopicDetail(pool, id, days, now, historyCursor);
   const resolved = await resolveTopic(pool, id);
   if (!resolved) return null;
   const [[frequency]] = resolved.canonicalId
@@ -295,11 +305,23 @@ export function registerTopicRoutes(app: FastifyInstance, pool: Pool) {
       };
     });
   });
-  app.get<{ Params: { id: string }; Querystring: { days?: string } }>('/api/topics/:id', async (req, reply) => {
+  app.get<{ Params: { id: string }; Querystring: { days?: string; historyCursor?: string } }>('/api/topics/:id', async (req, reply) => {
     const days = daysValue(req.query.days);
     if (!days) return reply.code(400).send({ error: 'invalid_days' });
     const id = req.params.id;
     if (!/^(rss:[1-9]\d{0,9}|tag:[0-9a-f]{64})$/.test(id)) return reply.code(400).send({ error: 'invalid_topic' });
+    if (historyReadsEnabled()) {
+      reply.header('cache-control', 'no-store');
+      try {
+        // The detail's authoritative disposition decides status; no earlier preflight can go stale.
+        const detail = await topicEvidenceDetail(pool, id, days, true, new Date(), req.query.historyCursor);
+        if (!detail) return reply.code(404).send({ error: 'topic_not_found' });
+        return reply.send({ ...metadata(), days, vocabulary: await vocabularyStatus(pool), ...detail });
+      } catch (error) {
+        if (error instanceof Error && error.message === 'topic_gone') return reply.code(410).send({ error: 'topic_gone' });
+        throw error;
+      }
+    }
     const result = await cache.get(`detail:${days}:${id}`, async () => {
       const detail = await topicEvidenceDetail(pool, id, days);
       return detail ? { ...metadata(), days, vocabulary: await vocabularyStatus(pool), ...detail } : null;

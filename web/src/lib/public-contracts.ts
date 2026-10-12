@@ -67,6 +67,13 @@ export const PUBLIC_CONTRACTS: Record<PublicKind, (raw: unknown) => boolean> = {
       blogs: rows,
       articles: rows,
       vocabulary: object,
+      // Absent while history reads are off; rows with another evidenceState are dropped by the view (historyRows).
+      history: optional((value) =>
+        shape(value, {
+          articles: (items) => rows(items, { id: number, title: text, url: text, blogSlug: text, blogName: text, observedAt: text }),
+          nextCursor: nullable(text),
+        }),
+      ),
     }),
   relations: (raw) =>
     shape(raw, { nodes: rows, edges: rows, mostMentioned: rows, mutual: rows, coverage: relationCoverage, generatedAt: text }),

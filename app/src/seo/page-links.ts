@@ -1,5 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import type { Pool, RowDataPacket } from 'mysql2/promise';
+import { historyReadsEnabled } from '../topics/history-contracts.ts';
 import { digest, normalizeTerm } from '../topics/policy.ts';
 import { publicationExclusionReason } from '../topics/publication-noise.ts';
 import { SOURCE } from '../topics/snapshot-client.ts';
@@ -61,8 +62,10 @@ async function loadLinks(pool: Pool, refs: Ref[]): Promise<Map<string, string>> 
     .map((r) => r.value.slice(4));
   if (hashes.length) {
     const [rows] = await pool.query<RowDataPacket[]>(
-      'SELECT t.id FROM topic_canonical_terms_v3 t JOIN topic_current c ON c.source=? AND c.snapshot_id=t.snapshot_id WHERE t.id IN (?)',
-      [SOURCE, hashes],
+      historyReadsEnabled()
+        ? 'SELECT canonical_id id FROM topic_pages WHERE canonical_id IN (?)'
+        : 'SELECT t.id FROM topic_canonical_terms_v3 t JOIN topic_current c ON c.source=? AND c.snapshot_id=t.snapshot_id WHERE t.id IN (?)',
+      historyReadsEnabled() ? [hashes] : [SOURCE, hashes],
     );
     for (const row of rows) entities.set(`topic:tag:${row.id}`, String(row.id));
     const missing = hashes.filter((id) => !entities.has(`topic:tag:${id}`));
@@ -85,6 +88,41 @@ async function loadLinks(pool: Pool, refs: Ref[]): Promise<Map<string, string>> 
     for (const row of rows) entities.set(`topic:rss:${row.id}`, digest(normalizeTerm(row.label)));
   }
   for (const ref of refs) if (ref.kind === 'blog-id') entities.set(keyOf(ref), ref.value);
+  if (historyReadsEnabled()) {
+    const ids = [
+      ...new Set(
+        refs
+          .filter((r) => r.kind === 'topic')
+          .map((r) => entities.get(keyOf(r)))
+          .filter((id): id is string => !!id),
+      ),
+    ];
+    const graph = new Map<string, { state: string; target: string | null }>();
+    let pending = ids;
+    for (let depth = 0; depth < 16 && pending.length; depth++) {
+      const [rows] = await pool.query<RowDataPacket[]>('SELECT canonical_id,state,merged_into FROM topic_pages WHERE canonical_id IN (?)', [
+        pending,
+      ]);
+      const next = new Set<string>();
+      for (const row of rows) {
+        graph.set(row.canonical_id, { state: row.state, target: row.merged_into });
+        if (row.state === 'merged' && /^[a-f0-9]{64}$/.test(row.merged_into ?? '') && !graph.has(row.merged_into))
+          next.add(row.merged_into);
+      }
+      pending = [...next];
+    }
+    for (const [key, original] of entities) {
+      if (!key.startsWith('topic:')) continue;
+      let id = original;
+      const visited = new Set<string>();
+      while (graph.get(id)?.state === 'merged' && !visited.has(id)) {
+        visited.add(id);
+        id = graph.get(id)?.target ?? '';
+      }
+      if (!id || graph.get(id)?.state === 'merged') entities.delete(key);
+      else entities.set(key, id);
+    }
+  }
   const result = new Map<string, string>();
   for (const kind of ['blog', 'topic'] as PublicPageKind[]) {
     const selected = refs.filter((r) => (r.kind === 'topic') === (kind === 'topic'));
@@ -105,6 +143,7 @@ async function loadLinks(pool: Pool, refs: Ref[]): Promise<Map<string, string>> 
 type Cache = { entries: Map<string, { until: number; value: string | null }>; flights: Map<string, Promise<void>> };
 const caches = new WeakMap<Pool, Cache>();
 async function cachedLinks(pool: Pool, refs: Ref[]): Promise<Map<string, string>> {
+  if (historyReadsEnabled()) return loadLinks(pool, refs);
   let cache = caches.get(pool);
   if (!cache) {
     cache = { entries: new Map(), flights: new Map() };

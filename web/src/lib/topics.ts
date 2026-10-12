@@ -119,6 +119,31 @@ export type TopicDetail = {
     blogName: string;
   }>;
   truncated: boolean;
+  /** Articles the topic was ever matched in (app/src/topics/history-contracts.ts); absent while history reads are off. */
+  history?: TopicHistory;
+};
+/** A past match: title and original URL only, never the article text. */
+export type HistoryArticle = {
+  id: number;
+  title: string;
+  url: string;
+  publishedAt: string | null;
+  blogSlug: string;
+  blogName: string;
+  blogCanonicalPath?: string;
+  /** pending: seen before, waiting to be re-checked; never a current match. */
+  evidenceState: 'confirmed' | 'pending';
+  observedAt: string;
+};
+export type TopicHistory = {
+  articles: HistoryArticle[];
+  /** Next page: the same /api/topics/:id?days= read with historyCursor=. */
+  nextCursor: string | null;
+  confirmed: number;
+  pending: number;
+  lastObservedAt: string | null;
+  /** Distinct public articles. */
+  total: number;
 };
 export type Topics = {
   days: number;
@@ -230,3 +255,57 @@ export function matchingPolicyText(policy: Weights = DEFAULT_MATCHING_POLICY) {
     `同一部落格的文章由高到低排列，之後每篇再乘 ${d}。例如同站 2 篇標題、1 篇僅正文合計 ${blogContribution(2, 1, policy)}。`
   );
 }
+
+/**
+ * What a topic page shows for its period: the period's articles when there are
+ * any; otherwise the topic's article history when the payload has one; otherwise
+ * the plain empty state (also what a payload without `history` gets, so turning
+ * history reads off falls back to the old page).
+ */
+export function topicArticleMode(data: Pick<TopicDetail, 'articles' | 'history'>): 'recent' | 'history' | 'empty' {
+  if (data.articles.length) return 'recent';
+  return historyRows(data.history).length ? 'history' : 'empty';
+}
+
+/**
+ * History rows as the view renders them: only the listed fields (no article
+ * text, whatever else a payload carries) and only confirmed or pending evidence.
+ */
+export function historyRows(history: Pick<TopicHistory, 'articles'> | null | undefined): HistoryArticle[] {
+  if (!history || !Array.isArray(history.articles)) return [];
+  return history.articles
+    .filter((a) => a.evidenceState === 'confirmed' || a.evidenceState === 'pending')
+    .map((a) => ({
+      id: a.id,
+      title: a.title,
+      url: a.url,
+      publishedAt: a.publishedAt,
+      blogSlug: a.blogSlug,
+      blogName: a.blogName,
+      ...(a.blogCanonicalPath === undefined ? {} : { blogCanonicalPath: a.blogCanonicalPath }),
+      evidenceState: a.evidenceState,
+      observedAt: a.observedAt,
+    }));
+}
+
+/** How a history row's evidence is labelled; `observed` is the formatted observation date. */
+export function evidenceLabel(state: HistoryArticle['evidenceState'], observed: string) {
+  return state === 'pending' ? `過去曾觀測到提及，待重新確認（觀測於 ${observed}）` : `曾確認提及（觀測於 ${observed}）`;
+}
+
+/** "共 N 篇（已確認 C · 待重新確認 P）", leaving out counts an older payload did not record. */
+export function historySummary(history: Partial<Pick<TopicHistory, 'total' | 'confirmed' | 'pending'>>) {
+  const fmt = (n: number) => n.toLocaleString('zh-TW');
+  const total = recorded(history.total);
+  const confirmed = recorded(history.confirmed);
+  const pending = recorded(history.pending);
+  const split = [confirmed === null ? '' : `已確認 ${fmt(confirmed)}`, pending === null ? '' : `待重新確認 ${fmt(pending)}`]
+    .filter(Boolean)
+    .join(' · ');
+  if (total === null) return split;
+  return split ? `共 ${fmt(total)} 篇（${split}）` : `共 ${fmt(total)} 篇`;
+}
+
+/** Page description: the page carries recent and accumulated articles, so it names no period. */
+export const topicPageDescription = (label: string) =>
+  `台灣部落格中提到「${label}」的文章與部落格，依共同關鍵字整理，包含近期與過去觀測到的文章。`;

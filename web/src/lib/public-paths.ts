@@ -45,7 +45,7 @@ const RULES: readonly Rule[] = [
   { kind: 'authors', path: /^\/api\/catalog\/authors$/, query: ['author', 'page', 'limit'] },
   { kind: 'search', path: /^\/api\/search$/, query: ['q', 'page', 'limit', 'blog'] },
   { kind: 'topics', path: /^\/api\/topics$/, query: ['days'] },
-  { kind: 'topic', path: new RegExp(`^/api/topics/${SEGMENT}$`), query: ['days'] },
+  { kind: 'topic', path: new RegExp(`^/api/topics/${SEGMENT}$`), query: ['days', 'historyCursor'] },
   { kind: 'relations', path: /^\/api\/relations$/, query: ['days'] },
   { kind: 'traffic', path: /^\/api\/traffic$/, query: ['blog'] },
   { kind: 'tag', path: new RegExp(`^/api/tags/${SEGMENT}$`), query: [] },
