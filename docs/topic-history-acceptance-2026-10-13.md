@@ -1,12 +1,14 @@
 # 累積話題正式驗收（2026-10-13）
 
+> 下列18:43–18:45 UTC資料為歷史紀錄，產生時正式站仍是blue `a45b06a`、generation2；工具所在worktree HEAD為`fc6b5a9`。兩份舊artifact沒有記錄release SHA，其中HTTP檔僅含status/canonical，**不能當作現行42711cf的驗收**。舊檔保留；新驗收另存新路徑。
+
 ## 來源與結果
 
-本報告依固定驗收檔 `.reviews/history/audit-final.json`，資料截至 **2026-10-12T18:43:15.000Z**（台北 2026-10-13 02:43:15）。來源檔 SHA-256：`c0bf9dc24c2f74811c57aa2d047f6c2aa58b3a9dc746f5f237fd3dea13a3449c`。稽核工具為 [`tools/audit-topic-history.ts`](../tools/audit-topic-history.ts)，本次文件整理沒有寫入正式資料庫。
+本報告依固定驗收檔 `/home/deck/.cache/blog-topic-history/.reviews/history/audit-final.json`，資料截至 **2026-10-12T18:43:15.000Z**（台北 2026-10-13 02:43:15）。來源檔 SHA-256：`c0bf9dc24c2f74811c57aa2d047f6c2aa58b3a9dc746f5f237fd3dea13a3449c`。稽核工具為 [`tools/audit-topic-history.ts`](../tools/audit-topic-history.ts)，本次文件整理沒有寫入正式資料庫。
 
 累積可公開話題 **4,769** 個；其中近 30 天及近 90 天均無可確認文章的話題 **710** 個；缺少可讀網址 **0** 個。母體是部落格文章的保留比對證據，**不是 tag 的完整詞庫**。低頻、單篇、單站不因數量少而新增 noindex 門檻。
 
-資料統計是唯讀且循序的 SELECT，worker 同時持續更新，並非全份資料處於同一個隔離交易。下表保留該次紀錄，不把稍後 HTTP 的最新值倒填成同時刻統計。主代理另以正常匿名 HTTP 驗證這二十個舊網址：全部一次 301 到表中可讀網址，最後 200、canonical 指向自己，沒有 noindex；結果保存在 `.reviews/history/final-20-http.json`。
+資料統計是唯讀且循序的 SELECT，worker 同時持續更新，並非全份資料處於同一個隔離交易。下表保留該次紀錄，不把稍後 HTTP 的最新值倒填成同時刻統計。主代理另以正常匿名 HTTP 驗證這二十個舊網址：全部一次 301 到表中可讀網址，最後 200、canonical 指向自己，沒有 noindex；結果保存在 `/home/deck/.cache/blog-topic-history/.reviews/history/final-20-http.json`。
 
 ## 保留證據、待確認與近期文章的語義
 
