@@ -3,6 +3,7 @@ import type { Pool, RowDataPacket } from 'mysql2/promise';
 import { reserveBudget } from '../jobs/budget.ts';
 import type { BatchOptions } from '../jobs/contracts.ts';
 import { withJobLease } from '../jobs/lease.ts';
+import { topicDeferredReason } from './deferred-reason.ts';
 import { carryTopicIndexes } from './index-carry.ts';
 import { digest } from './matcher.ts';
 import { storedNormalizedLabel } from './policy.ts';
@@ -386,7 +387,7 @@ export async function syncVocabulary(pool: Pool, options: SyncOptions = {}) {
           if (options.source) throw error;
           const nextAttemptAt = new Date(now.getTime() + 15 * 60_000);
           await pool.execute('UPDATE topic_window_runs SET next_attempt_at=?,updated_at=? WHERE id=?', [nextAttemptAt, now, id]);
-          return { status: 'deferred', version: id, nextAttemptAt };
+          return { status: 'deferred', version: id, nextAttemptAt, deferredReason: topicDeferredReason(error) };
         }
         await assertLease();
         await pool.execute('UPDATE topic_window_runs SET status=?,updated_at=? WHERE id=?', [reason, options.now?.() ?? new Date(), id]);
