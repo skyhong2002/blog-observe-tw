@@ -53,3 +53,5 @@ npm run blogs:merge -- old-slug new-slug --apply
 [持久化歷史遍歷](docs/history-import.md)支援 sitemap 全分片、RSS／Atom 下一頁與 WordPress／Blogger 公開分頁；每五分鐘處理最久未輪到的五站，按頁數、文章數與時間切批，不因低頻發文判 stale。僅走完且沒有來源缺口才標完整，受限或公開索引不足會明確保留狀態。
 
 [候選自動收錄](docs/automatic-candidate-review.md)每半小時驗證最多25筆，完整名稱、RSS首頁與文章歸屬皆須一致；網站／feed所有權、人工決定與稽核在同一交易保護。每十五分鐘另補最多10個新收錄站的缺圖，失敗冷卻七天；每月原圖示刷新保留。三種新工作都在 blog 自己的 BullMQ 單一 worker，以獨立旗標停止，姊妹站不改動。
+
+最新部署與本輪驗收：[2026-10-12 歷史遍歷、來源驗證與圖示補齊](docs/completion-2026-10-12.md)。

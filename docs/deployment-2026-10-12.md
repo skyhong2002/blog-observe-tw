@@ -1,5 +1,6 @@
 # 2026-10-12：前端、favicon 與 tag Similarweb 接線驗收
 
+> 本文為前一階段快照；缺網址、候選審核與最新部署狀態請見 [後續完成紀錄](completion-2026-10-12.md)。
 ## 版本與部署
 
 - 本階段以 fetch 後的 `origin/main` `696c39bb5f904f096a653f4125bf294b61bd6253` 建立獨立 worktree；原共享 checkout 未 reset、未改動。
