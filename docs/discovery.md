@@ -34,3 +34,13 @@ blog 的資料庫、Redis namespace、佇列、cookie jar、Playwright profile �
 使用者後續核准由程式與網路查證直接補齊，已實作獨立 seed resolution 工具、名稱／首頁／feed 證據與交易式綁定；不以任意部落卷連結直接覆蓋種子網址。已驗證 120 筆、2 筆搬家指向既有站點，9 筆保留 unresolved 與原因。操作與紀錄見 [種子網址配對](seed-url-matching-proposal.md)。
 
 鎖連線若在檢查後斷線，已開始的一次請求仍可能完成；下一次檢查即中止。寫入以交易及完整路徑唯一鍵保持冪等。探索錯誤不會觸發無限制重試。
+
+## 2026-10-12 正式驗收
+
+從 `origin/main` 的 `b179767` 開始修正，程式 release 為 `0882121`。正式探索未預置目標網址，實際取得 13 頁、新增 958 個候選、保存 2,088 筆來源觀察，其中 1,078 筆為部落卷關係。`skyhong.tw` 候選 ID 為 1229，由 Wiwi 與 JN 的部落卷各自發現；兩條路徑獨立存在 `discovery_edges`，候選仍待一般收錄流程驗證。
+
+`/party` 觸及每頁 1,000 個連結上限，因此本輪 `truncated=true`；未宣稱已完整收盡該頁。兩張部落卷及 `/random` 在本輪解析到 0 個外站連結，仍屬後續來源覆蓋調查項目。這不影響上述兩條自然發現路徑的驗收。
+
+204 項測試、TypeScript、Biome 與 production build 通過；隔離 MariaDB 還原驗證涵蓋鎖競爭、304 回放、跨來源同網址、UTC 時間往返、人工 evidence／拒絕狀態保護及交易失敗回滾。正式執行前後其他來源的候選 checksum 一致。Codex／Opus 審查與處理紀錄保留於忽略版控的 `.reviews/`。
+
+切換後 `blog.observe.tw`、`/healthz`、目錄與來源頁均 200；Google OAuth 起始 302，S256 與 callback 正確；proxy SSRF 回歸請求回 400；tag／youtube 首頁仍 200。前一 release `9400b6a` 與 service drop-in 備份保留，可回滾。
