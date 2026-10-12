@@ -1,4 +1,5 @@
 import { boolean, char, datetime, index, int, json, mysqlTable, primaryKey, text, uniqueIndex, varchar } from 'drizzle-orm/mysql-core';
+import type { BlogrollLink } from '../crawl/blogroll-contract.ts';
 
 /**
  * The database is deliberately owned by blog-observe.  These tables mirror
@@ -389,3 +390,39 @@ export const similarwebControl = mysqlTable('similarweb_control', {
   nextRoundAt: datetime('next_round_at').notNull(),
   cooldownUntil: datetime('cooldown_until'),
 });
+
+/** Cached parsed links, not raw HTML; digest primary keys avoid oversized UTF-8 URL indexes. */
+export const discoveryPages = mysqlTable(
+  'discovery_pages',
+  {
+    urlSha256: char('url_sha256', { length: 64 }).primaryKey(),
+    url: varchar('url', { length: 1024 }).notNull(),
+    finalUrl: varchar('final_url', { length: 1024 }).notNull(),
+    parserVersion: int('parser_version').notNull(),
+    kind: varchar('kind', { length: 32 }).notNull(),
+    etag: varchar('etag', { length: 512 }),
+    lastModified: varchar('last_modified', { length: 255 }),
+    bodySha256: char('body_sha256', { length: 64 }).notNull(),
+    links: json('links').$type<BlogrollLink[]>().notNull(),
+    fetchedAt: datetime('fetched_at').notNull(),
+  },
+  (table) => [index('discovery_pages_fetched').on(table.fetchedAt)],
+);
+
+/** Observed links preserve every root/source/target relationship independently of candidate review status. */
+export const discoveryEdges = mysqlTable(
+  'discovery_edges',
+  {
+    edgeSha256: char('edge_sha256', { length: 64 }).primaryKey(),
+    rootUrl: varchar('root_url', { length: 1024 }).notNull(),
+    sourceUrl: varchar('source_url', { length: 1024 }).notNull(),
+    targetUrl: varchar('target_url', { length: 1024 }).notNull(),
+    path: json('path').$type<string[]>().notNull(),
+    anchorText: varchar('anchor_text', { length: 512 }).notNull(),
+    relation: varchar('relation', { length: 32 }).notNull(),
+    bodySha256: char('body_sha256', { length: 64 }).notNull(),
+    firstSeenAt: datetime('first_seen_at').notNull(),
+    lastSeenAt: datetime('last_seen_at').notNull(),
+  },
+  (table) => [index('discovery_edges_seen').on(table.lastSeenAt)],
+);
