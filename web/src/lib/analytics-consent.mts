@@ -211,13 +211,14 @@ export function classifyClick(href: string, marker: string | undefined, origin: 
 // clears it when a sign-in starts, fails or the reader logs out, so a
 // cancelled sign-in by an already signed-in reader never carries it. It is
 // read only to send `login` (method=google), never for authentication, and
-// the browser deletes it right after that event.
-export const LOGIN_COMPLETED_COOKIE = 'blog_login_completed';
+// the browser deletes it right after that event. The `__Host-` prefix makes it
+// host-only (Secure, Path=/, no Domain), so a sibling subdomain cannot plant it.
+export const LOGIN_COMPLETED_COOKIE = '__Host-blog_login_completed';
 
-/** Exactly `blog_login_completed=1` among the document's cookies. */
+/** Exactly `__Host-blog_login_completed=1` among the document's cookies. */
 export function loginCompleted(cookie: string): boolean {
   return cookie.split(';').some((part) => part.trim() === `${LOGIN_COMPLETED_COOKIE}=1`);
 }
 
-/** document.cookie assignment that deletes the receipt (same Path, SameSite and Secure as set). */
+/** document.cookie assignment that deletes the receipt (same Path, SameSite and Secure as set; no Domain, as `__Host-` requires). */
 export const CLEAR_LOGIN_COMPLETED = `${LOGIN_COMPLETED_COOKIE}=; Path=/; Max-Age=0; SameSite=Lax; Secure`;

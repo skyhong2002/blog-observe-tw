@@ -31,7 +31,7 @@ Measurement ID：`G-VKWGDHDESV`（property 558498886、stream 16112932212）。I
 | follow | 動作名稱，不含使用者或部落格 ID |
 | app_installed | 動作名稱 |
 
-OAuth 成功後 gateway 才寫入 `blog_login_completed=1` 短效布林 cookie（`Secure; SameSite=Lax; Path=/; Max-Age=300`，非 HttpOnly），開始登入、失敗與登出時清除。前端只用它送一次 `login`（`method=google`），不呼叫 `/auth/me`、不推論登入狀態；事件送出後立即以相同屬性刪除。回到私人頁（如 `/my/`）時延後到 cookie 期限內第一個可計入的公開頁、且 gtag.js 已載入後再送；退出統計時不送也不刪。此訊號不參與認證，也不含 session、sub 或 email；已登入使用者取消 Google 登入時沒有此 cookie，不會誤計成功。未建立的 save 功能不虛構事件。
+OAuth 成功後 gateway 才寫入 `__Host-blog_login_completed=1` 短效布林 cookie（`Secure; SameSite=Lax; Path=/; Max-Age=300`，非 HttpOnly），開始登入、失敗與登出時清除。前端只用它送一次 `login`（`method=google`），不呼叫 `/auth/me`、不推論登入狀態；事件送出後立即以相同屬性刪除。回到私人頁（如 `/my/`）時延後到 cookie 期限內第一個可計入的公開頁、且 gtag.js 已載入後再送；退出統計時不送也不刪。此訊號不參與認證，也不含 session、sub 或 email；已登入使用者取消 Google 登入時沒有此 cookie，不會誤計成功。未建立的 save 功能不虛構事件。
 
 ## 驗收與發布
 

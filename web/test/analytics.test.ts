@@ -521,11 +521,15 @@ test('login: only the exact gateway marker counts; the runtime never asks /auth/
     `${LOGIN_COMPLETED_COOKIE}=`,
     `${LOGIN_COMPLETED_COOKIE}=1x`,
     `${LOGIN_COMPLETED_COOKIE}=true`,
+    // The unprefixed name could be planted by a sibling subdomain; only the host-only one counts.
+    'blog_login_completed=1',
   ])
     assert.equal(loginCompleted(cookie), false, cookie);
   // Deleted with the attributes the gateway sets it with.
-  assert.equal(CLEAR_LOGIN_COMPLETED, 'blog_login_completed=; Path=/; Max-Age=0; SameSite=Lax; Secure');
+  assert.equal(LOGIN_COMPLETED_COOKIE, '__Host-blog_login_completed');
+  assert.equal(CLEAR_LOGIN_COMPLETED, '__Host-blog_login_completed=; Path=/; Max-Age=0; SameSite=Lax; Secure');
   const gateway = readFileSync(new URL('../../app/src/auth/google-login.ts', import.meta.url), 'utf8');
+  assert.match(gateway, /LOGIN_COMPLETED_COOKIE = '__Host-blog_login_completed'/);
   assert.match(gateway, /Path=\/; Max-Age=\$\{completed \? 300 : 0\}; SameSite=Lax; Secure/);
 });
 

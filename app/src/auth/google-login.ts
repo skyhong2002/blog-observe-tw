@@ -30,7 +30,7 @@ export interface LoginStore {
 
 export const SESSION_COOKIE = 'blog_session';
 export const FLOW_COOKIE = 'blog_oauth';
-export const LOGIN_COMPLETED_COOKIE = 'blog_login_completed';
+export const LOGIN_COMPLETED_COOKIE = '__Host-blog_login_completed';
 export const SESSION_DAYS = 30;
 export const FLOW_SECONDS = 600;
 
