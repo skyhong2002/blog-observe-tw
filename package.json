@@ -24,7 +24,8 @@
     "web:build": "npm --prefix web run build",
     "web:start": "npm --prefix web run start",
     "blogs:merge": "node --env-file-if-exists=.env tools/merge-blog-urls.ts",
-    "favicons:fetch": "node --env-file-if-exists=.env tools/fetch-favicons.ts"
+    "favicons:fetch": "node --env-file-if-exists=.env tools/fetch-favicons.ts",
+    "seed:resolve": "node --env-file-if-exists=.env tools/resolve-seed-urls.ts"
   },
   "dependencies": {
     "@fastify/rate-limit": "^11.2.0",

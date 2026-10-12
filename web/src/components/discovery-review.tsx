@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import BlogIcon from '@/components/BlogIcon';
 
 type Candidate = {
@@ -34,7 +34,7 @@ export default function DiscoveryReview() {
   const [loaded, setLoaded] = useState(false);
   const [selected, setSelected] = useState<number[]>([]);
   const [message, setMessage] = useState('載入中…');
-  const load = async () => {
+  const load = useCallback(async () => {
     const response = await fetch('/api/admin/discovery?status=candidate&limit=200', { credentials: 'include', cache: 'no-store' });
     if (!response.ok) {
       setMessage(
@@ -46,11 +46,11 @@ export default function DiscoveryReview() {
     setLoaded(true);
     setItems(payload.candidates ?? []);
     setMessage(`${payload.candidates?.length ?? 0} 筆待審候選`);
-  };
+  }, []);
   // Candidate data is loaded once when the operator opens the page.
   useEffect(() => {
     void load().catch(() => setMessage('候選暫時無法載入，請稍後重新整理。'));
-  }, []);
+  }, [load]);
   const review = async (status: 'approved' | 'rejected') => {
     if (!selected.length || busy) return;
     if (selected.length > 100) {

@@ -1,8 +1,9 @@
 import { createHash } from 'node:crypto';
 import { lookup } from 'node:dns/promises';
 import { isIP, type LookupFunction } from 'node:net';
+import { gunzipSync } from 'node:zlib';
 import * as cheerio from 'cheerio';
-import { XMLParser } from 'fast-xml-parser';
+import { XMLParser, XMLValidator } from 'fast-xml-parser';
 import type { Pool } from 'mysql2/promise';
 import { Agent, type Dispatcher, fetch as undiciFetch } from 'undici';
 
@@ -46,6 +47,21 @@ const hostNextAt = new Map<string, number>();
 const robotsCache = new Map<string, { expiresAt: number; disallow: string[] }>();
 const DEFAULT_DELAY_MS = Math.max(250, Number(process.env.BLOG_CRAWL_DELAY_MS || 1200));
 export const MAX_RESPONSE_BYTES = 5 * 1024 * 1024;
+
+/** Read XML fetched through politeFetch. Some sitemap.xml.gz files have no Content-Encoding.
+ * Detect bytes instead of the URL/header, because fetch already decompresses HTTP content encodings. */
+export async function readFeedBody(response: Response): Promise<string> {
+  const bytes = Buffer.from(await response.arrayBuffer());
+  if (bytes.length > MAX_RESPONSE_BYTES) throw new Error(`crawl response exceeds ${MAX_RESPONSE_BYTES} bytes`);
+  if (bytes[0] !== 0x1f || bytes[1] !== 0x8b) return bytes.toString('utf8');
+  try {
+    return gunzipSync(bytes, { maxOutputLength: MAX_RESPONSE_BYTES }).toString('utf8');
+  } catch (error) {
+    if (error instanceof Error && 'code' in error && error.code === 'ERR_BUFFER_TOO_LARGE')
+      throw new Error(`decompressed crawl response exceeds ${MAX_RESPONSE_BYTES} bytes`);
+    throw new Error('invalid gzip feed response');
+  }
+}
 
 const asArray = <T>(value: T | T[] | null | undefined): T[] => (value == null ? [] : Array.isArray(value) ? value : [value]);
 const textOf = (value: unknown): string => {
@@ -94,10 +110,12 @@ const ipv6Value = (value: string): bigint | null => {
   return expanded.reduce((result, part) => (result << 16n) + BigInt(`0x${part}`), 0n);
 };
 
+// CIDR boundaries verified against https://www.iana.org/assignments/iana-ipv4-special-registry/
+// Do not reject all 192.0/16: public WordPress hosts use 192.0.78/24.
 const ipv4Blocked = (value: string): boolean => {
   const parts = ipv4Parts(value);
   if (!parts) return false;
-  const [a, b] = parts;
+  const [a, b, c] = parts;
   return (
     a === 0 ||
     a === 10 ||
@@ -105,10 +123,10 @@ const ipv4Blocked = (value: string): boolean => {
     (a === 100 && b >= 64 && b <= 127) ||
     (a === 169 && b === 254) ||
     (a === 172 && b >= 16 && b <= 31) ||
-    (a === 192 && (b === 0 || b === 2 || b === 168)) ||
-    (a === 192 && b === 88) ||
-    (a === 198 && (b === 18 || b === 19 || b === 51)) ||
-    (a === 203 && b === 0) ||
+    (a === 192 && ((b === 0 && (c === 0 || c === 2)) || b === 168)) ||
+    (a === 192 && b === 88 && c === 99) ||
+    (a === 198 && (b === 18 || b === 19 || (b === 51 && c === 100))) ||
+    (a === 203 && b === 0 && c === 113) ||
     a >= 224
   );
 };
@@ -462,6 +480,103 @@ export function parseSitemap(xml: string, baseUrl: string): FeedEntry[] {
     .filter((item): item is FeedEntry => Boolean(item));
 }
 
+const objectOf = (value: unknown): Record<string, unknown> | null =>
+  value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : null;
+const schemaArticleTypes = new Set(['Article', 'BlogPosting', 'NewsArticle']);
+const cleanMetadata = (value: unknown, max: number): string => textOf(value).replace(/\s+/g, ' ').trim().slice(0, max);
+
+/** A sitemap proves a URL exists, not that it is an article. Never index shop/category URLs by their path alone. */
+export function parseSitemapArticle(html: string, candidate: FeedEntry, finalUrl: string): FeedEntry | null {
+  const $ = cheerio.load(html);
+  const meta = (name: string) => $(`meta[property="${name}"], meta[name="${name}"]`).first().attr('content') || '';
+  const pageIdentity = (value: string) => {
+    const url = new URL(value, finalUrl);
+    return `${url.hostname.replace(/^www\./, '')}${url.pathname.replace(/\/$/, '')}`;
+  };
+  const articles: Record<string, unknown>[] = [];
+  let visited = 0;
+  const inspect = (value: unknown) => {
+    if (++visited > 128) return;
+    if (Array.isArray(value)) {
+      for (const item of value) inspect(item);
+      return;
+    }
+    const node = objectOf(value);
+    if (!node) return;
+    const types = asArray(node['@type']).filter((type): type is string => typeof type === 'string');
+    const isArticle = types.some((type) => schemaArticleTypes.has(type.replace(/^https?:\/\/schema\.org\//, '')));
+    if (isArticle) {
+      const declaredUrl = textOf(node.url || node['@id']);
+      if (!declaredUrl || pageIdentity(declaredUrl) === pageIdentity(finalUrl)) articles.push(node);
+    }
+    // Do not inspect ItemList/recommendations/comments: those are other pages.
+    if (node['@graph']) inspect(node['@graph']);
+    if (node.mainEntity) inspect(node.mainEntity);
+  };
+  $('script[type="application/ld+json"]')
+    .slice(0, 20)
+    .each((_, element) => {
+      const text = $(element).text();
+      if (text.length > 256 * 1024) return;
+      try {
+        inspect(JSON.parse(text));
+      } catch {
+        /* A malformed schema block is not article evidence. */
+      }
+    });
+  const article = articles[0];
+  if (!article && meta('og:type').toLowerCase() !== 'article') return null;
+  const title = cleanMetadata(article?.headline || article?.name || meta('og:title') || $('h1').first().text() || $('title').text(), 512);
+  if (!title || /^(?:just a moment|access denied|page not found|404\b)/i.test(title)) return null;
+  const author = asArray(article?.author)[0];
+  const image = asArray(article?.image)[0];
+  const publishedAt = dateOf(article?.datePublished || meta('article:published_time'));
+  return {
+    ...candidate,
+    url: finalUrl,
+    title,
+    summary: cleanMetadata(article?.description || meta('og:description') || meta('description'), 20_000),
+    author: cleanMetadata(objectOf(author)?.name || author || meta('author'), 255) || null,
+    publishedAt,
+    updatedAt: dateOf(article?.dateModified || meta('article:modified_time')) || candidate.updatedAt,
+    imageUrl: textOf(objectOf(image)?.url || objectOf(image)?.contentUrl || image || meta('og:image'))
+      ? absolute(objectOf(image)?.url || objectOf(image)?.contentUrl || image || meta('og:image'), finalUrl)
+      : null,
+    categories: asArray(article?.articleSection)
+      .map((value) => cleanMetadata(value, 255))
+      .filter(Boolean)
+      .slice(0, 20),
+  };
+}
+
+function sitemapUrlInBlog(value: string, home: string): boolean {
+  const url = new URL(value);
+  const blog = new URL(home);
+  const host = (item: URL) => item.hostname.replace(/^www\./, '');
+  if (host(url) !== host(blog)) return false;
+  if (!['medium.com', 'vocus.cc', 'xuite.net'].includes(host(blog))) return true;
+  const path = blog.pathname.replace(/\/$/, '');
+  return url.pathname === path || url.pathname.startsWith(`${path}/`);
+}
+
+async function verifySitemapArticles(entries: FeedEntry[], blogUrl: string, options: FeedCrawlerOptions): Promise<FeedEntry[]> {
+  const verified: FeedEntry[] = [];
+  for (const candidate of entries) {
+    if (!sitemapUrlInBlog(candidate.url, blogUrl)) continue;
+    try {
+      const response = await politeFetch(candidate.url, { accept: 'text/html,application/xhtml+xml' }, options);
+      if (!response.ok || !sitemapUrlInBlog(response.url || candidate.url, blogUrl)) continue;
+      const contentType = response.headers.get('content-type');
+      if (contentType && !/text\/html|application\/xhtml\+xml/i.test(contentType)) continue;
+      const article = parseSitemapArticle(await response.text(), candidate, response.url || candidate.url);
+      if (article) verified.push(article);
+    } catch {
+      /* A missing/blocked article does not invalidate other entries or bypass robots. */
+    }
+  }
+  return verified;
+}
+
 export async function discoverFeedUrls(blogUrl: string, options: FeedCrawlerOptions = {}): Promise<FeedLink[]> {
   const response = await politeFetch(blogUrl, {}, options);
   if (!response.ok) throw new Error(`homepage ${response.status}`);
@@ -480,13 +595,22 @@ export async function crawlBlog(
   const now = new Date();
   let links: FeedLink[];
   try {
-    links = await discoverFeedUrls(blog.url, options);
+    // Verified seed resolution registers publication-specific sources. Reuse
+    // those instead of guessing a shared platform's global feed on each run.
+    const [registered] = await pool.execute(
+      'SELECT url,type FROM feed_sources WHERE blog_id=? AND last_success_at IS NOT NULL ORDER BY id',
+      [blog.id],
+    );
+    const known = Array.isArray(registered) ? (registered as FeedLink[]) : [];
+    links = known.filter((source) => ['rss', 'atom', 'sitemap'].includes(source.type) && isAllowedCrawlUrl(source.url));
+    if (!links.length) links = await discoverFeedUrls(blog.url, options);
   } catch (error) {
     await pool.execute('UPDATE blogs SET last_crawled_at=? WHERE id=?', [now, blog.id]);
     throw error;
   }
   let total = 0;
   let sourceCount = 0;
+  let sitemapBudget = 30;
   for (const source of links) {
     const [savedResult] = await pool.execute('SELECT * FROM feed_sources WHERE url=?', [source.url]);
     const saved = (Array.isArray(savedResult) ? savedResult[0] : null) as { etag?: string; last_modified?: string } | undefined;
@@ -518,8 +642,35 @@ export async function crawlBlog(
       );
       continue;
     }
-    const body = await response.text();
-    const entries = source.type === 'sitemap' ? parseSitemap(body, source.url) : parseFeed(body, source.url);
+    let body: string;
+    try {
+      body = await readFeedBody(response);
+    } catch {
+      await pool.execute(
+        'INSERT INTO feed_sources (blog_id,url,type,last_error_at,consecutive_failures) VALUES (?,?,?,?,1) ON DUPLICATE KEY UPDATE last_error_at=VALUES(last_error_at),consecutive_failures=consecutive_failures+1',
+        [blog.id, source.url, source.type, now],
+      );
+      continue;
+    }
+    // A 200 HTML error page must not become a successful feed source.
+    const xmlValid = !/<!DOCTYPE|<!ENTITY/i.test(body) && XMLValidator.validate(body) === true;
+    const parsedRoot = xmlValid ? objectOf(parser.parse(body)) : null;
+    const expectedRoot =
+      source.type === 'sitemap' ? objectOf(parsedRoot?.urlset) : objectOf(objectOf(parsedRoot?.rss)?.channel) || objectOf(parsedRoot?.feed);
+    if (!expectedRoot) {
+      await pool.execute('UPDATE feed_sources SET last_error_at=?,consecutive_failures=consecutive_failures+1 WHERE url=? AND blog_id=?', [
+        now,
+        source.url,
+        blog.id,
+      ]);
+      continue;
+    }
+    let entries: FeedEntry[];
+    if (source.type === 'sitemap') {
+      const candidates = parseSitemap(body, response.url || source.url).slice(0, sitemapBudget);
+      sitemapBudget -= candidates.length;
+      entries = await verifySitemapArticles(candidates, blog.url, options);
+    } else entries = parseFeed(body, response.url || source.url);
     await pool.execute(
       'INSERT INTO feed_sources (blog_id,url,type,etag,last_modified,last_success_at,consecutive_failures) VALUES (?,?,?,?,?,?,0) ON DUPLICATE KEY UPDATE etag=VALUES(etag),last_modified=VALUES(last_modified),last_success_at=VALUES(last_success_at),consecutive_failures=0',
       [blog.id, source.url, source.type, response.headers.get('etag'), response.headers.get('last-modified'), now],

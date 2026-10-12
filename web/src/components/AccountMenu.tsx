@@ -32,6 +32,7 @@ export default function AccountMenu() {
       document.removeEventListener('keydown', close);
     };
   }, [open]);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: Navigation changes intentionally reset this UI state.
   useEffect(() => setOpen(false), [path]);
 
   if (!session?.enabled) return null;

@@ -1,4 +1,5 @@
 import net, { type LookupFunction, type TcpNetConnectOpts } from 'node:net';
+import { gzipSync } from 'node:zlib';
 import { type Agent, fetch as undiciFetch } from 'undici';
 import { describe, expect, it, vi } from 'vitest';
 import {
@@ -9,6 +10,7 @@ import {
   parseFeed,
   parseSitemap,
   politeFetch,
+  readFeedBody,
   validateCrawlUrl,
 } from './feed.ts';
 
@@ -69,6 +71,24 @@ describe('crawl request safety', () => {
       expect(isBlockedAddress(address)).toBe(true);
     expect(isBlockedAddress('2606:4700:4700::1111')).toBe(false);
     expect(isBlockedAddress('2001:4860:4860::8888')).toBe(false);
+  });
+
+  it('uses exact special-purpose CIDRs without blocking public neighboring networks', () => {
+    for (const address of ['192.0.0.1', '192.0.2.1', '192.88.99.1', '198.51.100.1', '203.0.113.1', '192.168.1.1', '198.18.1.1'])
+      expect(isBlockedAddress(address)).toBe(true);
+    for (const address of [
+      '192.0.78.12',
+      '192.0.78.13',
+      '192.0.1.1',
+      '192.0.3.1',
+      '192.88.98.1',
+      '192.88.100.1',
+      '198.51.99.1',
+      '198.51.101.1',
+      '203.0.112.1',
+      '203.0.114.1',
+    ])
+      expect(isBlockedAddress(address)).toBe(false);
   });
 
   it('removes stale compressed wire headers from the consumed body while preserving final URL and validators', async () => {
@@ -301,5 +321,31 @@ describe('crawl request safety', () => {
     ).rejects.toThrow('crawl response exceeds');
     expect(dispatchers).toHaveLength(2);
     expect(dispatchers.every((dispatcher) => dispatcher.destroyed)).toBe(true);
+  });
+});
+
+describe('bounded compressed XML sources', () => {
+  it('reads a gzip sitemap without Content-Encoding and preserves actual XML URLs', async () => {
+    const xml = '<urlset><url><loc>https://gzip-feed.test/post</loc></url></urlset>';
+    const response = new Response(gzipSync(xml), { headers: { 'content-type': 'application/gzip' } });
+    const decoded = await readFeedBody(response);
+    expect(decoded).toBe(xml);
+    expect(parseSitemap(decoded, 'https://gzip-feed.test/')).toMatchObject([{ url: 'https://gzip-feed.test/post', publishedAt: null }]);
+  });
+
+  it('does not decompress already-decoded XML a second time based on a stale gzip header', async () => {
+    const xml = '<rss><channel><title>Plain XML</title></channel></rss>';
+    expect(await readFeedBody(new Response(xml, { headers: { 'content-encoding': 'gzip' } }))).toBe(xml);
+  });
+
+  it('rejects gzip output exceeding 5 MiB, even with a tiny compressed body', async () => {
+    const compressed = gzipSync('x'.repeat(MAX_RESPONSE_BYTES + 1));
+    expect(compressed.length).toBeLessThan(10_000);
+    await expect(readFeedBody(new Response(compressed))).rejects.toThrow(`decompressed crawl response exceeds ${MAX_RESPONSE_BYTES} bytes`);
+  });
+
+  it('rejects corrupt gzip and oversized plain XML bodies', async () => {
+    await expect(readFeedBody(new Response(Buffer.from([0x1f, 0x8b, 0, 0])))).rejects.toThrow('invalid gzip feed response');
+    await expect(readFeedBody(new Response('x'.repeat(MAX_RESPONSE_BYTES + 1)))).rejects.toThrow('crawl response exceeds');
   });
 });

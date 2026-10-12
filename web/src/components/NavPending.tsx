@@ -36,6 +36,7 @@ export function LinkClickPending() {
   const setPending = useContext(NavPendingContext);
   const route = `${usePathname()}?${useSearchParams()}`;
   // A new route ends the click's navigation.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: Navigation changes intentionally reset this UI state.
   useEffect(() => setPending(false), [route, setPending]);
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout> | undefined;

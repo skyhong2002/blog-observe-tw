@@ -9,7 +9,7 @@ Created in [T3 Code](https://t3.codes).
 目前服務使用 Steam Machine 上分離的 gateway、web、worker user services：gateway 對外監聽 `127.0.0.1:18160`，Next web 監聽 `127.0.0.1:18162`，由 Cloudflare Tunnel 提供 `https://blog.observe.tw`。目前版本提供：
 
 - 前端直接移植新文易數的 Tailwind 4 版面、分組導覽、來源頁、文章列表、手機選單、深淺色與 PWA 元件；首頁顯示收錄排行、標籤與文章，詳見 [`docs/frontend-parity.md`](docs/frontend-parity.md)。
-- 135 個 seed 部落格目錄，其中 4 個已有核對網址；支援分類搜尋、個別網站頁與原站連結。
+- 135 個 seed 部落格目錄，網址核對與收錄統計見 [種子處理紀錄](docs/seed-resolution-2026-10-12.md)；支援分類搜尋、個別網站頁與原站連結。
 - `/healthz`、`/auth/me` 與 Google OAuth PKCE 登入流程；callback 固定為 `https://blog.observe.tw/auth/google/callback`。
 - 私有 OAuth 設定檔 `/home/deck/.config/blog-observe.env`，不提交到 Git，也不與 tag.observe.tw 共用服務設定。
 - 獨立 MariaDB `blog_observe` schema、Drizzle schema 與持久化 session；seed 匯入器保留原始列、來源 SHA-256、分類與未換算的流量原值。
@@ -46,4 +46,4 @@ npm run blogs:merge -- old-slug new-slug --apply
 
 以 GitHub `main` 為唯一整合與發版來源；主要工作目錄 `/home/deck/.t3/projects/blog-observe-tw` 的 main 已同步，`feat/tag-frontend-parity` 已完整納入。新工作先 fetch，再從遠端 main 開始；正式服務固定使用 commit SHA 的獨立 release，不從功能分支或 checkout 的舊 `.next` 發版。詳見 [分支、部署與回滾流程](docs/deployment.md)。
 
-131 個缺網址 seed 的下一步採「既有候選／blogroll 配對 → 證據分級 → 管理員確認」，不自動猜測收錄；具體設計與尚待新增的 UI 見 [種子網址配對提案](docs/seed-url-matching-proposal.md)。
+依使用者要求，自行搜尋並驗證 131 個缺網址 seed；唯一官方身份及有效 RSS／Atom／sitemap 通過後直接補入既有 seed，真正無法驗證者保留 unresolved 與證據。詳見 [種子網址驗證流程](docs/seed-url-matching-proposal.md)。

@@ -1,49 +1,39 @@
-# 缺網址種子的配對與人工確認方案
+# 種子網址查找、驗證與收錄
 
-## 範圍與目前能力
+本文件取代先前的人工配對提案。2026-10-12 使用者明確要求由維運者自行查找並驗證 131 個缺網址種子，符合條件直接補上；只有真正無法判定或無法安全驗證的個案保留 unresolved，不將整批工作交回使用者。
 
-135 個 seed 名稱已有 4 個核對網址，另 131 個仍缺網址；136 個原始 CSV 列（含「捏捏 bewithnene.tw」重複列）的 SHA-256、列號、原名、原分類與原值均留在 `seed_records`。名稱中偶有網域字串，也只是待核對線索，不能直接寫成已核准網址。
+## 來源與身份證據
 
-建議先用 1030 筆 discovery 候選及既有 blogroll evidence 產生配對建議，再由管理員逐筆確認。**任何信心等級都不會自動填 `blogs.url`、核准收錄、合併作者或啟動抓取。** 本文件是下一步實作方案，尚未新增配對程式、資料表或 UI，也沒有執行配對／修改正式資料。
+先解析原名內的網域，再比對既有 1,030 筆 discovery 候選／blogroll，最後搜尋官方網站、about、官方搬家公告及作者連結。搜尋只是線索，不能單憑名稱或網域猜測。研究 JSON 與逐站報告保存在 gitignored `.reviews/seed-resolution/`；原始 CSV 不入 Git。
 
-目前 `/admin/discovery/` 與 `/api/admin/discovery/review` 能審核候選、追加 audit；現有 approve 只更新候選狀態，沒有把網址綁到指定 seed 的交易。因此不能把現有批次核准當成「補網址」功能，需加入明確的 seed 配對操作。
+`tools/resolve-seed-urls.ts` 每次重新抓取首頁與來源。首頁 title、og:site_name 或作者須與完整站名／有出處的官方別名相符，且至少驗證一個 RSS、Atom 或 sitemap。跨網域轉址要求完整身份，不接受「廚房」「旅行日記」等泛稱。平台總站不得冒充個人出版者；保留 Medium 等平台的作者路徑。RSS 須為實際有效 XML，留言 feed 不作文章來源；sitemap index 會再驗證其子 sitemap。
 
-## 先做本地、可重現的配對清單
+所有抓取沿用 DNS 驗證及連線釘選、每跳轉址檢查、robots、識別 UA、每站延遲、20 秒以下 timeout 與 5 MiB 上限。403、robots 禁止或驗證頁不繞過。沒有 RSS／sitemap 即使官方身份已找到，也仍保留 unresolved 與理由。
 
-1. 以唯讀方式選出 `blogs.url IS NULL` 的 seed，帶上所有關聯 `seed_records.id`、SHA-256 與原始列號。讀取候選名稱、完整 URL、來源頁、blogroll 連結文字／發現路徑與已保存的 RSS 結果；資料不存在時標示缺證據，不假定已有網站 title／feed title。
-2. 原文完全保留；只為比對另外建立 NFKC、空白／大小寫／標點正規化版本。繁簡、筆名或站名縮寫只作較弱線索，不自動改名；「生活」「旅行」等泛稱、原分類與相似 favicon 不構成身份證明。名稱中的明確網域字串可作查找鍵，但仍要查核站點自身證據。
-3. 比對候選連結文字、站名與既存別名；每個 seed 最多列 5 個不同站點，附命中的原文字串、來源 URL／候選 ID、抓取時間與衝突理由。相同文章或轉載 blogroll 不當成多個獨立佐證。
-4. 比較單位是站點身份：獨立網域、平台子網域或作者路徑。`medium.com/@a` 與 `medium.com/@b`、同平台兩個子網域必須分開。文章 URL 不能單靠裁切路徑就變成部落格首頁；需可追溯的作者／首頁連結。不要把同 host 候選全部合併。
-5. 第一版工具建議為 `tools/propose-seed-urls.ts`，預設 dry-run、沒有網路與正式 DB 寫入；輸出私人 JSON 摘要（例如 `.reviews/seed-url-proposals.json`），包含資料快照時間、演算法版本與 evidence 雜湊。原始 CSV、全量候選／seed 私人資料不提交 Git。先回報高信心／待查／無對應的實際數量，不預先承諾可配對多少筆。
+## 執行
 
-## 信心與補證據規則
+```bash
+# research.json: [{id, urls, aliases?, evidence:[{url,title,note}]}]
+# 研究檔只由維運者建立，不提供公開提交或任意別名授權入口。
+node --env-file=/home/deck/.config/blog-observe.env tools/resolve-seed-urls.ts \
+  /private/research.json --report /private/validation.json
+# --apply 仍會重新連網驗證；不直接信任舊報告 validated 布林值。
+node --env-file=/home/deck/.config/blog-observe.env tools/resolve-seed-urls.ts \
+  /private/research.json --report /private/applied.json --apply --ids 2,3
+```
 
-| 等級 | 必要條件 | 後續 |
-| --- | --- | --- |
-| 高信心待審 | 有辨識度的完整站名／已確認別名一致；第一方網站標題、about 或 feed 中可核對站名；第三方 blogroll 明確連到同一身份；沒有同名、網址所有權或搬家衝突 | 排在最前面，仍須人工選定網址 |
-| 待查 | 模糊名稱、僅單一來源、只有文章連結、缺第一方內容、同名多站或 RSS 與站名不一致 | 展示全部合理選項與缺證據，不能批次綁定 |
-| 無對應／拒絕 | 無匹配、已證實不同站、停放／轉售網域或內容與原站不符 | 保留缺網址與理由，不硬湊答案 |
+單一 DB 交易鎖定既有 seed，補網址、canonical host、`blog_urls`、已驗證 `feed_sources`，保存 `seed-url-resolution` 候選及 append-only audit。原有 blog ID、slug、分類、作者、人工標籤與全部 136 個 `seed_records` 原始列不變。URL 身份比對統一 scheme／www／尾斜線，但保留出版路徑與 query；已被其他站擁有、曾拒絕或多個不同身份通過時不直接覆寫。
 
-信心是可解釋的證據分級，不是校準過的正確機率；RSS 成功只能證明可以訂閱，不能證明它就是 CSV 那一站。
+重複種子另作有完整轉址與相同 feed 證據的受限 alias 交易：保留兩個 seed ID 及原始列，別名標為 moved，文章／feed 仍只屬 canonical seed。不能憑作者相同就合併不同網站。正式寫入前已備份並在隔離 MariaDB 還原演練，驗證重跑冪等、audit 寫入失敗整筆回滾及網址所有權衝突。
 
-只為短名單缺少的證據補抓 HTML title、about 入口、RSS／Atom title/link；沿用現有 DNS 釘選、每一跳 redirect 驗證、robots、識別 UA、站點延遲、5 MiB 上限與 ETag/Last-Modified。單程序低頻（初期每週一次、最多 30 個不同站點），優先重用快取與候選，失敗保留待查。不要另外抓 Similarweb；tag 的共用額度不拿來猜種子網址。未命中的名稱可後續另列人工搜尋清單，而非組合 `.com`／`.tw` 網域試探。
+## 收錄與圖示
 
-## 人工 UI 與確認交易
+網址驗證成功不等於已有文章。`crawl:once -- --history --ids ...` 優先使用驗證成功的 feed；RSS／Atom 解析文章，sitemap 頁面還須有 Article／BlogPosting／NewsArticle 或 og:type=article 證據，不把商品、分類頁當文章。每站單輪最多 30 個 sitemap 文章頁；這是有界的初次歷史匯入，不宣稱已抓完整歷史。低頻站不判 stale。
 
-延伸現有管理頁的「種子補網址」分頁，左側顯示原始 seed 名稱／分類／列號，右側列配對建議、favicon、完整身份 URL、來源鏈、站名／feed 證據與時間；能開原站確認、選擇其他 URL、標記同名衝突、拒絕該配對或保留待查。拒絕的是「seed 與候選的關聯」，不因此否定候選站本身。
+`favicons:fetch` 依既有安全抓取與固定尺寸 PNG 流程補本地圖示，保留 revision 與每月刷新。無法抓取者使用預設圖示，不以平台總站 logo 冒充作者。
 
-建議新增 `seed_url_proposals` 與 append-only `seed_url_proposal_audits`（Drizzle migration），保存 seed blog ID、candidate ID、提議 URL、站點身份鍵、信心／理由、證據快照與 hash、演算法版本、待審／確認／拒絕／已被替代狀態、審核者／時間／備註。拒絕記錄不能被下一次產生建議覆寫；相同證據重跑不重複插入。
+## unresolved 與回滾
 
-「確認網址」使用新的管理員 endpoint，沿用登入、權限、同源與速率限制；初期每次一筆，不預選高信心項目。確認時重新鎖定 seed 與 proposal，檢查版本／證據 hash 與網址仍未被其他人綁定，重驗 URL 安全邊界；重複提交須冪等，過期建議回衝突狀態。若 URL 已屬另一個 blog，進入另行審核的搬家／合併流程，不能靜默轉移。
+逐站報告保留搜尋出處、最後網址、身份命中、首頁 hash、來源檢查及失敗理由。可針對官方來源恢復、解除禁止或新證據重跑指定 ID；不反覆轟炸不可用站點。已核對網址不因後續暫時抓取失敗而清除。
 
-單一 DB 交易填入**既有 seed blog** 的 URL／canonical host，新增 `blog_urls` 身份紀錄、proposal 決定與稽核；保留 blog ID、slug、追蹤關係與全部原始 seed 列，不建立第二份同名 blog，也不覆寫人工分類／標籤。網址確認、收錄範圍批准與有效文章索引是不同狀態：UI 要分別呈現，不能因配對或 RSS 偵測成功就宣稱已收錄。爬蟲仍只處理明確核准的站點。
-
-確認且核准抓取後，才排入既有 blog queue 進行 favicon、feed 與歷史匯入，沿用低頻站政策。文章 URL、舊站搬家、共享平台、多作者站都保留身份邊界，不憑筆名跨站合併。
-
-## 落地順序與驗收
-
-先交付只讀配對工具及報表，人工抽查高信心與歧義樣本；第二批新增 proposal／audit 與管理 UI；最後以小批人工確認驗證 URL 寫入與既有 worker 整合。正式寫入前備份與還原演練，將該安全／資料變更納入高價值 review 節點，不為本份提案消耗 Opus quota。
-
-必要案例：正確的唯一站名、同名異站、通用短名、筆名不合併、同平台不同作者路徑、單站多個文章候選、搬家／網域轉售、RSS title 衝突、CSV 重複列、已拒絕建議重跑、兩名管理員同時確認、撤銷不覆寫後續人工變更。驗收時須證明 dry-run 前後正式資料不變；未人工確認的 131 個 seed 不會因此啟用爬蟲；確認只更新既有 seed 並保留 provenance；未找到對應是有效結果。
-
-回滾可先停用配對入口與補證據 job，保留建議及稽核。已確認網址若要撤銷，由管理员提出補償修訂，檢查後續編輯與訂閱／文章關係後處理，不刪原始 seed 或重設全部 `blogs.url`。
+部署可回到先前 immutable release，保留新增 audit、文章及圖示。撤銷錯誤網址須先查核其後續文章、追蹤及人工變更，再作補償交易；不能還原整庫覆蓋後續使用者資料，不能刪原始種子。
