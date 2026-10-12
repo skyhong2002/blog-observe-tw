@@ -6,6 +6,7 @@ import { useSearchParams } from 'next/navigation';
 import ArticleListItem from '@/components/ArticleListItem';
 import SectionTabs from '@/components/SectionTabs';
 import { type Post, taipei } from '@/lib/api';
+import { blogHref } from '@/lib/page-links';
 import { normalizeSearch, QUERY_MAX, type SearchParams, type SearchResult, searchHref, searchParamsOf, searchPath } from '@/lib/search';
 import { type PublicLoad, usePublicJson } from '@/lib/use-public-json';
 
@@ -135,7 +136,7 @@ export default function ArticlesView({
       {asked.blog && (
         <p className="text-xs text-zinc-600 dark:text-zinc-400">
           只搜尋{' '}
-          <Link href={`/blogs/${encodeURIComponent(asked.blog)}/`} className="text-brand-700 hover:underline dark:text-brand-400">
+          <Link href={blogHref(asked.blog)} className="text-brand-700 hover:underline dark:text-brand-400">
             這個部落格
           </Link>{' '}
           的文章 ·{' '}

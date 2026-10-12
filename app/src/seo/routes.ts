@@ -1,18 +1,13 @@
 import { stat } from 'node:fs/promises';
 import type { FastifyInstance } from 'fastify';
-import type { Pool, RowDataPacket } from 'mysql2/promise';
+import type { Pool } from 'mysql2/promise';
 import { TopicResponseCache } from '../topics/cache.ts';
-import { evidence } from '../topics/routes.ts';
+import { getIndexablePages } from './indexability.ts';
 
 export const SEO_ORIGIN = 'https://blog.observe.tw';
 export const SITEMAP_PAGE_SIZE = 10_000;
 const MAX_XML_BYTES = 50 * 1024 * 1024;
 const CACHE = 'public, max-age=300, s-maxage=300, stale-while-revalidate=600';
-const slugPattern = /^[a-z0-9][a-z0-9_-]{0,179}$/;
-const validPostDate =
-  'COALESCE(CASE WHEN p.updated_at<=UTC_TIMESTAMP() THEN p.updated_at END,CASE WHEN p.published_at<=UTC_TIMESTAMP() THEN p.published_at END,CASE WHEN p.created_at<=UTC_TIMESTAMP() THEN p.created_at END)';
-const validDiscoveryDate = 'CASE WHEN b.discovered_at<=UTC_TIMESTAMP() THEN b.discovered_at END';
-const blogWhere = "b.status='verified' AND BINARY b.slug REGEXP '^[a-z0-9][a-z0-9_-]{0,179}$' AND b.url REGEXP '^https?://'";
 const staticPages = ['/', '/blogs/', '/topics/', '/api/', '/about/'] as const;
 export const xmlEscape = (value: string) =>
   value.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&apos;' })[c]!);
@@ -43,10 +38,6 @@ export function sitemapChildPaths(blogCount: number, topicCount: number) {
 }
 export function registerSeoRoutes(app: FastifyInstance, pool: Pool) {
   const cache = new TopicResponseCache(300_000, 32);
-  const topicWindow = () => {
-    const now = new Date();
-    return [new Date(now.getTime() - 90 * 86400_000), now];
-  };
   const fileDate = (source: URL) =>
     stat(source)
       .then((s) => s.mtime)
@@ -62,13 +53,13 @@ export function registerSeoRoutes(app: FastifyInstance, pool: Pool) {
     );
   const stats = () =>
     cache.get('counts', async () => {
-      const [[blogs]] = await pool.query<RowDataPacket[]>(
-        `SELECT COUNT(*) n,MAX(COALESCE((SELECT MAX(${validPostDate}) FROM posts p WHERE p.blog_id=b.id),${validDiscoveryDate})) lastmod FROM blogs b WHERE ${blogWhere}`,
-      );
-      const [[topics]] = await pool.query<RowDataPacket[]>(
-        `WITH ${evidence(false, true)} SELECT COUNT(DISTINCT topic_id) n,MAX(${validPostDate}) lastmod FROM recent r JOIN posts p ON p.id=r.post_id`,
-        topicWindow(),
-      );
+      const [blogs, topics] = await Promise.all([getIndexablePages(pool, 'blog'), getIndexablePages(pool, 'topic')]);
+      const newest = (rows: { lastmod: unknown }[]) =>
+        rows
+          .map((row) => iso(row.lastmod))
+          .filter((date): date is string => Boolean(date))
+          .sort()
+          .at(-1) ?? null;
       const pages = await pageEntries();
       const dates = pages
         .map((p) => iso(p.lastmod))
@@ -76,10 +67,10 @@ export function registerSeoRoutes(app: FastifyInstance, pool: Pool) {
         .sort();
       const fallback = await fileDate(new URL('./routes.ts', import.meta.url));
       return {
-        blogs: Number(blogs.n),
-        topics: Number(topics.n),
-        blogsLastmod: iso(blogs.lastmod) ?? iso(fallback),
-        topicsLastmod: iso(topics.lastmod) ?? iso(fallback),
+        blogs: blogs.length,
+        topics: topics.length,
+        blogsLastmod: newest(blogs) ?? iso(fallback),
+        topicsLastmod: newest(topics) ?? iso(fallback),
         pagesLastmod: dates.at(-1) ?? iso(fallback),
       };
     });
@@ -134,38 +125,15 @@ export function registerSeoRoutes(app: FastifyInstance, pool: Pool) {
       return reply.code(404).header('cache-control', 'no-store').send({ error: 'not_found' });
     const xml = await cache.get(`${kind}:${page}`, async () => {
       const offset = (page - 1) * SITEMAP_PAGE_SIZE;
-      if (kind === 'blogs') {
-        const [rows] = await pool.query<RowDataPacket[]>(
-          `SELECT b.slug,b.status,b.url,COALESCE((SELECT MAX(${validPostDate}) FROM posts p WHERE p.blog_id=b.id),${validDiscoveryDate}) lastmod FROM blogs b WHERE ${blogWhere} ORDER BY b.id LIMIT ${SITEMAP_PAGE_SIZE} OFFSET ${offset}`,
-        );
-        const fallback =
-          (await fileDate(new URL('../../../web/src/app/blogs/[slug]/page.tsx', import.meta.url))) ??
-          (await fileDate(new URL('./routes.ts', import.meta.url)));
-        return sitemapXml(
-          rows
-            .filter(
-              (r) =>
-                r.status === 'verified' &&
-                typeof r.slug === 'string' &&
-                slugPattern.test(r.slug) &&
-                typeof r.url === 'string' &&
-                /^https?:\/\//.test(r.url),
-            )
-            .map((r) => ({ loc: `${SEO_ORIGIN}/blogs/${encodeURIComponent(r.slug)}/`, lastmod: iso(r.lastmod) ?? iso(fallback) })),
-        );
-      }
-      const [rows] = await pool.query<RowDataPacket[]>(
-        `WITH ${evidence(false, true)} SELECT r.topic_id,MAX(${validPostDate}) lastmod FROM recent r JOIN posts p ON p.id=r.post_id GROUP BY r.topic_id ORDER BY r.topic_id LIMIT ${SITEMAP_PAGE_SIZE} OFFSET ${offset}`,
-        topicWindow(),
-      );
+      const rows = (await getIndexablePages(pool, kind === 'blogs' ? 'blog' : 'topic')).slice(offset, offset + SITEMAP_PAGE_SIZE);
       const fallback =
-        (await fileDate(new URL('../../../web/src/app/topics/[id]/page.tsx', import.meta.url))) ??
-        (await fileDate(new URL('./routes.ts', import.meta.url)));
-      return sitemapXml(
-        rows
-          .filter((r) => typeof r.topic_id === 'string' && /^tag:[a-f0-9]{64}$/.test(r.topic_id))
-          .map((r) => ({ loc: `${SEO_ORIGIN}/topics/${encodeURIComponent(r.topic_id)}/`, lastmod: iso(r.lastmod) ?? iso(fallback) })),
-      );
+        (await fileDate(
+          new URL(
+            kind === 'blogs' ? '../../../web/src/app/blogs/[slug]/page.tsx' : '../../../web/src/app/topics/[id]/page.tsx',
+            import.meta.url,
+          ),
+        )) ?? (await fileDate(new URL('./routes.ts', import.meta.url)));
+      return sitemapXml(rows.map((row) => ({ loc: SEO_ORIGIN + row.canonicalPath, lastmod: iso(row.lastmod) ?? iso(fallback) })));
     });
     return reply.type('application/xml; charset=utf-8').header('cache-control', CACHE).send(xml);
   });

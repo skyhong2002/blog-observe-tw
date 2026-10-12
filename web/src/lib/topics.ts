@@ -61,6 +61,8 @@ export type MatchingRule = 'title-only' | 'title-and-body';
 export type Topic = {
   id: string;
   label: string;
+  /** Readable topic page from the page registry; absent links use the legacy id URL (page-links.ts). */
+  canonicalPath?: string;
   source: 'rss-category' | 'tag-vocabulary';
   score: number;
   posts: number;
@@ -85,6 +87,7 @@ export type TopicDetail = {
   topic: {
     id: string;
     label: string;
+    canonicalPath?: string;
     source: string;
     canonicalId?: string | null;
     excludedReason?: string | null;
@@ -96,8 +99,25 @@ export type TopicDetail = {
     matchingRule?: MatchingRule;
     matchingReason?: string | null;
   } | null;
-  blogs: Array<{ id: number; slug: string; name: string; posts: number; score: number; titlePosts?: number; bodyOnlyPosts?: number }>;
-  articles: Array<{ id: number; title: string; url: string; publishedAt: string | null; blogSlug: string; blogName: string }>;
+  blogs: Array<{
+    id: number;
+    slug: string;
+    canonicalPath?: string;
+    name: string;
+    posts: number;
+    score: number;
+    titlePosts?: number;
+    bodyOnlyPosts?: number;
+  }>;
+  articles: Array<{
+    id: number;
+    title: string;
+    url: string;
+    publishedAt: string | null;
+    blogSlug: string;
+    blogCanonicalPath?: string;
+    blogName: string;
+  }>;
   truncated: boolean;
 };
 export type Topics = {

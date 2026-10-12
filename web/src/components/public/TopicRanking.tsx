@@ -6,6 +6,7 @@ import { useSearchParams } from 'next/navigation';
 import SectionTabs from '@/components/SectionTabs';
 import TableScroller from '@/components/TableScroller';
 import VocabularyNotice from '@/components/VocabularyNotice';
+import { topicLink } from '@/lib/page-links';
 import { type Period, periodOf, TOPICS_PERIOD, topicsApiPath } from '@/lib/public-query';
 import { table } from '@/lib/table-styles';
 import { formatLift, liftExplanation, matchingPolicyText, matchingReasonLabel, matchSplit, type Topics } from '@/lib/topics';
@@ -75,7 +76,7 @@ function TopicRows({ days, data }: { days: Period; data: Topics }) {
                   <div className={table.leadBox}>
                     <Link
                       className={`${table.leadText} block text-brand-700 hover:underline dark:text-brand-400 sm:max-w-80`}
-                      href={`/topics/${encodeURIComponent(t.id)}/?days=${days}`}
+                      {...topicLink(t.id, t.canonicalPath, days)}
                       title={t.label}
                     >
                       {t.label}

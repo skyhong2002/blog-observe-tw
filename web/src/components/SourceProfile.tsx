@@ -5,13 +5,15 @@ import { type ReactNode, Suspense } from 'react';
 import BlogIcon from '@/components/BlogIcon';
 import ProfilePostsView, { ProfilePostsFromUrl } from '@/components/public/ProfilePosts';
 import { type Blog, taipei } from '@/lib/api';
+import { blogHref } from '@/lib/page-links';
 import FollowButton from './follow-button';
 import MediaSidebar from './MediaSidebar';
 import MediaWordCloud from './MediaWordCloud';
 import SectionTabs from './SectionTabs';
-export default function SourceProfile({ blog, sidebar }: { blog: Blog; sidebar?: ReactNode }) {
+/** `note`: why a valid page is noindex (page-links.ts indexabilityNote), shown under the blog's data. */
+export default function SourceProfile({ blog, sidebar, note }: { blog: Blog; sidebar?: ReactNode; note?: string | null }) {
   const allPosts = blog.posts ?? [];
-  const owner = { slug: blog.slug, name: blog.name };
+  const owner = { slug: blog.slug, name: blog.name, canonicalPath: blog.canonicalPath };
   return (
     <div className="pb-4">
       <nav aria-label="麵包屑" className="mb-3 text-xs text-zinc-500 dark:text-zinc-400">
@@ -50,7 +52,7 @@ export default function SourceProfile({ blog, sidebar }: { blog: Blog; sidebar?:
         className="mb-5"
         label="部落格資料"
         tabs={[
-          { href: `/blogs/${blog.slug}/`, label: '收錄文章', current: true },
+          { href: blogHref(blog.slug, blog.canonicalPath), label: '收錄文章', current: true },
           { href: '#authors', label: '相關作者' },
           { href: '#source', label: '來源資料' },
         ]}
@@ -84,6 +86,7 @@ export default function SourceProfile({ blog, sidebar }: { blog: Blog; sidebar?:
             <p className="mt-3 border-t border-zinc-200 pt-3 leading-5 text-zinc-500 dark:border-zinc-800">
               沒有近期文章不代表網站失效，抓取成功與發文時間分開記錄。
             </p>
+            {note ? <p className="mt-2 leading-5 text-zinc-500">{note}</p> : null}
           </section>
           {sidebar}
           <section id="authors" className="rounded-lg border border-zinc-200 p-3 text-xs dark:border-zinc-800">

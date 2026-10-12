@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { taipei } from '@/lib/api';
+import { blogLink } from '@/lib/page-links';
 import { type RelationEdge, type RelationNode, shareExplanation, shareLabel, sharePercent } from '@/lib/relations';
 import BlogIcon from './BlogIcon';
 export default function RelationLists({
@@ -21,11 +22,12 @@ export default function RelationLists({
         <ul className="mt-3 divide-y divide-zinc-200 dark:divide-zinc-800">
           {edges.map((e) => {
             const n = index.get(incoming ? e.sourceBlogId : e.targetBlogId);
+            const path = n?.canonicalPath ?? (incoming ? e.sourceBlogCanonicalPath : e.targetBlogCanonicalPath);
             return (
               <li key={`${e.sourceBlogId}:${e.targetBlogId}`} className="flex items-center justify-between gap-3 py-3 text-sm">
                 <Link
                   className="flex min-w-0 items-center gap-2 text-brand-700 hover:underline dark:text-brand-400"
-                  href={`/blogs/${n?.slug ?? ''}/`}
+                  {...blogLink(n?.slug ?? '', path)}
                   title={n?.name ?? '部落格'}
                 >
                   <BlogIcon media={n?.slug ?? ''} iconUrl={n?.iconUrl} title={n?.name ?? '部落格'} size={18} />

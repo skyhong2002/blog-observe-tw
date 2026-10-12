@@ -20,6 +20,9 @@ import { createApiKeyService } from './reader/api-keys.ts';
 import { registerApiKeyRoutes } from './reader/key-routes.ts';
 import { registerRelationRoutes } from './relations/routes.ts';
 import { registerSearchRoutes } from './search.ts';
+import { registerPageApi } from './seo/page-api.ts';
+import { registerPageLinks } from './seo/page-links.ts';
+import { createPublicPageRedirect } from './seo/redirects.ts';
 import { registerSeoRoutes } from './seo/routes.ts';
 import { registerTopicRoutes } from './topics/routes.ts';
 import { createUiProxy } from './ui-proxy.js';
@@ -57,6 +60,7 @@ export async function buildApp(config, { logger = false, store = null } = {}) {
   });
   const own = store || createDb(config.blogDbUrl);
   const { pool } = own;
+  registerPageLinks(app, pool);
   const startedAt = Date.now();
   const keys = createApiKeyService(pool);
   installPublicApiPolicy(app, keys);
@@ -301,6 +305,8 @@ export async function buildApp(config, { logger = false, store = null } = {}) {
   });
 
   const proxyToUi = createUiProxy(config.uiOrigin);
+  registerPageApi(app, pool);
+  const redirectPublicPage = createPublicPageRedirect(pool);
   registerApiStatus(app, proxyToUi, pool);
   app.get('/api', proxyToUi);
   app.get('/api/', proxyToUi);
@@ -308,6 +314,7 @@ export async function buildApp(config, { logger = false, store = null } = {}) {
     // Unknown API/auth routes must never cycle through Next's rewrites.
     if (/^\/(api|auth)(?:\/|$)/.test(request.url))
       return reply.code(404).send({ error: publicApiPath(request.url) ? 'not_found' : 'not found' });
+    if (await redirectPublicPage(request, reply)) return;
     return proxyToUi(request, reply);
   };
   app.route({ method: ['GET', 'HEAD'], url: '/', handler });

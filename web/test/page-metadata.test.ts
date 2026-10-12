@@ -52,7 +52,11 @@ test('every page route is either a known public page or a noindexed private one'
   }
   for (const route of DYNAMIC_PUBLIC) {
     const text = source(join(APP, route.slice(1), 'page.tsx'));
-    assert.match(text, /generateMetadata[\s\S]*pageMetadata\(\s*(blogPath|topicPath)\(/, route);
+    // The registry's canonicalPath (readable URL) and its robots, resolved through the page API.
+    assert.match(text, /generateMetadata[\s\S]*detailPageMetadata\(\s*page,/, route);
+    assert.match(text, /getPublicPage\('(blog|topic)', \(await params\)\.(slug|id)\)/, route);
+    assert.ok(!/decodeParam|decodeURIComponent/.test(text), `${route} never decodes the param a second time`);
+    assert.ok(!/(blogPath|topicPath)\(/.test(text), `${route} uses canonicalPath, not the legacy URL`);
   }
   for (const route of PRIVATE_ROUTES) {
     const text = source(join(APP, route.slice(1), 'page.tsx'));

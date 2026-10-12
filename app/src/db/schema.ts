@@ -483,4 +483,5 @@ export * from '../content/schema.ts';
 export * from '../jobs/schema.ts';
 export * from '../reader/schema.ts';
 export * from '../relations/schema.ts';
+export * from '../seo/schema.ts';
 export * from '../topics/schema.ts';

@@ -11,6 +11,7 @@ import BlogTrafficTrend from '@/components/BlogTrafficTrend';
 import SortIndicator from '@/components/SortIndicator';
 import TableScroller from '@/components/TableScroller';
 import TrafficSparkline from '@/components/TrafficSparkline';
+import { blogLink } from '@/lib/page-links';
 import { table } from '@/lib/table-styles';
 import {
   ascendingFirst,
@@ -346,7 +347,7 @@ export default function BlogTrafficComparison({ data, initial }: { data: Traffic
                   <td className={`${table.lead} py-1.5`}>
                     <div className={table.leadBox}>
                       <Link
-                        href={`/blogs/${encodeURIComponent(blog.slug)}/`}
+                        {...blogLink(blog.slug, blog.canonicalPath)}
                         className="flex min-w-0 items-center gap-2 hover:underline"
                         title={`${blog.name} · ${blog.domain}`}
                       >

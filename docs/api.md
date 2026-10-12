@@ -13,6 +13,7 @@
 - 公開查詢不需要金鑰。每個 IP 每分鐘最多 60 次，超過回 `429`；回應帶 `x-ratelimit-limit`、`x-ratelimit-remaining`、`x-ratelimit-reset`。登入後可在 `/my/` 建立個人 API 金鑰（每人最多 3 把），以 `x-api-key: blog_…` 傳送，每把每分鐘 1000 次；伺服器只存 SHA-256 摘要，完整金鑰只顯示一次。無效或撤銷的金鑰回 `401`。為防止隨機金鑰探測，首次出現或未快取的金鑰須先通過每 IP 每分鐘 60 次的匿名／驗證桶；若該桶已用完會先回 `429`，請等窗口重設後重試。已快取且有效的金鑰不受此 IP 桶限制，每把每分鐘 1000 次額度不變。金鑰不能用來登入、管理或讀取私人資料，`Authorization` 不是本 API 的金鑰認證方式。
 - 允許跨網域：`Access-Control-Allow-Origin: *`，不接受跨域 cookie 認證。瀏覽器可讀取限流標頭與 `Retry-After`；遇 `429` 請依 `Retry-After` 秒數退避。共享快取上的限流標頭可能是產生回應時的快照，不能當作即時餘額；來源站仍對實際到站請求計額。
 - 時間一律使用 UTC ISO 8601（例如 `2026-10-12T00:00:00.000Z`）；「一天」指台北時間（UTC+8）的日曆日，`hours` 則是連續經過的小時數。未知日期回 `null`，不以抓取日期冒充發文日期。
+- 部落格 `slug` 與話題 `id` 是穩定 API 識別碼，不因網頁網址改名而變動。已建立可讀網頁網址時，項目另附選用的 `canonicalPath`，文章附 `blogCanonicalPath`；以基底網址加上此相對路徑即可分享。欄位暫缺時仍可使用原識別碼網址，網頁會 301 到正式網址；不要拿可讀 slug 取代 API 參數。
 - 匿名成功回應帶 `cache-control: public, max-age=0, s-maxage=120, stale-while-revalidate=180`。文章依各站 RSS／抓取排程分批更新，關係快照約每 5 分鐘，話題查詢快取約 2 分鐘；低頻部落格不因久未發文而失效。請至少間隔 120 秒輪詢，關係以 5 分鐘以上為宜。更新與歷史回補有延遲，不保證每輪都有新資料。
 - 帶 `x-api-key` 或 `Authorization` 的請求與錯誤回應為 `private, no-store` 或 `no-store`，不得進共享快取。快取標頭不代表 CDN 已快取該端點；目前 Cloudflare 的專用 HTML 規則只涵蓋首頁。
 - 錯誤格式為 `{"error":"..."}`：`400` 參數／游標錯誤、`401` 無效金鑰、`404` 找不到、`405` 不支援的方法、`429` 太頻繁、`503` 暫時無法提供服務。未知參數、重複參數與不合法的時間窗口會回 `400`。
@@ -133,6 +134,7 @@ curl --fail-with-body -sS 'https://blog.observe.tw/api/v1/articles'
 | `items[].summary` | string | 純文字短摘要；不提供全文 |
 | `items[].observedAt` | string (ISO 時間) \| null | 本站首次收錄時間 |
 | `items[].iconUrl` | string \| null | 部落格圖示 |
+| `items[].blogCanonicalPath` | string | 可讀網頁的相對 canonical 路徑；選用，不取代原 API 識別碼 |
 | `nextCursor` | string \| null | 下一頁游標；null 表示末頁 |
 | `window` | object | 此輪固定窗口；游標保留窗口與篩選條件 |
 | `window.since` | string (ISO 時間) |  |
@@ -181,6 +183,7 @@ curl --fail-with-body -sS 'https://blog.observe.tw/api/v1/blogs/skyhong-tw/artic
 | `items[].summary` | string | 純文字短摘要；不提供全文 |
 | `items[].observedAt` | string (ISO 時間) \| null | 本站首次收錄時間 |
 | `items[].iconUrl` | string \| null | 部落格圖示 |
+| `items[].blogCanonicalPath` | string | 可讀網頁的相對 canonical 路徑；選用，不取代原 API 識別碼 |
 | `nextCursor` | string \| null | 下一頁游標；null 表示末頁 |
 | `window` | object | 此輪固定窗口；游標保留窗口與篩選條件 |
 | `window.since` | string (ISO 時間) |  |
@@ -228,6 +231,7 @@ curl --fail-with-body -sS 'https://blog.observe.tw/api/v1/blogs'
 | `items[].lastCrawlSuccessAt` | string (ISO 時間) \| null | 最近抓取成功時間 |
 | `items[].lastPublishedAt` | string (ISO 時間) \| null | 最近發文時間 |
 | `items[].expectedIntervalHours` | integer | 預期更新間隔，單位小時 |
+| `items[].canonicalPath` | string | 可讀網頁的相對 canonical 路徑；選用，不取代原 API 識別碼 |
 | `nextCursor` | string \| null | 下一頁游標 |
 
 錯誤：`400` invalid_query／invalid_cursor；`401` invalid_api_key；`404` not_found；`405` method_not_allowed；`429` rate_limit_exceeded（請依 Retry-After 退避）；`503` unavailable。
@@ -266,6 +270,7 @@ curl --fail-with-body -sS 'https://blog.observe.tw/api/v1/blogs/skyhong-tw'
 | `blog.lastCrawlSuccessAt` | string (ISO 時間) \| null | 最近抓取成功時間 |
 | `blog.lastPublishedAt` | string (ISO 時間) \| null | 最近發文時間 |
 | `blog.expectedIntervalHours` | integer | 預期更新間隔，單位小時 |
+| `blog.canonicalPath` | string | 可讀網頁的相對 canonical 路徑；選用，不取代原 API 識別碼 |
 | `blog.feeds` | object[] |  |
 | `blog.feeds[].url` | string | 原站 feed 位址 |
 | `blog.feeds[].type` | string | rss／atom／sitemap |
@@ -306,6 +311,7 @@ curl --fail-with-body -sS 'https://blog.observe.tw/api/v1/relations'
 | `nodes[].slug` | string |  |
 | `nodes[].name` | string |  |
 | `nodes[].iconUrl` | string \| null |  |
+| `nodes[].canonicalPath` | string | 可讀網頁的相對 canonical 路徑；選用，不取代原 API 識別碼 |
 | `edges` | object[] | 全站最多 500 條圖形邊 |
 | `edges[].sourceBlogId` | integer |  |
 | `edges[].targetBlogId` | integer |  |
@@ -314,6 +320,8 @@ curl --fail-with-body -sS 'https://blog.observe.tw/api/v1/relations'
 | `edges[].firstMentionAt` | string (ISO 時間) \| null |  |
 | `edges[].lastMentionAt` | string (ISO 時間) \| null |  |
 | `edges[].mutual` | boolean | 窗口內是否也有反向正文提及 |
+| `edges[].sourceBlogCanonicalPath` | string | 可讀網頁的相對 canonical 路徑；選用，不取代原 API 識別碼 |
+| `edges[].targetBlogCanonicalPath` | string | 可讀網頁的相對 canonical 路徑；選用，不取代原 API 識別碼 |
 | `mostMentioned` | object[] |  |
 | `mostMentioned[].blogId` | integer |  |
 | `mostMentioned[].mentions` | integer |  |
@@ -375,6 +383,7 @@ curl --fail-with-body -sS 'https://blog.observe.tw/api/v1/blogs/skyhong-tw/relat
 | `nodes[].slug` | string |  |
 | `nodes[].name` | string |  |
 | `nodes[].iconUrl` | string \| null |  |
+| `nodes[].canonicalPath` | string | 可讀網頁的相對 canonical 路徑；選用，不取代原 API 識別碼 |
 | `edges` | object[] | 全站最多 500 條圖形邊 |
 | `edges[].sourceBlogId` | integer |  |
 | `edges[].targetBlogId` | integer |  |
@@ -383,6 +392,8 @@ curl --fail-with-body -sS 'https://blog.observe.tw/api/v1/blogs/skyhong-tw/relat
 | `edges[].firstMentionAt` | string (ISO 時間) \| null |  |
 | `edges[].lastMentionAt` | string (ISO 時間) \| null |  |
 | `edges[].mutual` | boolean | 窗口內是否也有反向正文提及 |
+| `edges[].sourceBlogCanonicalPath` | string | 可讀網頁的相對 canonical 路徑；選用，不取代原 API 識別碼 |
+| `edges[].targetBlogCanonicalPath` | string | 可讀網頁的相對 canonical 路徑；選用，不取代原 API 識別碼 |
 | `mostMentioned` | object[] |  |
 | `mostMentioned[].blogId` | integer |  |
 | `mostMentioned[].mentions` | integer |  |
@@ -417,6 +428,8 @@ curl --fail-with-body -sS 'https://blog.observe.tw/api/v1/blogs/skyhong-tw/relat
 | `outgoing[].firstMentionAt` | string (ISO 時間) \| null |  |
 | `outgoing[].lastMentionAt` | string (ISO 時間) \| null |  |
 | `outgoing[].mutual` | boolean | 窗口內是否也有反向正文提及 |
+| `outgoing[].sourceBlogCanonicalPath` | string | 可讀網頁的相對 canonical 路徑；選用，不取代原 API 識別碼 |
+| `outgoing[].targetBlogCanonicalPath` | string | 可讀網頁的相對 canonical 路徑；選用，不取代原 API 識別碼 |
 | `incoming` | object[] |  |
 | `incoming[].sourceBlogId` | integer |  |
 | `incoming[].targetBlogId` | integer |  |
@@ -425,6 +438,8 @@ curl --fail-with-body -sS 'https://blog.observe.tw/api/v1/blogs/skyhong-tw/relat
 | `incoming[].firstMentionAt` | string (ISO 時間) \| null |  |
 | `incoming[].lastMentionAt` | string (ISO 時間) \| null |  |
 | `incoming[].mutual` | boolean | 窗口內是否也有反向正文提及 |
+| `incoming[].sourceBlogCanonicalPath` | string | 可讀網頁的相對 canonical 路徑；選用，不取代原 API 識別碼 |
+| `incoming[].targetBlogCanonicalPath` | string | 可讀網頁的相對 canonical 路徑；選用，不取代原 API 識別碼 |
 | `evidence` | object[] |  |
 | `evidence[].postId` | integer |  |
 | `evidence[].postTitle` | string |  |
@@ -480,6 +495,7 @@ curl --fail-with-body -sS 'https://blog.observe.tw/api/v1/topics'
 | `items[].lift` | number \| null | 近期文章占比 ÷ 長期基準占比；無基準時為 null，不代表零 |
 | `items[].matchingRule` | "title-only" \| "title-and-body" |  |
 | `items[].matchingReason` | string \| null |  |
+| `items[].canonicalPath` | string | 可讀網頁的相對 canonical 路徑；選用，不取代原 API 識別碼 |
 | `nextCursor` | null | 排行僅提供有界快照，不提供游標續頁 |
 | `hours` | integer |  |
 | `vocabulary` | object |  |

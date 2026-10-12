@@ -7,9 +7,9 @@ import BlogTopics from '@/components/BlogTopics';
 import SimilarwebTraffic from '@/components/SimilarwebTraffic';
 import SourceProfile from '@/components/SourceProfile';
 import { plainText } from '@/lib/api';
-import { getBlog } from '@/lib/public-api';
-import { decodeParam, isSlug } from '@/lib/public-query';
-import { blogPath, breadcrumbSchema, pageMetadata, serializeJsonLd, shortText } from '@/lib/seo';
+import { indexabilityNote } from '@/lib/page-links';
+import { getBlog, getPublicPage } from '@/lib/public-api';
+import { breadcrumbSchema, detailPageMetadata, serializeJsonLd, shortText } from '@/lib/seo';
 
 // ISR (PUBLIC_REVALIDATE_SECONDS), generated on first request and never at build
 // (no list of every blog is fetched). The in-page ?q= post filter runs in the browser.
@@ -20,32 +20,37 @@ export function generateStaticParams() {
 }
 
 type Props = { params: Promise<{ slug: string }> };
-/** Only slug-shaped segments are looked up (and cached); a gateway 404 is the page's 404. */
+/**
+ * The segment is a readable key or a legacy slug, already decoded once by Next
+ * (never decoded again). The page registry resolves it; the blog itself is
+ * read by its stable API slug. Unknown keys and a gateway 404 are the page's 404.
+ */
 async function blogOf(params: Props['params']) {
-  const slug = decodeParam((await params).slug);
-  return isSlug(slug) ? getBlog(slug) : null;
+  const page = await getPublicPage('blog', (await params).slug);
+  if (!page) notFound();
+  const blog = await getBlog(page.stableId);
+  if (!blog) notFound();
+  return { page, blog };
 }
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  const blog = await blogOf(params);
-  // A 404 here, not only in the page, so a missing blog is never streamed as a 200.
-  if (!blog) notFound();
+  const { page, blog } = await blogOf(params);
   const description =
     shortText(plainText(blog.description)) || `${shortText(blog.name, 60)}的最新文章、內文來源與共同話題，收錄於部落格觀察。`;
-  return pageMetadata(blogPath(blog.slug), blog.name, description);
+  return detailPageMetadata(page, blog.name, description);
 }
 export default async function BlogDetailPage({ params }: Props) {
-  const blog = await blogOf(params);
-  if (!blog) notFound();
+  const { page, blog } = await blogOf(params);
   const breadcrumb = breadcrumbSchema([
     ['/blogs/', '部落格目錄'],
-    [blogPath(blog.slug), blog.name],
+    [page.canonicalPath, blog.name],
   ]);
   return (
     <>
       {/* Public blog name only; serializeJsonLd escapes '<'. */}
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: serializeJsonLd(breadcrumb) }} />
       <SourceProfile
-        blog={blog}
+        blog={{ ...blog, canonicalPath: page.canonicalPath }}
+        note={indexabilityNote(page, 'blog')}
         sidebar={
           <>
             <BlogContentSources slug={blog.slug} />

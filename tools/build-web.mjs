@@ -1,10 +1,12 @@
 import { spawn } from 'node:child_process';
 import { readFile, rm } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
+import { assertLargeWriteSpace } from './disk-space.mjs';
 
 // Next's standalone tracing may retain files from an earlier build. Never
 // publish a new source commit with an old standalone HTML/JavaScript artifact.
 const web = fileURLToPath(new URL('../web/', import.meta.url));
+await assertLargeWriteSpace();
 await rm(new URL('../web/.next/', import.meta.url), { recursive: true, force: true });
 const processBuild = spawn('npm', ['run', 'build'], { cwd: web, stdio: 'inherit', env: process.env });
 const code = await new Promise((resolve, reject) => {

@@ -1,6 +1,9 @@
+// Optional readable page URLs from the gateway's page registry, next to the
+// stable slug/id they never replace (links: page-links.ts; absent = legacy URL).
 export type Blog = {
   id?: number;
   slug: string;
+  canonicalPath?: string;
   name: string;
   url?: string | null;
   category?: string | null;
@@ -27,6 +30,7 @@ export type Author = {
   role?: string;
   isPrimary?: boolean;
   blogSlug?: string;
+  blogCanonicalPath?: string;
   blogName?: string;
   postCount?: number;
 };
@@ -48,11 +52,12 @@ export type Post = {
   author?: string | null;
   publishedAt?: string | null;
   blogSlug?: string;
+  blogCanonicalPath?: string;
   blogName?: string;
   imageUrl?: string | null;
   tags?: Tag[];
 };
-export type Follow = Pick<Blog, 'slug' | 'name' | 'url' | 'category' | 'iconUrl'>;
+export type Follow = Pick<Blog, 'slug' | 'name' | 'url' | 'category' | 'iconUrl' | 'canonicalPath'>;
 export type Overview = {
   posts: Post[];
   tags: Array<Tag & { postCount: number; blogCount: number }>;

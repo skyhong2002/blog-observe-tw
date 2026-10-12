@@ -79,6 +79,15 @@ export function writeOptOut(storage: Pick<Storage, 'setItem' | 'removeItem'>, op
 // /blogs/<slug>/ or /topics/<id>/ path exists is not known here, only that
 // its segment has the published shape, so no free text a visitor typed into
 // the address bar can reach GA.
+//
+// Readable page URLs (page-links.ts) are deliberately not measured: a
+// readable topic key is the topic's label, a readable blog key a domain or
+// name. Only the pre-registry shapes below count: an ASCII blog slug without
+// dots and tag:<hash> / rss:<n> topic ids. Anything else, such as
+// /topics/旅行/ or /blogs/example.com/, is an unmeasured page and, after
+// `config`, taints the document like any other (analytics-runtime.mts). Until
+// the browser has a verified stable mapping for those paths, GA coverage of
+// blog and topic detail pages is intentionally smaller than before.
 const STATIC_PUBLIC: Record<string, string> = {
   '/': 'home',
   '/about/': 'about',
@@ -163,16 +172,30 @@ export function referrerOrigin(referrer: string | null | undefined): string {
 }
 
 /**
+ * A select_content id as a link may declare it (data-analytics-content-id, set
+ * by page-links.ts from the server record's stable id): an ASCII blog slug, a
+ * topic's 64-hex hash or an RSS topic number. Anything else is undefined.
+ */
+export function safeContentId(type: 'blog' | 'topic', value: unknown): string | undefined {
+  if (typeof value !== 'string') return undefined;
+  if (type === 'blog') return isBlogSlug(value) && value.length <= 180 ? value : undefined;
+  return /^(?:[a-f0-9]{64}|[1-9]\d{0,9})$/.test(value) ? value : undefined;
+}
+
+/**
  * select_content for a same-site link to a blog or topic page. content_id is
  * only an ASCII slug, a numeric RSS topic id or a topic's hex hash; never a
- * label, query string or other text.
+ * label, query string or other text. A readable path gives content_type only,
+ * unless the link declares a `contentId` that passes safeContentId.
  */
-export function selectContentTarget(pathname: string): { content_type: 'blog' | 'topic'; content_id?: string } | null {
+export function selectContentTarget(pathname: string, contentId?: string): { content_type: 'blog' | 'topic'; content_id?: string } | null {
   const blog = /^\/blogs\/([^/]+)\/?$/.exec(pathname);
+  const topic = blog ? null : /^\/topics\/([^/]+)\/?$/.exec(pathname);
+  if (!blog && !topic) return null;
+  const declared = safeContentId(blog ? 'blog' : 'topic', contentId);
+  if (declared) return { content_type: blog ? 'blog' : 'topic', content_id: declared };
   if (blog) return isBlogSlug(blog[1]) ? { content_type: 'blog', content_id: blog[1] } : { content_type: 'blog' };
-  const topic = /^\/topics\/([^/]+)\/?$/.exec(pathname);
-  if (!topic) return null;
-  const id = topicIdOf(topic[1]);
+  const id = topicIdOf(topic![1]);
   // tag:<hash> / rss:<n> -> the hash or the number.
   return id ? { content_type: 'topic', content_id: id.slice(4) } : { content_type: 'topic' };
 }
@@ -187,7 +210,13 @@ export type ClickEvent =
  * marker and the current page type. Sign-in links are not events: only a
  * completed sign-in counts (loginCompleted).
  */
-export function classifyClick(href: string, marker: string | undefined, origin: string, sourcePageType: string): ClickEvent | null {
+export function classifyClick(
+  href: string,
+  marker: string | undefined,
+  origin: string,
+  sourcePageType: string,
+  contentId?: string,
+): ClickEvent | null {
   let url: URL;
   try {
     url = new URL(href, `${origin}/`);
@@ -202,7 +231,7 @@ export function classifyClick(href: string, marker: string | undefined, origin: 
   if (url.pathname === '/me/feed.xml' || url.pathname.startsWith('/feeds/')) return { name: 'rss_click' };
   // API JSON and query-string links are not content selections.
   if (url.search || url.pathname.startsWith('/api/')) return null;
-  const target = selectContentTarget(url.pathname);
+  const target = selectContentTarget(url.pathname, contentId);
   return target ? { name: 'select_content', params: { ...target, source_page_type: sourcePageType } } : null;
 }
 

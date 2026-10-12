@@ -23,6 +23,7 @@ import {
   topicIdOf,
 } from '../src/lib/analytics-consent.mts';
 import { type AnalyticsDeps, installAnalytics } from '../src/lib/analytics-runtime.mts';
+import { blogLink, topicLink } from '../src/lib/page-links.ts';
 import { isSlug, isTopicId } from '../src/lib/public-query.ts';
 
 const ORIGIN = 'https://blog.observe.tw';
@@ -750,4 +751,80 @@ test('the opt-out page is noindex; an empty ID never installs', () => {
   const component = readFileSync(new URL('../src/components/SiteAnalytics.tsx', import.meta.url), 'utf8');
   assert.match(component, /if \(block \|\| !GA_ID\) return;/);
   assert.equal(analyticsBlock({ ...reader, measurementId: measurementId('') }), 'environment');
+});
+
+// ---- readable page URLs (page-links.ts): not measured, links may declare a safe id ----
+
+const READABLE_TOPIC = '/topics/%E6%97%85%E8%A1%8C/';
+const linkTo = (href: string, contentId?: string) => ({
+  target: {
+    closest: () => ({
+      getAttribute: (name: string) => (name === 'href' ? href : name === 'data-analytics-content-id' ? (contentId ?? null) : null),
+    }),
+  },
+  button: 0,
+});
+
+test('readable topic and dotted/Unicode blog paths are not measured pages', () => {
+  for (const path of [
+    READABLE_TOPIC,
+    '/topics/react/',
+    '/topics/c.js/',
+    '/blogs/example.com/',
+    '/blogs/%E7%94%B2%E4%B9%99/',
+    '/blogs/example.com-alice/',
+  ])
+    assert.equal(publicPage(ORIGIN + path, ORIGIN), null, path);
+  // The prior safe shapes stay measurable.
+  assert.equal(publicPageType(`${ORIGIN}/blogs/abc/`, ORIGIN), 'blog');
+  assert.equal(publicPageType(`${ORIGIN}/topics/tag%3A${HASH}/`, ORIGIN), 'topic');
+});
+
+test('select_content: a declared id is used only when it is a stable ASCII slug, hash or RSS number', () => {
+  assert.deepEqual(selectContentTarget(READABLE_TOPIC, HASH), { content_type: 'topic', content_id: HASH });
+  assert.deepEqual(selectContentTarget(READABLE_TOPIC, '42'), { content_type: 'topic', content_id: '42' });
+  assert.deepEqual(selectContentTarget('/blogs/example.com/', 'discovered-abc'), { content_type: 'blog', content_id: 'discovered-abc' });
+  // Labels, titles, readable keys, URLs and emails never become content_id.
+  for (const bad of ['旅行', `tag:${HASH}`, 'example.com', 'Alice', 'a@b.c', 'https://x.tw/', ''])
+    for (const path of [READABLE_TOPIC, '/blogs/example.com/'])
+      assert.equal(selectContentTarget(path, bad)?.content_id, undefined, `${path} ${bad}`);
+  for (const bad of [`${HASH}x`, '0', 'abc', HASH.toUpperCase()])
+    assert.equal(selectContentTarget(READABLE_TOPIC, bad)?.content_id, undefined, bad);
+  // A blog slug does not become a topic id.
+  assert.deepEqual(selectContentTarget(READABLE_TOPIC, 'abc'), { content_type: 'topic' });
+});
+
+test('runtime: clicks on readable links send select_content with the declared stable id; navigating there taints', () => {
+  const t = setup('/topics/');
+  const stop = installAnalytics(t.deps);
+  t.load();
+  t.doc.dispatch('click', linkTo(READABLE_TOPIC, HASH));
+  t.doc.dispatch('click', linkTo('/blogs/example.com/', 'discovered-abc'));
+  t.doc.dispatch('click', linkTo('/blogs/example.com/', '旅行'));
+  assert.deepEqual(t.events(), [
+    ['event', 'select_content', { content_type: 'topic', content_id: HASH, source_page_type: 'topics' }],
+    ['event', 'select_content', { content_type: 'blog', content_id: 'discovered-abc', source_page_type: 'topics' }],
+    ['event', 'select_content', { content_type: 'blog', source_page_type: 'topics' }],
+  ]);
+  const seen = google(t);
+  t.history.pushState(null, '', READABLE_TOPIC);
+  assert.equal(seen.at(-1)?.disabled, true);
+  t.setHref('/topics/');
+  t.win.dispatch('popstate');
+  assert.equal(seen.at(-1)?.disabled, true, 'back to the list stays off: the readable path would be the referrer');
+  assert.equal(t.configs().length, 1);
+  const text = JSON.stringify(t.layer());
+  for (const secret of ['%E6%97%85', '旅行', 'example.com']) assert.ok(!text.includes(secret), secret);
+  stop();
+});
+
+test('page-links: link props carry only analytics-safe stable ids, never readable keys', () => {
+  assert.deepEqual(blogLink('discovered-abc', '/blogs/example.com/'), {
+    href: '/blogs/example.com/',
+    'data-analytics-content-id': 'discovered-abc',
+  });
+  assert.deepEqual(blogLink('甲'), { href: '/blogs/%E7%94%B2/' });
+  assert.deepEqual(topicLink(`tag:${HASH}`, READABLE_TOPIC), { href: READABLE_TOPIC, 'data-analytics-content-id': HASH });
+  assert.deepEqual(topicLink('rss:42', undefined, '30'), { href: '/topics/rss%3A42/?days=30', 'data-analytics-content-id': '42' });
+  assert.deepEqual(topicLink('旅行'), { href: '/topics/%E6%97%85%E8%A1%8C/' });
 });

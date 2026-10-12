@@ -6,6 +6,7 @@ import { flushSync } from 'react-dom';
 import BlogIcon from '@/components/BlogIcon';
 import SuggestInput, { type Suggestion } from '@/components/SuggestInput';
 import { suppliedIconUrl } from '@/lib/media-icons';
+import { blogHref } from '@/lib/page-links';
 
 // SuggestInput for plain GET forms rendered by server components, which cannot
 // hand a suggest function across the client boundary. `source` names where the
@@ -19,7 +20,8 @@ type TagRow = { slug: string; label: string };
 async function suggestionsFor(source: SuggestSource, typed: string, signal: AbortSignal): Promise<SuggestItem[]> {
   const response = await fetch('/api/overview', { signal });
   if (!response.ok) return [];
-  const data: { tags?: TagRow[]; blogs?: Array<{ slug: string; name: string; iconUrl?: unknown }> } = await response.json();
+  const data: { tags?: TagRow[]; blogs?: Array<{ slug: string; name: string; iconUrl?: unknown; canonicalPath?: unknown }> } =
+    await response.json();
   const needle = typed.toLocaleLowerCase();
   const blogs: SuggestItem[] = (data.blogs ?? [])
     .filter((blog) => blog.name.toLocaleLowerCase().includes(needle))
@@ -29,7 +31,7 @@ async function suggestionsFor(source: SuggestSource, typed: string, signal: Abor
       media: blog.slug,
       iconUrl: suppliedIconUrl(blog.iconUrl),
       hint: '部落格',
-      href: source.go ? `/blogs/${encodeURIComponent(blog.slug)}/` : undefined,
+      href: source.go ? blogHref(blog.slug, blog.canonicalPath) : undefined,
     }));
   const tags: SuggestItem[] = (data.tags ?? [])
     .filter((tag) => tag.label.toLocaleLowerCase().includes(needle))

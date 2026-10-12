@@ -11,6 +11,7 @@
  * list is non-empty: an empty list, a null profile or "unavailable" vocabulary
  * are valid answers. Pure: node --test imports this file.
  */
+import { pageInfoOf } from './page-links.ts';
 import type { PublicKind } from './public-paths.ts';
 
 type Value = Record<string, unknown>;
@@ -87,6 +88,9 @@ export const PUBLIC_CONTRACTS: Record<PublicKind, (raw: unknown) => boolean> = {
       topics: rows,
     }),
   blogContent: (raw) => shape(raw, { blog: object, sources: rows }),
+  // Every field: the page's canonical, robots and the stable id of its API reads come from here.
+  blogPage: (raw) => pageInfoOf('blog', raw) !== null,
+  topicPage: (raw) => pageInfoOf('topic', raw) !== null,
 };
 
 /** True when a 200 payload has what the page for this kind of path reads. */

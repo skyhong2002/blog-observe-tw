@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import BlogIcon from '@/components/BlogIcon';
 import type { Follow } from '@/lib/api';
+import { blogHref } from '@/lib/page-links';
 export default function ReaderList() {
   const [follows, setFollows] = useState<Follow[] | null>(null);
   const [state, setState] = useState<'loading' | 'ready' | 'login' | 'error'>('loading');
@@ -63,7 +64,7 @@ export default function ReaderList() {
         <ul className="divide-y divide-zinc-200 dark:divide-zinc-800">
           {follows.map((blog) => (
             <li key={blog.slug}>
-              <Link href={`/blogs/${blog.slug}/`} className="flex min-h-14 items-center justify-between gap-3 py-3">
+              <Link href={blogHref(blog.slug, blog.canonicalPath)} className="flex min-h-14 items-center justify-between gap-3 py-3">
                 <strong className="inline-flex items-center gap-1.5 text-sm font-medium text-brand-700 dark:text-brand-400">
                   <BlogIcon media={blog.slug} iconUrl={blog.iconUrl} title={blog.name} />
                   {blog.name}

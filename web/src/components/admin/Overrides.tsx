@@ -1,6 +1,7 @@
 'use client';
 import { useRef, useState } from 'react';
 import { adminGet, manualOverride } from '@/lib/admin-client';
+import { blogHref } from '@/lib/page-links';
 import { button, input, panel, primary, type RunAction } from './shared';
 
 type Blog = { id: number; slug: string; name: string };
@@ -132,7 +133,7 @@ export default function Overrides({ run, busy }: { run: RunAction; busy: boolean
         {blog ? (
           <p className="text-sm">
             目前選取：
-            <a className="text-brand-700 underline dark:text-brand-400" href={`/blogs/${blog.slug}/`}>
+            <a className="text-brand-700 underline dark:text-brand-400" href={blogHref(blog.slug)}>
               {blog.name}
             </a>
             （#{blog.id}）

@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { topicLink } from '@/lib/page-links';
 import { publicJsonOrNull } from '@/lib/public-api';
 import type { Topics } from '@/lib/topics';
 export default async function BlogTopics({ slug }: { slug: string }) {
@@ -16,7 +17,7 @@ export default async function BlogTopics({ slug }: { slug: string }) {
           {data.items.slice(0, 20).map((t) => (
             <li key={t.id}>
               <Link
-                href={`/topics/${encodeURIComponent(t.id)}/?days=90`}
+                {...topicLink(t.id, t.canonicalPath, '90')}
                 className="inline-flex rounded-md border border-zinc-300 px-3 py-2 text-sm hover:bg-zinc-100 dark:border-zinc-700 dark:hover:bg-zinc-800"
               >
                 {t.label} · {t.posts} 篇

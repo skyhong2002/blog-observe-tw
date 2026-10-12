@@ -7,6 +7,7 @@ import ArticleListItem from '@/components/ArticleListItem';
 import BlogIcon from '@/components/BlogIcon';
 import SectionTabs from '@/components/SectionTabs';
 import type { Blog, Overview, Post, Tag } from '@/lib/api';
+import { blogLink } from '@/lib/page-links';
 import { isSlug, tagApiPath } from '@/lib/public-query';
 import { asIs, type PublicLoad, usePublicJson } from '@/lib/use-public-json';
 
@@ -67,7 +68,7 @@ export default function TagExplorerView({
             {detail.data.blogs?.map((blog) => (
               <li key={blog.slug}>
                 <Link
-                  href={`/blogs/${blog.slug}/`}
+                  {...blogLink(blog.slug, blog.canonicalPath)}
                   className="inline-flex items-center gap-1.5 text-brand-700 hover:underline dark:text-brand-400"
                 >
                   <BlogIcon media={blog.slug} title={blog.name} />

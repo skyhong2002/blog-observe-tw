@@ -1,5 +1,5 @@
 'use client';
-// One view for a prerendered (on demand) 30-day topic page and the browser's ?days=7|90; see app/topics/[id]/page.tsx.
+// One view for a prerendered (on demand) 90-day topic page and the browser's ?days=7|30; see app/topics/[id]/page.tsx.
 
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
@@ -7,7 +7,8 @@ import BlogIcon from '@/components/BlogIcon';
 import SectionTabs from '@/components/SectionTabs';
 import VocabularyNotice from '@/components/VocabularyNotice';
 import { taipei } from '@/lib/api';
-import { type Period, periodOf, TOPICS_PERIOD, topicApiPath } from '@/lib/public-query';
+import { blogLink, TOPIC_DETAIL_PERIOD, topicHref, topicLink } from '@/lib/page-links';
+import { type Period, periodOf, topicApiPath } from '@/lib/public-query';
 import {
   exclusionReasonLabel,
   formatPercent,
@@ -40,17 +41,26 @@ function frequencyBasis(data: TopicDetail) {
   return `門檻：基準期間命中文章占比超過 ${formatPercent(ratio)}。基準期間：${period}。`;
 }
 
-/** `label` titles the page while another period loads (the topic itself does not change). */
+/**
+ * `id` is the stable topic id every API read uses; `path` the page's canonical
+ * (readable) URL, for the period tabs. `label` titles the page while another
+ * period loads (the topic itself does not change). `note` explains a noindex
+ * page with its 90-day counts, separate from the period tab's counts.
+ */
 export default function TopicDetailView({
   id,
+  path,
   days,
   load,
   label,
+  note,
 }: {
   id: string;
+  path: string;
   days: Period;
   load: PublicLoad<TopicDetail>;
   label?: string;
+  note?: string | null;
 }) {
   const data = load.status === 'ready' ? load.data : null;
   return (
@@ -63,12 +73,13 @@ export default function TopicDetailView({
       </h1>
       <SectionTabs
         label="話題期間"
-        tabs={[7, 30, 90].map((d) => ({
-          href: `/topics/${encodeURIComponent(id)}/?days=${d}`,
+        tabs={(['7', '30', '90'] as const).map((d) => ({
+          href: topicHref(id, path, d),
           label: `近 ${d} 天`,
-          current: String(d) === days,
+          current: d === days,
         }))}
       />
+      {note ? <p className="text-xs text-zinc-500">{note}</p> : null}
       {data?.topic?.excludedReason ? (
         <>
           <section role="status" className="rounded-xl border border-zinc-300 p-4 text-sm dark:border-zinc-800">
@@ -97,10 +108,7 @@ export default function TopicDetailView({
           {data.topic.canonicalId && data.topic.canonicalId !== data.topic.id ? (
             <p className="text-sm text-zinc-600 dark:text-zinc-400">
               {data.topic.source === 'rss-category' ? '此 RSS 標籤對應到共同關鍵字' : '這個寫法已與只差在大小寫或全半形的寫法合併為'}「
-              <Link
-                className="text-brand-700 hover:underline dark:text-brand-400"
-                href={`/topics/${encodeURIComponent(data.topic.canonicalId)}/?days=${days}`}
-              >
+              <Link className="text-brand-700 hover:underline dark:text-brand-400" {...topicLink(data.topic.canonicalId, undefined, days)}>
                 {data.topic.label}
               </Link>
               」，以下為合併後的結果。
@@ -121,7 +129,7 @@ export default function TopicDetailView({
               <ul className="mt-3 divide-y divide-zinc-200 dark:divide-zinc-800">
                 {data.blogs.map((b) => (
                   <li key={b.id} className="flex justify-between gap-3 py-3 text-sm">
-                    <Link className="flex items-center gap-2 text-brand-700 dark:text-brand-400" href={`/blogs/${b.slug}/`}>
+                    <Link className="flex items-center gap-2 text-brand-700 dark:text-brand-400" {...blogLink(b.slug, b.canonicalPath)}>
                       <BlogIcon media={b.slug} title={b.name} size={18} />
                       {b.name}
                     </Link>
@@ -151,7 +159,7 @@ export default function TopicDetailView({
                       {a.title}
                     </a>
                     <p className="mt-2 text-xs text-zinc-500">
-                      <Link href={`/blogs/${a.blogSlug}/`}>{a.blogName}</Link> · {taipei(a.publishedAt)}
+                      <Link {...blogLink(a.blogSlug, a.blogCanonicalPath)}>{a.blogName}</Link> · {taipei(a.publishedAt)}
                     </p>
                   </li>
                 ))}
@@ -177,10 +185,23 @@ export default function TopicDetailView({
 // public-contracts.ts requires topic (id, label), blogs, articles and vocabulary: {} or a null topic is an error, not a page.
 const parseDetail = asIs<TopicDetail>;
 
-/** Reads ?days= (inside the page's Suspense boundary); periods other than the prerendered one come from /api/topics/:id. */
-export function TopicDetailFromUrl({ id, baseline }: { id: string; baseline: PublicLoad<TopicDetail> }) {
-  const days = periodOf(useSearchParams(), TOPICS_PERIOD);
-  const load = usePublicJson(days === TOPICS_PERIOD ? null : topicApiPath(id, days), parseDetail);
+/**
+ * Reads ?days= (inside the page's Suspense boundary); periods other than the
+ * prerendered 90 days come from /api/topics/:id, always by the stable id.
+ */
+export function TopicDetailFromUrl({
+  id,
+  path,
+  baseline,
+  note,
+}: {
+  id: string;
+  path: string;
+  baseline: PublicLoad<TopicDetail>;
+  note?: string | null;
+}) {
+  const days = periodOf(useSearchParams(), TOPIC_DETAIL_PERIOD);
+  const load = usePublicJson(days === TOPIC_DETAIL_PERIOD ? null : topicApiPath(id, days), parseDetail);
   const label = baseline.status === 'ready' ? baseline.data.topic?.label : undefined;
-  return <TopicDetailView id={id} days={days} load={load ?? baseline} label={label} />;
+  return <TopicDetailView id={id} path={path} days={days} load={load ?? baseline} label={label} note={note} />;
 }

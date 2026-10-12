@@ -10,6 +10,7 @@ import MediaTabs from '@/components/MediaTabs';
 import ReloadButton from '@/components/public/ReloadButton';
 import TableScroller from '@/components/TableScroller';
 import { type Catalog, taipei } from '@/lib/api';
+import { blogLink } from '@/lib/page-links';
 import {
   type CatalogFilters,
   type CatalogSort,
@@ -164,7 +165,7 @@ export default function BlogCatalogView({ catalog: data, filters, status }: { ca
                       {/* One line per row: name keeps its width, the URL takes what is left and is the first to truncate. */}
                       <div className={`${table.leadBox} flex items-baseline gap-2`}>
                         <Link
-                          href={`/blogs/${blog.slug}/`}
+                          {...blogLink(blog.slug, blog.canonicalPath)}
                           className="flex min-w-0 items-center gap-1.5 self-center font-medium text-brand-700 hover:underline dark:text-brand-400"
                         >
                           <BlogIcon media={blog.slug} iconUrl={blog.iconUrl} title={blog.name} />

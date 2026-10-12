@@ -26,6 +26,12 @@ Measurement ID：`G-VKWGDHDESV`（property 558498886、stream 16112932212）。I
 
 因此採保守規則：同一份文件一旦已送出 `config`（不論 gtag.js 已載入或仍在載入），只要切到任何私人、query、noindex、無法解析或其他不可計入的網址，即標記為受污染；此後 `ga-disable-<ID>` 恆為 true，所有自訂事件（含暫存佇列與 login）一律丟棄，回到公開頁、StrictMode 卸載重掛、或晚到的 gtag.js onload 都不會再啟用。卸載期間發生、無人判斷的導覽（pushState／replaceState／popstate，或重掛時網址已不同）也視同污染；history wrapper 與 popstate 監聽在整份文件期間保留以偵測這類導覽。不自動重新載入，避免打斷表單與導覽；下一次完整頁面載入會重新開始，`document.referrer` 只保留 origin。從未送出 `config` 的文件（例如落地在私人或 noindex 頁）仍可在第一個公開頁啟用，因為 Google 未看過先前的記錄。
 
+### 可讀網址（2026-10-12 起，刻意縮小的涵蓋範圍）
+
+部落格與話題詳細頁改用頁面登錄的可讀網址（`canonicalPath`，例如 `/topics/旅行/`、`/blogs/example.com/`），舊網址由 gateway 301。可讀話題片段就是話題標籤文字，可讀部落格片段是網域或名稱，因此**不納入** GA：`publicPage` 維持原本的安全形狀（不含 `.` 的小寫 ASCII 部落格 slug、`tag:<hash>`／`rss:<n>`），其他片段一律視為不可計入頁。已送出 `config` 的文件一旦進入可讀話題頁或含網域的部落格頁，就依上節規則整份文件停用，之後回到首頁或列表也不再計。結果是：首頁、列表頁之間的落地／切頁／上一頁 page_view 照常；話題詳細頁與多數部落格詳細頁（及其後同一文件的瀏覽）不計，直到瀏覽器端有經驗證、穩定且安全的對應（例如伺服器保證的 ID 對照）再另行評估。不另外送 page_view 或 config 補償。
+
+select_content：連到可讀網址的連結，若伺服器資料提供穩定 ID，`page-links.ts` 會加 `data-analytics-content-id`（原始 ASCII 部落格 slug、話題 64 hex hash 或 RSS 數字），點擊時經 `safeContentId` 再驗一次才當作 content_id；不符合（標籤、標題、可讀片段、網址、email）時只送 content_type。
+
 一般公開頁之間的 SPA 切頁與上一頁／下一頁不受影響，照常由加強型評估計 page_view；程式從不手動送 page_view。單元測試的假 Google 無法重現 Google 引擎的 referrer 行為，只鎖定上述保守規則，仍須以真實 collect 請求驗收。
 
 自訂事件只允許：
@@ -33,7 +39,7 @@ Measurement ID：`G-VKWGDHDESV`（property 558498886、stream 16112932212）。I
 | 事件 | 資料 |
 | --- | --- |
 | open_original | link_domain、source_page_type（`data-analytics="open_original"`：SourceLink 與首頁真正的原文連結；退回 `/blogs/` 的連結不標記） |
-| select_content | content_type、經驗證的 slug／數字／hash content_id、source_page_type |
+| select_content | content_type、經驗證的 slug／數字／hash content_id（取自舊形網址或連結的 `data-analytics-content-id`）、source_page_type |
 | rss_click | 無內容或身分參數 |
 | login | method=google |
 | follow | 動作名稱，不含使用者或部落格 ID |

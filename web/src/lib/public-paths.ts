@@ -32,6 +32,8 @@ export const PUBLIC_KINDS = [
   'blogTopics',
   'blogInference',
   'blogContent',
+  'blogPage',
+  'topicPage',
 ] as const;
 export type PublicKind = (typeof PUBLIC_KINDS)[number];
 
@@ -52,6 +54,9 @@ const RULES: readonly Rule[] = [
   { kind: 'blogTopics', path: blogPath('/topics'), query: ['days'] },
   { kind: 'blogInference', path: blogPath('/inference'), query: [] },
   { kind: 'blogContent', path: blogPath('/content'), query: [] },
+  // Page registry reads (app/src/seo/page-api.ts): one encoded key, no query.
+  { kind: 'blogPage', path: new RegExp(`^/api/pages/blogs/${SEGMENT}$`), query: [] },
+  { kind: 'topicPage', path: new RegExp(`^/api/pages/topics/${SEGMENT}$`), query: [] },
 ];
 
 /** Never public, whatever a rule above might match. */

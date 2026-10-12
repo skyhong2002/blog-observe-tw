@@ -83,6 +83,35 @@ export const EMPTY: Record<PublicKind, unknown> = {
     sources: [],
     publicContent: 'summary-only',
   },
+  // app/src/seo/page-api.ts: a thin page is valid (indexable false, with a reason).
+  blogPage: {
+    page: {
+      entityId: '12',
+      stableId: 'discovered-abc',
+      slug: 'example.com',
+      canonicalPath: '/blogs/example.com/',
+      indexable: false,
+      indexabilityReason: 'unverified-or-invalid-url',
+      windowDays: 90,
+      posts: 0,
+      blogs: 0,
+      currentVersion: null,
+    },
+  },
+  topicPage: {
+    page: {
+      entityId: 'a'.repeat(64),
+      stableId: `tag:${'a'.repeat(64)}`,
+      slug: '旅行',
+      canonicalPath: '/topics/%E6%97%85%E8%A1%8C/',
+      indexable: false,
+      indexabilityReason: 'insufficient-posts',
+      windowDays: 90,
+      posts: 0,
+      blogs: 0,
+      currentVersion: null,
+    },
+  },
 };
 
 /** A path answering each kind. */
@@ -101,6 +130,8 @@ export const PATHS: Record<PublicKind, string> = {
   blogTopics: '/api/blogs/a/topics?days=90',
   blogInference: '/api/blogs/a/inference',
   blogContent: '/api/blogs/a/content',
+  blogPage: '/api/pages/blogs/example.com',
+  topicPage: '/api/pages/topics/%E6%97%85%E8%A1%8C',
 };
 
 export const json = (status: number, body: unknown = { ok: true }) =>

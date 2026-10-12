@@ -7,9 +7,10 @@ import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import ArticleListItem from '@/components/ArticleListItem';
 import type { Post } from '@/lib/api';
+import { blogHref } from '@/lib/page-links';
 import { profileQueryOf } from '@/lib/public-query';
 
-type Owner = { slug: string; name: string };
+type Owner = { slug: string; name: string; canonicalPath?: string };
 
 export default function ProfilePostsView({ blog, posts: allPosts, query }: { blog: Owner; posts: Post[]; query: string }) {
   const posts = query
@@ -17,7 +18,7 @@ export default function ProfilePostsView({ blog, posts: allPosts, query }: { blo
     : allPosts;
   return (
     <>
-      <form action={`/blogs/${blog.slug}/`} className="mb-1 flex gap-2">
+      <form action={blogHref(blog.slug, blog.canonicalPath)} className="mb-1 flex gap-2">
         <input
           key={query}
           name="q"
@@ -53,7 +54,13 @@ export default function ProfilePostsView({ blog, posts: allPosts, query }: { blo
           {posts.map((post) => (
             <ArticleListItem
               key={post.id ?? post.guid ?? post.url}
-              post={{ ...post, blogSlug: post.blogSlug ?? blog.slug, blogName: post.blogName ?? blog.name }}
+              post={{
+                ...post,
+                blogSlug: post.blogSlug ?? blog.slug,
+                blogCanonicalPath:
+                  post.blogCanonicalPath ?? (post.blogSlug && post.blogSlug !== blog.slug ? undefined : blog.canonicalPath),
+                blogName: post.blogName ?? blog.name,
+              }}
             />
           ))}
         </ul>

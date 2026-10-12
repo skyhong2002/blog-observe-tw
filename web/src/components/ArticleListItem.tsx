@@ -3,6 +3,7 @@ import ArticleThumbnail from '@/components/ArticleThumbnail';
 import BlogIcon from '@/components/BlogIcon';
 import SourceLink from '@/components/SourceLink';
 import { type Post, plainText, taipei } from '@/lib/api';
+import { blogLink } from '@/lib/page-links';
 
 /** Markup copied from tag.observe.tw ArticleListItem, commit afe0a65.
  * Blog data keeps source links and tags; news-only discovery/attribution is omitted. */
@@ -68,7 +69,7 @@ export default function ArticleListItem({
           <div className="mt-0.5 flex flex-wrap items-center gap-x-2.5 text-[11px] leading-5 text-zinc-500 dark:text-zinc-400">
             {showMedia && article.media && (
               <Link
-                href={`/blogs/${encodeURIComponent(article.media)}/`}
+                {...blogLink(article.media, post.blogCanonicalPath)}
                 className="inline-flex items-center gap-1.5 font-medium text-brand-700 hover:underline dark:text-brand-400"
               >
                 <BlogIcon media={article.media} title={article.mediaTitle} />

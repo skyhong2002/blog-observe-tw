@@ -296,7 +296,13 @@ export function installAnalytics(deps: AnalyticsDeps): () => void {
     const anchor = typeof target?.closest === 'function' ? target.closest('a[href]') : null;
     const href = anchor?.getAttribute('href');
     if (!anchor || !href || !page) return;
-    const found = classifyClick(href, anchor.getAttribute('data-analytics') ?? undefined, origin, page.type);
+    const found = classifyClick(
+      href,
+      anchor.getAttribute('data-analytics') ?? undefined,
+      origin,
+      page.type,
+      anchor.getAttribute('data-analytics-content-id') ?? undefined,
+    );
     if (!found) return;
     if (found.name === 'rss_click') send('rss_click');
     else send(found.name, found.params);

@@ -4,26 +4,19 @@ import type { Pool } from 'mysql2/promise';
 import { describe, expect, it, vi } from 'vitest';
 import { registerSeoRoutes, SEO_ORIGIN, sitemapChildPaths, sitemapXml, xmlEscape } from './routes.ts';
 
-const hash = 'a'.repeat(64);
+vi.mock('./indexability.ts', () => ({
+  getIndexablePages: async (pool: Pool, kind: string) => (await pool.query(`fixture:${kind}`))[0],
+}));
 function fixture(blogCount = 1, lastmod = '2026-01-01T00:00:00.000Z') {
-  const query = vi.fn(async (sql: string) => {
-    if (sql.includes('COUNT(DISTINCT topic_id)')) return [[{ n: 1 }]];
-    if (sql.startsWith('SELECT COUNT(*) n,MAX(')) return [[{ n: blogCount, lastmod }]];
-    if (sql.startsWith('SELECT b.slug'))
-      return [
-        [
-          { slug: 'kocpc', url: 'https://www.kocpc.com.tw/', status: 'verified', lastmod },
-          { slug: 'private-source', url: 'https://private.example/', status: 'seed', lastmod: null },
-          { slug: 'bad<injection', url: 'https://bad.example/', status: 'verified', lastmod: null },
-        ],
-      ];
-    return [
-      [
-        { topic_id: `tag:${hash}`, lastmod: '2026-01-02T00:00:00.000Z' },
-        { topic_id: 'rss:999', lastmod: null },
-      ],
-    ];
-  });
+  const query = vi.fn(async (sql: string) => [
+    sql === 'fixture:blog'
+      ? Array.from({ length: blogCount }, (_, i) => ({
+          entityId: String(i + 1),
+          canonicalPath: `/blogs/${i === 0 ? 'kocpc' : `blog-${i}`}/`,
+          lastmod,
+        }))
+      : [{ entityId: 'a'.repeat(64), canonicalPath: '/topics/%E4%BA%BA%E5%B7%A5%E6%99%BA%E6%85%A7/', lastmod: '2026-01-02T00:00:00.000Z' }],
+  ]);
   const app = Fastify({ exposeHeadRoutes: true });
   registerSeoRoutes(app, { query } as unknown as Pool);
   return { app, query };
@@ -60,7 +53,8 @@ describe('public crawler discovery routes', () => {
       expect(result.body).toContain('<lastmod>2026-01-01T00:00:00.000Z</lastmod>');
       const second = await app.inject('/sitemaps/blogs-2.xml');
       expect(second.statusCode).toBe(200);
-      expect(query.mock.calls.some(([sql]) => sql.includes('LIMIT 10000 OFFSET 10000'))).toBe(true);
+      expect((second.body.match(/<url>/g) || []).length).toBe(1);
+      expect(second.body).toContain('/blogs/blog-10000/');
       expect((await app.inject('/sitemaps/blogs-3.xml')).statusCode).toBe(404);
       expect((await app.inject('/sitemaps/blogs-1.xml')).statusCode).toBe(404);
       expect((await app.inject('/sitemaps/private.xml')).statusCode).toBe(404);
@@ -82,14 +76,9 @@ describe('public crawler discovery routes', () => {
       expect(blogs.body).not.toContain('private-source');
       expect(blogs.body).not.toContain('injection');
       const topics = await app.inject('/sitemaps/topics.xml');
-      expect(topics.body).toContain(`${SEO_ORIGIN}/topics/tag%3A${hash}/`);
+      expect(topics.body).toContain(`${SEO_ORIGIN}/topics/%E4%BA%BA%E5%B7%A5%E6%99%BA%E6%85%A7/`);
       expect(topics.body).not.toContain('rss:');
-      const sql = query.mock.calls.map(([text]) => text).find((text) => text.includes('GROUP BY r.topic_id'))!;
-      expect(sql).toContain("b.status='verified'");
-      expect(sql).toContain('t.exclusion_reason IS NULL');
-      expect(sql).toContain("i.status='ok'");
-      expect(sql).toContain('topic_matches_v3');
-      expect(sql).toContain('i.matcher_version=');
+      expect(query.mock.calls.some(([sql]) => sql === 'fixture:topic')).toBe(true);
       const head = await app.inject({ method: 'HEAD', url: '/sitemaps/topics.xml' });
       expect(head.statusCode).toBe(200);
       expect(head.body).toBe('');
@@ -111,17 +100,13 @@ describe('public crawler discovery routes', () => {
     }
   });
   it('skips future database timestamps and falls back to a real source mtime rather than now', async () => {
-    const { app, query } = fixture(1, '2099-01-01T00:00:00.000Z');
+    const { app } = fixture(1, '2099-01-01T00:00:00.000Z');
     try {
       const result = await app.inject('/sitemaps/blogs.xml');
       expect(result.statusCode).toBe(200);
       expect(result.body).not.toContain('2099-01-01');
       const source = await stat(new URL('../../../web/src/app/blogs/[slug]/page.tsx', import.meta.url));
       expect(result.body).toContain(`<lastmod>${source.mtime.toISOString()}</lastmod>`);
-      const statements = query.mock.calls.map(([sql]) => sql);
-      for (const field of ['updated_at', 'published_at', 'created_at'])
-        expect(statements.some((sql) => sql.includes(`CASE WHEN p.${field}<=UTC_TIMESTAMP() THEN p.${field} END`))).toBe(true);
-      expect(statements.some((sql) => sql.includes('CASE WHEN b.discovered_at<=UTC_TIMESTAMP() THEN b.discovered_at END'))).toBe(true);
       const index = await app.inject('/sitemap.xml');
       expect(index.body).not.toContain('2099-01-01');
       expect((index.body.match(/<lastmod>/g) || []).length).toBe(3);

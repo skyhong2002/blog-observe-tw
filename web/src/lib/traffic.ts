@@ -7,10 +7,13 @@
  * a blog without an estimate has `traffic: null`, and zero only appears when
  * the source itself said zero.
  */
+import { isCanonicalPagePath } from './page-links.ts';
 export type TrafficStatus = 'ready' | 'pending' | 'blocked' | 'no-data' | 'unavailable';
 export type TrafficPoint = { month: string; visits: number };
 export type TrafficBlog = {
   slug: string;
+  /** Readable blog page when the gateway sent a valid one (page-links.ts). */
+  canonicalPath?: string;
   name: string;
   domain: string;
   status: TrafficStatus;
@@ -109,6 +112,7 @@ export function normalizeTraffic(raw: unknown): TrafficData | null {
     }
     blogs.push({
       slug,
+      ...(isCanonicalPagePath('blog', item.canonicalPath) ? { canonicalPath: item.canonicalPath } : {}),
       name: text(item.name) ?? slug,
       domain,
       status,

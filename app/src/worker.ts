@@ -15,6 +15,7 @@ import { createDb } from './db/client.ts';
 import { runPublicationDiscoveryBatch } from './relations/home.ts';
 import { runRelationSnapshotBatch } from './relations/routes.ts';
 import { runRelationBatch } from './relations/worker.ts';
+import { backfillPublicRoutes, backfillTopicRouteAliases } from './seo/page-routes.ts';
 import { runTopicsBatch } from './topics/batch.ts';
 import { refreshTopicFrequencies } from './topics/frequency.ts';
 import { syncVocabulary } from './topics/sync.ts';
@@ -64,6 +65,7 @@ for (const [name, every, enabled] of [
   ['blogs-history', 5 * 60_000, historyEnabled],
   ['blogs-candidate-review', 30 * 60_000, candidateReviewEnabled],
   ['blogs-missing-icons', 15 * 60_000, missingIconsEnabled],
+  ['blogs-public-routes', 15 * 60_000, true],
 ] as const) {
   if (enabled) await queue.upsertJobScheduler(name, { every }, { name, data: {}, opts: { removeOnComplete: 20, removeOnFail: 20 } });
   else await queue.removeJobScheduler(name);
@@ -81,6 +83,13 @@ const worker = new Worker(
       userAgent: config.crawlUserAgent,
       delayMs: config.crawlDelayMs,
     };
+    if (job.name === 'blogs-public-routes') {
+      // Missing-only batches avoid rewriting the full vocabulary or changing established slugs.
+      const blogs = await backfillPublicRoutes(store.pool, { kind: 'blog', limit: 100, missingOnly: true });
+      const topics = await backfillPublicRoutes(store.pool, { kind: 'topic', limit: 100, missingOnly: true });
+      const aliases = await backfillTopicRouteAliases(store.pool, { limit: 100, missingOnly: true });
+      return { blogs, topics, aliases };
+    }
     if (job.name === 'blogs-content') return contentEnabled ? runContentBatch(store.pool, batchOptions) : { skipped: 'disabled' };
     if (job.name === 'blogs-relation-snapshots') return runRelationSnapshotBatch(store.pool, batchOptions);
     if (job.name === 'blogs-publication-discovery')

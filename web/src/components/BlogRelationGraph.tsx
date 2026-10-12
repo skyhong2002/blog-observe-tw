@@ -7,6 +7,7 @@ import * as echarts from 'echarts/core';
 import { CanvasRenderer } from 'echarts/renderers';
 import { useEffect, useRef } from 'react';
 import { brandMark } from '@/lib/brand';
+import { blogHref } from '@/lib/page-links';
 import type { RelationEdge, RelationNode } from '@/lib/relations';
 
 echarts.use([GraphChart, TooltipComponent, CanvasRenderer]);
@@ -59,7 +60,7 @@ export default function BlogRelationGraph({ nodes, edges }: { nodes: RelationNod
       if (p.dataType === 'node') {
         const id = (p.data as { id: string }).id;
         const n = nodes.find((n) => String(n.id) === id);
-        if (n) window.location.assign(`/blogs/${encodeURIComponent(n.slug)}/`);
+        if (n) window.location.assign(blogHref(n.slug, n.canonicalPath));
       }
     });
     const resize = new ResizeObserver(() => chart.resize());

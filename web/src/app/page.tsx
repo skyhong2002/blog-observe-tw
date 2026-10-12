@@ -5,6 +5,7 @@ import BlogIcon from '@/components/BlogIcon';
 import { plainText, taipei } from '@/lib/api';
 import { recentBlogRows } from '@/lib/home';
 import { externalHref } from '@/lib/images';
+import { blogHref, blogLink, topicLink } from '@/lib/page-links';
 import { overview, publicJson } from '@/lib/public-api';
 import { topicsApiPath } from '@/lib/public-query';
 import { serializeJsonLd, siteSchema, staticPageMetadata } from '@/lib/seo';
@@ -20,7 +21,8 @@ export default async function HomePage() {
   const [data, topics] = await Promise.all([overview(), publicJson<Topics>(topicsApiPath('30'))]);
   const [lead, ...rest] = data.posts;
   const recentBlogs = recentBlogRows(data, 10);
-  const postHref = (post: { url?: string | null; blogSlug?: string }) => externalHref(post.url) ?? `/blogs/${post.blogSlug}/`;
+  const postHref = (post: { url?: string | null; blogSlug?: string; blogCanonicalPath?: string }) =>
+    externalHref(post.url) ?? blogHref(post.blogSlug ?? '', post.blogCanonicalPath);
   // Only a real source URL is an original article; the /blogs/ fallback is not.
   const original = (post: { url?: string | null }) => (externalHref(post.url) ? 'open_original' : undefined);
   const updated = data.updatedAt ? `${taipei(data.updatedAt)} 更新` : '等待資料更新';
@@ -40,7 +42,7 @@ export default async function HomePage() {
               <ol className={styles.ranking}>
                 {topics.items.slice(0, 8).map((tag, i) => (
                   <li key={tag.id}>
-                    <Link href={`/topics/${encodeURIComponent(tag.id)}/?days=30`}>
+                    <Link {...topicLink(tag.id, tag.canonicalPath, '30')}>
                       <span className={styles.rank}>{String(i + 1).padStart(2, '0')}</span>
                       <span className={styles.rankBody}>
                         <strong>{tag.label}</strong>
@@ -92,7 +94,7 @@ export default async function HomePage() {
                       </a>
                     </h3>
                     <p className={styles.source}>
-                      <Link href={`/blogs/${lead.blogSlug}/`} className="inline-flex items-center gap-1.5">
+                      <Link {...blogLink(lead.blogSlug ?? '', lead.blogCanonicalPath)} className="inline-flex items-center gap-1.5">
                         {lead.blogSlug && <BlogIcon media={lead.blogSlug} title={lead.blogName} />}
                         {lead.blogName}
                       </Link>
@@ -124,7 +126,7 @@ export default async function HomePage() {
                           </a>
                         </h3>
                         <p className={styles.source}>
-                          <Link href={`/blogs/${post.blogSlug}/`} className="inline-flex items-center gap-1.5">
+                          <Link {...blogLink(post.blogSlug ?? '', post.blogCanonicalPath)} className="inline-flex items-center gap-1.5">
                             {post.blogSlug && <BlogIcon media={post.blogSlug} title={post.blogName} />}
                             {post.blogName}
                           </Link>
@@ -182,7 +184,7 @@ export default async function HomePage() {
                     return (
                       <li key={blog.slug}>
                         <p className={styles.recentBlogName}>
-                          <Link href={`/blogs/${encodeURIComponent(blog.slug)}/`} title={blog.name}>
+                          <Link {...blogLink(blog.slug, blog.canonicalPath)} title={blog.name}>
                             <BlogIcon media={blog.slug} title={blog.name} />
                             <span>{blog.name}</span>
                           </Link>

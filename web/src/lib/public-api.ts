@@ -1,6 +1,7 @@
 import 'server-only';
 import { cache } from 'react';
 import type { AuthorCatalog, AuthorCatalogQuery, Blog, Catalog, CatalogQuery, Overview, Post } from './api';
+import { isPageKey, type PageKind, type PublicPageInfo, pageApiPath, pageInfoOf } from './page-links';
 import { authorApiPath, catalogApiPath } from './public-query';
 import { PublicGatewayError, readPublic } from './public-read';
 import { gatewayOrigin } from './server-gateway';
@@ -36,6 +37,17 @@ export async function publicJsonOrNull<T>(path: string): Promise<T | null> {
 export const overview = () => publicJson<Overview>('/api/overview');
 export const catalog = (query: CatalogQuery = {}) => publicJson<Catalog>(catalogApiPath(query));
 export const authorCatalog = (query: AuthorCatalogQuery = {}) => publicJson<AuthorCatalog>(authorApiPath(query));
+
+/**
+ * The page registry entry for a /blogs/<key>/ or /topics/<key>/ param: null for
+ * a key the registry could not have minted or the gateway's 404. `key` is the
+ * param as Next passed it (decoded once); it is never decoded again.
+ */
+export async function getPublicPage(kind: PageKind, key: string): Promise<PublicPageInfo | null> {
+  if (!isPageKey(kind, key)) return null;
+  // A 200 that pageInfoOf rejects already threw in readPublic (public-contracts.ts).
+  return pageInfoOf(kind, await publicJsonOrNull<unknown>(pageApiPath(kind, key)));
+}
 
 /** null only for the gateway's real 404; a 200 without `blog` already threw (public-contracts.ts). */
 export async function getBlog(slug: string): Promise<Blog | null> {

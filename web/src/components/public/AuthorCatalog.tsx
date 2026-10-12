@@ -7,6 +7,7 @@ import BlogIcon from '@/components/BlogIcon';
 import ReloadButton from '@/components/public/ReloadButton';
 import TableScroller from '@/components/TableScroller';
 import type { AuthorCatalog } from '@/lib/api';
+import { blogLink } from '@/lib/page-links';
 import { authorApiPath, authorQueryOf, isAuthorBaseline, isAuthorId } from '@/lib/public-query';
 import { table } from '@/lib/table-styles';
 import { asIs, usePublicJson } from '@/lib/use-public-json';
@@ -88,7 +89,7 @@ function AuthorRows({ data }: { data: AuthorCatalog }) {
                 <td className={table.cell}>
                   {a.blogSlug ? (
                     <Link
-                      href={`/blogs/${a.blogSlug}/`}
+                      {...blogLink(a.blogSlug, a.blogCanonicalPath)}
                       className="flex min-w-0 items-center gap-1.5 text-brand-700 hover:underline dark:text-brand-400"
                     >
                       <BlogIcon media={a.blogSlug} title={a.blogName} />
