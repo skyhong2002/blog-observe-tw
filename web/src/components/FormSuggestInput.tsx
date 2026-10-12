@@ -3,6 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { type Ref, useCallback, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
+import BlogIcon from '@/components/BlogIcon';
 import SuggestInput, { type Suggestion } from '@/components/SuggestInput';
 
 // SuggestInput for plain GET forms rendered by server components, which cannot
@@ -17,14 +18,22 @@ type TagRow = { slug: string; label: string };
 async function suggestionsFor(source: SuggestSource, typed: string, signal: AbortSignal): Promise<SuggestItem[]> {
   const response = await fetch('/api/overview', { signal });
   if (!response.ok) return [];
-  const data: { tags?: TagRow[] } = await response.json();
-  return (data.tags ?? [])
-    .filter((tag) => tag.label.toLocaleLowerCase().includes(typed.toLocaleLowerCase()))
-    .slice(0, 8)
-    .map((tag) => ({
-      value: tag.label,
-      href: source.go ? `/tags/?tag=${encodeURIComponent(tag.slug)}` : undefined,
+  const data: { tags?: TagRow[]; blogs?: Array<{ slug: string; name: string }> } = await response.json();
+  const needle = typed.toLocaleLowerCase();
+  const blogs: SuggestItem[] = (data.blogs ?? [])
+    .filter((blog) => blog.name.toLocaleLowerCase().includes(needle))
+    .slice(0, 4)
+    .map((blog) => ({
+      value: blog.name,
+      media: blog.slug,
+      hint: '部落格',
+      href: source.go ? `/blogs/${encodeURIComponent(blog.slug)}/` : undefined,
     }));
+  const tags: SuggestItem[] = (data.tags ?? [])
+    .filter((tag) => tag.label.toLocaleLowerCase().includes(needle))
+    .slice(0, 8 - blogs.length)
+    .map((tag) => ({ value: tag.label, hint: '標籤', href: source.go ? `/tags/?tag=${encodeURIComponent(tag.slug)}` : undefined }));
+  return [...blogs, ...tags];
 }
 
 export default function FormSuggestInput({
@@ -68,6 +77,7 @@ export default function FormSuggestInput({
         key: item.href ?? item.value,
         label: item.label ?? item.value,
         hint: item.hint,
+        icon: item.media ? <BlogIcon media={item.media} title={item.label ?? item.value} /> : undefined,
       }));
     },
     [sourceKey],

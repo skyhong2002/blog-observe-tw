@@ -11,3 +11,5 @@ components, home layout, source profile/sidebar/tabs, article/table/word-cloud
 components. See docs/frontend-parity.md for the porting inventory and differences.
 
 Copyright (c) 2026 Sky Hong
+
+Favicon caching and rendering ported from tools/fetch-favicons.ts, app/src/v1/icons.ts and web/src/components/MediaIcon.tsx at tag.observe.tw afe0a653fa8aae7e25a04a1d9fe87bf0400a2a39. Copyright (c) 2026 Sky Hong.

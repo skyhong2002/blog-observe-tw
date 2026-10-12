@@ -1,0 +1,15 @@
+[Unit]
+Description=Refresh blog favicon cache monthly
+After=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=%h/.t3/projects/blog-observe-tw
+EnvironmentFile=-%h/.config/blog-observe.env
+Environment=BLOG_FAVICON_ROOT=%h/.local/share/blog-observe/icons
+ExecStart=%h/.local/bin/node tools/fetch-favicons.ts --monthly --include-candidates
+Nice=10
+CPUQuota=25%
+MemoryMax=512M
+TimeoutStartSec=8h
+NoNewPrivileges=true

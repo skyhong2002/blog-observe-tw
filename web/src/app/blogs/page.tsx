@@ -1,5 +1,7 @@
 // Table layout copied from tag.observe.tw /media/ at afe0a65.
+
 import Link from 'next/link';
+import BlogIcon from '@/components/BlogIcon';
 import MediaTabs from '@/components/MediaTabs';
 import TableScroller from '@/components/TableScroller';
 import { type Blog, overview, taipei } from '@/lib/api';
@@ -157,7 +159,11 @@ export default async function BlogsPage({
               <tr key={blog.slug} className={table.row}>
                 <td className={table.lead}>
                   <div className={table.leadBox}>
-                    <Link href={`/blogs/${blog.slug}/`} className="font-medium text-brand-700 hover:underline dark:text-brand-400">
+                    <Link
+                      href={`/blogs/${blog.slug}/`}
+                      className="inline-flex items-center gap-1.5 font-medium text-brand-700 hover:underline dark:text-brand-400"
+                    >
+                      <BlogIcon media={blog.slug} title={blog.name} />
                       {blog.name}
                     </Link>
                     {blog.url && <p className={`${table.leadExtra} mt-1 max-w-60 truncate text-xs text-zinc-500`}>{blog.url}</p>}

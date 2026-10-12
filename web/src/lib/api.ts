@@ -4,6 +4,7 @@ export type Blog = {
   name: string;
   url?: string | null;
   category?: string | null;
+  iconUrl?: string | null;
   statusLabel?: string | null;
   description?: string | null;
   latestPosts?: Post[];

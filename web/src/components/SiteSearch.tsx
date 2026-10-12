@@ -29,7 +29,7 @@ export default function SiteSearch({ inputRef, onEscape, q = '', days = null }: 
           source={{ kind: 'tags', go: true }}
           name="q"
           type="search"
-          aria-label="搜尋所有文章的標題、摘要與標籤"
+          aria-label="搜尋文章標題、摘要、標籤與部落格"
           placeholder="搜尋文章"
           maxLength={60}
           required

@@ -6,6 +6,8 @@ import { dbLoginStore } from './auth/store.ts';
 import { createDb } from './db/client.ts';
 import { loadOverview } from './overview.js';
 import { createUiProxy } from './ui-proxy.js';
+import { iconManifest, registerFavicons } from './v1/favicon-routes.ts';
+import { iconUrl } from './v1/icons.ts';
 
 const esc = (value) =>
   String(value ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&apos;' })[c]);
@@ -32,6 +34,7 @@ export async function buildApp(config, { logger = false, store = null } = {}) {
       return typeof forwarded === 'string' && forwarded.length <= 64 ? forwarded : request.ip;
     },
   });
+  registerFavicons(app);
   for (const type of ['application/xml', 'text/xml', 'application/x-opml']) {
     app.addContentTypeParser(type, { parseAs: 'string', bodyLimit: 1024 * 1024 }, (_request, body, done) => done(null, body));
   }
@@ -83,7 +86,8 @@ export async function buildApp(config, { logger = false, store = null } = {}) {
       'SELECT id,slug,name,url,canonical_host AS canonicalHost,category,status,status_label AS statusLabel,description,last_crawled_at AS lastCrawledAt,last_crawl_success_at AS lastCrawlSuccessAt,last_published_at AS lastPublishedAt,expected_interval_hours AS expectedIntervalHours,stale_policy AS stalePolicy FROM blogs ORDER BY name LIMIT ?',
       [limit],
     );
-    return { blogs: rows };
+    const icons = await iconManifest();
+    return { blogs: rows.map((blog) => ({ ...blog, iconUrl: iconUrl(blog.slug, icons) })) };
   });
   app.get('/api/blogs/:slug', async (request, reply) => {
     const [blogs] = await pool.query(
@@ -106,7 +110,7 @@ export async function buildApp(config, { logger = false, store = null } = {}) {
        WHERE bt.blog_id=? AND bt.status='active' AND t.visibility='public' AND t.status='active' ORDER BY t.label`,
       [blogs[0].id],
     );
-    return { blog: { ...blogs[0], authors, tags }, posts };
+    return { blog: { ...blogs[0], iconUrl: iconUrl(blogs[0].slug, await iconManifest()), authors, tags }, posts };
   });
 
   const login = registerLogin(app, config.login ? dbLoginStore(own.db) : null, config.login);
@@ -242,7 +246,12 @@ export async function buildApp(config, { logger = false, store = null } = {}) {
        FROM discovery_candidates WHERE status=? ORDER BY discovered_at DESC LIMIT ?`,
       [status, limit],
     );
-    return { candidates: rows, status, reviewer: { id: admin.id, email: admin.email } };
+    const icons = await iconManifest();
+    return {
+      candidates: rows.map((candidate) => ({ ...candidate, iconUrl: iconUrl(`candidate-${candidate.id}`, icons) })),
+      status,
+      reviewer: { id: admin.id, email: admin.email },
+    };
   });
   app.post('/api/admin/discovery/review', async (request, reply) => {
     if (!sameOrigin(request, config.publicOrigin)) return reply.code(403).send({ error: 'same-origin requests only' });

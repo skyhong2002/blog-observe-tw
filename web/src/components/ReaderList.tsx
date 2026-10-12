@@ -1,6 +1,7 @@
 'use client';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
+import BlogIcon from '@/components/BlogIcon';
 import type { Follow } from '@/lib/api';
 export default function ReaderList() {
   const [follows, setFollows] = useState<Follow[] | null>(null);
@@ -63,7 +64,10 @@ export default function ReaderList() {
           {follows.map((blog) => (
             <li key={blog.slug}>
               <Link href={`/blogs/${blog.slug}/`} className="flex min-h-14 items-center justify-between gap-3 py-3">
-                <strong className="text-sm font-medium text-brand-700 dark:text-brand-400">{blog.name}</strong>
+                <strong className="inline-flex items-center gap-1.5 text-sm font-medium text-brand-700 dark:text-brand-400">
+                  <BlogIcon media={blog.slug} title={blog.name} />
+                  {blog.name}
+                </strong>
                 <span className="text-xs text-zinc-500">{blog.category ?? '未分類'}</span>
               </Link>
             </li>

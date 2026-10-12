@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import BlogIcon from '@/components/BlogIcon';
 import TableScroller from '@/components/TableScroller';
 import { overview } from '@/lib/api';
 import { table } from '@/lib/table-styles';
@@ -33,7 +34,11 @@ export default async function AuthorsPage({ searchParams }: { searchParams: Prom
                 <td className={table.cell}>{a.displayName}</td>
                 <td className={table.cell}>
                   {a.blogSlug ? (
-                    <Link href={`/blogs/${a.blogSlug}/`} className="text-brand-700 hover:underline dark:text-brand-400">
+                    <Link
+                      href={`/blogs/${a.blogSlug}/`}
+                      className="inline-flex items-center gap-1.5 text-brand-700 hover:underline dark:text-brand-400"
+                    >
+                      <BlogIcon media={a.blogSlug} title={a.blogName} />
                       {a.blogName}
                     </Link>
                   ) : (

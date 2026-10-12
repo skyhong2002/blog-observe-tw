@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import ArticleListItem from '@/components/ArticleListItem';
+import BlogIcon from '@/components/BlogIcon';
 import SectionTabs from '@/components/SectionTabs';
 import { type Blog, gateway, overview, type Post, type Tag } from '@/lib/api';
 export const dynamic = 'force-dynamic';
@@ -51,7 +52,11 @@ export default async function TagsPage({ searchParams }: { searchParams: Promise
               <ul className="mt-4 space-y-2">
                 {detail.blogs?.map((blog) => (
                   <li key={blog.slug}>
-                    <Link href={`/blogs/${blog.slug}/`} className="text-brand-700 hover:underline dark:text-brand-400">
+                    <Link
+                      href={`/blogs/${blog.slug}/`}
+                      className="inline-flex items-center gap-1.5 text-brand-700 hover:underline dark:text-brand-400"
+                    >
+                      <BlogIcon media={blog.slug} title={blog.name} />
                       {blog.name}
                     </Link>
                   </li>

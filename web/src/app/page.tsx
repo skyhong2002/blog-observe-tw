@@ -1,5 +1,7 @@
 // Layout and CSS copied from tag.observe.tw homepage at afe0a65; blog data replaces news-specific measures.
+
 import Link from 'next/link';
+import BlogIcon from '@/components/BlogIcon';
 import { overview, plainText, taipei } from '@/lib/api';
 import styles from './_home/home.module.css';
 import MastheadCloud from './_home/MastheadCloud';
@@ -46,7 +48,10 @@ export default async function HomePage() {
             {data.authors.slice(0, 8).map((author) => (
               <li key={`${author.id}-${author.blogSlug}`}>
                 <Link href={`/authors/?author=${author.id}`}>
-                  <span className={styles.journalistName}>{author.displayName}</span>
+                  <span className={`${styles.journalistName} inline-flex items-center gap-1.5`}>
+                    {author.blogSlug && <BlogIcon media={author.blogSlug} title={author.blogName} />}
+                    {author.displayName}
+                  </span>
                   <span className={styles.journalistCount}>{author.postCount ?? 0} 篇</span>
                 </Link>
               </li>
@@ -78,7 +83,10 @@ export default async function HomePage() {
                     </a>
                   </h3>
                   <p className={styles.source}>
-                    <Link href={`/blogs/${lead.blogSlug}/`}>{lead.blogName}</Link>
+                    <Link href={`/blogs/${lead.blogSlug}/`} className="inline-flex items-center gap-1.5">
+                      {lead.blogSlug && <BlogIcon media={lead.blogSlug} title={lead.blogName} />}
+                      {lead.blogName}
+                    </Link>
                     <span>· {taipei(lead.publishedAt)}</span>
                   </p>
                   <p className="line-clamp-5 text-sm leading-7 text-zinc-600 dark:text-zinc-400">{plainText(lead.summary)}</p>
@@ -107,7 +115,10 @@ export default async function HomePage() {
                         </a>
                       </h3>
                       <p className={styles.source}>
-                        <Link href={`/blogs/${post.blogSlug}/`}>{post.blogName}</Link>
+                        <Link href={`/blogs/${post.blogSlug}/`} className="inline-flex items-center gap-1.5">
+                          {post.blogSlug && <BlogIcon media={post.blogSlug} title={post.blogName} />}
+                          {post.blogName}
+                        </Link>
                         <span>· {taipei(post.publishedAt)}</span>
                       </p>
                     </div>
@@ -161,7 +172,10 @@ export default async function HomePage() {
               .map((blog) => (
                 <article className={styles.headlineCard} key={blog.slug}>
                   <h3>
-                    <Link href={`/blogs/${blog.slug}/`}>{blog.name}</Link>
+                    <Link href={`/blogs/${blog.slug}/`} className="inline-flex items-center gap-1.5">
+                      <BlogIcon media={blog.slug} title={blog.name} />
+                      {blog.name}
+                    </Link>
                   </h3>
                   <div className={styles.headlineSource}>
                     <p className={styles.headlineByline}>

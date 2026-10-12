@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import BlogIcon from '@/components/BlogIcon';
 
 type Candidate = {
   id: number;
@@ -117,7 +118,12 @@ export default function DiscoveryReview() {
                 }
               />
               <span>
-                <strong>{item.name || item.url}</strong>
+                <strong>
+                  <span className="inline-flex items-center gap-1.5">
+                    <BlogIcon media={`candidate-${item.id}`} title={item.name || item.url} />
+                    {item.name || item.url}
+                  </span>
+                </strong>
                 <small>{item.url}</small>
                 <small>
                   {item.sourceType} · {item.sourceUrl || '來源頁待補'}

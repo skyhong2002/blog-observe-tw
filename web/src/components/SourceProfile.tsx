@@ -1,5 +1,7 @@
 // Profile grid and sidebar copied from tag.observe.tw /media/[media]/ (afe0a65).
+
 import Link from 'next/link';
+import BlogIcon from '@/components/BlogIcon';
 import { type Blog, taipei } from '@/lib/api';
 import ArticleListItem from './ArticleListItem';
 import FollowButton from './follow-button';
@@ -25,6 +27,7 @@ export default function SourceProfile({ blog, query = '' }: { blog: Blog; query?
       <header className="mb-4 flex flex-wrap items-center justify-between gap-x-6 gap-y-3 border-b border-zinc-300 pb-4 dark:border-zinc-700">
         <div>
           <div className="flex flex-wrap items-center gap-2.5">
+            <BlogIcon media={blog.slug} title={blog.name} size={32} className="rounded" />
             <h1 className="text-2xl font-semibold tracking-tight">{blog.name}</h1>
             <FollowButton slug={blog.slug} />
           </div>
@@ -144,7 +147,10 @@ export default function SourceProfile({ blog, query = '' }: { blog: Blog; query?
           {posts.length ? (
             <ul className="divide-y divide-zinc-200 dark:divide-zinc-800">
               {posts.map((post) => (
-                <ArticleListItem key={post.id ?? post.guid ?? post.url} post={post} />
+                <ArticleListItem
+                  key={post.id ?? post.guid ?? post.url}
+                  post={{ ...post, blogSlug: post.blogSlug ?? blog.slug, blogName: post.blogName ?? blog.name }}
+                />
               ))}
             </ul>
           ) : (

@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import ArticleThumbnail from '@/components/ArticleThumbnail';
+import BlogIcon from '@/components/BlogIcon';
 import SourceLink from '@/components/SourceLink';
 import { type Post, plainText, taipei } from '@/lib/api';
 
@@ -48,8 +49,9 @@ export default function ArticleListItem({ post }: { post: Post }) {
             {showMedia && article.media && (
               <Link
                 href={`/blogs/${encodeURIComponent(article.media)}/`}
-                className="font-medium text-brand-700 hover:underline dark:text-brand-400"
+                className="inline-flex items-center gap-1.5 font-medium text-brand-700 hover:underline dark:text-brand-400"
               >
+                <BlogIcon media={article.media} title={article.mediaTitle} />
                 {article.mediaTitle}
               </Link>
             )}
