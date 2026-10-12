@@ -6,7 +6,7 @@ GitHub `skyhong2002/blog-observe-tw` 的 `main` 是整合與正式發版來源�
 
 2026-10-12 收尾查核：GitHub main 原已包含 `06fa126`，本機 main 從 `696c39b` 以 `git merge --ff-only origin/main` 同步至 `06fa126`，未重寫歷史。`feat/tag-frontend-parity` 已完整納入 main；其 worktree `/home/deck/.cache/blog-frontend-parity` 保留作歷史比較，不再作開發或發版入口。
 
-正式三服務目前使用 `/home/deck/.local/share/blog-observe/releases/c09ddae4cce558e36af5e4404ca63713183ceefe`，不是功能分支工作目錄。`c09ddae` 是 main 的祖先；`06fa126` 與後續本次收尾 commit 僅補充文件，不需要重啟正式服務。詳細驗收見 [部署紀錄](deployment-2026-10-12.md)。
+正式三服務已更新至 `/home/deck/.local/share/blog-observe/releases/9400b6a4a54fb0ae34ad22fd7158241cc63bc276`，由 fetch 後的遠端 main 乾淨 worktree 安裝、建置與驗證。前版 `4315a6ad713dcf37c74cfe0096b0d367e26bd3be` 與先前 `c09ddae4cce558e36af5e4404ca63713183ceefe` 及其四個服務 drop-in 內容保留供回滾。此次為種子網址驗證／文章來源收錄更新，詳見 [種子處理與部署紀錄](seed-resolution-2026-10-12.md)；早期版本見 [先前部署紀錄](deployment-2026-10-12.md)。
 
 後續一般修改回到本機 main；多人並行時，先 fetch，再從遠端 main 建立短期功能分支／獨立 worktree。完成測試與 review 後合併回 main 並 push，才準備正式 release。不要對有未提交修改的共享 checkout 執行 pull、reset 或強制切換；保留現場，使用獨立 worktree。main 若分岔，先整合衝突，不以 force push 解決。
 

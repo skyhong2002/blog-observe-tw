@@ -10,6 +10,7 @@ import {
   parseFeed,
   parseSitemap,
   politeFetch,
+  rankedSitemapUrls,
   readFeedBody,
   validateCrawlUrl,
 } from './feed.ts';
@@ -348,4 +349,16 @@ describe('bounded compressed XML sources', () => {
     await expect(readFeedBody(new Response(Buffer.from([0x1f, 0x8b, 0, 0])))).rejects.toThrow('invalid gzip feed response');
     await expect(readFeedBody(new Response('x'.repeat(MAX_RESPONSE_BYTES + 1)))).rejects.toThrow('crawl response exceeds');
   });
+});
+
+it('defensively ignores malformed or unsafe direct sitemap ranking inputs', () => {
+  expect(
+    rankedSitemapUrls([
+      'https://rank-safe.test/misc.xml',
+      'http://[',
+      '/relative.xml',
+      'http://127.0.0.1/private.xml',
+      'https://rank-safe.test/post.xml',
+    ]),
+  ).toEqual(['https://rank-safe.test/post.xml', 'https://rank-safe.test/misc.xml']);
 });
