@@ -239,12 +239,14 @@ describe('private route cache boundaries', () => {
       // @ts-expect-error JS gateway's injected store default is inferred as null.
       { store: { pool: { query: async () => [[]] } } },
     );
+    const warnings = vi.spyOn(app.log, 'warn');
     try {
-      for (const url of ['/api/me/follows', '/me/feed.xml', '/me/opml']) {
+      for (const url of ['/api/me/follows', '/me/feed.xml', '/me/opml', '/me/feed.xml?_rsc=reader-prefetch']) {
         const r = await app.inject(url);
         expect(r.statusCode).toBe(401);
         expect(r.headers['cache-control']).toBe('private, no-store');
       }
+      expect(warnings.mock.calls.flat().map(String).join(' ')).not.toContain('already sent');
       expect((await app.inject('/auth/me')).headers['cache-control']).toBe('private, no-store');
       expect((await app.inject('/api/topics?days=1')).headers['cache-control']).toBe('no-store');
     } finally {

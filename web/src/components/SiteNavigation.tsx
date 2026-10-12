@@ -1,10 +1,10 @@
 'use client';
 
-import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { NAV_GROUPS } from '@/lib/site-nav';
 import NavPending from './NavPending';
+import Link from './NoPrefetchLink';
 
 export default function SiteNavigation() {
   const pathname = usePathname();

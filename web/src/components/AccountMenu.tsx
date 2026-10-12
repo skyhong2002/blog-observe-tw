@@ -1,10 +1,10 @@
 'use client';
 
-import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { loginHref, useSession } from '@/lib/session';
 import Avatar from './Avatar';
+import Link from './NoPrefetchLink';
 
 const READER_LINKS = [
   ['/my/', '我的追蹤'],

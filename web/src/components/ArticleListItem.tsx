@@ -1,6 +1,6 @@
-import Link from 'next/link';
 import ArticleThumbnail from '@/components/ArticleThumbnail';
 import BlogIcon from '@/components/BlogIcon';
+import Link from '@/components/NoPrefetchLink';
 import SourceLink from '@/components/SourceLink';
 import { type Post, plainText, taipei } from '@/lib/api';
 import { blogLink } from '@/lib/page-links';

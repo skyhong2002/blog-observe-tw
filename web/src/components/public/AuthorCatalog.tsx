@@ -1,9 +1,10 @@
 'use client';
+
 // One view for the prerendered author list and the browser's ?author=&page=&limit=; see app/authors/page.tsx.
 
-import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import BlogIcon from '@/components/BlogIcon';
+import Link from '@/components/NoPrefetchLink';
 import ReloadButton from '@/components/public/ReloadButton';
 import TableScroller from '@/components/TableScroller';
 import type { AuthorCatalog } from '@/lib/api';

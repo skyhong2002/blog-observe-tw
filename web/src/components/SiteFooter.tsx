@@ -1,10 +1,10 @@
-import Link from 'next/link';
 import { Suspense } from 'react';
 import { catalog } from '@/lib/public-api';
 import { METHOD_HREF } from '@/lib/site-nav';
 import BackToTop from './BackToTop';
 import FooterMethod from './FooterMethod';
 import InstallApp from './InstallApp';
+import Link from './NoPrefetchLink';
 import Wordmark from './Wordmark';
 
 // The one footer for every page: this page's 資料來源與計算方式, then a full-width

@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import Link from '@/components/NoPrefetchLink';
 export default function NotFound() {
   return (
     <section className="space-y-4 py-12">

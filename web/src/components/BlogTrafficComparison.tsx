@@ -1,13 +1,14 @@
 'use client';
+
 // Table, controls and URL state ported from tag.observe.tw components/TrafficComparison.tsx
 // and the state column of TrafficCollectionTable.tsx (afe0a65); renamed for blogs.
 // Columns tag reads from other sources (crawl counts, Taiwan share edits, Radar,
 // traffic channels) are left out until the blog gateway provides them.
 
-import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import BlogIcon from '@/components/BlogIcon';
 import BlogTrafficTrend from '@/components/BlogTrafficTrend';
+import Link from '@/components/NoPrefetchLink';
 import SortIndicator from '@/components/SortIndicator';
 import TableScroller from '@/components/TableScroller';
 import TrafficSparkline from '@/components/TrafficSparkline';

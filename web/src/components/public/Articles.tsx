@@ -1,9 +1,10 @@
 'use client';
+
 // One view for the prerendered latest-articles list and the browser's ?q=&page=&blog= search; see app/articles/page.tsx.
 
-import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import ArticleListItem from '@/components/ArticleListItem';
+import Link from '@/components/NoPrefetchLink';
 import SectionTabs from '@/components/SectionTabs';
 import { type Post, taipei } from '@/lib/api';
 import { blogHref } from '@/lib/page-links';

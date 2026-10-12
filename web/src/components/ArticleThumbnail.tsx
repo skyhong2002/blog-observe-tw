@@ -1,8 +1,8 @@
 'use client';
 
-import Link from 'next/link';
 import { useState } from 'react';
 import { articleImage, type ImageState } from '@/lib/images';
+import Link from './NoPrefetchLink';
 import SafeImage from './SafeImage';
 
 /** Optional list thumbnail. No valid image, or a failed load, removes the link

@@ -1,12 +1,12 @@
 'use client';
 
-import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Suspense, useEffect, useRef, useState } from 'react';
 import AccountMenu from './AccountMenu';
 import NavPending, { LinkClickPending, NavPendingContext, NavProgressBar } from './NavPending';
+import Link from './NoPrefetchLink';
 import SiteNavigation from './SiteNavigation';
-import SiteSearch, { isSearchPage, SiteSearchFromUrl } from './SiteSearch';
+import SiteSearch, { SiteSearchFromUrl } from './SiteSearch';
 import ThemeToggle from './ThemeToggle';
 import Wordmark from './Wordmark';
 
@@ -67,10 +67,10 @@ export default function SiteHeader() {
   // While the wordmark is hidden, phones show the search box in the space it
   // would take instead of a bare bar; it folds back into an icon once the
   // wordmark returns. An explicit open outlives that.
-  // The results page has no search box of its own, so phones keep this one
-  // open there (without focusing it, which would pop the keyboard).
-  const onResults = isSearchPage(usePathname());
-  const autoSearch = (!revealed || onResults) && !searchOpen;
+  // Unlike tag's /search/, the results page (/articles/) has its own search
+  // form, so phones keep the header's as an icon there too: next to the
+  // wordmark, theme, login and menu an open box is left ~80px wide.
+  const autoSearch = !revealed && !searchOpen;
   const searchToggle = useRef<HTMLButtonElement>(null);
   const searchInput = useRef<HTMLInputElement>(null);
   useEffect(() => {

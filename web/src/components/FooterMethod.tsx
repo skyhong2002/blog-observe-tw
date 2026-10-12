@@ -1,8 +1,8 @@
 'use client';
 
-import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { METHOD_HREF } from '@/lib/site-nav';
+import Link from './NoPrefetchLink';
 
 const inlineLink = 'text-brand-700 underline underline-offset-2 dark:text-brand-400';
 

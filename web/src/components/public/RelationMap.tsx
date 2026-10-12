@@ -1,10 +1,11 @@
 'use client';
+
 // One view for the prerendered 90-day relation map and the browser's ?days=7|30; see app/relations/page.tsx.
 
-import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import BlogIcon from '@/components/BlogIcon';
 import BlogRelationGraph from '@/components/BlogRelationGraph';
+import Link from '@/components/NoPrefetchLink';
 import SectionTabs from '@/components/SectionTabs';
 import { taipei } from '@/lib/api';
 import { blogLink } from '@/lib/page-links';

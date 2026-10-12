@@ -1,8 +1,8 @@
 // Profile grid and sidebar copied from tag.observe.tw /media/[media]/ (afe0a65).
 
-import Link from 'next/link';
 import { type ReactNode, Suspense } from 'react';
 import BlogIcon from '@/components/BlogIcon';
+import Link from '@/components/NoPrefetchLink';
 import ProfilePostsView, { ProfilePostsFromUrl } from '@/components/public/ProfilePosts';
 import { type Blog, taipei } from '@/lib/api';
 import { blogHref } from '@/lib/page-links';

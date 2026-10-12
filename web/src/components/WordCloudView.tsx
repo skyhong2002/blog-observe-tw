@@ -1,9 +1,9 @@
 'use client';
 
-import Link from 'next/link';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { pictureBox } from '@/lib/word-cloud.mts';
 import { markPreviewClick } from './NavPending';
+import Link from './NoPrefetchLink';
 import styles from './WordCloudView.module.css';
 
 // Draws word clouds laid out on the server (WordCloud) and opens a card with a

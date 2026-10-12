@@ -1,6 +1,6 @@
-import Link from 'next/link';
 import { publicJsonOrNull } from '@/lib/public-api';
 import { type Relations, shareExplanation } from '@/lib/relations';
+import Link from './NoPrefetchLink';
 import RelationLists from './RelationLists';
 export default async function BlogRelations({ slug }: { slug: string }) {
   const data = await publicJsonOrNull<Relations>(`/api/blogs/${encodeURIComponent(slug)}/relations?days=90`);

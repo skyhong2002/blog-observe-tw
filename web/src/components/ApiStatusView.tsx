@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { table } from '@/lib/table-styles';
-import TableScroller from './TableScroller';
 
 // The gateway's public status metadata (GET /api/status, Accept: application/json).
 // Only a validated `status: 'ok'` reads as healthy; anything else is shown as a failure.
@@ -128,11 +127,14 @@ export default function ApiStatusView() {
           <h2 id="endpoints" className="text-lg font-semibold">
             端點用途
           </h2>
-          <TableScroller card label="API 端點用途表格，可左右捲動">
-            <table className="w-full min-w-[30rem] whitespace-nowrap text-sm">
-              <thead className="bg-zinc-50 text-left text-xs text-zinc-600 dark:bg-zinc-950 dark:text-zinc-400">
+          {/* A two-column text table: phones stack each row (table-stack) so the
+              full path stays readable, instead of truncating it in a sideways scroller. */}
+          <div className="overflow-hidden rounded-xl border border-zinc-300 bg-white px-4 sm:px-0 dark:border-zinc-800 dark:bg-zinc-900">
+            {/* -mt-px tucks the first stacked row's top rule under the card's own border. */}
+            <table className={`w-full text-left text-sm max-sm:-mt-px ${table.stack}`}>
+              <thead className="bg-zinc-50 text-xs text-zinc-600 dark:bg-zinc-950 dark:text-zinc-400">
                 <tr>
-                  <th scope="col" className={table.leadHead}>
+                  <th scope="col" className={table.cell}>
                     端點
                   </th>
                   <th scope="col" className={table.cell}>
@@ -142,24 +144,18 @@ export default function ApiStatusView() {
               </thead>
               <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
                 {data.endpoints.map((endpoint) => (
-                  <tr key={endpoint.path} className={table.row}>
-                    <td className={table.lead}>
-                      <div className={table.leadBox}>
-                        <span className={`${table.leadText} block font-mono text-[13px] sm:max-w-80`} title={endpoint.path}>
-                          {endpoint.path}
-                        </span>
-                      </div>
+                  <tr key={endpoint.path}>
+                    <td className={`${table.cell} font-mono text-[13px] break-all sm:whitespace-nowrap`} data-label="端點">
+                      {endpoint.path}
                     </td>
-                    <td className={`${table.cell} whitespace-nowrap`}>
-                      <span className="block max-w-[28rem] truncate" title={endpoint.summary}>
-                        {endpoint.summary}
-                      </span>
+                    <td className={table.cell} data-label="用途">
+                      {endpoint.summary}
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
-          </TableScroller>
+          </div>
         </section>
       )}
     </>

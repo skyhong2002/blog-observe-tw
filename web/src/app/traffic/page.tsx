@@ -1,6 +1,7 @@
 // Layout follows tag.observe.tw /media/traffic/ (afe0a65), adapted for blogs.
-import Link from 'next/link';
+
 import MediaTabs from '@/components/MediaTabs';
+import Link from '@/components/NoPrefetchLink';
 import SimilarwebTraffic from '@/components/SimilarwebTraffic';
 import { staticPageMetadata } from '@/lib/seo';
 

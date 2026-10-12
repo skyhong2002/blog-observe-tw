@@ -1,11 +1,12 @@
 'use client';
+
 // A blog profile's newest posts with its in-page ?q= filter (title and summary
 // of the posts already on the page). The profile is prerendered without a
 // query; the filter is applied in the browser.
 
-import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import ArticleListItem from '@/components/ArticleListItem';
+import Link from '@/components/NoPrefetchLink';
 import type { Post } from '@/lib/api';
 import { blogHref } from '@/lib/page-links';
 import { profileQueryOf } from '@/lib/public-query';

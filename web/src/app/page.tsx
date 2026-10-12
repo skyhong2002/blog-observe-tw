@@ -1,7 +1,7 @@
 // Layout and CSS copied from tag.observe.tw homepage at afe0a65; blog data replaces news-specific measures.
 
-import Link from 'next/link';
 import BlogIcon from '@/components/BlogIcon';
+import Link from '@/components/NoPrefetchLink';
 import { plainText, taipei } from '@/lib/api';
 import { recentBlogRows } from '@/lib/home';
 import { externalHref } from '@/lib/images';

@@ -1,8 +1,9 @@
 'use client';
+
 // One view for the prerendered 30-day ranking and the browser's ?days=7|90; see app/topics/page.tsx.
 
-import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
+import Link from '@/components/NoPrefetchLink';
 import SectionTabs from '@/components/SectionTabs';
 import TableScroller from '@/components/TableScroller';
 import VocabularyNotice from '@/components/VocabularyNotice';

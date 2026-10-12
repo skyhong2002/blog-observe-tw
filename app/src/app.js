@@ -208,7 +208,7 @@ export async function buildApp(config, { logger = false, store = null } = {}) {
   };
   app.get('/api/me/follows', async (request, reply) => {
     const user = await requireUser(request, reply);
-    if (!user) return;
+    if (!user) return reply;
     const [follows] = await pool.query(
       "SELECT b.slug,b.name,b.url,b.category FROM user_follows f JOIN blogs b ON b.id=f.blog_id WHERE f.user_id=? AND b.status='verified' ORDER BY b.name",
       [user.id],
@@ -222,7 +222,7 @@ export async function buildApp(config, { logger = false, store = null } = {}) {
     handler: async (request, reply) => {
       if (!sameOrigin(request, config.publicOrigin)) return reply.code(403).send({ error: 'same-origin requests only' });
       const user = await requireUser(request, reply);
-      if (!user) return;
+      if (!user) return reply;
       const [blogs] = await pool.query(
         `SELECT id FROM blogs WHERE slug=? ${request.method === 'POST' ? "AND status='verified'" : ''} LIMIT 1`,
         [request.params.slug],
@@ -240,7 +240,7 @@ export async function buildApp(config, { logger = false, store = null } = {}) {
   });
   app.get('/me/feed.xml', async (request, reply) => {
     const user = await requireUser(request, reply);
-    if (!user) return;
+    if (!user) return reply;
     const [items] = await pool.query(
       "SELECT p.guid,p.title,p.url,p.summary,p.published_at AS publishedAt FROM posts p JOIN blogs b ON b.id=p.blog_id JOIN user_follows f ON f.blog_id=p.blog_id WHERE f.user_id=? AND b.status='verified' AND (p.published_at IS NULL OR p.published_at<=UTC_TIMESTAMP()) ORDER BY COALESCE(p.published_at,p.updated_at,p.created_at) DESC LIMIT 100",
       [user.id],
@@ -251,7 +251,7 @@ export async function buildApp(config, { logger = false, store = null } = {}) {
   });
   app.get('/me/opml', async (request, reply) => {
     const user = await requireUser(request, reply);
-    if (!user) return;
+    if (!user) return reply;
     const [follows] = await pool.query(
       "SELECT b.name,b.url,(SELECT fs.url FROM feed_sources fs WHERE fs.blog_id=b.id AND fs.last_success_at IS NOT NULL AND fs.type IN ('rss','atom') ORDER BY fs.last_success_at DESC,fs.id LIMIT 1) AS feedUrl FROM user_follows f JOIN blogs b ON b.id=f.blog_id WHERE f.user_id=? AND b.status='verified' ORDER BY b.name",
       [user.id],
@@ -273,7 +273,7 @@ export async function buildApp(config, { logger = false, store = null } = {}) {
   app.post('/api/me/opml', async (request, reply) => {
     if (!sameOrigin(request, config.publicOrigin)) return reply.code(403).send({ error: 'same-origin requests only' });
     const user = await requireUser(request, reply);
-    if (!user) return;
+    if (!user) return reply;
     const xml = typeof request.body === 'string' ? request.body : '';
     if (xml.length > 1024 * 1024) return reply.code(413).send({ error: 'OPML too large' });
     const $ = cheerio.load(xml, { xmlMode: true });

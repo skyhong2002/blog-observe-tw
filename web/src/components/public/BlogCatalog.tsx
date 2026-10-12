@@ -1,12 +1,13 @@
 'use client';
+
 // Table layout copied from tag.observe.tw /media/ at afe0a65.
 // One view for both the prerendered catalog (no query) and the browser's own
 // query; see app/blogs/page.tsx.
 
-import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import BlogIcon from '@/components/BlogIcon';
 import MediaTabs from '@/components/MediaTabs';
+import Link from '@/components/NoPrefetchLink';
 import ReloadButton from '@/components/public/ReloadButton';
 import TableScroller from '@/components/TableScroller';
 import { type Catalog, taipei } from '@/lib/api';

@@ -1,8 +1,8 @@
-import Link from 'next/link';
 import { taipei } from '@/lib/api';
 import { blogLink } from '@/lib/page-links';
 import { type RelationEdge, type RelationNode, shareExplanation, shareLabel, sharePercent } from '@/lib/relations';
 import BlogIcon from './BlogIcon';
+import Link from './NoPrefetchLink';
 export default function RelationLists({
   title,
   edges,

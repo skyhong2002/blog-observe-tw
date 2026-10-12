@@ -1,10 +1,11 @@
 'use client';
+
 // One view for the prerendered tag list and the browser's ?tag=; see app/tags/page.tsx.
 
-import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import ArticleListItem from '@/components/ArticleListItem';
 import BlogIcon from '@/components/BlogIcon';
+import Link from '@/components/NoPrefetchLink';
 import SectionTabs from '@/components/SectionTabs';
 import type { Blog, Overview, Post, Tag } from '@/lib/api';
 import { blogLink } from '@/lib/page-links';

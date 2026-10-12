@@ -1,6 +1,6 @@
 // Adapted from tag.observe.tw web/src/app/(site)/observe/opt-out/page.tsx, MIT, Copyright (c) 2026 Sky Hong.
 import type { Metadata } from 'next';
-import Link from 'next/link';
+import Link from '@/components/NoPrefetchLink';
 import { SITE_NAME } from '@/lib/seo';
 import OptOutToggle from './OptOutToggle';
 

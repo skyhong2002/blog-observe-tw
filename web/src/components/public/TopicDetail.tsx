@@ -1,11 +1,12 @@
 'use client';
+
 // One view for a prerendered (on demand) 30-day topic page and the browser's ?days=7|90; see app/topics/[id]/page.tsx.
 // A period without articles shows the topic's history (past matches) instead, when the payload has one.
 
-import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { useState } from 'react';
 import BlogIcon from '@/components/BlogIcon';
+import Link from '@/components/NoPrefetchLink';
 import SectionTabs from '@/components/SectionTabs';
 import VocabularyNotice from '@/components/VocabularyNotice';
 import { taipei } from '@/lib/api';

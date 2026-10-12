@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import Link from '@/components/NoPrefetchLink';
 import { staticPageMetadata } from '@/lib/seo';
 
 export const metadata = staticPageMetadata('/about/');

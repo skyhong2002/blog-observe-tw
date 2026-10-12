@@ -1,7 +1,7 @@
-import Link from 'next/link';
 import { topicLink } from '@/lib/page-links';
 import { publicJsonOrNull } from '@/lib/public-api';
 import type { Topics } from '@/lib/topics';
+import Link from './NoPrefetchLink';
 export default async function BlogTopics({ slug }: { slug: string }) {
   const data = await publicJsonOrNull<Topics>(`/api/blogs/${encodeURIComponent(slug)}/topics?days=90`);
   return (

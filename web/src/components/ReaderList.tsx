@@ -1,9 +1,9 @@
 'use client';
-import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import BlogIcon from '@/components/BlogIcon';
 import type { Follow } from '@/lib/api';
 import { blogHref } from '@/lib/page-links';
+import Link from './NoPrefetchLink';
 export default function ReaderList() {
   const [follows, setFollows] = useState<Follow[] | null>(null);
   const [state, setState] = useState<'loading' | 'ready' | 'login' | 'error'>('loading');

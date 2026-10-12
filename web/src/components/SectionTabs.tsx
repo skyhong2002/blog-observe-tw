@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import Link from './NoPrefetchLink';
 
 export default function SectionTabs({
   label,

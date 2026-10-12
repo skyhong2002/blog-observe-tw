@@ -1,6 +1,5 @@
-import Link from 'next/link';
-
 import Logo from '@/components/Logo';
+import Link from '@/components/NoPrefetchLink';
 import WordCloud from '@/components/WordCloud';
 import type { Overview } from '@/lib/api';
 

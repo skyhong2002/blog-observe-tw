@@ -2,7 +2,7 @@
 // Traffic channels (direct/referral/search/social), engagement and Taiwan-share
 // edits are omitted: the blog gateway does not provide them.
 
-import Link from 'next/link';
+import Link from '@/components/NoPrefetchLink';
 import TrafficSparkline from '@/components/TrafficSparkline';
 import {
   categoryName,
