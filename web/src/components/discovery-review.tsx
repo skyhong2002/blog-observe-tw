@@ -39,6 +39,12 @@ function evidenceText(value: Candidate['sourceEvidence']) {
     feed_entries_outside_publication: 'RSS 混有其他站點文章',
     robots_disallowed: 'robots 或來源存取規則限制',
     homepage_http_403: '來源拒絕存取（403）',
+    homepage_http_404: '找不到候選首頁（404）',
+    homepage_http_410: '來源已移除首頁（410）',
+    homepage_http_500: '來源暫時發生錯誤（500）',
+    fetch_failed: '來源連線或讀取失敗，保留待重試',
+    redirect_not_publication_home: '轉址後不是可確認的部落格首頁',
+    unsafe_xml: 'RSS 格式未通過安全檢查',
     empty_feed: 'RSS 尚無可驗證文章',
     timeout: '來源回應逾時，保留待重試',
   };

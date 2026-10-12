@@ -3,6 +3,8 @@ import * as cheerio from 'cheerio';
 import Fastify, { LogController } from 'fastify';
 import { registerLogin } from './auth/google-login.ts';
 import { dbLoginStore } from './auth/store.ts';
+import { loadCatalog } from './catalog.js';
+import { loadAuthorCatalog } from './catalog-authors.js';
 import { createDb } from './db/client.ts';
 import { loadOverview } from './overview.js';
 import { createUiProxy } from './ui-proxy.js';
@@ -57,6 +59,26 @@ export async function buildApp(config, { logger = false, store = null } = {}) {
     version: '0.3.0',
     uptimeSeconds: Math.floor((Date.now() - startedAt) / 1000),
   }));
+
+  app.get('/api/catalog/authors', async (request, reply) => {
+    reply.header('cache-control', 'public, max-age=30');
+    try {
+      return await loadAuthorCatalog(pool, request.query);
+    } catch (error) {
+      reply.header('cache-control', 'no-store');
+      if (error.code === 'INVALID_AUTHOR') return reply.code(400).send({ error: 'invalid author id' });
+      return reply.code(503).send({ error: 'authors unavailable' });
+    }
+  });
+
+  app.get('/api/catalog', async (request, reply) => {
+    reply.header('cache-control', 'public, max-age=30');
+    try {
+      return await loadCatalog(pool, request.query);
+    } catch {
+      return reply.header('cache-control', 'no-store').code(503).send({ error: 'catalog unavailable' });
+    }
+  });
 
   app.get('/api/overview', async (_request, reply) => {
     reply.header('cache-control', 'public, max-age=30');

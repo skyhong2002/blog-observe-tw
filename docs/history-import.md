@@ -18,7 +18,9 @@ node --env-file-if-exists=.env tools/crawl-history.ts --blogs 5 --duration-ms 60
 - RSS/Atom 的 `rel=next`（XML 與 HTTP Link）；Blogger OpenSearch 明確總量／游標。
 - WordPress 首頁 API discovery 或 feed generator 所指示的公開 REST posts 分頁；只讀公開已發佈 `post`，不登入、不走管理 API。沒有總頁數 header 時逐頁走到空頁或明確 `rest_post_invalid_page_number`。
 - Sitemap index 所有合法分片，再把每個 URL 存成獨立待辦。每個 HTML 都必須具有相符 `Article` / `BlogPosting` / `NewsArticle` 或 `og:type=article` 才寫入；商品、分類與推薦區塊不是文章。XML gzip 同樣受 5 MiB 解壓上限限制。
-- 所有文章、子 sitemap、redirect 與下一頁都限制在同一出版者；Medium／vocus 等共用網域保留作者路徑，已登記的外部 feed 只允許在既有 feed 路徑調整 query。留言 feed 與 comment anchor 不會當文章。
+- WordPress oEmbed XML（含舊 feed_sources 遺留）不是 RSS，不抓取、不當歷史來源；已有待辦記錄 non-syndication-source 後繼續。錯誤僅保存 timeout、bodylimit、XML／JSON／gzip、已知 SQL code 等固定分類，不記錄原始錯誤中的 SQL／URL／憑證。
+
+所有文章、子 sitemap、redirect 與下一頁都限制在同一出版者；Medium／vocus 等共用網域保留作者路徑，已登記的外部 feed 只允許在既有 feed 路徑調整 query。留言 feed 與 comment anchor 不會當文章。
 
 未提供可列舉歷史的站只能收錄公開可發現的資料；不猜測私人 API 或日期 URL。網頁、來源不同格式可能提供同篇文章：共用 writer 在鎖定 blog row 的交易內依 canonical URL 找原有 GUID，避免 RSS GUID 與 sitemap URL 產生重複文章。空白日期、摘要、作者與圖片不覆蓋既有有效資料，預設「未命名文章」不覆蓋既有標題；content hash 由合併後實際內容重算。作者最後發文時間取較新值。資料庫以非唯一 `(blog_id,url(512))` prefix index 加速精確 URL 查找，不改 URL 相等語意。Sitemap lastmod 只作更新時間，絕不當發文時間。
 

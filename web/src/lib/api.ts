@@ -58,6 +58,33 @@ export type Overview = {
   totals: { blogs: number; posts: number };
   updatedAt: string | null;
 };
+export type CatalogQuery = { q?: string; category?: string; status?: string; sort?: string; dir?: string; page?: string; limit?: string };
+export type Catalog = {
+  blogs: Blog[];
+  totals: { blogs: number; posts: number; withUrls: number; authors: number };
+  categories: Array<{ value: string; count: number }>;
+  statuses: Array<{ value: string; count: number }>;
+  updatedAt: string | null;
+  pagination: { page: number; pages: number; pageSize: number; total: number };
+  filters: {
+    q: string;
+    category: string;
+    status: string;
+    sort: 'name' | 'category' | 'posts' | 'latest' | 'crawl' | 'status';
+    dir: 'asc' | 'desc';
+    page: number;
+    limit: number;
+  };
+};
+export async function catalog(query: CatalogQuery): Promise<Catalog> {
+  const params = new URLSearchParams();
+  for (const key of ['q', 'category', 'status', 'sort', 'dir', 'page', 'limit'] as const) {
+    if (typeof query[key] === 'string') params.set(key, query[key]);
+  }
+  const data = await gateway<Catalog>(`/api/catalog?${params}`);
+  if (!data) throw new Error('Blog catalog unavailable');
+  return data;
+}
 function origin() {
   return process.env.BLOG_GATEWAY_INTERNAL_URL ?? 'http://127.0.0.1:18160';
 }
@@ -104,4 +131,22 @@ export function plainText(value?: string | null) {
     )
     .replace(/\s+/g, ' ')
     .trim();
+}
+
+export type AuthorCatalogQuery = { author?: string; page?: string; limit?: string };
+export type AuthorCatalog = {
+  authors: Author[];
+  totals: { authors: number; relationships: number };
+  matchedAuthors: number;
+  pagination: { page: number; pages: number; pageSize: number; total: number };
+  filters: { author: number | null; page: number; limit: number };
+};
+export async function authorCatalog(query: AuthorCatalogQuery): Promise<AuthorCatalog> {
+  const params = new URLSearchParams();
+  for (const key of ['author', 'page', 'limit'] as const) {
+    if (typeof query[key] === 'string') params.set(key, query[key]);
+  }
+  const data = await gateway<AuthorCatalog>(`/api/catalog/authors?${params}`);
+  if (!data) throw new Error('Author catalog unavailable');
+  return data;
 }

@@ -4,45 +4,17 @@ import Link from 'next/link';
 import BlogIcon from '@/components/BlogIcon';
 import MediaTabs from '@/components/MediaTabs';
 import TableScroller from '@/components/TableScroller';
-import { type Blog, overview, taipei } from '@/lib/api';
+import { type Catalog, type CatalogQuery, catalog, taipei } from '@/lib/api';
 import { table } from '@/lib/table-styles';
 export const dynamic = 'force-dynamic';
-export default async function BlogsPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ q?: string; category?: string; sort?: string; page?: string; status?: string; dir?: string }>;
-}) {
-  const data = await overview();
-  const query = await searchParams;
-  const q = (query.q ?? '').trim().slice(0, 100);
-  const categories = [...new Set(data.blogs.map((b) => b.category).filter(Boolean))] as string[];
-  const statuses = [...new Set(data.blogs.map((blog) => blog.statusLabel ?? '待核對'))];
-  const rows = data.blogs.filter(
-    (blog) =>
-      (!q || `${blog.name} ${blog.url ?? ''}`.toLocaleLowerCase().includes(q.toLocaleLowerCase())) &&
-      (!query.category || blog.category === query.category) &&
-      (!query.status || (blog.statusLabel ?? '待核對') === query.status),
-  );
-  const sorts = {
-    name: (blog: Blog) => blog.name,
-    category: (blog: Blog) => blog.category ?? '',
-    posts: (blog: Blog) => blog.postCount ?? -1,
-    latest: (blog: Blog) => (blog.lastPublishedAt ? Date.parse(blog.lastPublishedAt) : 0),
-    crawl: (blog: Blog) => (blog.lastCrawlSuccessAt ? Date.parse(blog.lastCrawlSuccessAt) : 0),
-    status: (blog: Blog) => blog.statusLabel ?? '待核對',
-  };
-  type SortKey = keyof typeof sorts;
-  const sort = Object.hasOwn(sorts, query.sort ?? '') ? (query.sort as SortKey) : 'name';
+export default async function BlogsPage({ searchParams }: { searchParams: Promise<CatalogQuery> }) {
+  const data = await catalog(await searchParams);
+  const { q, sort, dir, category, status, limit } = data.filters;
+  const query = { q, sort, dir, category, status, ...(limit !== 50 ? { limit: String(limit) } : {}) };
+  const { categories, statuses, blogs: rows } = data;
+  const { page, pages, total } = data.pagination;
+  type SortKey = Catalog['filters']['sort'];
   const ascendingFirst = new Set<SortKey>(['name', 'category', 'status']);
-  const dir = query.dir === 'asc' || query.dir === 'desc' ? query.dir : ascendingFirst.has(sort) ? 'asc' : 'desc';
-  rows.sort((a, b) => {
-    const x = sorts[sort](a),
-      y = sorts[sort](b);
-    const result = typeof x === 'number' && typeof y === 'number' ? x - y : String(x).localeCompare(String(y), 'zh-Hant');
-    return (dir === 'asc' ? 1 : -1) * result;
-  });
-  const pages = Math.max(1, Math.ceil(rows.length / 50));
-  const page = Math.min(pages, Math.max(1, Number.parseInt(query.page ?? '1', 10) || 1));
   const href = (patch: Record<string, string | null>) => {
     const params = new URLSearchParams(Object.entries(query).filter((entry): entry is [string, string] => typeof entry[1] === 'string'));
     params.delete('page');
@@ -86,8 +58,8 @@ export default async function BlogsPage({
         {[
           { label: '收錄部落格', value: data.totals.blogs },
           { label: '收錄文章', value: data.totals.posts },
-          { label: '已提供網址', value: data.blogs.filter((b) => b.url).length },
-          { label: '作者紀錄', value: data.authors.length },
+          { label: '已提供網址', value: data.totals.withUrls },
+          { label: '作者紀錄', value: data.totals.authors },
         ].map((item) => (
           <div key={item.label} className="rounded-xl border border-zinc-300 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">
             <div className="text-xs text-zinc-600 dark:text-zinc-400">{item.label}</div>
@@ -99,18 +71,18 @@ export default async function BlogsPage({
         <Link href={href({ status: null })} scroll={false} className={chip(!query.status)}>
           全部狀態
         </Link>
-        {statuses.map((status) => (
+        {statuses.map(({ value: status, count }) => (
           <Link key={status} href={href({ status })} scroll={false} className={chip(query.status === status)}>
-            {status} {data.blogs.filter((blog) => (blog.statusLabel ?? '待核對') === status).length}
+            {status} {count}
           </Link>
         ))}
         <span className="mx-1 h-5 w-px bg-zinc-200 dark:bg-zinc-700" aria-hidden />
         <Link href={href({ category: null })} scroll={false} className={chip(!query.category)}>
           全部分類
         </Link>
-        {categories.map((category) => (
+        {categories.map(({ value: category, count }) => (
           <Link key={category} href={href({ category })} scroll={false} className={chip(query.category === category)}>
-            {category}
+            {category} {count}
           </Link>
         ))}
       </div>
@@ -139,7 +111,7 @@ export default async function BlogsPage({
           </button>
         </div>
         <span role="status" className="text-xs text-zinc-500">
-          共 {rows.length} 個部落格 · 沒有近期文章不代表網站失效
+          共 {total} 個部落格 · 沒有近期文章不代表網站失效
         </span>
       </form>
       <TableScroller card label="部落格與文章數表格，可左右捲動">
@@ -155,7 +127,7 @@ export default async function BlogsPage({
             </tr>
           </thead>
           <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
-            {rows.slice((page - 1) * 50, page * 50).map((blog) => (
+            {rows.map((blog) => (
               <tr key={blog.slug} className={table.row}>
                 <td className={table.lead}>
                   <div className={table.leadBox}>
