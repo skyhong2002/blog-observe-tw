@@ -364,7 +364,7 @@ test('a landing document marked noindex is not measured (extra guard)', () => {
   stop();
 });
 
-test('navigation updates the guard before Google sees the URL, and never configs again', () => {
+test('public SPA and back/forward navigation keep every view, guard first, never config again', () => {
   const t = setup('/');
   const stop = installAnalytics(t.deps);
   t.load();
@@ -372,29 +372,97 @@ test('navigation updates the guard before Google sees the URL, and never configs
   t.history.pushState(null, '', '/topics');
   assert.deepEqual(seen.at(-1), { disabled: false, location: `${ORIGIN}/topics/` });
   assert.deepEqual(t.sets().at(-1)?.[1], { page_location: `${ORIGIN}/topics/`, page_title: PAGE_TITLE, page_referrer: ORIGIN });
-  t.history.pushState(null, '', '/articles/?q=my+secret');
-  assert.equal(seen.at(-1)?.disabled, true);
-  t.history.replaceState(null, '', '/blogs/alice%40example.com/');
-  assert.equal(seen.at(-1)?.disabled, true);
-  t.history.pushState(null, '', '/my/');
-  assert.equal(seen.at(-1)?.disabled, true);
   t.history.pushState(null, '', '/blogs/');
   assert.deepEqual(seen.at(-1), { disabled: false, location: `${ORIGIN}/blogs/` });
-  t.setHref('/topics/private-email/');
+  t.setHref('/topics/');
   t.win.dispatch('popstate');
-  assert.equal(seen.at(-1)?.disabled, true);
+  assert.deepEqual(seen.at(-1), { disabled: false, location: `${ORIGIN}/topics/` });
   t.setHref('/ranking');
   t.win.dispatch('popstate');
   assert.deepEqual(seen.at(-1), { disabled: false, location: `${ORIGIN}/ranking/` });
-  const text = JSON.stringify(t.layer());
-  for (const secret of ['secret', 'alice', 'private-email', '/my/']) assert.ok(!text.includes(secret), secret);
-  // A state-only replaceState keeps everything as is.
+  // A state-only replaceState and a fragment change keep everything as is.
   const before = t.layer().length;
   t.history.replaceState({ scroll: 1 }, '');
   t.history.replaceState({ scroll: 2 }, '', `${ORIGIN}/ranking#top`);
   assert.equal(t.layer().length, before);
+  assert.equal(t.disabled(), false);
+  assert.equal(t.layer().filter((c) => c[0] === 'event' && c[1] === 'page_view').length, 0);
   assert.equal(t.configs().length, 1);
   assert.equal(t.scripts.length, 1);
+  stop();
+});
+
+// Production finding: from /articles/?q=..., history.back() to /articles/
+// made Google's history page_view carry dr=<the ?q URL> despite `set` and
+// `config` page_referrer. The fake Google cannot model that engine; these
+// tests pin the conservative rule (off for the rest of the document).
+test('after config, any private, query or unknown URL taints the document: public returns stay off', () => {
+  for (const away of ['/articles/?q=ga-privacy-test', '/my/', '/blogs/alice%40example.com/', '/topics/private-email/']) {
+    const t = setup('/articles/');
+    const stop = installAnalytics(t.deps);
+    t.load();
+    const seen = google(t);
+    t.history.pushState(null, '', away);
+    assert.equal(seen.at(-1)?.disabled, true, away);
+    // history.back() to the public page, then onward to others.
+    t.setHref('/articles/');
+    t.win.dispatch('popstate');
+    assert.equal(seen.at(-1)?.disabled, true, away);
+    t.history.pushState(null, '', '/blogs/');
+    t.history.replaceState(null, '', '/');
+    assert.equal(seen.at(-1)?.disabled, true, away);
+    t.doc.dispatch('click', anchor('https://example.com/a', 'open_original'));
+    t.win.dispatch(ACTION_EVENT, { detail: 'follow' });
+    t.win.dispatch('appinstalled');
+    assert.equal(t.events().length, 0, away);
+    assert.equal(t.configs().length, 1);
+    assert.equal(t.scripts.length, 1);
+    const text = JSON.stringify(t.layer());
+    for (const secret of ['ga-privacy-test', 'alice', 'private-email', '/my/']) assert.ok(!text.includes(secret), secret);
+    stop();
+  }
+});
+
+test('taint while gtag.js is still loading: the late onload sends nothing and enables nothing', () => {
+  const t = setup('/articles/', { cookie: `${LOGIN_COMPLETED_COOKIE}=1` });
+  const stop = installAnalytics(t.deps);
+  t.doc.dispatch('click', anchor('https://example.com/a', 'open_original'));
+  t.history.pushState(null, '', '/articles/?q=x');
+  t.setHref('/articles/');
+  t.win.dispatch('popstate');
+  assert.equal(t.disabled(), true);
+  t.load();
+  assert.equal(t.disabled(), true);
+  assert.equal(t.events().length, 0);
+  assert.ok(loginCompleted(t.cookie()), 'the login marker waits for a fresh document');
+  t.history.pushState(null, '', '/blogs/');
+  t.win.dispatch(ACTION_EVENT, { detail: 'follow' });
+  assert.equal(t.events().length, 0);
+  assert.equal(t.configs().length, 1);
+  stop();
+
+  // Onload arriving while unmounted, then a remount on the public page.
+  const u = setup('/');
+  const stop2 = installAnalytics(u.deps);
+  u.history.pushState(null, '', '/login/');
+  stop2();
+  u.load();
+  u.setHref('/');
+  const again = installAnalytics(u.deps);
+  assert.equal(u.disabled(), true);
+  u.win.dispatch(ACTION_EVENT, { detail: 'follow' });
+  assert.equal(u.events().length, 0);
+  assert.equal(u.configs().length, 1);
+  again();
+});
+
+test('a fresh full page load starts clean: only the referrer origin is kept', () => {
+  const t = setup('/articles/');
+  t.deps.referrer = `${ORIGIN}/articles/?q=ga-privacy-test`;
+  const stop = installAnalytics(t.deps);
+  assert.equal(t.disabled(), false);
+  assert.equal((t.sets()[0][1] as { page_referrer: string }).page_referrer, ORIGIN);
+  assert.ok(!JSON.stringify(t.layer()).includes('ga-privacy-test'));
   stop();
 });
 
@@ -410,8 +478,10 @@ test('a private or query landing loads nothing until the first public page, whic
   assert.equal(t.disabled(), false);
   assert.equal(t.configs().length, 1);
   assert.equal(t.scripts.length, 1);
+  // Configured now: a private page from here on taints the document.
   t.history.pushState(null, '', '/my/');
   t.history.pushState(null, '', '/');
+  assert.equal(t.disabled(), true);
   assert.equal(t.configs().length, 1);
   stop();
 });
@@ -582,7 +652,7 @@ test('StrictMode remount: no duplicate config, script, wrappers or listeners; cl
   assert.notEqual(ours, t.nativePush);
   stop();
   assert.equal(t.history.pushState, t.nativePush);
-  assert.equal(t.win.count() + t.doc.count(), 0);
+  assert.equal(t.win.count() + t.doc.count(), 1, 'only the document-long popstate watcher stays');
   assert.equal(t.disabled(), true, 'unguarded between mounts: off');
   const again = installAnalytics(t.deps);
   assert.equal(t.disabled(), false);
@@ -594,18 +664,12 @@ test('StrictMode remount: no duplicate config, script, wrappers or listeners; cl
   const outer = t.history.pushState;
   again();
   assert.equal(t.history.pushState, outer);
-  t.history.pushState(null, '', '/my/');
-  assert.equal(t.nativeCalls.at(-1), `${ORIGIN}/my/`);
-  assert.equal(seen.at(-1)?.disabled, true);
   // The inert wrapper inside Google's is reused, not stacked, and guards again.
   const third = installAnalytics(t.deps);
   assert.equal(t.history.pushState, outer);
-  t.history.pushState(null, '', '/login/');
-  assert.equal(seen.at(-1)?.disabled, true);
-  t.history.pushState(null, '', '/articles/?q=x');
-  assert.equal(seen.at(-1)?.disabled, true);
-  t.history.pushState(null, '', '/');
-  assert.deepEqual(seen.at(-1), { disabled: false, location: `${ORIGIN}/` });
+  assert.equal(t.disabled(), false);
+  t.history.pushState(null, '', '/blogs/');
+  assert.deepEqual(seen.at(-1), { disabled: false, location: `${ORIGIN}/blogs/` });
   assert.equal(t.configs().length, 1);
   assert.equal(t.scripts.length, 1);
   // Events on the remounted instance go straight to gtag (already loaded).
@@ -614,6 +678,69 @@ test('StrictMode remount: no duplicate config, script, wrappers or listeners; cl
   assert.equal(t.win.count(), 6, 'ours (5) + the fake Google popstate listener');
   assert.equal(t.doc.count(), 2);
   third();
+});
+
+test('StrictMode remount after taint, or after navigations nobody judged, stays off', () => {
+  // Tainted while mounted, remounted back on a public page.
+  const t = setup('/');
+  const stop = installAnalytics(t.deps);
+  t.load();
+  t.history.pushState(null, '', '/articles/?q=x');
+  stop();
+  t.setHref('/');
+  const again = installAnalytics(t.deps);
+  assert.equal(t.disabled(), true);
+  t.history.pushState(null, '', '/blogs/');
+  assert.equal(t.disabled(), true);
+  assert.equal(t.configs().length, 1);
+  again();
+
+  // Unmounted: a private push, a popstate, or a URL that simply moved.
+  const unjudged: Array<(u: ReturnType<typeof setup>) => void> = [
+    (u) => {
+      u.history.pushState(null, '', '/my/');
+      u.history.pushState(null, '', '/');
+    },
+    (u) => {
+      u.setHref('/articles/?q=x');
+      u.win.dispatch('popstate');
+      u.setHref('/');
+      u.win.dispatch('popstate');
+    },
+    (u) => u.setHref('/blogs/'),
+  ];
+  for (const move of unjudged) {
+    const u = setup('/');
+    const first = installAnalytics(u.deps);
+    u.load();
+    const seen = google(u);
+    first();
+    move(u);
+    assert.equal(seen.at(-1)?.disabled ?? true, true);
+    const remount = installAnalytics(u.deps);
+    assert.equal(u.disabled(), true);
+    u.history.pushState(null, '', '/topics/');
+    assert.equal(seen.at(-1)?.disabled, true);
+    u.win.dispatch(ACTION_EVENT, { detail: 'follow' });
+    assert.equal(u.events().length, 0);
+    assert.equal(u.configs().length, 1);
+    remount();
+  }
+});
+
+test('homepage original-article links carry the open_original marker, the /blogs/ fallback does not', () => {
+  const page = readFileSync(new URL('../src/app/page.tsx', import.meta.url), 'utf8');
+  assert.match(
+    page,
+    /const original = \(post: \{ url\?: string \| null \}\) => \(externalHref\(post\.url\) \? 'open_original' : undefined\);/,
+  );
+  // Hero title, hero "到原站閱讀" and story titles; plus the hero and story images.
+  assert.equal(page.match(/data-analytics=\{original\((lead|post)\)\}/g)?.length, 3);
+  assert.equal(page.match(/analytics=\{original\((lead|post)\)\}/g)?.length, 5);
+  // The recent-blogs entry only renders as a link for an external URL.
+  assert.match(page, /<a\s+href=\{href\}\s+data-analytics="open_original"\s+rel="noopener noreferrer"/);
+  const image = readFileSync(new URL('../src/app/_home/NewsImage.tsx', import.meta.url), 'utf8');
+  assert.match(image, /data-analytics=\{analytics\}/);
 });
 
 test('the opt-out page is noindex; an empty ID never installs', () => {

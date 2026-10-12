@@ -14,11 +14,14 @@ import styles from './home.module.css';
 export default function NewsImage({
   src,
   href,
+  analytics,
   title,
   variant,
 }: {
   src: string | null | undefined;
   href: string;
+  /** `open_original` when href is the source article. */
+  analytics?: string;
   title: string;
   variant: 'hero' | 'thumbnail';
 }) {
@@ -30,6 +33,7 @@ export default function NewsImage({
   return (
     <a
       href={href}
+      data-analytics={analytics}
       className={priority ? styles.heroImage : styles.thumbnail}
       data-image-state={state}
       tabIndex={-1}

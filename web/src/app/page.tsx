@@ -21,6 +21,8 @@ export default async function HomePage() {
   const [lead, ...rest] = data.posts;
   const recentBlogs = recentBlogRows(data, 10);
   const postHref = (post: { url?: string | null; blogSlug?: string }) => externalHref(post.url) ?? `/blogs/${post.blogSlug}/`;
+  // Only a real source URL is an original article; the /blogs/ fallback is not.
+  const original = (post: { url?: string | null }) => (externalHref(post.url) ? 'open_original' : undefined);
   const updated = data.updatedAt ? `${taipei(data.updatedAt)} 更新` : '等待資料更新';
   return (
     <>
@@ -81,11 +83,11 @@ export default async function HomePage() {
             {lead ? (
               <>
                 <article className={styles.hero}>
-                  <NewsImage src={lead.imageUrl} href={postHref(lead)} title={lead.title} variant="hero" />
+                  <NewsImage src={lead.imageUrl} href={postHref(lead)} analytics={original(lead)} title={lead.title} variant="hero" />
                   <div className={styles.heroContent}>
                     <span className={styles.heroBadge}>最近發文</span>
                     <h3>
-                      <a href={postHref(lead)} className={styles.heroLink} rel="noopener noreferrer">
+                      <a href={postHref(lead)} data-analytics={original(lead)} className={styles.heroLink} rel="noopener noreferrer">
                         {lead.title}
                       </a>
                     </h3>
@@ -99,7 +101,7 @@ export default async function HomePage() {
                     <p className="line-clamp-5 text-sm leading-7 text-zinc-600 dark:text-zinc-400">{plainText(lead.summary)}</p>
                     <div className={styles.heroFoot}>
                       <span>{lead.author}</span>
-                      <a href={postHref(lead)} rel="noopener noreferrer">
+                      <a href={postHref(lead)} data-analytics={original(lead)} rel="noopener noreferrer">
                         到原站閱讀 →
                       </a>
                     </div>
@@ -117,7 +119,7 @@ export default async function HomePage() {
                           <span className={styles.storyIndex}>{String(i + 2).padStart(2, '0')}</span> {post.blogName}
                         </p>
                         <h3>
-                          <a href={postHref(post)} rel="noopener noreferrer">
+                          <a href={postHref(post)} data-analytics={original(post)} rel="noopener noreferrer">
                             {post.title}
                           </a>
                         </h3>
@@ -129,7 +131,13 @@ export default async function HomePage() {
                           <span>· {taipei(post.publishedAt)}</span>
                         </p>
                       </div>
-                      <NewsImage src={post.imageUrl} href={postHref(post)} title={post.title} variant="thumbnail" />
+                      <NewsImage
+                        src={post.imageUrl}
+                        href={postHref(post)}
+                        analytics={original(post)}
+                        title={post.title}
+                        variant="thumbnail"
+                      />
                     </article>
                   ))}
                   <Link href="/articles/" className={styles.more}>
@@ -182,7 +190,13 @@ export default async function HomePage() {
                         </p>
                         {latest ? (
                           href ? (
-                            <a href={href} rel="noopener noreferrer" className={styles.recentPost} title={title}>
+                            <a
+                              href={href}
+                              data-analytics="open_original"
+                              rel="noopener noreferrer"
+                              className={styles.recentPost}
+                              title={title}
+                            >
                               {title}
                             </a>
                           ) : (

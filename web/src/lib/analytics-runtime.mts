@@ -8,13 +8,23 @@
 // replaceState are wrapped (and popstate captured) before gtag.js loads, so
 // each navigation first updates `ga-disable-<ID>` and the global page fields
 // (`set`: canonical origin + public path, fixed title, origin-only referrer).
-// Private pages and any URL with a query string disable hits until the
-// reader is back on a public page. The script itself is inserted on the
-// first public page.
+// The script itself is inserted on the first public page.
+//
+// Privacy taint: once `config` has been sent, the first navigation to a
+// private, query, noindex or unparsable URL turns hits off for the rest of
+// the document, even back on public pages. Seen in production: GA enhanced
+// measurement's history events overwrite page_referrer with the previous full
+// URL whatever `set` or `config` say, so /articles/?q=x -> back -> /articles/
+// sent dr=...?q=x. A pure mock cannot reproduce Google's engine; this is the
+// conservative rule. Navigations while no instance is mounted (StrictMode
+// remount) count the same way when the URL moved. A new full page load starts
+// clean (document.referrer is cut to its origin); nothing reloads by itself.
+// A document that never sent `config` may still start on its first public
+// page: Google saw none of its history.
 //
 // Custom events are only handed to gtag once gtag.js has loaded; until then
-// they wait here, and any suppression (opt-out, private or query page)
-// discards them, so nothing queued on an eligible page replays later.
+// they wait here, and any suppression (opt-out, private or query page,
+// taint) discards them, so nothing queued on an eligible page replays later.
 import {
   ACTION_EVENT,
   type AnalyticsAction,
@@ -74,6 +84,8 @@ interface Hooks {
   handler: Navigate | null;
   push: HistoryMethod | null;
   replace: HistoryMethod | null;
+  /** The popstate watcher stays for the document, like the wrappers. */
+  popstate: boolean;
 }
 interface State {
   configured: boolean;
@@ -83,11 +95,27 @@ interface State {
   /** The landing URL (no fragment) when its document was noindex. */
   noindexPage: string | null;
   landingChecked: boolean;
+  /** The last URL (no fragment) seen by any instance. */
+  current: string | null;
+  /** Configured, then on a non-measurable URL: off for this document. */
+  tainted: boolean;
   onLoad: (() => void) | null;
   hooks: Hooks;
 }
 
 const STATE = '__blogAnalytics';
+
+const withoutHash = (href: string, base: string) => new URL(href, base).href.replace(/#.*$/, '');
+
+/** A navigation no instance judged: after `config`, any move taints. */
+function unobserved(state: State, href: string, base: string) {
+  if (!state.configured || state.tainted) return;
+  let url: string | null = null;
+  try {
+    url = withoutHash(href, base);
+  } catch {}
+  if (url !== state.current) state.tainted = true;
+}
 
 /** Installs the guards and listeners (idempotent per window); returns their cleanup. */
 export function installAnalytics(deps: AnalyticsDeps): () => void {
@@ -100,8 +128,10 @@ export function installAnalytics(deps: AnalyticsDeps): () => void {
     loginSent: false,
     noindexPage: null,
     landingChecked: false,
+    current: null,
+    tainted: false,
     onLoad: null,
-    hooks: { handler: null, push: null, replace: null },
+    hooks: { handler: null, push: null, replace: null, popstate: false },
   } satisfies State;
   win.dataLayer ??= [];
   const state = win[STATE] as State;
@@ -136,7 +166,12 @@ export function installAnalytics(deps: AnalyticsDeps): () => void {
     pending = [];
     win[disableKey] = true;
   };
-  const eligible = () => !disposed && page !== null && state.configured && win[disableKey] === false && !optedOut();
+  /** Leaving for a URL that is not measured: after `config`, for good. */
+  const leave = () => {
+    if (state.configured) state.tainted = true;
+    disable();
+  };
+  const eligible = () => !disposed && page !== null && state.configured && !state.tainted && win[disableKey] === false && !optedOut();
 
   const emit = (name: string, params?: Record<string, string | undefined>) => {
     if (params) gtag('event', name, params);
@@ -181,12 +216,13 @@ export function installAnalytics(deps: AnalyticsDeps): () => void {
     try {
       next = new URL(href, deps.href()).href;
     } catch {
-      return disable();
+      return leave();
     }
-    const url = next.replace(/#.*$/, '');
+    const url = withoutHash(next, next);
     if (url === current) return;
     const referrer = current ? origin : deps.referrer;
     current = url;
+    state.current = url;
     if (!state.landingChecked) {
       state.landingChecked = true;
       let noindex = true;
@@ -196,7 +232,8 @@ export function installAnalytics(deps: AnalyticsDeps): () => void {
       if (noindex) state.noindexPage = url;
     }
     const found = optedOut() || url === state.noindexPage ? null : publicPage(next, origin);
-    if (!found) return disable();
+    if (!found) return leave();
+    if (state.tainted) return disable();
     page = found;
     if (!state.configured) gtag('js', new Date());
     // Page fields go through `set` only, before `config`: values passed to
@@ -218,7 +255,7 @@ export function installAnalytics(deps: AnalyticsDeps): () => void {
     try {
       apply(String(url));
     } catch {
-      disable();
+      leave();
     }
   };
   const hooks = state.hooks;
@@ -226,7 +263,10 @@ export function installAnalytics(deps: AnalyticsDeps): () => void {
   const wrap = (original: HistoryMethod): HistoryMethod => {
     const wrapper = function (this: unknown, _data: unknown, _unused: string, url?: string | URL | null) {
       // A state-only call (no URL) keeps the page.
-      if (url !== undefined && url !== null) hooks.handler?.(url);
+      if (url !== undefined && url !== null) {
+        if (hooks.handler) hooks.handler(url);
+        else unobserved(state, String(url), deps.href());
+      }
       // biome-ignore lint/complexity/noArguments: pass the call through unchanged.
       return original.apply(this, arguments as unknown as Parameters<HistoryMethod>);
     };
@@ -237,7 +277,11 @@ export function installAnalytics(deps: AnalyticsDeps): () => void {
   if (!hooks.push) deps.history.pushState = hooks.push = wrap(deps.history.pushState);
   if (!hooks.replace) deps.history.replaceState = hooks.replace = wrap(deps.history.replaceState);
 
-  const popstate = () => navigate(deps.href());
+  if (!hooks.popstate) {
+    hooks.popstate = true;
+    const popstate = () => (hooks.handler ? hooks.handler(deps.href()) : unobserved(state, deps.href(), deps.href()));
+    deps.win.addEventListener('popstate', popstate, true);
+  }
   const choice = (event: Event) => {
     // `storage` with key null is another tab's localStorage.clear(): re-read.
     const key = (event as StorageEvent).key;
@@ -262,18 +306,18 @@ export function installAnalytics(deps: AnalyticsDeps): () => void {
   };
   const installed = () => send('app_installed');
 
-  deps.win.addEventListener('popstate', popstate, true);
   deps.win.addEventListener(OPT_OUT_EVENT, choice);
   deps.win.addEventListener('storage', choice);
   deps.win.addEventListener(ACTION_EVENT, action);
   deps.win.addEventListener('appinstalled', installed);
   deps.doc.addEventListener('click', click, true);
   deps.doc.addEventListener('auxclick', click, true);
+  // Mounted again on another URL: navigations in between went unjudged.
+  unobserved(state, deps.href(), deps.href());
   navigate(deps.href());
 
   return () => {
     disposed = true;
-    deps.win.removeEventListener('popstate', popstate, true);
     deps.win.removeEventListener(OPT_OUT_EVENT, choice);
     deps.win.removeEventListener('storage', choice);
     deps.win.removeEventListener(ACTION_EVENT, action);
