@@ -8,3 +8,6 @@ node_modules/
 web/.next/
 web/out/
 web/.env
+
+__pycache__/
+app/data/.favicon-refresh.lock

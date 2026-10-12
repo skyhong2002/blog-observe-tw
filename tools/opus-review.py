@@ -6,6 +6,7 @@ The credential is only used in the Authorization header, never printed.
 """
 import json
 import os
+from pathlib import Path
 import sys
 import urllib.error
 import urllib.request
@@ -14,9 +15,14 @@ def main():
     packet = sys.stdin.read()
     if not packet.strip() or len(packet) > 240_000:
         sys.exit('Provide a non-empty, reviewed packet of at most 240000 characters on stdin.')
-    key = os.environ.get('CLI_PROXY_API_KEY')
+    key = (os.environ.get('CLI_PROXY_API_KEY') or '').strip()
     if not key:
-        sys.exit('CLI_PROXY_API_KEY is required.')
+        try:
+            key = Path('/home/deck/.config/ai-gateway/t3-client.key').read_text().strip()
+        except OSError:
+            sys.exit('CLI Proxy credential is unavailable in the environment or configured local key file.')
+    if not key:
+        sys.exit('CLI Proxy credential is empty.')
     try:
         max_tokens = int(os.environ.get('OPUS_REVIEW_MAX_TOKENS', '4096'))
         if not 1024 <= max_tokens <= 12000:
@@ -30,7 +36,6 @@ def main():
             {'role': 'user', 'content': packet},
         ],
         'max_tokens': max_tokens,
-        'reasoning_effort': 'low',
         'stream': False,
     }
     request = urllib.request.Request(
@@ -53,7 +58,9 @@ def main():
             # review body. Treat that as incomplete instead of counting it.
             return bool(text) and not (text.startswith('<reasoning_effort>') and text.endswith('</reasoning_effort>'))
         if not choices or any(not usable(c) for c in choices):
-            sys.exit('CLI Proxy returned an incomplete or truncated review; this does not count as completed review.')
+            reasons = [str(c.get('finish_reason')) for c in choices]
+            lengths = [len(c.get('message', {}).get('content') or '') for c in choices]
+            sys.exit(f'CLI Proxy returned incomplete review (finish={reasons}, chars={lengths}); not counted.')
         print(json.dumps({
             'requested_model': payload['model'], 'response_model': data.get('model'),
             'reviews': [{'text': c.get('message', {}).get('content'), 'finish_reason': c.get('finish_reason')} for c in data.get('choices', [])],
