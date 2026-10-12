@@ -78,3 +78,5 @@ Similarweb 目前不提供引薦流量欄位，擴充需求見[欄位提案](doc
 公開查詢提供已驗證部落格目錄、文章短摘要、提及關係與話題；不公開抓取全文或私人追蹤。匿名每 IP 每分鐘 60 次；登入 `/my/` 可建立最多三把 `x-api-key` 金鑰，每把每分鐘 1000 次，資料庫只存 SHA-256。金鑰只授權公開查詢，不取代登入 session。管理金鑰需 session、同源 Origin 與 CSRF。
 
 v1 由單一 gateway process 提供，撤銷立即清除同 process 的 key cache；若未來改多 gateway，必須先加入跨 process 失效通知與共用限流。匿名成功回應提供 `s-maxage=120, stale-while-revalidate=180`；Cookie／API key／Authorization 與錯誤回應不共用快取。現有 Cloudflare 專用 HTML 規則只涵蓋首頁；若另增加 API 規則，必須明確排除上述三種標頭，尊重來源 `private/no-store`，不得把憑證請求的回應強制快取。
+
+正式 web 建置請使用根目錄 `npm run web:build`；此入口先清除該 checkout 的 `web/.next`，完成後比對 standalone 的 build ID 與 API 文件 HTML，避免重複建置留下舊 release 的靜態產物。請勿在正在提供服務的 release 目錄執行建置。

@@ -21,7 +21,7 @@
     "feed:once": "node --env-file-if-exists=.env tools/crawl-once.ts",
     "discover:blogblog": "node --env-file-if-exists=.env tools/discover-blogblog.ts",
     "discover:similar": "node --env-file-if-exists=.env tools/discover-similar.ts",
-    "web:build": "npm --prefix web run build",
+    "web:build": "node tools/build-web.mjs",
     "web:start": "npm --prefix web run start",
     "blogs:merge": "node --env-file-if-exists=.env tools/merge-blog-urls.ts",
     "favicons:fetch": "node --env-file-if-exists=.env tools/fetch-favicons.ts",
