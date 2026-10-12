@@ -13,3 +13,7 @@ Next standalone build 需要在每次 build 後把 `web/.next/static` 與 `web/p
 前端移植版位於 `/home/deck/.local/share/blog-observe/releases/0638bfbe29d4c9c47132528b61d677d9be46fabc`。gateway/web 各自透過 `~/.config/systemd/user/<service>.service.d/20-frontend-release.conf` 的 `WorkingDirectory` 指到該 release；每次新版本另建 release，不在正式 `.next` 上重建。此批次未更動 worker、DB 或排程。
 
 本次快速回滾：移除 gateway 和 web 各自的 `20-frontend-release.conf`，執行 `systemctl --user daemon-reload`，再重啟 `blog-observe.service blog-observe-web.service`。原始 checkout 與舊 standalone build 保持 `696c39b`，未 reset 或覆寫；也可把 drop-in 指回上一個不可變 release。`50d9d20` 的舊架構回滾仍依上節備份辦理。
+
+## 2026-10-12 favicon／Similarweb 後續切換
+
+目前 gateway、web、worker 與 favicon service 均指向 `c09ddae` 不可變 release，已啟用 tag API adapter；不再適用前端第一階段「worker 不變」的狀態描述。最新驗收與回滾順序見 [本次部署紀錄](deployment-2026-10-12.md)。先關閉 Similarweb 旗標，再切回保留的 release；勿刪新增稽核資料表。
