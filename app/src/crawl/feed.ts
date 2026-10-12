@@ -1,9 +1,10 @@
 import { createHash } from 'node:crypto';
 import { lookup } from 'node:dns/promises';
-import { isIP } from 'node:net';
+import { isIP, type LookupFunction } from 'node:net';
 import * as cheerio from 'cheerio';
 import { XMLParser } from 'fast-xml-parser';
 import type { Pool } from 'mysql2/promise';
+import { Agent, type Dispatcher, fetch as undiciFetch } from 'undici';
 
 export type FeedSourceType = 'rss' | 'atom' | 'sitemap';
 export type FeedLink = { url: string; type: FeedSourceType };
@@ -20,12 +21,12 @@ export type FeedEntry = {
 };
 export type BlogToCrawl = { id: number; slug: string; url: string };
 export type HostResolver = (hostname: string) => Promise<string[]>;
-export type FeedFetcher = typeof fetch;
+export type FeedFetcher = (input: Parameters<typeof fetch>[0], init?: RequestInit & { dispatcher?: Dispatcher }) => Promise<Response>;
 export type FeedCrawlerOptions = {
   userAgent?: string;
   delayMs?: number;
   timeoutMs?: number;
-  /** Test seam; production always uses the system resolver and fetch. */
+  /** Test seams; production resolves once and pins each request to those addresses. */
   resolveHost?: HostResolver;
   fetcher?: FeedFetcher;
   historyImport?: boolean;
@@ -113,25 +114,18 @@ const ipv4Blocked = (value: string): boolean => {
 };
 
 const ipv6Blocked = (value: string): boolean => {
-  const normalized = value.toLowerCase().split('%', 1)[0];
-  const mapped = normalized.match(/^::ffff:(\d{1,3}(?:\.\d{1,3}){3})$/);
-  if (mapped && ipv4Blocked(mapped[1])) return true;
-  const numeric = ipv6Value(normalized);
-  if (numeric === null) return true;
-  if (numeric >> 32n === 0xffffn) {
-    const mappedValue = Number(numeric & 0xffffffffn);
-    const mappedAddress = [mappedValue >>> 24, (mappedValue >>> 16) & 255, (mappedValue >>> 8) & 255, mappedValue & 255].join('.');
-    if (ipv4Blocked(mappedAddress)) return true;
-  }
-  const prefix = (bits: number, length: number) => numeric >> BigInt(128 - length) === BigInt(bits);
+  // Only ordinary global unicast is eligible. This deliberately excludes all
+  // mapped/compatible IPv4, NAT64, local, scoped, multicast and reserved space.
+  // Special ranges: https://www.iana.org/assignments/iana-ipv6-special-registry/
+  if (value.includes('%')) return true;
+  const numeric = ipv6Value(value);
+  if (numeric === null || numeric >> 125n !== 1n) return true; // 2000::/3
+  const inPrefix = (prefix: bigint, length: number) => numeric >> BigInt(128 - length) === prefix >> BigInt(128 - length);
   return (
-    numeric === 0n ||
-    numeric === 1n ||
-    prefix(0xfc, 8) ||
-    prefix(0x3fa, 10) ||
-    prefix(0x3fb, 10) ||
-    prefix(0xff, 8) ||
-    prefix(0x20010db8, 32)
+    inPrefix(0x20010000000000000000000000000000n, 23) || // IETF protocol assignments, including Teredo/ORCHID
+    inPrefix(0x20010db8000000000000000000000000n, 32) || // Documentation
+    inPrefix(0x20020000000000000000000000000000n, 16) || // 6to4 embeds an IPv4 destination
+    inPrefix(0x3fff0000000000000000000000000000n, 20) // Documentation
   );
 };
 
@@ -154,23 +148,73 @@ export function isAllowedCrawlUrl(value: string): boolean {
 const defaultResolveHost: HostResolver = async (hostname) =>
   (await lookup(hostname, { all: true, verbatim: true })).map(({ address }) => address);
 
-/** Resolve every address so a hostname cannot hide a private or unresolved target. */
-export async function validateCrawlUrl(value: string, resolveHost: HostResolver = defaultResolveHost): Promise<URL> {
+type CrawlTarget = { url: URL; addresses: Array<{ address: string; family: number }> };
+
+/** Resolve once; reject the entire answer set if any address is non-public. */
+async function resolveCrawlTarget(value: string, resolveHost: HostResolver): Promise<CrawlTarget> {
   if (!isAllowedCrawlUrl(value)) throw new Error(`unsafe crawl URL: ${value}`);
   const url = new URL(value);
   const hostname = hostnameOf(url);
   const addresses = isIP(hostname) ? [hostname] : await resolveHost(hostname);
   if (!addresses.length || addresses.some((address) => isBlockedAddress(address))) throw new Error(`unsafe crawl address: ${hostname}`);
-  return url;
+  return { url, addresses: addresses.map((address) => ({ address, family: isIP(address) })) };
 }
 
-async function limitedResponse(response: Response): Promise<Response> {
+/** Validation-only API. Network requests use the resolved addresses below, not a second DNS lookup. */
+export async function validateCrawlUrl(value: string, resolveHost: HostResolver = defaultResolveHost): Promise<URL> {
+  return (await resolveCrawlTarget(value, resolveHost)).url;
+}
+
+function pinnedLookup(target: CrawlTarget): LookupFunction {
+  const hostname = hostnameOf(target.url);
+  return (requested, options, callback) => {
+    const family = options.family === 'IPv4' ? 4 : options.family === 'IPv6' ? 6 : options.family;
+    const matches = target.addresses.filter((entry) => !family || entry.family === family);
+    if (requested !== hostname || !matches.length) {
+      callback(Object.assign(new Error('crawl connection target does not match validated DNS'), { code: 'ENOTFOUND' }), []);
+      return;
+    }
+    // Node's autoSelectFamily requests all addresses. Never fall back to the
+    // system resolver, including when the requested family is unavailable.
+    if (options.all)
+      callback(
+        null,
+        matches.map((entry) => ({ ...entry })),
+      );
+    else callback(null, matches[0].address, matches[0].family);
+  };
+}
+
+async function pinnedFetch(target: CrawlTarget, headers: Record<string, string>, timeoutMs: number, fetcher: FeedFetcher) {
+  // A request-scoped dispatcher prevents pooled connections from crossing a
+  // validation boundary. Keep the URL hostname for HTTP Host and TLS SNI/name
+  // verification; only socket DNS lookup is replaced with the validated set.
+  const dispatcher = new Agent({ connect: { lookup: pinnedLookup(target), timeout: timeoutMs }, connections: 1, maxOrigins: 1 });
+  try {
+    const response = await fetcher(target.url, {
+      headers,
+      redirect: 'manual',
+      signal: AbortSignal.timeout(timeoutMs),
+      dispatcher,
+    });
+    return await limitedResponse(response, target.url.toString());
+  } finally {
+    // limitedResponse consumes/cancels the body before this runs. Destroy
+    // instead of graceful close so failures/aborts cannot leave idle sockets.
+    await dispatcher.destroy().catch(() => undefined);
+  }
+}
+
+async function limitedResponse(response: Response, requestedUrl: string): Promise<Response> {
   const declared = Number(response.headers.get('content-length'));
   if (Number.isFinite(declared) && declared > MAX_RESPONSE_BYTES) {
     await response.body?.cancel().catch(() => undefined);
     throw new Error(`crawl response exceeds ${MAX_RESPONSE_BYTES} bytes`);
   }
-  if (!response.body) return response;
+  if (!response.body) {
+    if (!response.url) Object.defineProperty(response, 'url', { value: requestedUrl });
+    return response;
+  }
   const reader = response.body.getReader();
   const chunks: Uint8Array[] = [];
   let total = 0;
@@ -189,7 +233,14 @@ async function limitedResponse(response: Response): Promise<Response> {
     reader.releaseLock();
   }
   const body = Buffer.concat(chunks.map((chunk) => Buffer.from(chunk)));
-  return new Response(body.length ? body : null, { status: response.status, statusText: response.statusText, headers: response.headers });
+  const buffered = new Response(body.length ? body : null, {
+    status: response.status,
+    statusText: response.statusText,
+    headers: response.headers,
+  });
+  // Consumers resolve relative feed/icon links against the final response URL.
+  Object.defineProperty(buffered, 'url', { value: response.url || requestedUrl });
+  return buffered;
 }
 
 function robotsRules(text: string, userAgent: string): string[] {
@@ -234,14 +285,8 @@ async function robotsAllows(
       let robotsUrl = `${origin}/robots.txt`;
       let response: Response = new Response(null, { status: 503 });
       for (let hop = 0; hop <= 5; hop += 1) {
-        await validateCrawlUrl(robotsUrl, resolveHost);
-        response = await limitedResponse(
-          await fetcher(robotsUrl, {
-            headers: { 'user-agent': userAgent, accept: 'text/plain' },
-            redirect: 'manual',
-            signal: AbortSignal.timeout(timeoutMs),
-          }),
-        );
+        const target = await resolveCrawlTarget(robotsUrl, resolveHost);
+        response = await pinnedFetch(target, { 'user-agent': userAgent, accept: 'text/plain' }, timeoutMs, fetcher);
         if (![301, 302, 303, 307, 308].includes(response.status)) break;
         const location = response.headers.get('location');
         if (!location) break;
@@ -271,10 +316,12 @@ export async function politeFetch(
   const timeoutMs = options.timeoutMs ?? 20_000;
   const delayMs = Math.max(250, options.delayMs ?? DEFAULT_DELAY_MS);
   const resolveHost = options.resolveHost ?? defaultResolveHost;
-  const fetcher = options.fetcher ?? fetch;
+  // Agent and fetch must use the same undici version; Node's bundled fetch
+  // can use an older dispatcher handler protocol than the installed package.
+  const fetcher = options.fetcher ?? (undiciFetch as FeedFetcher);
   let url = new URL(value);
   for (let hop = 0; hop <= 5; hop += 1) {
-    await validateCrawlUrl(url.toString(), resolveHost);
+    const target = await resolveCrawlTarget(url.toString(), resolveHost);
     // Check both the initial URL and every redirect target. This prevents a
     // feed from bypassing robots by bouncing through an unrelated host.
     const host = url.host;
@@ -282,16 +329,15 @@ export async function politeFetch(
     if (wait > 0) await new Promise((resolve) => setTimeout(resolve, wait));
     hostNextAt.set(host, Date.now() + delayMs);
     if (!(await robotsAllows(url.toString(), userAgent, timeoutMs, resolveHost, fetcher))) throw new Error(`robots disallow ${url}`);
-    const response = await limitedResponse(
-      await fetcher(url, {
-        headers: {
-          'user-agent': userAgent,
-          accept: 'application/rss+xml, application/atom+xml, application/xml, text/xml, text/html;q=0.8',
-          ...headers,
-        },
-        redirect: 'manual',
-        signal: AbortSignal.timeout(timeoutMs),
-      }),
+    const response = await pinnedFetch(
+      target,
+      {
+        'user-agent': userAgent,
+        accept: 'application/rss+xml, application/atom+xml, application/xml, text/xml, text/html;q=0.8',
+        ...headers,
+      },
+      timeoutMs,
+      fetcher,
     );
     if (![301, 302, 303, 307, 308].includes(response.status)) return response;
     const location = response.headers.get('location');

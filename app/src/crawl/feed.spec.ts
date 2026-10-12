@@ -1,5 +1,16 @@
-import { describe, expect, it } from 'vitest';
-import { isAllowedCrawlUrl, isBlockedAddress, MAX_RESPONSE_BYTES, parseFeed, parseSitemap, politeFetch, validateCrawlUrl } from './feed.ts';
+import net, { type LookupFunction, type TcpNetConnectOpts } from 'node:net';
+import { type Agent, fetch as undiciFetch } from 'undici';
+import { describe, expect, it, vi } from 'vitest';
+import {
+  type FeedFetcher,
+  isAllowedCrawlUrl,
+  isBlockedAddress,
+  MAX_RESPONSE_BYTES,
+  parseFeed,
+  parseSitemap,
+  politeFetch,
+  validateCrawlUrl,
+} from './feed.ts';
 
 describe('feed parsing', () => {
   it('parses RSS and Atom links without fetching article bodies', () => {
@@ -37,6 +48,26 @@ describe('crawl request safety', () => {
     expect(isBlockedAddress('100.64.0.1')).toBe(true);
     expect(isBlockedAddress('::ffff:127.0.0.1')).toBe(true);
     expect(isBlockedAddress('2001:db8::1')).toBe(true);
+    for (const address of [
+      'fd00::1',
+      'fc00::1',
+      'fe80::1',
+      'fec0::1',
+      'ff02::1',
+      '::ffff:5db8:d822',
+      '::ffff:93.184.216.34',
+      '::93.184.216.34',
+      '64:ff9b::7f00:1',
+      '2001::1',
+      '2002:7f00:1::',
+      '2001:2::1',
+      '3fff::1',
+      '5f00::1',
+      '2606:4700::1%eth0',
+    ])
+      expect(isBlockedAddress(address)).toBe(true);
+    expect(isBlockedAddress('2606:4700:4700::1111')).toBe(false);
+    expect(isBlockedAddress('2001:4860:4860::8888')).toBe(false);
   });
 
   it('rejects unresolved and private DNS answers before fetch', async () => {
@@ -87,5 +118,172 @@ describe('crawl request safety', () => {
     await expect(
       politeFetch(`https://${host}/feed.xml`, {}, { delayMs: 250, fetcher, resolveHost: async () => ['93.184.216.34'] }),
     ).rejects.toThrow(`crawl response exceeds ${MAX_RESPONSE_BYTES} bytes`);
+  });
+  it('rejects mixed public/private DNS answers as a whole', async () => {
+    const fetcher = vi.fn();
+    await expect(
+      politeFetch(
+        'https://mixed-addresses.test/feed',
+        {},
+        {
+          fetcher,
+          resolveHost: async () => ['93.184.216.34', 'fd00::1'],
+        },
+      ),
+    ).rejects.toThrow('unsafe crawl address');
+    expect(fetcher).not.toHaveBeenCalled();
+  });
+
+  it('pins the real fetch socket lookup to validated DNS even after the answer changes', async () => {
+    // Intercept the socket boundary, not fetch or the dispatcher: no network
+    // connection is made, but Node/undici must actually use our lookup.
+    const connections: Array<{ host: string; lookup: LookupFunction }> = [];
+    const connect = vi.spyOn(net, 'connect').mockImplementation((...args: unknown[]) => {
+      const options = args[0] as TcpNetConnectOpts;
+      const socket = new net.Socket();
+      if (options.lookup) connections.push({ host: options.host ?? '', lookup: options.lookup });
+      queueMicrotask(() => socket.destroy(new Error('test socket boundary: network disabled')));
+      return socket;
+    });
+    let answer = ['93.184.216.34', '2606:4700:4700::1111'];
+    const resolveHost = vi.fn(async () => [...answer]);
+    const dispatchers: Agent[] = [];
+    const fetcher: FeedFetcher = async (input, init) => {
+      dispatchers.push(init?.dispatcher as Agent);
+      if (String(input).endsWith('/robots.txt')) {
+        answer = ['127.0.0.1']; // Attacker rebinds after validation.
+        return new Response('');
+      }
+      return (undiciFetch as FeedFetcher)(input, init);
+    };
+    try {
+      await expect(politeFetch('http://pinned-socket.test/feed.xml', {}, { fetcher, resolveHost })).rejects.toThrow('fetch failed');
+      expect(connections).toHaveLength(1);
+      expect(connections[0].host).toBe('pinned-socket.test');
+      const pinned = connections[0].lookup;
+      const one = vi.fn();
+      pinned('pinned-socket.test', {}, one);
+      expect(one).toHaveBeenCalledWith(null, '93.184.216.34', 4);
+      const all = vi.fn();
+      pinned('pinned-socket.test', { all: true }, all);
+      expect(all).toHaveBeenCalledWith(null, [
+        { address: '93.184.216.34', family: 4 },
+        { address: '2606:4700:4700::1111', family: 6 },
+      ]);
+      const ipv6 = vi.fn();
+      pinned('pinned-socket.test', { family: 6, all: true }, ipv6);
+      expect(ipv6).toHaveBeenCalledWith(null, [{ address: '2606:4700:4700::1111', family: 6 }]);
+      const wrongHost = vi.fn();
+      pinned('another-host.test', {}, wrongHost);
+      expect(wrongHost.mock.calls[0][0]?.code).toBe('ENOTFOUND');
+      expect(resolveHost).toHaveBeenCalledTimes(2); // Initial URL plus robots; socket never resolves again.
+      expect(dispatchers).toHaveLength(2);
+      expect(dispatchers.every((dispatcher) => dispatcher.destroyed)).toBe(true);
+    } finally {
+      connect.mockRestore();
+    }
+  });
+
+  it('uses the pinned dispatcher with the production fetch implementation', async () => {
+    const lookups: LookupFunction[] = [];
+    const connect = vi.spyOn(net, 'connect').mockImplementation((...args: unknown[]) => {
+      const options = args[0] as TcpNetConnectOpts;
+      if (options.lookup) lookups.push(options.lookup);
+      const socket = new net.Socket();
+      queueMicrotask(() => socket.destroy(new Error('test socket boundary: network disabled')));
+      return socket;
+    });
+    try {
+      // No injected fetcher: catches mismatches between installed undici Agent
+      // and Node's bundled fetch before they silently break all real crawls.
+      await expect(
+        politeFetch(
+          'http://production-pinned.test/feed',
+          {},
+          {
+            resolveHost: async () => ['93.184.216.34'],
+          },
+        ),
+      ).rejects.toThrow('robots disallow');
+      expect(lookups).toHaveLength(1);
+      const callback = vi.fn();
+      lookups[0]('production-pinned.test', { all: true }, callback);
+      expect(callback).toHaveBeenCalledWith(null, [{ address: '93.184.216.34', family: 4 }]);
+      const absentFamily = vi.fn();
+      lookups[0]('production-pinned.test', { family: 6 }, absentFamily);
+      expect(absentFamily.mock.calls[0][0]?.code).toBe('ENOTFOUND');
+    } finally {
+      connect.mockRestore();
+    }
+  });
+
+  it('pins robots redirects and content redirects separately and preserves the final response URL', async () => {
+    const dispatchers: Agent[] = [];
+    const requested: string[] = [];
+    const resolveHost = vi.fn(async () => ['93.184.216.34']);
+    const fetcher: FeedFetcher = async (input, init) => {
+      const url = String(input);
+      requested.push(url);
+      dispatchers.push(init?.dispatcher as Agent);
+      expect(init?.redirect).toBe('manual');
+      if (url === 'https://redirect-pinned.test/robots.txt')
+        return new Response('', { status: 302, headers: { location: 'https://robots-pinned.test/rules' } });
+      if (url.endsWith('/rules') || url.endsWith('/robots.txt')) return new Response('');
+      if (url.endsWith('/start')) return new Response('', { status: 302, headers: { location: 'https://final-pinned.test/blog/' } });
+      return new Response('<link rel="icon" href="favicon.png">');
+    };
+    const response = await politeFetch('https://redirect-pinned.test/start', {}, { fetcher, resolveHost });
+    expect(response.url).toBe('https://final-pinned.test/blog/');
+    expect(new URL('favicon.png', response.url).toString()).toBe('https://final-pinned.test/blog/favicon.png');
+    expect(requested).toEqual([
+      'https://redirect-pinned.test/robots.txt',
+      'https://robots-pinned.test/rules',
+      'https://redirect-pinned.test/start',
+      'https://final-pinned.test/robots.txt',
+      'https://final-pinned.test/blog/',
+    ]);
+    expect(resolveHost.mock.calls).toHaveLength(5);
+    expect(dispatchers).toHaveLength(5);
+    expect(new Set(dispatchers).size).toBe(5);
+    expect(dispatchers.every((dispatcher) => dispatcher.destroyed)).toBe(true);
+  });
+
+  it('blocks a private robots redirect before requesting its destination', async () => {
+    const calls: string[] = [];
+    const fetcher: FeedFetcher = async (input) => {
+      calls.push(String(input));
+      return new Response('', { status: 302, headers: { location: 'http://[fd00::1]/rules' } });
+    };
+    await expect(
+      politeFetch(
+        'https://private-robots-redirect.test/feed',
+        {},
+        {
+          fetcher,
+          resolveHost: async () => ['93.184.216.34'],
+        },
+      ),
+    ).rejects.toThrow('robots disallow');
+    expect(calls).toEqual(['https://private-robots-redirect.test/robots.txt']);
+  });
+
+  it('destroys the pinned dispatcher when a streamed response exceeds the limit', async () => {
+    const dispatchers: Agent[] = [];
+    const fetcher: FeedFetcher = async (input, init) => {
+      dispatchers.push(init?.dispatcher as Agent);
+      return String(input).endsWith('/robots.txt') ? new Response('') : new Response('x'.repeat(MAX_RESPONSE_BYTES + 1));
+    };
+    await expect(
+      politeFetch(
+        'https://oversize-cleanup.test/feed',
+        {},
+        {
+          fetcher,
+          resolveHost: async () => ['93.184.216.34'],
+        },
+      ),
+    ).rejects.toThrow('crawl response exceeds');
+    expect(dispatchers).toHaveLength(2);
+    expect(dispatchers.every((dispatcher) => dispatcher.destroyed)).toBe(true);
   });
 });
