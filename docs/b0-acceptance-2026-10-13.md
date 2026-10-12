@@ -1,5 +1,7 @@
 # B0：即時公開性與歷史話題驗收
 
+> **目前部署：42711cf18c452b406904af6000ccbf88a1ff6102，blue generation 4，2026-10-12T20:19:52.889Z。** 最終同 build 的 53 個 barrier／60 個首請求結果、27 組整合測試、獨立候選 UI review 均已通過；正式 HTTP 驗收通過，babysit 外部最終驗收待確認。下面 b011873 等章節保留歷史，不能代替文末新證據。F3/F4 仍不擴大。
+
 基底：fetch 後的 `origin/main` **fc6b5a902f230047252391ee2eae509e76c46427**。本批維持 no-store；F3/F4 公開上線仍須 B0 驗收通過。部署完成與 babysit 瀏覽器驗收是不同狀態，不以 commit／HTTP 200 代替。
 
 ## 即時撤下
@@ -43,7 +45,7 @@ Review 原始紀錄（gitignore）：`.reviews/b0-f4/opus-b0-review.json`、`ren
 
 - active state 原子寫入：**19:19:13.484668Z**；edge 探針完成 **19:19:14Z**。
 - active.json：`{"active":"green","commit":"b011873255f9bbf30c252df2ca65ead0ef1c306e","generation":3}`。
-- release：`/home/deck/.local/share/blog-observe/releases/b011873255f9bbf30c252df2ca65ead0ef1c306e`；green gateway18175／web18173，固定edge18160不中斷切換。blue a45b06a保留為安全回滾；沒有把舊unsafe版本重新啟動。
+- release：`/home/deck/.local/share/blog-observe/releases/b011873255f9bbf30c252df2ca65ead0ef1c306e`；green gateway18175／web18173，固定edge18160不中斷切換。當時blue a45b06a保留為predicate修正的回滾版本（後續發現共享promise缺口，不是完整B0安全基線）；沒有把舊unsafe版本重新啟動。
 - 建置前153GiB、切換後151GiB可用，未建立完整備份、未刪除任何既有資料。Worker仍單一，改用此release；active favicon job自動跟隨green。
 
 ### 舊隔離首請求紀錄（缺少版本 metadata，不作最終 build 驗收）
@@ -88,18 +90,18 @@ Origin query不使用完成結果快取，Next這些公開頁dynamic/no-store，
 - 兩份 JSON 均包含 releaseSHA、nextBuildId、UTC 起訖、gateway/web PID與cwd、gatewayGitBlob、buildIdSha256、isolatedPorts（DB18169/gateway18176/web18177），以及每一個回應狀態、no-store、時間與redirect。
 - 原始紀錄：[48筆 JSON](/home/deck/.t3/projects/blog-observe-tw/.reviews/b0-ssr-provenance/rsc-visibility-result.json)、[12筆 JSON](/home/deck/.t3/projects/blog-observe-tw/.reviews/b0-ssr-provenance/future-rsc-visibility-result.json)。舊無版本JSON保留，但不再拿它當最終build provenance。
 
-## 並行 fresh-read 補修（候選，尚未宣稱 B0 全通過）
+## 並行 fresh-read 補修（已部署；正式外部驗收待確認）
 
 獨立 Codex 審查用 deferred loader 重現：A先讀visible資料並暫停，hide commit後B同key讀取時會共用A的舊Promise，B自己的loader沒有執行；relations真實入口搭配fake pool也可重現。**這是程式語義的隔離重現，不是已確認正式站實際洩漏。**程序內clear／revision無法涵蓋CLI、worker和其他process的全部寫入，所以不拿它當可靠跨程序撤銷機制。
 
-最小修法讓每個request各自fresh load，不共用完成或未完成結果；topic/overview/SEO wrapper每實例最多8個讀取，relations每pool最多4，超量回503而非舊內容。clear/invalidate不重設active，finally釋放容量。102項純unit回歸含A→commit→B、clear期間容量、不同行為失敗排空和SEO入口；Opus安全review已完成（claude-opus-5-5、finish=stop），未發現阻擋問題；採納真實DB barrier與其他cache掃描建議，部署與最終驗收仍待完成。前一版48+12序列測試通過不能抹除這個並行缺口。
+最小修法讓每個request各自fresh load，不共用完成或未完成結果；topic/overview/SEO wrapper每實例最多8個讀取，relations每pool最多4，超量回503而非舊內容。clear/invalidate不重設active，finally釋放容量。102項純unit回歸含A→commit→B、clear期間容量、不同行為失敗排空和SEO入口；Opus安全review已完成（claude-opus-5-5、finish=stop），未發現阻擋問題；採納真實DB barrier與其他cache掃描建議，最終 build 隔離驗收及部署已完成，見文末 42711cf 紀錄；正式外部驗收待確認。前一版48+12序列測試通過不能抹除這個並行缺口。
 
 
-### 最終驗收語意與尚待完成項目
+### 最終驗收語意
 
-撤下保證以資料庫交易 **commit** 為界：A若在commit之前已開始讀取，可完成並回傳它已讀到的舊結果；commit之後才開始的新匿名請求B，必須獨立查詢，不可共用A的未完成Promise。測試必須使用可手動釋放的barrier，不以sleep、重試或TTL等候製造通過。下一輪final candidate測試須記錄A開始、commit、B開始、B完成、A完成的UTC與sequence，涵蓋hide／rejected／moved／future及關係圖、sitemap。artifact需包含releaseSHA、Next BUILD_ID、source tree hash，並分開記錄DB、gateway、web埠。
+撤下保證以資料庫交易 **commit** 為界：A若在commit之前已開始讀取，可完成並回傳它已讀到的舊結果；commit之後才開始的新匿名請求B，必須獨立查詢，不可共用A的未完成Promise。測試必須使用可手動釋放的barrier，不以sleep、重試或TTL等候製造通過。最終final candidate測試已記錄A開始、commit、B開始、B完成、A完成的UTC與sequence，涵蓋hide／rejected／moved／future及關係圖、sitemap。artifact需包含releaseSHA、Next BUILD_ID、source tree hash，並分開記錄DB、gateway、web埠。
 
-上述b011873的48+12筆只是已補版本metadata的**序列**證據；最終fresh-read candidate的barrier／SSR／RSC尚待完成。F3/F4保持暫停，no-store與Cloudflare兩條Disabled規則不變。
+上述b011873的48+12筆只是已補版本metadata的**序列**證據；最終42711cf的barrier／SSR／RSC已完成，見文末完整路徑。F3/F4保持暫停，no-store與Cloudflare兩條Disabled規則不變。
 
 Opus原始安全review與處理紀錄：worktree `.reviews/b0-f4/opus-fresh-read-review-retry.json`、`fresh-read-review-outcome.md`。第一次回覆截斷不計有效review。九個wrapper各有最多8個邏輯讀取（包含巢狀SEO工作），relations每pool4個，並不是全服務只准8個；底層mysql仍4連線與64排隊上限。實際queue/負載由部署後測量，沒有提高DB連線數。
 
@@ -109,4 +111,71 @@ Opus原始安全review與處理紀錄：worktree `.reviews/b0-f4/opus-fresh-read
 
 負控制在獨立程序重現舊single-flight，只有A已捕捉舊SQL→commit→B開始→B無法完成而deadline失敗的完整事件順序，才視為成功抓出缺口；artifact本身仍 `passed:false`，見 `.reviews/b0-f4/barrier-negative.json`。正常模式不使用sleep、重試或TTL。獨立GPT-6.1 Sol另外核對barrier位置、B correlation＋同SQL指紋，以及Next測試preload僅在原始fetch下層附追蹤header，不改Next cache key、no-store、回應或SQL條件。
 
-UI小修由Opus實作（7a89af2），獨立GPT-6.1 Sol的候選實測：首頁自動RSC prefetch=0，點擊導覽保留client navigation，390px搜尋可展開，API status九個端點完整顯示。最終fresh-read build完成後仍須在同build跑HTML/RSC barrier，再切流；不以這份API-only結果替代。
+UI小修由Opus實作（7a89af2），獨立GPT-6.1 Sol的候選實測：首頁自動RSC prefetch=0，點擊導覽保留client navigation，390px搜尋可展開，API status九個端點完整顯示。後續42711cf已使用實際部署build完成HTML/RSC barrier與60筆首請求檢查，再完成獨立candidate UI review與切流；沒有用API-only結果替代。
+
+## 最終42711cf：同一份不可變 build、review、切換與正式驗收
+
+本批起點為fetch後remote main `7a89af2d2bec4f4246d606a3f84291f8f3a21744`。`2736b49`關閉共享promise並加barrier；`ca4ca01`校正Next驗證的RSC query key；`42711cf`將兩組舊single-flight測試改為新契約。最後一個commit只改測試，但仍重新建立實際42711cf不可變release並重跑全部證據，**不主張其BUILD_ID和ca4ca01相同**。完整diff保留在主repo `.reviews/b0-final-barrier/ca4-to-427.patch`。測試仍驗fresh read、容量上限8／4、超量503與釋放後可再讀，未刪除隱私檢查。
+
+| provenance | 值 |
+| --- | --- |
+| release SHA | `42711cf18c452b406904af6000ccbf88a1ff6102` |
+| Next BUILD_ID | `GOv8HpPOwOSxlwvjwd6FB` |
+| Git source tree hash | `8d8ac1209aa1b7947c8eef714f6e99ba83fecdff` |
+| runtime source SHA-256 | `d9311c416073e966b8e8fa99ec86bc3d88090c55579b8420218a6b62f7ee3a96` |
+| 隔離 DB / gateway / web | `18169 / 18176 / 18177` |
+| 同build驗收UTC | `2026-10-12T20:15:46.658Z`–`20:16:41.201Z` |
+| archive核對 | 563個tracked files逐一核對Git來源；19 migrations |
+
+最終完整結果（私有、gitignore；舊檔均保留）：
+
+- [barrier-result.json](/home/deck/.t3/projects/blog-observe-tw/.reviews/b0-final-barrier/42711cf18c452b406904af6000ccbf88a1ff6102/barrier-result.json)
+- [sequence-result.json](/home/deck/.t3/projects/blog-observe-tw/.reviews/b0-final-barrier/42711cf18c452b406904af6000ccbf88a1ff6102/sequence-result.json)
+- [runner-result.json](/home/deck/.t3/projects/blog-observe-tw/.reviews/b0-final-barrier/42711cf18c452b406904af6000ccbf88a1ff6102/runner-result.json)
+
+53個barrier為55種組合扣掉future/delete不該隱藏部落格本身的兩個blogs-sitemap案例。每筆保留A開始、捕捉旧SQL、commit、B開始、B獨立SQL與回應、A放行／完成的UTC及sequence；A直到B完成才放行。測试沒有sleep、重試、TTL grace。60個sequence首請求是57個200、3個hidden/rejected/moved來源HTML 404，不是全部200。HTML／完整RSC／prefetch涵蓋首頁、文章、來源、話題；prefetch若只有shell，不當作唯一撤銷證據。27組完整隔離整合測試全過，log為`.reviews/b0-final-barrier/integration-42711cf.log`。正式DB未插入驗收資料或改動真實內容。
+
+其後才做獨立candidate review：GPT-6.1 Sol，1280×900／390×900，實際讀7張candidate及6張tag參考圖。首頁自動prefetch與初載RSC均0，點擊仍有client navigation；390搜尋可展開聚焦，API status九條路徑完整。GA傳輸0、429為0。實際筆記、model raw harness與image tool receipt見[final review](/home/deck/.t3/userdata/ui-review-blog-20261013/batch-final-42711cf/reviewer-original-notes.json)。只涵蓋本次三scope，不冒稱其他UI狀態完成；完整ledger仍有pending。本批安全／拆解review為3 Codex＋1有效Opus，採納真實DB barrier、cache audit與有界讀取建議；截斷的Opus回應不算有效review。
+
+已就緒的blue gateway18174/web18172先完成candidate probe與review，之後atomic切換固定edge18160：`2026-10-12T20:19:52.889Z`，transition4與active.json一致：
+
+```json
+{"active":"blue","commit":"42711cf18c452b406904af6000ccbf88a1ff6102","generation":4}
+```
+
+worker舊job正常完成後單一重啟到同release；favicon跟active slot。green舊檔與程序保留，不把含共享promise缺口的舊release稱為通過B0的回滾版本。未做migration或完整備份、未刪除任何檔案。建置前140.23GiB、建置後139.39GiB；切換前`df -h /home`139G、驗收後140G，均高於10GiB。
+
+### 正式HTTP結果與資源
+
+2026-10-12T20:20:30.861Z起，各5次匿名新連線GET，最終200 headers TTFB（包括公網/TLS/CF，非103 Early Hints）：
+
+| route | Cache-Control | cf-cache-status | TTFB中位數 |
+| --- | --- | --- | --- |
+| `/` | `private, no-store` | `DYNAMIC` | 1276.6ms |
+| `/blogs/` | `private, no-store` | `DYNAMIC` | 442.7ms |
+| `/topics/` | `private, no-store` | `DYNAMIC` | 923.1ms |
+| `/api/v1/articles` | `private, no-store` | `DYNAMIC` | 396.2ms |
+
+20次均200、無Age、release header全部42711cf。load1/5/15：9.29/7.43/6.76→8.89/7.47/6.78。上一版同法中位數2535/1033/1472.6/426.2ms，但其他thread負載不同，不能把全部改善歸因本次修改。candidate review之前/之後正式首頁TTFB仍曾2.56/4.62秒，因此正式capture當時維持暫停，未用重試掩蓋。
+
+首頁、OpenAPI、真正404均`Strict-Transport-Security: max-age=86400`，無includeSubDomains/preload；health200、OAuth302/S256/精確callback、SSRF400；tag/youtube200。正式原始結果：[public-42711cf.json](/home/deck/.t3/projects/blog-observe-tw/.reviews/b0-final-barrier/public-42711cf.json)。CF兩條規則維持Disabled，沒有改CF/WAF。origin/Next不共用內容結果，edge DYNAMIC；未恢復任何內容cache，亦不宣稱已實作三層主動purge。commit前已开始的A與使用者已下載的內容不在新請求撤銷保證內。
+
+修正前受影響的端點及唯讀資料統計見[歷史隱私報告](privacy-deployment-2026-10-13.md#修正前影響範圍與已知資料量)：9個seed與2個moved來源metadata各0文章；一次移除前有37篇的來源未保存原status。沒有回應body或CF存取紀錄，因此不能確認歷史實際外洩數量或期間，也不列私有內容。
+
+另於 2026-10-12T20:22:59.286755+00:00 開始對本機edge18160直連，各5次200（不經CF/TLS），origin TTFB中位數：`/` 745.9ms、`/blogs/` 31.4ms、`/topics/` 428.9ms、`/api/v1/articles` 20.0ms。原始資料 `.reviews/b0-final-barrier/origin-42711cf.json`；此組與上述公網最終headers TTFB分開，不混稱純回源延遲。
+
+該origin量測時load已升至20.61/9.30/7.38→19.89/9.53/7.47；收到此觀測後立即通知reviewer停止後續正式capture。先前9.x負載並非持續穩定保證；並行其他thread工作仍會造成尖峰。沒有提高瀏覽器／build上限或恢復cache。
+
+### 正式歷史fallback：同release畫面
+
+正式捕捉fresh gate於20:22:33Z通過：load1=3.76、首頁最終200 TTFB1.226秒、全機其他browser root1，因此本thread只啟動一個browser。正式`42711cf`三頁1280×900／390×900共六張畫面均200、header release42711cf、no-store/DYNAMIC，並顯示「過去觀測到的文章」與「近90天沒有新的相關文章」：
+
+| URL | 歷史篇數 | 正式桌機／手機畫面 |
+| --- | ---: | --- |
+| https://blog.observe.tw/topics/風險管理/?days=90 | 3 | `batch-live-history-42711cf/risk-1280.png`／`risk-390.png` |
+| https://blog.observe.tw/topics/榴槤/?days=90 | 1 | `batch-live-history-42711cf/durian-1280.png`／`durian-390.png` |
+| https://blog.observe.tw/topics/國際市場/?days=90 | 2 | `batch-live-history-42711cf/market-1280.png`／`market-390.png` |
+
+以上根目錄 `/home/deck/.t3/userdata/ui-review-blog-20261013/`；同folder的`capture.json`保留每頁UTC、headers與SSR可見文字。DNT=1、預先阻擋GA/GTM、optout、無GA外送，沒有登入者資訊。20:22:59Z另外的資源測量讀到load>12後要求停止後續capture；reviewer於20:23:27Z確認load17.29並停止，當時已在途的最後畫面完成後browser於20:23:30.370Z正常關閉。沒有補拍或重試，不能把整段稱為持續通過負載閘門。實際model讀圖記錄另列UI ledger，不拿HTTP/DOM文字冒充視覺review。既有20筆證據抽樣仍見`topic-history-acceptance-2026-10-13.md`。
+
+上述六圖已由獨立GPT-6.1 Sol實際讀圖，原始證據：[reviewer-original-notes.json](/home/deck/.t3/userdata/ui-review-blog-20261013/batch-live-history-42711cf/reviewer-original-notes.json)。三頁均顯示已確認3/1/2篇、待重新確認0；畫面有來源版本但沒有文章數字ID，ID與match version仍以20筆資料證據表為準，不混稱截圖包含。

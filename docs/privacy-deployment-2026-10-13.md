@@ -1,5 +1,7 @@
 # 公開資料撤銷、HSTS 與舊服務退役驗收
 
+> 此文是 18:31–18:47 UTC 的歷史部署紀錄。現行 release 為 42711cf（20:19:52.889 UTC，blue generation 4）；最終 barrier 與正式標頭見 [B0 驗收](b0-acceptance-2026-10-13.md)。舊版共享未完成查詢的缺口已移除，不以舊版序列測試取代最終證據。
+
 時間均為 UTC；本階段原始 remote main 為 `f6bd9191cae318c5bfb9c63e0b213fb6b8b3905f`，本輪退役改動基於重新 fetch 的 `2a47d92cc31c56e18da074e54dccecb0cb03119d`。所有修正 commit 已推至 main，沒有修改 tag／youtube 程式、服務或 Cloudflare 設定。
 
 ## 正式版本與切換
@@ -10,7 +12,7 @@
 | HSTS edge | `2a47d92cc31c56e18da074e54dccecb0cb03119d`，18:33:33Z edge 程序啟動；socket 保持 listener |
 | 舊服務退役／active favicon launcher／安全回滾底線 | `93060cc5e97628f84fa1fb2b8e9eecc41157d462`；舊服務停止 18:39:21Z、新 timer 啟用 18:42:52Z |
 
-應用仍為 blue a45b06a（gateway 18174、web 18172），沒有為 timer 安裝重建或切換應用。edge/code 指向 93060cc 的 immutable archive，運作中的 edge 程序仍從 2a47d92 啟動；兩者的 proxy／HSTS 程式相同。下次啟動 wrapper 或排程使用新 launcher。green 2379fba 保留供診斷，**不允許安全回滾至該版本**；手動／自動回復必須通過 a45b06a 祖先檢查。
+本歷史紀錄當時應用為 blue a45b06a（gateway 18174、web 18172），沒有為 timer 安裝重建或切換應用。edge/code 指向 93060cc 的 immutable archive，運作中的 edge 程序仍從 2a47d92 啟動；兩者的 proxy／HSTS 程式相同。下次啟動 wrapper 或排程使用新 launcher。green 2379fba 保留供診斷，**不允許安全回滾至該版本**；手動／自動回復必須通過 a45b06a 祖先檢查。
 
 本輪容量檢查：安裝前 `/home` 465G／used 297G／available 155G／66%；驗收後 available 154G／66%。全程超過 10 GiB，沒有刪除、清理或新建完整資料庫備份。
 
@@ -33,7 +35,7 @@ Cloudflare 協助者已停用首頁 a142…／API 8056…兩條規則並 purge b
 
 ## 撤銷契約與隔離測試
 
-所有含文章／來源資料的 origin API、Next fetch、HTML／RSC、搜尋 loader、話題與 sitemap 均不保留完成的結果，TTL 為 **0**；只在同一次執行或同時進行的查詢合併工作。公開 SQL 要求 blog verified、文章仍存在、非未來發布；不再只排除 moved。關係公開讀不使用 worker 舊 snapshot。層別詳細規則見 [公開內容與快取](public-page-cache.md)。
+所有含文章／來源資料的 origin API、Next fetch、HTML／RSC、搜尋 loader、話題與 sitemap 均不保留完成的結果，TTL 為 **0**；當時仍會合併同時進行的查詢，後續確認這不符合commit後新請求契約；42711cf已移除跨請求的共享promise，見最新B0文件。公開 SQL 要求 blog verified、文章仍存在、非未來發布；不再只排除 moved。關係公開讀不使用 worker 舊 snapshot。層別詳細規則見 [公開內容與快取](public-page-cache.md)。
 
 隔離 MariaDB 為 18169 的隨機測試 DB，gateway／Next 為 18176／18177，使用正式 a45b06a build。兩站 A/B 共享一話題，另有 A-only 話題；先讀兩次，再把 A 改為非公開 seed，恢復／重新讀取後刪除 A 的文章。沒有對正式資料做這類驗證寫入。
 
