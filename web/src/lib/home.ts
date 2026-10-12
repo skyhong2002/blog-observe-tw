@@ -39,6 +39,21 @@ export function latestPostsBySlug(posts: Post[]): Map<string, RecentPost> {
 }
 
 /**
+ * Blog slug → the payload `iconUrl` the overview already carries (`recentBlogs`
+ * first, then `blogs`), so homepage icons can server-render the logo instead
+ * of waiting for the icon manifest. Keyed by slug only, like BlogIcon's
+ * `media`; a slug with no iconUrl is absent and keeps the initial.
+ */
+export function blogIconUrls(data: Pick<Overview, 'blogs' | 'recentBlogs'>): Map<string, string> {
+  const out = new Map<string, string>();
+  for (const blog of [...(data.recentBlogs ?? []), ...(data.blogs ?? [])]) {
+    const url = typeof blog.iconUrl === 'string' ? blog.iconUrl.trim() : '';
+    if (blog.slug && url && !out.has(blog.slug)) out.set(blog.slug, url);
+  }
+  return out;
+}
+
+/**
  * Prefers `recentBlogs` (already ordered by newest post). Older gateways only
  * send `blogs`: those are ordered by their newest known publish time, and the
  * latest title is looked up in `posts` by blog slug.

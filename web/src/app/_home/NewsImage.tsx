@@ -13,12 +13,15 @@ import styles from './home.module.css';
  */
 export default function NewsImage({
   src,
+  postId,
   href,
   analytics,
   title,
   variant,
 }: {
   src: string | null | undefined;
+  /** Public post ID for the same-origin derivative; absent keeps the original URL. */
+  postId?: number | null;
   href: string;
   /** `open_original` when href is the source article. */
   analytics?: string;
@@ -43,13 +46,11 @@ export default function NewsImage({
       <span className={styles.picture}>
         <SafeImage
           src={image}
+          postId={postId}
+          // One derivative per box (hero up to 560px, thumbnail up to 150px CSS).
+          srcWidth={priority ? 640 : 320}
           alt=""
           fill
-          sizes={
-            priority
-              ? '(max-width: 640px) calc(100vw - 34px), (max-width: 1000px) calc(66vw - 36px), (max-width: 1152px) calc(52vw - 40px), 560px'
-              : '(max-width: 640px) 26vw, (max-width: 1000px) 17vw, 150px'
-          }
           fetchPriority={priority ? 'high' : undefined}
           loading={priority ? 'eager' : 'lazy'}
           className={styles.photo}

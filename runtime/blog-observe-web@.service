@@ -1,0 +1,17 @@
+[Unit]
+Description=blog.observe.tw Next web slot %i
+After=network-online.target
+
+[Service]
+Type=simple
+EnvironmentFile=-%h/.config/blog-observe-web.env
+ExecStart=%h/.local/bin/node %h/.local/share/blog-observe/edge/code/app/src/edge/slot-service.ts web %i
+Restart=on-failure
+RestartSec=2
+TimeoutStopSec=35
+KillMode=mixed
+NoNewPrivileges=true
+UMask=0077
+
+[Install]
+WantedBy=default.target

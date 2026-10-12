@@ -95,7 +95,7 @@ export default function ArticleListItem({
             </ul>
           )}
         </div>
-        {href && <ArticleThumbnail src={article.image} href={href} title={headline.title} />}
+        {href && <ArticleThumbnail src={article.image} postId={article.id} href={href} title={headline.title} />}
       </article>
     </li>
   );

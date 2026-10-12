@@ -1,8 +1,8 @@
-# 可讀網址預覽驗證（2026-10-12）
+# 可讀網址驗證（2026-10-12）
 
-**尚未部署。** 正式版本仍為 `d6fd44a35da4ac92052e04bff670c6c161e50b3d`；本批以使用者指定草稿 `249bbc7` 與遠端 `origin/main` 的 `a1a226d` 為基礎。
+**已部署 `f6bd9191cae318c5bfb9c63e0b213fb6b8b3905f`**（2026-10-12 17:11 UTC），同 commit 已在 main／origin/main。先前正式 `d6fd44a35da4ac92052e04bff670c6c161e50b3d` 保留；本批以使用者指定草稿 `249bbc7` 與遠端 `origin/main` 的 `a1a226d` 為基礎。
 
-最後容量檢查約 9.2 GiB，低於 10 GiB 門檻，停止建置與部署；不另行清理任何檔案。先前已依使用者本人批准，只刪除 `blog-completion-release`、`blog-icon-fix` 中的六個依賴／建置目錄，df 可用空間當時由 10G 增至 12G。
+先前容量約 9.2 GiB 時依門檻暫停；後續容量恢复到約 66 GiB 才重新建置與部署，沒有額外清理任何目錄。先前已依使用者本人批准，只刪除 `blog-completion-release`、`blog-icon-fix` 中的六個依賴／建置目錄，df 可用空間當時由 10G 增至 12G。
 
 ## 已完成驗證
 
@@ -38,12 +38,19 @@
 
 這些數量取自同步中的預覽資料；正式切換後需重新擷取並回報。候選、文章與詞庫持續更新，不能把不同時間的筆數差異歸因於薄頁政策。
 
-## 尚待容量恢復
+## 正式部署驗證
 
-1. 重新 fetch origin，確認包含本批最新提交，先檢查至少 10 GiB；不再建立完整備份。
-2. 重建 `/api/`：最新使用者批准了 v1 blog.url 語意變更，頁面從同一份 `data/openapi.json` 產生，須把最新規格編進正式 artifact。
-3. 合併 main／push，建立不可變 release，切換 blog 服務，保留回滾。
-4. 重跑 `tools/seo/verify-readable.ts`、兩個 SEO 驗證器及三站／healthz／OAuth／SSRF 檢查；回報正式 commit、十組 301 與 sitemap 筆數。
+2026-10-12 17:15:30 UTC，`tools/seo/verify-readable.ts` 對正式網址通過：
+
+- 上表 5 個部落格均 301→200、自我 canonical。
+- 話題正式抽樣為「資訊安全／獨旅／解謎／統一／國防部長」，均 301→200、自我 canonical（預覽表的「剪刀」並非本次正式抽樣）。
+- sitemap：pages 5、blogs 313、topics 3176，全部為新網址；每類三筆 200、自我 canonical、無 noindex。
+- API 抽查 50 個部落格：url 本站頁面、sourceUrl 原站一致、圖示存在。
+- 首頁的 WebSite／Organization、部落格與話題的 BreadcrumbList 及 metadata 均通過驗證。
+
+筆數是該時間點的觀測值，不是凍結的資料集；詳細詞庫世代與 sitemap 數量差異另以一致性唯讀交易查核。薄頁政策未變。
+
+本次是直接重啟三服務，短暫 502 已確認；尚未實現先啟動新版再切流量。下一批須修正部署流程，並修正已正常送出 301 後的 duplicate reply 警告。
 
 ## 審查與容量
 

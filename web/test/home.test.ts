@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import type { Blog, Post } from '../src/lib/api.ts';
-import { latestPostsBySlug, recentBlogRows } from '../src/lib/home.ts';
+import { blogIconUrls, latestPostsBySlug, recentBlogRows } from '../src/lib/home.ts';
+import { mediaIconSource } from '../src/lib/media-icons.ts';
 
 const blog = (slug: string, extra: Partial<Blog> = {}): Blog => ({ slug, name: slug.toUpperCase(), ...extra });
 const post = (blogSlug: string, title: string, publishedAt: string | null, id = 0): Post => ({
@@ -73,4 +74,29 @@ test('latestPostsBySlug prefers dated, newer posts', () => {
     post('a', 'older', '2025-01-01T00:00:00Z', 3),
   ]);
   assert.equal(map.get('a')?.title, 'dated');
+});
+
+test('homepage icon lookup: payload iconUrl by blog slug, recentBlogs first, unknown slugs absent', () => {
+  const urls = blogIconUrls({
+    recentBlogs: [blog('a', { iconUrl: '/favicons/a.png?v=r2' }), blog('b', { iconUrl: '  ' })],
+    blogs: [
+      blog('a', { iconUrl: '/favicons/a.png?v=old' }),
+      blog('b', { iconUrl: 'https://b.example.com/favicon.ico' }),
+      blog('c', { iconUrl: null }),
+      blog('', { iconUrl: '/favicons/x.png' }),
+    ],
+  });
+  assert.deepEqual(
+    [...urls],
+    [
+      ['a', '/favicons/a.png?v=r2'],
+      ['b', 'https://b.example.com/favicon.ico'],
+    ],
+  );
+  // Server render has no manifest yet: a known slug renders its logo, an unknown one the initial.
+  assert.equal(mediaIconSource('a', {}, urls.get('a'), [], 14)?.src, '/images/icons/a/16.webp?v=r2');
+  assert.equal(mediaIconSource('c', {}, urls.get('c'), [], 14), null);
+  // Another blog's logo is never turned into this slug's local derivative.
+  assert.deepEqual(mediaIconSource('z', {}, urls.get('a'), [], 14), { src: '/favicons/a.png?v=r2', local: false });
+  assert.equal(blogIconUrls({ blogs: [] }).size, 0);
 });

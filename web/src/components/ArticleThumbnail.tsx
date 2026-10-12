@@ -7,7 +7,18 @@ import SafeImage from './SafeImage';
 
 /** Optional list thumbnail. No valid image, or a failed load, removes the link
  * and its box entirely so the row falls back to the text-only layout. */
-export default function ArticleThumbnail({ src, href, title }: { src: string | null; href: string; title: string }) {
+export default function ArticleThumbnail({
+  src,
+  postId,
+  href,
+  title,
+}: {
+  src: string | null;
+  /** Public post ID for the same-origin derivative; absent keeps the original URL. */
+  postId?: number | null;
+  href: string;
+  title: string;
+}) {
   const image = articleImage(src);
   const [settled, setSettled] = useState<{ src: string; state: ImageState } | null>(null);
   const state: ImageState = settled && settled.src === image ? settled.state : 'loading';
@@ -24,10 +35,13 @@ export default function ArticleThumbnail({ src, href, title }: { src: string | n
     >
       <SafeImage
         src={image}
+        postId={postId}
+        // 64-80px CSS box: 160 covers 2x.
+        srcWidth={160}
         alt=""
         width={320}
         height={220}
-        sizes="(max-width: 640px) 64px, 80px"
+        loading="lazy"
         className="aspect-[16/11] w-full object-cover"
         onLoad={() => setState('loaded')}
         onError={() => setState('error')}

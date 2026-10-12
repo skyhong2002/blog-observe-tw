@@ -1,8 +1,8 @@
 'use client';
 
-import Image from 'next/image';
-import { useState, useSyncExternalStore } from 'react';
-import { localMediaIcon, mediaIconClass, mediaIconSrc, mediaIcons } from '@/lib/media-icons';
+import { useRef, useState, useSyncExternalStore } from 'react';
+import { mediaIconClass, mediaIconSource, mediaIcons } from '@/lib/media-icons';
+import { useReplayedImageEvents } from './image-events';
 
 // One request for all mounted icons; monthly refreshes need no Next rebuild.
 let currentIcons = mediaIcons;
@@ -36,6 +36,8 @@ const getServerIcons = () => mediaIcons;
 // web/public/favicons (manifest: app/data/favicon-local.json); outlets without
 // a reviewed logo show their first character so rows stay aligned. `iconUrl`
 // (from the payload) lets server rendering show the logo before the manifest loads.
+// Stored logos load as same-origin WebP derivatives sized for the icon; a missing
+// derivative falls back to the stored PNG, then the next source, then the glyph.
 export default function MediaIcon({
   media,
   iconUrl,
@@ -55,22 +57,30 @@ export default function MediaIcon({
 }) {
   const icons = useSyncExternalStore(subscribe, getIcons, getServerIcons);
   const [failed, setFailed] = useState<string[]>([]);
-  const src = mediaIconSrc(media, icons, iconUrl, failed);
+  const source = mediaIconSource(media, icons, iconUrl, failed, size);
+  const ref = useRef<HTMLImageElement>(null);
+  useReplayedImageEvents(ref, source?.src);
   const px = (n: number) => (rem ? `${n / 16}rem` : n);
   const box = { width: px(size), height: px(size) };
-  if (src) {
+  if (source) {
+    const { src } = source;
     return (
-      <Image
+      // A plain <img>: next/image cannot take the derivative srcSet. A fresh
+      // element per source, so a dropped srcSet cannot race the new src.
+      <img
+        key={src}
+        ref={ref}
         src={src}
+        srcSet={source.srcSet}
         alt=""
         width={size}
         height={size}
-        unoptimized
         loading="lazy"
+        decoding="async"
         referrerPolicy="no-referrer"
-        onError={() => setFailed((previous) => [...previous, src])}
+        onError={() => setFailed((previous) => (previous.includes(src) ? previous : [...previous, src]))}
         style={box}
-        className={`shrink-0 rounded-sm object-contain ${src === localMediaIcon(media, icons) ? mediaIconClass(media, icons) : ''} ${className}`}
+        className={`shrink-0 rounded-sm object-contain ${source.local ? mediaIconClass(media, icons) : ''} ${className}`}
       />
     );
   }

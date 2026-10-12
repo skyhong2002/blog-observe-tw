@@ -1,0 +1,18 @@
+[Unit]
+Description=blog.observe.tw fixed-target blue/green edge
+Requires=blog-observe-edge.socket
+After=blog-observe-edge.socket
+
+[Service]
+Type=simple
+# Operator pins this symlink to one tested release; web deployments never change it.
+ExecStart=%h/.local/bin/node %h/.local/share/blog-observe/edge/code/app/src/edge/server.ts
+Sockets=blog-observe-edge.socket
+Restart=on-failure
+RestartSec=1
+TimeoutStopSec=35
+NoNewPrivileges=true
+UMask=0077
+
+[Install]
+WantedBy=default.target

@@ -11,6 +11,7 @@ import { loadCatalog } from './catalog.js';
 import { loadAuthorCatalog } from './catalog-authors.js';
 import { registerContentRoutes } from './content/routes.ts';
 import { createDb } from './db/client.ts';
+import { registerImageRoutes } from './images/routes.ts';
 import { loadOverview } from './overview.js';
 import { clientIp } from './public-api/client-ip.ts';
 import { installPublicApiPolicy, publicApiPath } from './public-api/middleware.ts';
@@ -61,6 +62,7 @@ export async function buildApp(config, { logger = false, store = null } = {}) {
   const own = store || createDb(config.blogDbUrl);
   const { pool } = own;
   registerPageLinks(app, pool);
+  registerImageRoutes(app, pool);
   const startedAt = Date.now();
   const keys = createApiKeyService(pool);
   installPublicApiPolicy(app, keys);
@@ -314,7 +316,7 @@ export async function buildApp(config, { logger = false, store = null } = {}) {
     // Unknown API/auth routes must never cycle through Next's rewrites.
     if (/^\/(api|auth)(?:\/|$)/.test(request.url))
       return reply.code(404).send({ error: publicApiPath(request.url) ? 'not_found' : 'not found' });
-    if (await redirectPublicPage(request, reply)) return;
+    if (await redirectPublicPage(request, reply)) return reply;
     return proxyToUi(request, reply, redirectPublicPage.uiPath(request));
   };
   app.route({ method: ['GET', 'HEAD'], url: '/', handler });

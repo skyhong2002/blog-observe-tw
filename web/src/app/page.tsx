@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import BlogIcon from '@/components/BlogIcon';
 import { plainText, taipei } from '@/lib/api';
-import { recentBlogRows } from '@/lib/home';
+import { blogIconUrls, recentBlogRows } from '@/lib/home';
 import { externalHref } from '@/lib/images';
 import { blogHref, blogLink, topicLink } from '@/lib/page-links';
 import { overview, publicJson } from '@/lib/public-api';
@@ -21,6 +21,8 @@ export default async function HomePage() {
   const [data, topics] = await Promise.all([overview(), publicJson<Topics>(topicsApiPath('30'))]);
   const [lead, ...rest] = data.posts;
   const recentBlogs = recentBlogRows(data, 10);
+  // Logos this response already carries: no extra request; unknown slugs keep the initial.
+  const iconUrls = blogIconUrls(data);
   const postHref = (post: { url?: string | null; blogSlug?: string; blogCanonicalPath?: string }) =>
     externalHref(post.url) ?? blogHref(post.blogSlug ?? '', post.blogCanonicalPath);
   // Only a real source URL is an original article; the /blogs/ fallback is not.
@@ -67,7 +69,9 @@ export default async function HomePage() {
                 <li key={`${author.id}-${author.blogSlug}`}>
                   <Link href={`/authors/?author=${author.id}`}>
                     <span className={`${styles.journalistName} inline-flex items-center gap-1.5`}>
-                      {author.blogSlug && <BlogIcon media={author.blogSlug} title={author.blogName} />}
+                      {author.blogSlug && (
+                        <BlogIcon media={author.blogSlug} iconUrl={iconUrls.get(author.blogSlug)} title={author.blogName} />
+                      )}
                       {author.displayName}
                     </span>
                     <span className={styles.journalistCount}>{author.postCount ?? 0} 篇</span>
@@ -85,7 +89,14 @@ export default async function HomePage() {
             {lead ? (
               <>
                 <article className={styles.hero}>
-                  <NewsImage src={lead.imageUrl} href={postHref(lead)} analytics={original(lead)} title={lead.title} variant="hero" />
+                  <NewsImage
+                    src={lead.imageUrl}
+                    postId={lead.id}
+                    href={postHref(lead)}
+                    analytics={original(lead)}
+                    title={lead.title}
+                    variant="hero"
+                  />
                   <div className={styles.heroContent}>
                     <span className={styles.heroBadge}>最近發文</span>
                     <h3>
@@ -95,7 +106,7 @@ export default async function HomePage() {
                     </h3>
                     <p className={styles.source}>
                       <Link {...blogLink(lead.blogSlug ?? '', lead.blogCanonicalPath)} className="inline-flex items-center gap-1.5">
-                        {lead.blogSlug && <BlogIcon media={lead.blogSlug} title={lead.blogName} />}
+                        {lead.blogSlug && <BlogIcon media={lead.blogSlug} iconUrl={iconUrls.get(lead.blogSlug)} title={lead.blogName} />}
                         {lead.blogName}
                       </Link>
                       <span>· {taipei(lead.publishedAt)}</span>
@@ -127,7 +138,9 @@ export default async function HomePage() {
                         </h3>
                         <p className={styles.source}>
                           <Link {...blogLink(post.blogSlug ?? '', post.blogCanonicalPath)} className="inline-flex items-center gap-1.5">
-                            {post.blogSlug && <BlogIcon media={post.blogSlug} title={post.blogName} />}
+                            {post.blogSlug && (
+                              <BlogIcon media={post.blogSlug} iconUrl={iconUrls.get(post.blogSlug)} title={post.blogName} />
+                            )}
                             {post.blogName}
                           </Link>
                           <span>· {taipei(post.publishedAt)}</span>
@@ -135,6 +148,7 @@ export default async function HomePage() {
                       </div>
                       <NewsImage
                         src={post.imageUrl}
+                        postId={post.id}
                         href={postHref(post)}
                         analytics={original(post)}
                         title={post.title}
@@ -185,7 +199,7 @@ export default async function HomePage() {
                       <li key={blog.slug}>
                         <p className={styles.recentBlogName}>
                           <Link {...blogLink(blog.slug, blog.canonicalPath)} title={blog.name}>
-                            <BlogIcon media={blog.slug} title={blog.name} />
+                            <BlogIcon media={blog.slug} iconUrl={iconUrls.get(blog.slug)} title={blog.name} />
                             <span>{blog.name}</span>
                           </Link>
                           {publishedAt && <time dateTime={publishedAt}>{taipei(publishedAt)}</time>}

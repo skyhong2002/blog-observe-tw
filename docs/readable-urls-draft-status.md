@@ -14,6 +14,8 @@
 
 ## 目前發布狀態
 
-2026-10-12 最後容量檢查再次低於 10 GiB，因此**尚未切換正式服務**，正式 release 仍是 `d6fd44a35da4ac92052e04bff670c6c161e50b3d`。可讀網址預覽已完成 5 個部落格與 5 個話題的 301→200、自我 canonical、Unicode／雙重編碼、三類 metadata／JSON-LD 及相容回滾測試。最新 API 欄位意義依使用者最終決定已更新規格與文件，`/api/` 自動讀取同一份產生的規格；仍須在容量恢復後重新建置該文件頁並完成正式網址驗收。
+2026-10-12 17:11 UTC 已將 `f6bd9191cae318c5bfb9c63e0b213fb6b8b3905f` 合併／推送至 main 並切換三個 blog 服務；先前容量阻塞已解除。正式 release 同 commit，`d6fd44a35da4ac92052e04bff670c6c161e50b3d` 保留供回滾，未刪既有備份或其他目錄。建置採單一 prerender worker，避免共用主機高負載造成內部 API 逾時。
 
-備份後補齊期間新增的 registry／alias，未修改文章 ID／原站 URL／favicon。這些新增表在 d6 正式版中尚未被使用。下一次先 fetch origin、確認此分支的最新 commit、檢查空間，通過建置與全部驗證後再合併 main／push／切換；不得拿本狀態文件當成已部署證明。
+17:15 UTC 正式 HTTP 驗證：5 個部落格與 5 個話題皆單次 301→200、自我 canonical；sitemap 三個子檔 5／313／3176 筆，皆無舊式網址；公開 API 抽查 50 個部落格的 url、sourceUrl 與圖示正確。首頁、部落格及話題 metadata／JSON-LD 通過。完整證據見 `docs/readable-urls-validation-2026-10-12.md`。
+
+此次仍是直接重啟既有服務，切換時曾短暫 502，不能宣稱零停機。後續部署應先啟動並驗證新版，再切換流量；穩定入口的首次引入限制與回滾流程需明列。另舊網址 handler 的重複 reply 警告已排入下一小批修正與回歸測試。

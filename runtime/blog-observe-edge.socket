@@ -1,0 +1,13 @@
+[Unit]
+Description=blog.observe.tw stable loopback listener (one-time migration required)
+
+[Socket]
+ListenStream=127.0.0.1:18160
+Accept=no
+FileDescriptorName=http
+Backlog=512
+Service=blog-observe-edge.service
+NoDelay=true
+
+[Install]
+WantedBy=sockets.target
