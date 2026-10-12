@@ -2,8 +2,12 @@ import { Queue, Worker } from 'bullmq';
 import { Redis } from 'ioredis';
 import pino from 'pino';
 import { loadConfig } from './config.js';
+import { runCandidateReviewBatch } from './crawl/candidate-review.ts';
 import { discoverBlogblog, discoverSimilar } from './crawl/discovery.ts';
+import { refreshMissingBlogFavicons } from './crawl/favicon-batch.ts';
 import { crawlBlog } from './crawl/feed.ts';
+import { runHistoryBatch } from './crawl/history.ts';
+import { createHistoryStore, selectHistoryBlogs } from './crawl/history-store.ts';
 import { createTagSimilarSitesClient } from './crawl/similarweb-client.ts';
 import { createDb } from './db/client.ts';
 
@@ -31,11 +35,67 @@ await queue.upsertJobScheduler(
   { every: 60 * 60_000 },
   { name: 'blogs-similarweb', data: {}, opts: { removeOnComplete: 10, removeOnFail: 10 } },
 );
+const historyEnabled = process.env.BLOG_HISTORY_ENABLED !== 'false';
+const candidateReviewEnabled = process.env.BLOG_CANDIDATE_REVIEW_ENABLED !== 'false';
+const missingIconsEnabled = process.env.BLOG_MISSING_FAVICONS_ENABLED !== 'false';
+for (const [name, every, enabled] of [
+  ['blogs-history', 5 * 60_000, historyEnabled],
+  ['blogs-candidate-review', 30 * 60_000, candidateReviewEnabled],
+  ['blogs-missing-icons', 15 * 60_000, missingIconsEnabled],
+] as const) {
+  if (enabled) await queue.upsertJobScheduler(name, { every }, { name, data: {}, opts: { removeOnComplete: 20, removeOnFail: 20 } });
+  else await queue.removeJobScheduler(name);
+}
 const similarWeb = { ...config.similarWeb, client: createTagSimilarSitesClient() };
 
+let closing = false;
 const worker = new Worker(
   config.queueName,
   async (job) => {
+    if (job.name === 'blogs-history') {
+      if (!historyEnabled) return { skipped: 'disabled' };
+      const blogs = await selectHistoryBlogs(store.pool, 5);
+      const history = createHistoryStore(store.pool);
+      const results = [];
+      for (const blog of blogs) {
+        if (closing) break;
+        try {
+          const result = await runHistoryBatch(history, blog, {
+            userAgent: config.crawlUserAgent,
+            delayMs: config.crawlDelayMs,
+            timeoutMs: 10000,
+            maxPages: 5,
+            maxArticles: 30,
+            maxDurationMs: 45000,
+          });
+          results.push(result);
+          if (result.status === 'busy') break;
+        } catch {
+          results.push({ blogId: blog.id, status: 'batch-failed' });
+        }
+      }
+      return { count: results.length, results };
+    }
+    if (job.name === 'blogs-candidate-review') {
+      if (!candidateReviewEnabled) return { skipped: 'disabled' };
+      return runCandidateReviewBatch(store.pool, {
+        apply: true,
+        limit: 25,
+        maxDurationMs: 120000,
+        userAgent: config.crawlUserAgent,
+        delayMs: config.crawlDelayMs,
+        timeoutMs: 6000,
+      });
+    }
+    if (job.name === 'blogs-missing-icons') {
+      if (!missingIconsEnabled) return { skipped: 'disabled' };
+      return refreshMissingBlogFavicons(store.pool, {
+        limit: 10,
+        maxDurationMs: 120000,
+        userAgent: config.crawlUserAgent,
+        delayMs: config.crawlDelayMs,
+      });
+    }
     if (job.name === 'blogs-discovery') {
       return discoverBlogblog(store.pool, config.crawlUserAgent);
     }
@@ -57,6 +117,7 @@ const worker = new Worker(
     ];
     const results = [];
     for (const blog of rows) {
+      if (closing) break;
       try {
         results.push(await crawlBlog(store, blog, { userAgent: config.crawlUserAgent, delayMs: config.crawlDelayMs }));
       } catch (error) {
@@ -70,7 +131,6 @@ const worker = new Worker(
 worker.on('completed', (job) => log.info({ job: job.name }, 'blog worker job completed'));
 worker.on('failed', (job, error) => log.error({ job: job?.name, error: error.message }, 'blog worker job failed'));
 
-let closing = false;
 async function close() {
   if (closing) return;
   closing = true;

@@ -7,7 +7,7 @@ import { XMLParser, XMLValidator } from 'fast-xml-parser';
 import type { Pool } from 'mysql2/promise';
 import { Agent, type Dispatcher, fetch as undiciFetch } from 'undici';
 
-export type FeedSourceType = 'rss' | 'atom' | 'sitemap';
+export type FeedSourceType = 'rss' | 'atom' | 'sitemap' | 'wordpress';
 export type FeedLink = { url: string; type: FeedSourceType };
 export type FeedEntry = {
   guid: string;
@@ -76,7 +76,9 @@ const textOf = (value: unknown): string => {
 };
 const absolute = (value: unknown, base: string): string | null => {
   try {
-    const url = new URL(textOf(value), base);
+    const raw = textOf(value).trim();
+    if (!raw) return null;
+    const url = new URL(raw, base);
     return isAllowedCrawlUrl(url.toString()) ? url.toString() : null;
   } catch {
     return null;
@@ -371,9 +373,12 @@ export async function politeFetch(
     // Check both the initial URL and every redirect target. This prevents a
     // feed from bypassing robots by bouncing through an unrelated host.
     const host = url.host;
-    const wait = (hostNextAt.get(host) ?? 0) - Date.now();
+    // Reserve the slot before yielding: concurrent redirected requests to the
+    // same host must not wake together and overwrite each other's reservation.
+    const scheduled = Math.max(Date.now(), hostNextAt.get(host) ?? 0);
+    hostNextAt.set(host, scheduled + delayMs);
+    const wait = scheduled - Date.now();
     if (wait > 0) await new Promise((resolve) => setTimeout(resolve, wait));
-    hostNextAt.set(host, Date.now() + delayMs);
     if (!(await robotsAllows(url.toString(), userAgent, timeoutMs, resolveHost, fetcher))) throw new Error(`robots disallow ${url}`);
     const response = await pinnedFetch(
       target,
@@ -412,6 +417,19 @@ function discoverLinks(html: string, baseUrl: string): FeedLink[] {
   return links;
 }
 
+export function isCommentsFeed(url: string, title = ''): boolean {
+  try {
+    const parsed = new URL(url);
+    return (
+      /(?:^|\/)comments?(?:\/|$)/i.test(parsed.pathname) ||
+      /^comments?(?:-|$)/i.test(parsed.searchParams.get('feed') || '') ||
+      /^(?:comments? (?:on|for)\b)|comments? feed|(?:留言|評論)(?:摘要|訂閱|回應|feed)/i.test(title)
+    );
+  } catch {
+    return true;
+  }
+}
+
 export function parseFeed(xml: string, baseUrl: string): FeedEntry[] {
   let root: Record<string, unknown>;
   try {
@@ -421,11 +439,12 @@ export function parseFeed(xml: string, baseUrl: string): FeedEntry[] {
   }
   const channel = (root.rss as Record<string, unknown> | undefined)?.channel as Record<string, unknown> | undefined;
   if (channel) {
+    if (isCommentsFeed(baseUrl, textOf(channel.title))) return [];
     return asArray(channel.item as unknown)
       .map((item): FeedEntry | null => {
         const object = (item || {}) as Record<string, unknown>;
         const url = absolute(object.link ?? object.guid, baseUrl);
-        if (!url) return null;
+        if (!url || /#comment|[?&]replytocom=/i.test(url)) return null;
         return {
           guid: textOf(object.guid || object.link || object.title).slice(0, 1024),
           url,
@@ -446,20 +465,21 @@ export function parseFeed(xml: string, baseUrl: string): FeedEntry[] {
   }
   const atom = root.feed as Record<string, unknown> | undefined;
   if (atom) {
+    if (isCommentsFeed(baseUrl, textOf(atom.title))) return [];
     return asArray(atom.entry as unknown)
       .map((entry): FeedEntry | null => {
         const object = (entry || {}) as Record<string, unknown>;
         const links = asArray(object.link as unknown).map((item) => (item || {}) as Record<string, unknown>);
         const link = links.find((item) => item['@_rel'] === 'alternate') || links[0];
         const url = absolute(link?.['@_href'] || link, baseUrl);
-        if (!url) return null;
+        if (!url || /#comment|[?&]replytocom=/i.test(url)) return null;
         return {
           guid: textOf(object.id || link?.['@_href'] || object.title).slice(0, 1024),
           url,
           title: textOf(object.title) || '未命名文章',
           summary: textOf(object.summary || object.content),
           author: textOf((object.author as Record<string, unknown> | undefined)?.name || object.author) || null,
-          publishedAt: dateOf(object.published || object.updated),
+          publishedAt: dateOf(object.published),
           updatedAt: dateOf(object.updated || object.published),
           imageUrl: null,
           categories: asArray(object.category).map(textOf).filter(Boolean).slice(0, 20),
@@ -627,7 +647,121 @@ export async function discoverFeedUrls(blogUrl: string, options: FeedCrawlerOpti
   return discoverLinks(await response.text(), blogUrl);
 }
 
-type SqlPool = Pick<Pool, 'execute'>;
+export type SqlPool = Pick<Pool, 'execute'>;
+
+export function canonicalArticleUrl(value: string): string {
+  const url = new URL(value);
+  url.hash = '';
+  for (const key of [...url.searchParams.keys()]) if (/^utm_|^(?:fbclid|gclid|mc_cid|mc_eid)$/i.test(key)) url.searchParams.delete(key);
+  url.searchParams.sort();
+  return url.href;
+}
+
+/** Shared writer. Production callers hold the blog row in a transaction so URL/guid identity is serialized. */
+export async function writeFeedEntries(
+  pool: SqlPool,
+  blog: BlogToCrawl,
+  source: FeedLink,
+  entries: FeedEntry[],
+  now = new Date(),
+): Promise<number> {
+  let written = 0;
+  for (const original of entries) {
+    const entry = { ...original, url: canonicalArticleUrl(original.url) };
+    const [existingUrl] = await pool.execute('SELECT guid FROM posts WHERE blog_id=? AND url=? ORDER BY id LIMIT 1', [blog.id, entry.url]);
+    if (Array.isArray(existingUrl) && existingUrl[0]) entry.guid = String((existingUrl[0] as { guid: string }).guid);
+    const title = truncateCharacters(entry.title, 512);
+    // MariaDB TEXT is limited in bytes. Chinese/emoji summaries can exceed
+    // it long before a JavaScript string reaches 65k characters.
+    const summary = truncateUtf8(entry.summary || '', 60 * 1024);
+    const author = entry.author ? truncateCharacters(entry.author.trim(), 255) || null : null;
+    // Truncating a URL creates a different resource; omit an oversized image.
+    const imageUrl = entry.imageUrl && entry.imageUrl.length <= 1024 ? entry.imageUrl : null;
+    const contentHash = shortHash(`${title}\n${summary}`);
+    await pool.execute(
+      "INSERT INTO posts (blog_id,guid,url,title,summary,author,published_at,updated_at,image_url,content_hash,source_type,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?) ON DUPLICATE KEY UPDATE url=VALUES(url),title=COALESCE(NULLIF(NULLIF(VALUES(title),''),'未命名文章'),title),summary=COALESCE(NULLIF(VALUES(summary),''),summary),author=COALESCE(NULLIF(VALUES(author),''),author),published_at=COALESCE(VALUES(published_at),published_at),updated_at=COALESCE(VALUES(updated_at),updated_at),image_url=COALESCE(NULLIF(VALUES(image_url),''),image_url),content_hash=SHA2(CONCAT(COALESCE(NULLIF(NULLIF(VALUES(title),''),'未命名文章'),title),CHAR(10),COALESCE(NULLIF(VALUES(summary),''),summary,'')),256)",
+      [
+        blog.id,
+        entry.guid.slice(0, 1024),
+        entry.url.slice(0, 1024),
+        title,
+        summary || null,
+        author,
+        entry.publishedAt,
+        entry.updatedAt,
+        imageUrl,
+        contentHash,
+        source.type,
+        now,
+      ],
+    );
+    // A pen name is resolved within this blog only. Matching names on two
+    // sites therefore create two author identities until a human explicitly
+    // merges them. Crawler updates never replace manual/community links.
+    if (author) {
+      const displayName = author;
+      const normalized = truncateCharacters(displayName.normalize('NFKC').toLocaleLowerCase('zh-TW').replace(/\s+/g, ' ').trim(), 255);
+      const [existing] = await pool.execute(
+        `SELECT a.id FROM authors a JOIN blog_authors ba ON ba.author_id=a.id
+           WHERE ba.blog_id=? AND a.normalized_name=? LIMIT 1`,
+        [blog.id, normalized],
+      );
+      let authorId = Array.isArray(existing) && existing[0] ? (existing[0] as { id: number }).id : null;
+      if (!authorId) {
+        const [result] = await pool.execute(
+          `INSERT INTO authors (display_name,normalized_name,source_type,source_url,source_evidence,first_seen_at,last_seen_at,created_at,updated_at)
+             VALUES (?,?,?,?,?,?,?,?,?)`,
+          [displayName, normalized, 'crawler', source.url, JSON.stringify({ guid: entry.guid }), now, now, now, now],
+        );
+        authorId = (result as { insertId: number }).insertId;
+      }
+      await pool.execute(
+        "UPDATE authors SET last_seen_at=?,last_published_at=COALESCE(GREATEST(COALESCE(last_published_at,?),?),last_published_at),updated_at=? WHERE id=? AND source_type NOT IN ('manual','community')",
+        [now, entry.publishedAt, entry.publishedAt, now, authorId],
+      );
+      await pool.execute(
+        `INSERT INTO blog_authors (blog_id,author_id,role,status,is_primary,source_type,source_url,source_evidence,first_seen_at,last_seen_at,created_at,updated_at)
+           VALUES (?,?,?,?,?,?,?,?,?,?,?,?) ON DUPLICATE KEY UPDATE last_seen_at=IF(blog_authors.source_type IN ('manual','community'),blog_authors.last_seen_at,VALUES(last_seen_at)),updated_at=VALUES(updated_at)`,
+        [blog.id, authorId, 'author', 'active', false, 'crawler', source.url, JSON.stringify({ guid: entry.guid }), now, now, now, now],
+      );
+      await pool.execute(
+        `INSERT INTO post_authors (post_id,author_id,position,source_type,source_url,source_evidence,first_seen_at,last_seen_at,created_at,updated_at)
+           SELECT id,?,?,?,?,?,?,?,?,? FROM posts WHERE blog_id=? AND guid=?
+           ON DUPLICATE KEY UPDATE last_seen_at=IF(post_authors.source_type IN ('manual','community'),post_authors.last_seen_at,VALUES(last_seen_at)),updated_at=VALUES(updated_at)`,
+        [authorId, 0, 'crawler', source.url, JSON.stringify({ guid: entry.guid }), now, now, now, now, blog.id, entry.guid.slice(0, 1024)],
+      );
+    }
+    for (const rawTag of entry.categories) {
+      const label = rawTag.trim().slice(0, 255);
+      if (!label) continue;
+      const normalized = label.normalize('NFKC').toLocaleLowerCase('zh-TW').replace(/\s+/g, ' ').trim();
+      const slug =
+        normalized
+          .replace(/[^\p{Letter}\p{Number}]+/gu, '-')
+          .replace(/^-|-$/g, '')
+          .slice(0, 180) || `tag-${shortHash(normalized).slice(0, 12)}`;
+      await pool.execute(
+        `INSERT INTO tags (slug,label,normalized_label,kind,visibility,status,source_type,source_url,source_evidence,first_seen_at,last_seen_at,created_at,updated_at)
+           VALUES (?,?,?,'topic','public','active','crawler',?,?,?,?,?,?) ON DUPLICATE KEY UPDATE last_seen_at=IF(tags.source_type IN ('manual','community'),tags.last_seen_at,VALUES(last_seen_at)),updated_at=VALUES(updated_at)`,
+        [slug, label, normalized, source.url, JSON.stringify({ guid: entry.guid }), now, now, now, now],
+      );
+      await pool.execute(
+        `INSERT INTO post_tags (post_id,tag_id,source_type,source_url,source_evidence,first_seen_at,last_seen_at,created_at,updated_at)
+           SELECT id,(SELECT id FROM tags WHERE slug=?),?,?,?,?,?,?,? FROM posts WHERE blog_id=? AND guid=?
+           ON DUPLICATE KEY UPDATE last_seen_at=IF(post_tags.source_type IN ('manual','community'),post_tags.last_seen_at,VALUES(last_seen_at)),updated_at=VALUES(updated_at)`,
+        [slug, 'crawler', source.url, JSON.stringify({ guid: entry.guid }), now, now, now, now, blog.id, entry.guid.slice(0, 1024)],
+      );
+      await pool.execute(
+        `INSERT INTO blog_tags (blog_id,tag_id,role,status,source_type,source_url,source_evidence,first_seen_at,last_seen_at,created_at,updated_at)
+           SELECT ?,id,'topic','active','crawler',?,?,?,?,?,? FROM tags WHERE slug=?
+           ON DUPLICATE KEY UPDATE last_seen_at=IF(blog_tags.source_type IN ('manual','community'),blog_tags.last_seen_at,VALUES(last_seen_at)),updated_at=VALUES(updated_at)`,
+        [blog.id, source.url, JSON.stringify({ guid: entry.guid }), now, now, now, now, slug],
+      );
+    }
+    written += 1;
+  }
+  return written;
+}
 
 /** Crawl one blog using the existing schema.  The worker supplies its own
  * pool; no queue, database, or session is shared with sibling services. */
@@ -724,132 +858,45 @@ export async function crawlBlog(
       sitemapBudget -= candidates.length;
       entries = await verifySitemapArticles(candidates, blog.url, options);
     } else entries = parseFeed(body, response.url || source.url);
-    for (const entry of entries) {
-      const title = truncateCharacters(entry.title, 512);
-      // MariaDB TEXT is limited in bytes. Chinese/emoji summaries can exceed
-      // it long before a JavaScript string reaches 65k characters.
-      const summary = truncateUtf8(entry.summary || '', 60 * 1024);
-      const author = entry.author ? truncateCharacters(entry.author.trim(), 255) || null : null;
-      // Truncating a URL creates a different resource; omit an oversized image.
-      const imageUrl = entry.imageUrl && entry.imageUrl.length <= 1024 ? entry.imageUrl : null;
-      const contentHash = shortHash(`${title}\n${summary}`);
-      await pool.execute(
-        'INSERT INTO posts (blog_id,guid,url,title,summary,author,published_at,updated_at,image_url,content_hash,source_type,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?) ON DUPLICATE KEY UPDATE url=VALUES(url),title=VALUES(title),summary=VALUES(summary),author=VALUES(author),published_at=VALUES(published_at),updated_at=VALUES(updated_at),image_url=VALUES(image_url),content_hash=VALUES(content_hash)',
+    // SQL work starts after all network requests. History uses the same writer
+    // in its task transaction, so both paths serialize on the blog row.
+    const connection = 'getConnection' in pool ? await (pool as Pool).getConnection() : null;
+    const writer = connection ?? pool;
+    try {
+      if (connection) {
+        await connection.beginTransaction();
+        await connection.execute('SELECT id FROM blogs WHERE id=? FOR UPDATE', [blog.id]);
+      }
+      total += await writeFeedEntries(writer, blog, source, entries, now);
+      // A validator acknowledges durable import of the entire source, including
+      // author/tag links. Persist it last so a failed write is replayable.
+      const etag = response.headers.get('etag');
+      const lastModified = response.headers.get('last-modified');
+      await writer.execute(
+        'INSERT INTO feed_sources (blog_id,url,type,etag,last_modified,last_success_at,consecutive_failures) VALUES (?,?,?,?,?,?,0) ON DUPLICATE KEY UPDATE etag=VALUES(etag),last_modified=VALUES(last_modified),last_success_at=VALUES(last_success_at),last_error_at=NULL,consecutive_failures=0',
         [
           blog.id,
-          entry.guid.slice(0, 1024),
-          entry.url.slice(0, 1024),
-          title,
-          summary || null,
-          author,
-          entry.publishedAt,
-          entry.updatedAt,
-          imageUrl,
-          contentHash,
+          source.url,
           source.type,
+          etag && etag.length <= 512 ? etag : null,
+          lastModified && lastModified.length <= 255 ? lastModified : null,
           now,
         ],
       );
-      // A pen name is resolved within this blog only. Matching names on two
-      // sites therefore create two author identities until a human explicitly
-      // merges them. Crawler updates never replace manual/community links.
-      if (author) {
-        const displayName = author;
-        const normalized = truncateCharacters(displayName.normalize('NFKC').toLocaleLowerCase('zh-TW').replace(/\s+/g, ' ').trim(), 255);
-        const [existing] = await pool.execute(
-          `SELECT a.id FROM authors a JOIN blog_authors ba ON ba.author_id=a.id
-           WHERE ba.blog_id=? AND a.normalized_name=? LIMIT 1`,
-          [blog.id, normalized],
-        );
-        let authorId = Array.isArray(existing) && existing[0] ? (existing[0] as { id: number }).id : null;
-        if (!authorId) {
-          const [result] = await pool.execute(
-            `INSERT INTO authors (display_name,normalized_name,source_type,source_url,source_evidence,first_seen_at,last_seen_at,created_at,updated_at)
-             VALUES (?,?,?,?,?,?,?,?,?)`,
-            [displayName, normalized, 'crawler', source.url, JSON.stringify({ guid: entry.guid }), now, now, now, now],
-          );
-          authorId = (result as { insertId: number }).insertId;
-        } else {
-          await pool.execute(
-            "UPDATE authors SET last_seen_at=?,last_published_at=COALESCE(?,last_published_at),updated_at=? WHERE id=? AND source_type NOT IN ('manual','community')",
-            [now, entry.publishedAt, now, authorId],
-          );
-        }
-        await pool.execute(
-          `INSERT INTO blog_authors (blog_id,author_id,role,status,is_primary,source_type,source_url,source_evidence,first_seen_at,last_seen_at,created_at,updated_at)
-           VALUES (?,?,?,?,?,?,?,?,?,?,?,?) ON DUPLICATE KEY UPDATE last_seen_at=IF(blog_authors.source_type IN ('manual','community'),blog_authors.last_seen_at,VALUES(last_seen_at)),updated_at=VALUES(updated_at)`,
-          [blog.id, authorId, 'author', 'active', false, 'crawler', source.url, JSON.stringify({ guid: entry.guid }), now, now, now, now],
-        );
-        await pool.execute(
-          `INSERT INTO post_authors (post_id,author_id,position,source_type,source_url,source_evidence,first_seen_at,last_seen_at,created_at,updated_at)
-           SELECT id,?,?,?,?,?,?,?,?,? FROM posts WHERE blog_id=? AND guid=?
-           ON DUPLICATE KEY UPDATE last_seen_at=IF(post_authors.source_type IN ('manual','community'),post_authors.last_seen_at,VALUES(last_seen_at)),updated_at=VALUES(updated_at)`,
-          [
-            authorId,
-            0,
-            'crawler',
-            source.url,
-            JSON.stringify({ guid: entry.guid }),
-            now,
-            now,
-            now,
-            now,
-            blog.id,
-            entry.guid.slice(0, 1024),
-          ],
-        );
-      }
-      for (const rawTag of entry.categories) {
-        const label = rawTag.trim().slice(0, 255);
-        if (!label) continue;
-        const normalized = label.normalize('NFKC').toLocaleLowerCase('zh-TW').replace(/\s+/g, ' ').trim();
-        const slug =
-          normalized
-            .replace(/[^\p{Letter}\p{Number}]+/gu, '-')
-            .replace(/^-|-$/g, '')
-            .slice(0, 180) || `tag-${shortHash(normalized).slice(0, 12)}`;
-        await pool.execute(
-          `INSERT INTO tags (slug,label,normalized_label,kind,visibility,status,source_type,source_url,source_evidence,first_seen_at,last_seen_at,created_at,updated_at)
-           VALUES (?,?,?,'topic','public','active','crawler',?,?,?,?,?,?) ON DUPLICATE KEY UPDATE last_seen_at=IF(tags.source_type IN ('manual','community'),tags.last_seen_at,VALUES(last_seen_at)),updated_at=VALUES(updated_at)`,
-          [slug, label, normalized, source.url, JSON.stringify({ guid: entry.guid }), now, now, now, now],
-        );
-        await pool.execute(
-          `INSERT INTO post_tags (post_id,tag_id,source_type,source_url,source_evidence,first_seen_at,last_seen_at,created_at,updated_at)
-           SELECT id,(SELECT id FROM tags WHERE slug=?),?,?,?,?,?,?,? FROM posts WHERE blog_id=? AND guid=?
-           ON DUPLICATE KEY UPDATE last_seen_at=IF(post_tags.source_type IN ('manual','community'),post_tags.last_seen_at,VALUES(last_seen_at)),updated_at=VALUES(updated_at)`,
-          [slug, 'crawler', source.url, JSON.stringify({ guid: entry.guid }), now, now, now, now, blog.id, entry.guid.slice(0, 1024)],
-        );
-        await pool.execute(
-          `INSERT INTO blog_tags (blog_id,tag_id,role,status,source_type,source_url,source_evidence,first_seen_at,last_seen_at,created_at,updated_at)
-           SELECT ?,id,'topic','active','crawler',?,?,?,?,?,? FROM tags WHERE slug=?
-           ON DUPLICATE KEY UPDATE last_seen_at=IF(blog_tags.source_type IN ('manual','community'),blog_tags.last_seen_at,VALUES(last_seen_at)),updated_at=VALUES(updated_at)`,
-          [blog.id, source.url, JSON.stringify({ guid: entry.guid }), now, now, now, now, slug],
-        );
-      }
-      total += 1;
+      if (connection) await connection.commit();
+    } catch (error) {
+      if (connection) await connection.rollback();
+      throw error;
+    } finally {
+      connection?.release();
     }
-    // A validator acknowledges durable import of the entire source, including
-    // author/tag links. Persist it last so a failed write is replayable.
-    const etag = response.headers.get('etag');
-    const lastModified = response.headers.get('last-modified');
-    await pool.execute(
-      'INSERT INTO feed_sources (blog_id,url,type,etag,last_modified,last_success_at,consecutive_failures) VALUES (?,?,?,?,?,?,0) ON DUPLICATE KEY UPDATE etag=VALUES(etag),last_modified=VALUES(last_modified),last_success_at=VALUES(last_success_at),last_error_at=NULL,consecutive_failures=0',
-      [
-        blog.id,
-        source.url,
-        source.type,
-        etag && etag.length <= 512 ? etag : null,
-        lastModified && lastModified.length <= 255 ? lastModified : null,
-        now,
-      ],
-    );
     sourceCount += 1;
   }
   await pool.execute(
     `UPDATE blogs SET last_crawled_at=?,last_crawl_success_at=IF(?, ?, last_crawl_success_at),
      last_published_at=COALESCE((SELECT MAX(published_at) FROM posts WHERE blog_id=?),last_published_at),
-     history_imported_at=IF(?, COALESCE(history_imported_at, ?), history_imported_at) WHERE id=?`,
-    [now, sourceCount > 0, now, blog.id, Boolean(options.historyImport && sourceCount > 0), now, blog.id],
+     history_imported_at=history_imported_at WHERE id=?`,
+    [now, sourceCount > 0, now, blog.id, blog.id],
   );
   return { blog: blog.slug, sources: sourceCount, posts: total };
 }

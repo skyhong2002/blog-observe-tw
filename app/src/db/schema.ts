@@ -1,3 +1,4 @@
+import { sql } from 'drizzle-orm';
 import { boolean, char, datetime, index, int, json, mysqlTable, primaryKey, text, uniqueIndex, varchar } from 'drizzle-orm/mysql-core';
 import type { BlogrollLink } from '../crawl/blogroll-contract.ts';
 
@@ -272,6 +273,9 @@ export const posts = mysqlTable(
     uniqueIndex('posts_blog_guid').on(table.blogId, table.guid),
     index('posts_published').on(table.publishedAt),
     index('posts_blog_published').on(table.blogId, table.publishedAt),
+    // URL equality remains exact; this nonunique prefix only narrows the lookup.
+    // 512 utf8mb4 characters + blog_id stay below InnoDB's 3072-byte key limit.
+    index('posts_blog_url_prefix').on(table.blogId, sql`${sql.identifier(table.url.name)}(512)`),
   ],
 );
 
@@ -425,4 +429,49 @@ export const discoveryEdges = mysqlTable(
     lastSeenAt: datetime('last_seen_at').notNull(),
   },
   (table) => [index('discovery_edges_seen').on(table.lastSeenAt)],
+);
+
+/** History completion is a durable queue state, never inferred from one successful feed poll. */
+export const historyRuns = mysqlTable(
+  'history_runs',
+  {
+    blogId: int('blog_id').primaryKey(),
+    status: varchar('status', { length: 16 }).notNull().default('partial'),
+    pagesFetched: int('pages_fetched').notNull().default(0),
+    articlesWritten: int('articles_written').notNull().default(0),
+    tasksTotal: int('tasks_total').notNull().default(0),
+    tasksDone: int('tasks_done').notNull().default(0),
+    archiveSeen: boolean('archive_seen').notNull().default(false),
+    warnings: json('warnings').$type<string[]>().notNull(),
+    lastError: varchar('last_error', { length: 255 }),
+    nextAttemptAt: datetime('next_attempt_at'),
+    startedAt: datetime('started_at').notNull(),
+    updatedAt: datetime('updated_at').notNull(),
+    completedAt: datetime('completed_at'),
+  },
+  (table) => [index('history_runs_schedule').on(table.status, table.nextAttemptAt, table.updatedAt)],
+);
+
+export const historyTasks = mysqlTable(
+  'history_tasks',
+  {
+    id: char('id', { length: 64 }).primaryKey(),
+    blogId: int('blog_id').notNull(),
+    url: varchar('url', { length: 1024 }).notNull(),
+    kind: varchar('kind', { length: 16 }).notNull(),
+    sourceUrl: varchar('source_url', { length: 1024 }).notNull(),
+    sourceType: varchar('source_type', { length: 16 }).notNull(),
+    depth: int('depth').notNull().default(0),
+    payload: json('payload').$type<Record<string, unknown>>().notNull(),
+    status: varchar('status', { length: 16 }).notNull().default('pending'),
+    attempts: int('attempts').notNull().default(0),
+    lastError: varchar('last_error', { length: 255 }),
+    responseHash: char('response_hash', { length: 64 }),
+    createdAt: datetime('created_at').notNull(),
+    completedAt: datetime('completed_at'),
+  },
+  (table) => [
+    index('history_tasks_pending').on(table.blogId, table.status, table.kind),
+    index('history_tasks_response').on(table.blogId, table.responseHash),
+  ],
 );

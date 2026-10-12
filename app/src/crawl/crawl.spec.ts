@@ -247,8 +247,8 @@ describe('durable feed import and schema bounds', () => {
     expect(result.sources).toBe(0);
     expect(result.posts).toBe(0);
     expect(f.execute.mock.calls.some(([sql]) => sql.startsWith('UPDATE feed_sources SET last_success_at'))).toBe(false);
-    const update = f.execute.mock.calls.find(([sql]) => sql.includes('history_imported_at=IF'));
-    expect(update?.[1]?.[4]).toBe(false);
+    const update = f.execute.mock.calls.find(([sql]) => sql.includes('history_imported_at=history_imported_at'));
+    expect(update).toBeDefined();
   });
 });
 

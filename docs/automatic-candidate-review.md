@@ -26,3 +26,5 @@ node --env-file=/home/deck/.config/blog-observe.env tools/review-candidates.ts -
 ```
 
 原始 CSV、研究報告、完整 review packet 與候選診斷留在私人 runtime／`.reviews/`，不提交 Git。正式批次前備份並以隔離 MariaDB 還原測試核准冪等、搬家別名、人工狀態、feed ownership、audit 失敗回滾與 seed 原始列不變。
+
+正式 worker 每 30 分鐘執行最多 25 筆／120 秒批次；`BLOG_CANDIDATE_REVIEW_ENABLED=false` 會移除該 scheduler 並略過已排入的工作。每 15 分鐘另以既有圖示鎖補最多 10 站缺圖，`BLOG_MISSING_FAVICONS_ENABLED=false` 可停止；失敗冷卻七天，不會每輪撞同一受阻來源。以上均保留在 blog 的獨立 queue/prefix。

@@ -362,3 +362,19 @@ it('defensively ignores malformed or unsafe direct sitemap ranking inputs', () =
     ]),
   ).toEqual(['https://rank-safe.test/post.xml', 'https://rank-safe.test/misc.xml']);
 });
+
+it('reserves distinct host slots before concurrent requests yield', async () => {
+  const received: number[] = [];
+  const fetcher: FeedFetcher = async (input) => {
+    if (!String(input).endsWith('/robots.txt')) received.push(Date.now());
+    return new Response('');
+  };
+  await Promise.all(
+    [1, 2, 3].map((page) =>
+      politeFetch(`https://atomic-delay.test/${page}`, {}, { fetcher, resolveHost: async () => ['93.184.216.34'], delayMs: 250 }),
+    ),
+  );
+  expect(received).toHaveLength(3);
+  expect(received[1] - received[0]).toBeGreaterThanOrEqual(200);
+  expect(received[2] - received[1]).toBeGreaterThanOrEqual(200);
+});

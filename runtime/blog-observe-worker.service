@@ -12,7 +12,12 @@ Environment=BLOG_QUEUE_PREFIX=blog-observe
 ExecStart=%h/.local/bin/node app/src/worker.ts
 Restart=always
 RestartSec=10
+TimeoutStopSec=600
 NoNewPrivileges=true
+Nice=10
+CPUQuota=35%
+MemoryHigh=512M
+MemoryMax=768M
 
 [Install]
 WantedBy=default.target

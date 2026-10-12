@@ -29,6 +29,13 @@
       "when": 1791781223624,
       "tag": "0003_blogroll_discovery",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "5",
+      "when": 1791784811777,
+      "tag": "0004_history_import",
+      "breakpoints": true
     }
   ]
 }

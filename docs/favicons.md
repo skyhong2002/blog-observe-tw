@@ -57,3 +57,5 @@ node --env-file=/home/deck/.config/blog-observe.env tools/fetch-favicons.ts --al
 | 依武、CELESTETERRY | 圖片 CDN 的 robots 拒絕；維持預設圖，不改主機、UA 或代理來繞過 |
 
 每個候選來源的 HTTP 狀態、轉址結果及 robots／MIME／解碼限制原因現在分別存於私人 catalog 的 `sourceChecks`，方便下次查修；不對外公開原始 catalog。成功的 5 張均驗證為 192 × 192 PNG，revision 與檔案 SHA-256 一致。
+
+新收錄站另由 `blogs-missing-icons` 每15分鐘檢查 verified 缺圖站，每批最多10站／120秒，使用與CLI／月刷新完全相同的exclusive lock；最近七天失敗的相同網址不重抓。依未嘗試、最舊嘗試順序輪轉，原圖檔缺失或站點身份變更會重新取得。可用 `BLOG_MISSING_FAVICONS_ENABLED=false` 暫停，不影響既有圖示供應。
