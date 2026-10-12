@@ -31,7 +31,7 @@ export function createUiProxy(origin, { request = undiciRequest, timeout = 15000
       !rawPath.startsWith('/') ||
       rawPath.startsWith('//') ||
       rawPath.startsWith('/\\') ||
-      /^\/[%2f\\]/i.test(rawPath) ||
+      /^\/(?:%2f|%5c)/i.test(rawPath) ||
       decodedPath.startsWith('//') ||
       decodedPath.startsWith('/\\') ||
       /^[a-z][a-z\d+.-]*:/i.test(rawPath)

@@ -4,6 +4,7 @@ import Fastify, { LogController } from 'fastify';
 import { registerLogin } from './auth/google-login.ts';
 import { dbLoginStore } from './auth/store.ts';
 import { createDb } from './db/client.ts';
+import { loadOverview } from './overview.js';
 import { createUiProxy } from './ui-proxy.js';
 
 const esc = (value) =>
@@ -52,6 +53,30 @@ export async function buildApp(config, { logger = false, store = null } = {}) {
     uptimeSeconds: Math.floor((Date.now() - startedAt) / 1000),
   }));
 
+  app.get('/api/overview', async (_request, reply) => {
+    reply.header('cache-control', 'public, max-age=30');
+    return loadOverview(pool);
+  });
+
+  app.get('/api/tags/:slug', async (request, reply) => {
+    const [tags] = await pool.query("SELECT id,slug,label FROM tags WHERE slug=? AND visibility='public' AND status='active' LIMIT 1", [
+      request.params.slug,
+    ]);
+    if (!tags.length) return reply.code(404).send({ error: 'tag not found' });
+    const [posts] = await pool.query(
+      `SELECT p.id,p.guid,p.title,p.url,p.summary,p.author,p.published_at AS publishedAt,p.image_url AS imageUrl,
+      b.slug AS blogSlug,b.name AS blogName FROM posts p JOIN post_tags pt ON pt.post_id=p.id JOIN blogs b ON b.id=p.blog_id
+      WHERE pt.tag_id=? AND pt.status='active' AND b.status <> 'moved' ORDER BY p.published_at DESC,p.id DESC LIMIT 200`,
+      [tags[0].id],
+    );
+    const [blogs] = await pool.query(
+      `SELECT DISTINCT b.id,b.slug,b.name,b.url,b.category,b.status_label AS statusLabel
+      FROM blogs b WHERE b.status <> 'moved' AND (EXISTS (SELECT 1 FROM blog_tags bt WHERE bt.blog_id=b.id AND bt.tag_id=? AND bt.status='active') OR EXISTS (SELECT 1 FROM posts p JOIN post_tags pt ON pt.post_id=p.id WHERE p.blog_id=b.id AND pt.tag_id=? AND pt.status='active')) ORDER BY b.name LIMIT 200`,
+      [tags[0].id, tags[0].id],
+    );
+    return { tag: tags[0], posts, blogs };
+  });
+
   app.get('/api/blogs', async (request) => {
     const limit = Math.min(200, Math.max(1, Number(request.query?.limit || 200)));
     const [rows] = await pool.query(
@@ -77,13 +102,18 @@ export async function buildApp(config, { logger = false, store = null } = {}) {
     );
     const [tags] = await pool.query(
       `SELECT t.slug,t.label,t.kind,t.visibility,bt.role FROM blog_tags bt JOIN tags t ON t.id=bt.tag_id
-       WHERE bt.blog_id=? AND bt.status <> 'rejected' ORDER BY t.label`,
+       WHERE bt.blog_id=? AND bt.status='active' AND t.visibility='public' AND t.status='active' ORDER BY t.label`,
       [blogs[0].id],
     );
     return { blog: { ...blogs[0], authors, tags }, posts };
   });
 
   const login = registerLogin(app, config.login ? dbLoginStore(own.db) : null, config.login);
+  app.get('/api/me/capabilities', async (request, reply) => {
+    reply.header('cache-control', 'no-store');
+    const user = await login.currentUser(request);
+    return { admin: Boolean(user && config.adminEmails?.has(user.email.toLowerCase())) };
+  });
   const requireUser = async (request, reply) => {
     const user = await login.currentUser(request);
     if (!user) {
@@ -218,6 +248,7 @@ export async function buildApp(config, { logger = false, store = null } = {}) {
     const admin = await requireAdmin(request, reply);
     if (!admin) return;
     const body = request.body && typeof request.body === 'object' ? request.body : {};
+    if (Array.isArray(body.ids) && body.ids.length > 100) return reply.code(400).send({ error: 'maximum 100 candidates per batch' });
     const ids = Array.isArray(body.ids)
       ? [...new Set(body.ids.map(Number).filter((id) => Number.isInteger(id) && id > 0))].slice(0, 100)
       : [];
@@ -267,7 +298,11 @@ export async function buildApp(config, { logger = false, store = null } = {}) {
   });
 
   const proxyToUi = createUiProxy(config.uiOrigin);
-  const handler = async (request, reply) => proxyToUi(request, reply);
+  const handler = async (request, reply) => {
+    // Unknown API/auth routes must never cycle through Next's rewrites.
+    if (/^\/(api|auth)(?:\/|$)/.test(request.url)) return reply.code(404).send({ error: 'not found' });
+    return proxyToUi(request, reply);
+  };
   app.route({ method: ['GET', 'HEAD'], url: '/', handler });
   app.route({ method: ['GET', 'HEAD'], url: '/*', handler });
   app.addHook('onClose', async () => {

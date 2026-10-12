@@ -1,0 +1,71 @@
+import { type CloudSizes, layoutWordCloud } from '@/lib/word-cloud.mts';
+import WordCloudView, { type CloudCanvasLayout, type CloudWordInfo } from './WordCloudView';
+
+export type { CloudCard, CloudTone } from './WordCloudView';
+
+// The site's one word cloud: laid out here on the server (a few hundred terms
+// take a noticeable moment to pack), drawn and made hoverable by WordCloudView.
+// With a `wide` canvas, `compact` is the phone layout and `wide` takes over
+// from md up; without one, `compact` is used everywhere. `canvases` replaces
+// both with any number of layouts, each shown by its own className.
+
+export interface CloudCanvas {
+  width: number;
+  height: number;
+  sizes: CloudSizes;
+}
+export interface CloudWord extends CloudWordInfo {
+  /** Sizes the word; larger counts get larger type. */
+  count: number;
+}
+
+export default function WordCloud({
+  words,
+  compact,
+  wide,
+  canvases: given,
+  compactClassName = 'mx-auto w-full max-w-[360px]',
+  label,
+  title,
+}: {
+  words: CloudWord[];
+  compact?: CloudCanvas;
+  wide?: CloudCanvas;
+  canvases?: Array<CloudCanvas & { className: string }>;
+  compactClassName?: string;
+  label: string;
+  title: string;
+}) {
+  const terms = words.map((w) => ({
+    label: w.label.trim(),
+    count: w.count,
+    square: !!(w.image || w.emoji),
+    aspect: w.image ? w.aspect : undefined,
+  }));
+  const lay = (canvas: CloudCanvas, className: string): CloudCanvasLayout => ({
+    width: canvas.width,
+    height: canvas.height,
+    className,
+    words: layoutWordCloud(terms, canvas.width, canvas.height, canvas.sizes).map(({ label, x, y, width, height, fontSize }) => ({
+      label,
+      x,
+      y,
+      width,
+      height,
+      fontSize,
+    })),
+  });
+  const canvases = given
+    ? given.map((c) => lay(c, c.className))
+    : !compact
+      ? []
+      : wide
+        ? [lay(compact, `${compactClassName} md:hidden`), lay(wide, 'hidden w-full md:block')]
+        : [lay(compact, compactClassName)];
+  if (!canvases.some((c) => c.words.length)) return null;
+  // Only words that made it onto a canvas travel to the client.
+  const shown = new Set(canvases.flatMap((c) => c.words.map((w) => w.label)));
+  const info: Record<string, CloudWordInfo> = {};
+  for (const { count: _, ...w } of words) if (shown.has(w.label.trim())) info[w.label.trim()] ??= w;
+  return <WordCloudView canvases={canvases} info={info} label={label} title={title} />;
+}

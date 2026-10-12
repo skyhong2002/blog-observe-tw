@@ -8,6 +8,7 @@ Created in [T3 Code](https://t3.codes).
 
 目前服務使用 Steam Machine 上分離的 gateway、web、worker user services：gateway 對外監聽 `127.0.0.1:18160`，Next web 監聽 `127.0.0.1:18162`，由 Cloudflare Tunnel 提供 `https://blog.observe.tw`。目前版本提供：
 
+- 前端直接移植新文易數的 Tailwind 4 版面、分組導覽、來源頁、文章列表、手機選單、深淺色與 PWA 元件；首頁顯示收錄排行、標籤與文章，詳見 [`docs/frontend-parity.md`](docs/frontend-parity.md)。
 - 135 個 seed 部落格目錄，其中 4 個已有核對網址；支援分類搜尋、個別網站頁與原站連結。
 - `/healthz`、`/auth/me` 與 Google OAuth PKCE 登入流程；callback 固定為 `https://blog.observe.tw/auth/google/callback`。
 - 私有 OAuth 設定檔 `/home/deck/.config/blog-observe.env`，不提交到 Git，也不與 tag.observe.tw 共用服務設定。

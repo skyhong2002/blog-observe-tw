@@ -10,6 +10,10 @@ export type Blog = {
   posts?: Post[];
   authors?: Author[];
   tags?: Tag[];
+  lastCrawlSuccessAt?: string | null;
+  lastPublishedAt?: string | null;
+  expectedIntervalHours?: number;
+  postCount?: number;
 };
 export type Author = {
   id: number;
@@ -18,57 +22,85 @@ export type Author = {
   homepageUrl?: string | null;
   role?: string;
   isPrimary?: boolean;
+  blogSlug?: string;
+  blogName?: string;
+  postCount?: number;
 };
-export type Tag = { slug: string; label: string; kind: string; visibility: string; role?: string };
-
+export type Tag = {
+  slug: string;
+  label: string;
+  kind?: string;
+  visibility?: string;
+  role?: string;
+  postCount?: number;
+  blogCount?: number;
+};
 export type Post = {
+  id?: number;
   guid?: string;
   title: string;
   url?: string | null;
   summary?: string | null;
+  author?: string | null;
   publishedAt?: string | null;
+  blogSlug?: string;
+  blogName?: string;
+  imageUrl?: string | null;
+  tags?: Tag[];
 };
-
 export type Follow = Pick<Blog, 'slug' | 'name' | 'url' | 'category'>;
-
-type GatewayEnvelope<T> = T | { blogs?: T; follows?: T; blog?: T };
-
+export type Overview = {
+  posts: Post[];
+  tags: Array<Tag & { postCount: number; blogCount: number }>;
+  authors: Author[];
+  blogs: Blog[];
+  totals: { blogs: number; posts: number };
+  updatedAt: string | null;
+};
 function origin() {
-  // This module only runs in Next server components. Never expose this value
-  // via NEXT_PUBLIC_*; the public browser uses the rewrites above instead.
   return process.env.BLOG_GATEWAY_INTERNAL_URL ?? 'http://127.0.0.1:18160';
 }
-
 export async function gateway<T>(path: string, init?: RequestInit): Promise<T | null> {
   try {
-    const response = await fetch(`${origin()}${path}`, { ...init, cache: 'no-store' });
-    if (!response.ok) return null;
-    return (await response.json()) as T;
+    const response = await fetch(`${origin()}${path}`, { ...init, cache: 'no-store', signal: AbortSignal.timeout(10000) });
+    return response.ok ? ((await response.json()) as T) : null;
   } catch {
     return null;
   }
 }
-
 export async function listBlogs(): Promise<Blog[]> {
-  const payload = await gateway<GatewayEnvelope<Blog[]>>('/api/blogs');
-  if (Array.isArray(payload)) return payload;
-  if (payload && Array.isArray(payload.blogs)) return payload.blogs;
-  return [];
+  const payload = await gateway<{ blogs: Blog[] }>('/api/blogs');
+  return payload?.blogs ?? [];
 }
-
 export async function getBlog(slug: string): Promise<Blog | null> {
-  const direct = await gateway<GatewayEnvelope<Blog>>(`/api/blogs/${encodeURIComponent(slug)}`);
-  if (direct && !Array.isArray(direct)) {
-    if ('blog' in direct && direct.blog) return direct.blog as Blog;
-    if ('slug' in direct) return direct as Blog;
-  }
-  const blogs = await listBlogs();
-  return blogs.find((blog) => blog.slug === slug) ?? null;
+  const data = await gateway<{ blog: Blog; posts: Post[] }>(`/api/blogs/${encodeURIComponent(slug)}`);
+  return data?.blog ? { ...data.blog, posts: data.posts ?? [] } : null;
 }
-
-export async function listFollows(): Promise<Follow[] | null> {
-  const payload = await gateway<GatewayEnvelope<Follow[]>>('/api/me/follows');
-  if (Array.isArray(payload)) return payload;
-  if (payload && Array.isArray(payload.follows)) return payload.follows;
-  return null;
+export async function overview(): Promise<Overview> {
+  const data = await gateway<Overview>('/api/overview');
+  if (!data) throw new Error('Blog overview unavailable');
+  return data;
+}
+export function taipei(value?: string | null) {
+  return value && Number.isFinite(Date.parse(value))
+    ? new Date(value).toLocaleString('zh-TW', {
+        timeZone: 'Asia/Taipei',
+        year: 'numeric',
+        month: 'numeric',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        hourCycle: 'h23',
+      })
+    : '尚無紀錄';
+}
+export function plainText(value?: string | null) {
+  return (value ?? '')
+    .replace(/<[^>]*>/g, ' ')
+    .replace(
+      /&(?:nbsp|amp|lt|gt|quot|#39);/g,
+      (entity) => ({ '&nbsp;': ' ', '&amp;': '&', '&lt;': '<', '&gt;': '>', '&quot;': '"', '&#39;': "'" })[entity] ?? entity,
+    )
+    .replace(/\s+/g, ' ')
+    .trim();
 }

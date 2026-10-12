@@ -4,3 +4,10 @@ Copyright (c) 2026 Sky Hong
 
 notices remain under their original MIT license. New blog.observe.tw code is also
 released under the MIT license in LICENSE.
+
+Frontend source copied/adapted from the same commit: Tailwind globals, layout,
+SiteHeader/SiteNavigation/SiteFooter, theme and install controls, nav/search/account
+components, home layout, source profile/sidebar/tabs, article/table/word-cloud
+components. See docs/frontend-parity.md for the porting inventory and differences.
+
+Copyright (c) 2026 Sky Hong
