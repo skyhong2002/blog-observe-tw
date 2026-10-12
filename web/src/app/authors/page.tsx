@@ -39,33 +39,47 @@ export default async function AuthorsPage({ searchParams }: { searchParams: Prom
       <p role="status" className="text-xs text-zinc-500">
         共 {data.matchedAuthors} 位作者 · {total} 筆作者與部落格關係
       </p>
-      <TableScroller card>
-        <table className="w-full min-w-[28rem] text-sm">
+      <TableScroller card label="部落格作者表格，可左右捲動">
+        <table className="w-full min-w-[28rem] whitespace-nowrap text-sm">
           <thead className="bg-zinc-50 text-left text-xs text-zinc-600 dark:bg-zinc-950 dark:text-zinc-400">
             <tr>
-              <th className={table.cell}>作者</th>
-              <th className={table.cell}>部落格</th>
-              <th className={table.num}>收錄文章</th>
+              <th scope="col" className={table.leadHead}>
+                作者
+              </th>
+              <th scope="col" className={table.cell}>
+                部落格
+              </th>
+              <th scope="col" className={table.num}>
+                收錄文章
+              </th>
             </tr>
           </thead>
           <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
             {rows.map((a) => (
               <tr key={`${a.id}-${a.blogSlug}`} className={table.row}>
-                <td className={table.cell}>{a.displayName}</td>
+                <td className={table.lead}>
+                  <div className={table.leadBox}>
+                    <span className={`${table.leadText} block font-medium sm:max-w-60`} title={a.displayName}>
+                      {a.displayName}
+                    </span>
+                  </div>
+                </td>
                 <td className={table.cell}>
                   {a.blogSlug ? (
                     <Link
                       href={`/blogs/${a.blogSlug}/`}
-                      className="inline-flex items-center gap-1.5 text-brand-700 hover:underline dark:text-brand-400"
+                      className="flex min-w-0 items-center gap-1.5 text-brand-700 hover:underline dark:text-brand-400"
                     >
                       <BlogIcon media={a.blogSlug} title={a.blogName} />
-                      {a.blogName}
+                      <span className="min-w-0 max-w-60 truncate" title={a.blogName}>
+                        {a.blogName}
+                      </span>
                     </Link>
                   ) : (
-                    '關係待核對'
+                    <span className="text-zinc-500">關係待核對</span>
                   )}
                 </td>
-                <td className={table.num}>{a.postCount ?? 0}</td>
+                <td className={table.num}>{(a.postCount ?? 0).toLocaleString('zh-TW')}</td>
               </tr>
             ))}
           </tbody>

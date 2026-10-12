@@ -3,7 +3,7 @@ import BlogIcon from '@/components/BlogIcon';
 import BlogRelationGraph from '@/components/BlogRelationGraph';
 import SectionTabs from '@/components/SectionTabs';
 import { gateway, taipei } from '@/lib/api';
-import type { Relations } from '@/lib/relations';
+import { type Relations, shareExplanation, shareLabel, sharePercent } from '@/lib/relations';
 export const dynamic = 'force-dynamic';
 export const metadata = { title: '部落格關係圖', description: '從正文連結看部落格之間的引用與交流。' };
 export default async function Page({ searchParams }: { searchParams: Promise<{ days?: string }> }) {
@@ -14,7 +14,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ d
   const blog = (id: number) => {
     const n = nodes.get(id);
     return n ? (
-      <Link className="text-brand-700 hover:underline dark:text-brand-400" href={`/blogs/${n.slug}/`}>
+      <Link className="min-w-0 break-words text-brand-700 hover:underline dark:text-brand-400" href={`/blogs/${n.slug}/`}>
         <BlogIcon media={n.slug} title={n.name} size={16} />
         <span className="ml-1.5">{n.name}</span>
       </Link>
@@ -83,10 +83,14 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ d
           </div>
           <details className="rounded-xl border border-zinc-300 p-4 dark:border-zinc-800">
             <summary className="cursor-pointer text-sm font-medium">圖中連結明細（{data.edges.length} 條）</summary>
+            <p className="mt-3 text-xs text-zinc-500">「篇」是提及方提到目標站的文章數。{shareExplanation}</p>
             <ul className="mt-3 divide-y divide-zinc-200 dark:divide-zinc-800">
               {data.edges.map((e) => (
-                <li key={`${e.sourceBlogId}:${e.targetBlogId}`} className="py-2 text-sm">
-                  {blog(e.sourceBlogId)} → {blog(e.targetBlogId)} · {e.count} 篇 · {(e.share * 100).toFixed(1)}%
+                <li key={`${e.sourceBlogId}:${e.targetBlogId}`} className="min-w-0 break-words py-2 text-sm">
+                  {blog(e.sourceBlogId)} → {blog(e.targetBlogId)}{' '}
+                  <span className="whitespace-nowrap tabular-nums text-zinc-600 dark:text-zinc-400">
+                    · {e.count} 篇 · {shareLabel} {sharePercent(e.share)}
+                  </span>
                 </li>
               ))}
             </ul>

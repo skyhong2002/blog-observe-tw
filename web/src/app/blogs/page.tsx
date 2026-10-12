@@ -27,7 +27,11 @@ export default async function BlogsPage({ searchParams }: { searchParams: Promis
   const sortLink = (col: SortKey) =>
     href({ sort: col, dir: sort === col ? (dir === 'asc' ? 'desc' : 'asc') : ascendingFirst.has(col) ? 'asc' : 'desc' });
   const Th = ({ col, label, className = '' }: { col: SortKey; label: string; className?: string }) => (
-    <th className={`${table.cell} ${className}`} aria-sort={sort === col ? (dir === 'asc' ? 'ascending' : 'descending') : undefined}>
+    <th
+      scope="col"
+      className={`${table.cell} ${className}`}
+      aria-sort={sort === col ? (dir === 'asc' ? 'ascending' : 'descending') : undefined}
+    >
       <Link
         href={sortLink(col)}
         scroll={false}
@@ -115,7 +119,7 @@ export default async function BlogsPage({ searchParams }: { searchParams: Promis
         </span>
       </form>
       <TableScroller card label="部落格與文章數表格，可左右捲動">
-        <table className="w-full min-w-[52rem] text-sm">
+        <table className="w-full min-w-[52rem] whitespace-nowrap text-sm">
           <thead className="bg-zinc-50 text-left text-xs text-zinc-600 dark:bg-zinc-950 dark:text-zinc-400">
             <tr>
               <Th col="name" label="部落格" className={table.leadHead} />
@@ -133,19 +137,33 @@ export default async function BlogsPage({ searchParams }: { searchParams: Promis
                   <div className={table.leadBox}>
                     <Link
                       href={`/blogs/${blog.slug}/`}
-                      className="inline-flex items-center gap-1.5 font-medium text-brand-700 hover:underline dark:text-brand-400"
+                      className="flex min-w-0 max-w-full items-center gap-1.5 font-medium text-brand-700 hover:underline dark:text-brand-400"
                     >
                       <BlogIcon media={blog.slug} title={blog.name} />
-                      {blog.name}
+                      <span className={`${table.leadText} sm:max-w-60`} title={blog.name}>
+                        {blog.name}
+                      </span>
                     </Link>
-                    {blog.url && <p className={`${table.leadExtra} mt-1 max-w-60 truncate text-xs text-zinc-500`}>{blog.url}</p>}
+                    {blog.url && (
+                      <p className={`${table.leadExtra} ${table.leadText} mt-1 text-xs text-zinc-500 sm:max-w-60`} title={blog.url}>
+                        {blog.url}
+                      </p>
+                    )}
                   </div>
                 </td>
-                <td className={table.cell}>{blog.category ?? '未分類'}</td>
-                <td className={table.num}>{blog.postCount ?? '—'}</td>
-                <td className={`${table.cell} whitespace-nowrap text-xs text-zinc-500`}>{taipei(blog.lastPublishedAt)}</td>
-                <td className={`${table.cell} whitespace-nowrap text-xs text-zinc-500`}>{taipei(blog.lastCrawlSuccessAt)}</td>
-                <td className={`${table.cell} whitespace-nowrap text-xs`}>{blog.statusLabel ?? '待核對'}</td>
+                <td className={table.cell}>
+                  <span className="block max-w-40 truncate" title={blog.category ?? '未分類'}>
+                    {blog.category ?? '未分類'}
+                  </span>
+                </td>
+                <td className={table.num}>{blog.postCount?.toLocaleString('zh-TW') ?? '—'}</td>
+                <td className={`${table.cell} text-xs tabular-nums text-zinc-500`}>{taipei(blog.lastPublishedAt)}</td>
+                <td className={`${table.cell} text-xs tabular-nums text-zinc-500`}>{taipei(blog.lastCrawlSuccessAt)}</td>
+                <td className={`${table.cell} text-xs`}>
+                  <span className="block max-w-40 truncate" title={blog.statusLabel ?? '待核對'}>
+                    {blog.statusLabel ?? '待核對'}
+                  </span>
+                </td>
               </tr>
             ))}
           </tbody>

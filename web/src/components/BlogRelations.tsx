@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { gateway } from '@/lib/api';
-import type { Relations } from '@/lib/relations';
+import { type Relations, shareExplanation } from '@/lib/relations';
 import RelationLists from './RelationLists';
 export default async function BlogRelations({ slug }: { slug: string }) {
   const data = await gateway<Relations>(`/api/blogs/${encodeURIComponent(slug)}/relations?days=90`);
@@ -12,9 +12,10 @@ export default async function BlogRelations({ slug }: { slug: string }) {
           全站關係圖 →
         </Link>
       </div>
-      <p className="text-sm text-zinc-500">
-        近 90 天正文提及。占比以提及方所有已辨識的部落格正文引用為分母，同篇對同站只計一次；不是造訪比例。
-      </p>
+      <div className="space-y-1 text-sm text-zinc-500">
+        <p>近 90 天正文提及；「篇」是提及方提到對方的文章數。</p>
+        <p className="text-xs">{shareExplanation}</p>
+      </div>
       {data ? (
         <>
           <div className="grid gap-4 lg:grid-cols-2">
@@ -26,7 +27,7 @@ export default async function BlogRelations({ slug }: { slug: string }) {
               <summary className="cursor-pointer">核對文章中的連結</summary>
               <ul className="mt-3 space-y-3">
                 {data.evidence.map((e) => (
-                  <li key={`${e.postUrl}:${e.targetUrl}:${e.anchor}`}>
+                  <li key={`${e.postUrl}:${e.targetUrl}:${e.anchor}`} className="min-w-0 break-words">
                     <a href={e.postUrl} target="_blank" rel="noopener noreferrer" className="text-brand-700 underline dark:text-brand-400">
                       {e.postTitle}
                     </a>

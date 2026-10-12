@@ -29,30 +29,38 @@ export default async function RankingPage() {
             <h2 className="mb-3 text-sm font-semibold">前十個標籤 · 參與部落格數</h2>
             <TagCountChartLoader rows={data.tags.slice(0, 10).map((t) => ({ label: t.label, blogCount: t.blogCount }))} />
           </section>
-          <TableScroller card>
-            <table className="w-full text-sm">
+          <TableScroller card label="標籤收錄排行表格，可左右捲動">
+            <table className="w-full whitespace-nowrap text-sm">
               <thead className="bg-zinc-50 text-left text-xs text-zinc-600 dark:bg-zinc-950 dark:text-zinc-400">
                 <tr>
-                  <th className={table.cell}>名次</th>
-                  <th className={table.cell}>標籤</th>
-                  <th className={table.num}>收錄文章</th>
-                  <th className={table.num}>部落格</th>
+                  <th scope="col" className={table.leadHead}>
+                    名次 · 標籤
+                  </th>
+                  <th scope="col" className={table.num}>
+                    部落格
+                  </th>
+                  <th scope="col" className={table.num}>
+                    收錄文章
+                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
                 {data.tags.map((tag, i) => (
                   <tr className={table.row} key={tag.slug}>
-                    <td className={`${table.cell} text-zinc-500`}>{i + 1}</td>
-                    <td className={table.cell}>
-                      <Link
-                        className="text-brand-700 hover:underline dark:text-brand-400"
-                        href={`/tags/?tag=${encodeURIComponent(tag.slug)}`}
-                      >
-                        {tag.label}
-                      </Link>
+                    <td className={table.lead}>
+                      <div className={`${table.leadBox} flex items-center gap-2`}>
+                        <span className={`${table.leadExtra} w-7 shrink-0 text-right text-xs tabular-nums text-zinc-500`}>{i + 1}</span>
+                        <Link
+                          className={`${table.leadText} text-brand-700 hover:underline dark:text-brand-400 sm:max-w-80`}
+                          href={`/tags/?tag=${encodeURIComponent(tag.slug)}`}
+                          title={`第 ${i + 1} 名：${tag.label}`}
+                        >
+                          {tag.label}
+                        </Link>
+                      </div>
                     </td>
-                    <td className={table.num}>{tag.postCount}</td>
-                    <td className={table.num}>{tag.blogCount}</td>
+                    <td className={table.num}>{tag.blogCount.toLocaleString('zh-TW')}</td>
+                    <td className={table.num}>{tag.postCount.toLocaleString('zh-TW')}</td>
                   </tr>
                 ))}
               </tbody>

@@ -25,31 +25,46 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ d
       />
       {data ? (
         <>
-          <TableScroller card>
-            <table className="w-full text-sm">
+          <TableScroller card label="共同話題表格，可左右捲動">
+            <table className="w-full whitespace-nowrap text-sm">
               <thead className="bg-zinc-50 text-left text-xs text-zinc-600 dark:bg-zinc-950 dark:text-zinc-400">
                 <tr>
-                  <th className={table.cell}>話題</th>
-                  <th className={table.cell}>來源</th>
-                  <th className={table.num}>部落格</th>
-                  <th className={table.num}>文章</th>
-                  <th className={table.num}>加權貢獻</th>
+                  <th scope="col" className={table.leadHead}>
+                    話題
+                  </th>
+                  <th scope="col" className={table.cell}>
+                    來源
+                  </th>
+                  <th scope="col" className={table.num}>
+                    部落格
+                  </th>
+                  <th scope="col" className={table.num}>
+                    文章
+                  </th>
+                  <th scope="col" className={table.num}>
+                    加權貢獻
+                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
                 {data.items.map((t) => (
                   <tr key={t.id} className={table.row}>
-                    <td className={table.cell}>
-                      <Link
-                        className="text-brand-700 hover:underline dark:text-brand-400"
-                        href={`/topics/${encodeURIComponent(t.id)}/?days=${days}`}
-                      >
-                        {t.label}
-                      </Link>
+                    <td className={table.lead}>
+                      <div className={table.leadBox}>
+                        <Link
+                          className={`${table.leadText} block text-brand-700 hover:underline dark:text-brand-400 sm:max-w-80`}
+                          href={`/topics/${encodeURIComponent(t.id)}/?days=${days}`}
+                          title={t.label}
+                        >
+                          {t.label}
+                        </Link>
+                      </div>
                     </td>
-                    <td className={table.cell}>{t.source === 'rss-category' ? 'RSS 標籤' : '共同關鍵字'}</td>
-                    <td className={table.num}>{t.blogs}</td>
-                    <td className={table.num}>{t.posts}</td>
+                    <td className={`${table.cell} text-xs text-zinc-600 dark:text-zinc-400`}>
+                      {t.source === 'rss-category' ? 'RSS 標籤' : '共同關鍵字'}
+                    </td>
+                    <td className={table.num}>{t.blogs.toLocaleString('zh-TW')}</td>
+                    <td className={table.num}>{t.posts.toLocaleString('zh-TW')}</td>
                     <td className={table.num}>{Number(t.score).toFixed(2)}</td>
                   </tr>
                 ))}
