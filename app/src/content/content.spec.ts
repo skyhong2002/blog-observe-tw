@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { MAX_RESPONSE_BYTES } from '../crawl/feed.ts';
 import { extractContent, inPublication, wordpressEvidence } from './article-content.ts';
 import { CONTENT_VERSION, type ContentEvidence, MAX_CONTENT_HTML_BYTES } from './contracts.ts';
 import { contentRequestPlan, inferredRule } from './registry.ts';
@@ -121,7 +122,7 @@ describe('identity and state transitions', () => {
     expect(wordpressEvidence(JSON.stringify([{ link: 'https://writer.example/other', content: { rendered: '錯文' } }]), base)).toBeNull();
     expect(wordpressEvidence(JSON.stringify([{ link: base.articleUrl, content: { rendered: '全文', protected: true } }]), base)).toBeNull();
     expect(wordpressEvidence(JSON.stringify([{ link: base.articleUrl, content: { rendered: '全文' } }]), base)?.kind).toBe('wordpress-api');
-    expect(CONTENT_VERSION).toBe('blog-content-v1');
+    expect(CONTENT_VERSION).toBe('blog-content-v2');
   });
 });
 
@@ -166,4 +167,28 @@ it('keeps Gamer owner publication identity separate from exact article sn identi
   });
   expect(extract({ ...e, sourceUrl: e.articleUrl }).status).toBe('ok');
   expect(extract(e).status).toBe('blocked');
+});
+
+describe('article page input is independent from persisted body limits', () => {
+  it('extracts a short WordPress body after more than 256 KiB of head scripts', () => {
+    const html = `<!doctype html><html><head><meta name="generator" content="WordPress"><script>${'x'.repeat(MAX_CONTENT_HTML_BYTES + 1000)}</script></head><body><div class="entry-content">短正文<a href="https://other.example/">引用</a></div></body></html>`;
+    const result = extract(evidence(html));
+    expect(result).toMatchObject({ status: 'ok', completeness: 'full', truncated: false, bodyText: '短正文引用', platform: 'wordpress' });
+  });
+  it('retains the original bound for syndicated/API fragments', () => {
+    const html = `<script>${'x'.repeat(MAX_CONTENT_HTML_BYTES)}</script><p>後段全文</p>`;
+    for (const kind of ['rss-content', 'atom-content', 'wordpress-api'] as const) {
+      const result = extract(evidence(html, { kind, completeness: 'full' }));
+      expect(result.truncated).toBe(true);
+      expect(result.completeness).toBe('partial');
+      expect(result.status).not.toBe('ok');
+    }
+  });
+  it('does not claim full coverage for real input beyond the unchanged 5 MiB response ceiling', () => {
+    const html = `<article>短正文</article><script>${'x'.repeat(MAX_RESPONSE_BYTES)}</script>`;
+    expect(extract(evidence(html))).toMatchObject({ status: 'partial', truncated: true, completeness: 'partial', reason: 'content-limit' });
+  });
+  it('keeps an upstream truncation flag even when the retained body fits both storage limits', () => {
+    expect(extract(evidence('<article>短正文</article>', { truncated: true }))).toMatchObject({ status: 'partial', truncated: true });
+  });
 });

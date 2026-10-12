@@ -1,5 +1,5 @@
 import type { Pool } from 'mysql2/promise';
-export const CONTENT_VERSION = 'blog-content-v1';
+export const CONTENT_VERSION = 'blog-content-v2';
 export const MAX_CONTENT_HTML_BYTES = 256 * 1024;
 export const MAX_CONTENT_TEXT_BYTES = 128 * 1024;
 export type ContentKind = 'rss-content' | 'atom-content' | 'wordpress-api' | 'article-html';

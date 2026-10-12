@@ -135,6 +135,17 @@ export async function runContentIntegration(pool: Pool) {
     }
     [[body]] = await pool.query<RowDataPacket[]>('SELECT * FROM content_post_bodies WHERE post_id=?', [posts[0]]);
     check(body.body_text.includes('短文'));
+    // A legacy page-size false-positive is retried despite its normal 30-day backoff.
+    await ingest({
+      ...base,
+      postId: posts[1],
+      articleUrl: home + 'html',
+      sourceUrl: home + 'html',
+      kind: 'article-html',
+      html: '<article>舊抽取截斷</article>',
+      truncated: true,
+    });
+    await pool.query("UPDATE content_post_bodies SET adapter_version='blog-content-v1' WHERE post_id IN (?)", [posts]);
     // HTML fetch is stored once; relation projection consumes that exact normalized body without any HTTP.
     let requests = 0;
     const fetcher = async (input: unknown) => {
@@ -158,6 +169,17 @@ export async function runContentIntegration(pool: Pool) {
     check(fetched.processed === 1 && requests === 2);
     [[body]] = await pool.query<RowDataPacket[]>('SELECT * FROM content_post_bodies WHERE post_id=?', [posts[1]]);
     check(body.status === 'ok' && body.body_text === 'HTML正文朋友');
+    let versionRefetches = 0;
+    const settled = await runContentBatch(pool, {
+      blogId: blogs[0],
+      limit: 1,
+      now: () => now,
+      fetcher: async () => {
+        versionRefetches++;
+        throw Error('full RSS must not refetch for a version bump');
+      },
+    });
+    check(settled.processed === 0 && settled.skipped === 0 && versionRefetches === 0);
     let repeated = 0;
     const projected = await runRelationBatch(pool, {
       limit: 1,

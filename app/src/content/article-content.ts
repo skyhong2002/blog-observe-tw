@@ -2,7 +2,7 @@
  * MIT Copyright (c) 2026 Sky Hong. No newsroom minimum length or image-only rejection. */
 import { createHash } from 'node:crypto';
 import * as cheerio from 'cheerio';
-import { articleIdentityKey, canonicalArticleUrl } from '../crawl/feed.ts';
+import { articleIdentityKey, canonicalArticleUrl, MAX_RESPONSE_BYTES } from '../crawl/feed.ts';
 import { identityKey, normalizeLink, publicationHome } from '../relations/identity.ts';
 import { articleNodes } from './article-nodes.ts';
 import {
@@ -49,7 +49,10 @@ export function inPublication(article: string, home: string): boolean {
   return !path || url.pathname === path || url.pathname.startsWith(path + '/');
 }
 export function extractContent(evidence: ContentEvidence, rule: ContentRule): ExtractedContent {
-  const bounded = utf8Prefix(evidence.html, MAX_CONTENT_HTML_BYTES);
+  // HTTP safety already caps article responses at 5 MiB. Do not confuse page boilerplate
+  // with the smaller persisted body fragment: select the body before applying storage bounds.
+  const inputLimit = evidence.kind === 'article-html' ? MAX_RESPONSE_BYTES : MAX_CONTENT_HTML_BYTES;
+  const bounded = utf8Prefix(evidence.html, inputLimit);
   let truncated = Boolean(evidence.truncated) || bounded.length !== evidence.html.length;
   const $ = cheerio.load(bounded),
     platform = rule.platform === 'generic' ? inferPlatform(evidence.articleUrl, bounded) : rule.platform;

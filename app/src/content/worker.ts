@@ -69,9 +69,9 @@ export async function runContentBatch(pool: Pool, options: BatchOptions & { blog
       const [posts] = await pool.query<RowDataPacket[]>(
         `SELECT p.id,p.blog_id,p.url,b.url blog_url,c.etag,c.last_modified,c.status,c.content_hash,c.source_kind,c.source_url
    FROM posts p JOIN blogs b ON b.id=p.blog_id LEFT JOIN content_post_bodies c ON c.post_id=p.id
-   WHERE b.status='verified' AND (? IS NULL OR p.blog_id=?) AND b.url IS NOT NULL AND (c.post_id IS NULL OR c.next_attempt_at<=? OR c.adapter_version<>?)
-   ORDER BY COALESCE(c.next_attempt_at,'1970-01-01'),p.published_at DESC,p.id DESC LIMIT 50`,
-        [options.blogId ?? null, options.blogId ?? null, now(), CONTENT_VERSION],
+   WHERE b.status='verified' AND (? IS NULL OR p.blog_id=?) AND b.url IS NOT NULL AND (c.post_id IS NULL OR c.next_attempt_at<=? OR (c.adapter_version<>? AND c.source_kind='article-html' AND c.status<>'ok'))
+   ORDER BY CASE WHEN c.adapter_version<>? AND c.source_kind='article-html' AND c.status<>'ok' AND c.last_error='content-limit' THEN 0 ELSE 1 END,COALESCE(c.next_attempt_at,'1970-01-01'),p.published_at DESC,p.id DESC LIMIT 50`,
+        [options.blogId ?? null, options.blogId ?? null, now(), CONTENT_VERSION, CONTENT_VERSION],
       );
       const fetcher = budgetedRelationFetcher(pool, options, assertLease, deadline);
       let attempts = 0;
