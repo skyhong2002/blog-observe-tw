@@ -645,16 +645,17 @@ test('login: a marker seen while opted out is neither sent nor deleted', () => {
   stop();
 });
 
-test('StrictMode remount: no duplicate config, script, wrappers or listeners; cleanup restores only our wrappers', () => {
+test('StrictMode remount: no duplicate config, script, wrappers or listeners; the guards stay for the document', () => {
   const t = setup('/');
   const stop = installAnalytics(t.deps);
   const ours = t.history.pushState;
   assert.notEqual(ours, t.nativePush);
   stop();
-  assert.equal(t.history.pushState, t.nativePush);
+  assert.equal(t.history.pushState, ours, 'never restored: unmounted navigations must still be judged');
   assert.equal(t.win.count() + t.doc.count(), 1, 'only the document-long popstate watcher stays');
-  assert.equal(t.disabled(), true, 'unguarded between mounts: off');
+  assert.equal(t.disabled(), true, 'no handler between mounts: off');
   const again = installAnalytics(t.deps);
+  assert.equal(t.history.pushState, ours, 'reused, not stacked');
   assert.equal(t.disabled(), false);
   assert.equal(t.configs().length, 1);
   assert.equal(t.scripts.length, 1);
@@ -725,6 +726,37 @@ test('StrictMode remount after taint, or after navigations nobody judged, stays 
     assert.equal(u.events().length, 0);
     assert.equal(u.configs().length, 1);
     remount();
+  }
+});
+
+test('unmounted before gtag.js loads: a private round trip back to the SAME URL still taints the late onload', () => {
+  for (const away of ['/my/', '/articles/?q=ga-privacy-test']) {
+    for (const method of ['pushState', 'replaceState'] as const) {
+      const t = setup('/articles/', { cookie: `${LOGIN_COMPLETED_COOKIE}=1` });
+      const first = installAnalytics(t.deps);
+      assert.equal(t.configs().length, 1);
+      // A click queued while gtag.js is still loading.
+      t.doc.dispatch('click', anchor('https://example.com/a', 'open_original'));
+      first();
+      // Nothing (no gtag.js) wraps ours: it must still be in place.
+      t.history[method](null, '', away);
+      t.history[method](null, '', '/articles/');
+      const remount = installAnalytics(t.deps);
+      t.load();
+      const state = t.win.__blogAnalytics as { tainted: boolean };
+      assert.equal(state.tainted, true, `${away} ${method}`);
+      assert.equal(t.disabled(), true, `${away} ${method}`);
+      assert.equal(t.events().length, 0, 'no queued events, no login');
+      assert.ok(loginCompleted(t.cookie()), 'the login marker is kept');
+      assert.equal(t.cleared.length, 0);
+      t.win.dispatch(ACTION_EVENT, { detail: 'follow' });
+      t.history.pushState(null, '', '/blogs/');
+      assert.equal(t.disabled(), true);
+      assert.equal(t.events().length, 0);
+      assert.equal(t.configs().length, 1);
+      assert.ok(!JSON.stringify(t.layer()).includes('ga-privacy-test'));
+      remount();
+    }
   }
 });
 

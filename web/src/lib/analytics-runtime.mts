@@ -84,7 +84,7 @@ interface Hooks {
   handler: Navigate | null;
   push: HistoryMethod | null;
   replace: HistoryMethod | null;
-  /** The popstate watcher stays for the document, like the wrappers. */
+  /** The wrappers and the popstate watcher stay for the document. */
   popstate: boolean;
 }
 interface State {
@@ -270,10 +270,10 @@ export function installAnalytics(deps: AnalyticsDeps): () => void {
       // biome-ignore lint/complexity/noArguments: pass the call through unchanged.
       return original.apply(this, arguments as unknown as Parameters<HistoryMethod>);
     };
-    return Object.assign(wrapper, { __original: original });
+    return wrapper;
   };
-  // A wrapper left in place by an earlier cleanup (gtag.js or another script
-  // wrapped it since) is still in the chain and only needs the new handler.
+  // Installed once per document and never removed: a later mount only needs
+  // the new handler.
   if (!hooks.push) deps.history.pushState = hooks.push = wrap(deps.history.pushState);
   if (!hooks.replace) deps.history.replaceState = hooks.replace = wrap(deps.history.replaceState);
 
@@ -328,16 +328,7 @@ export function installAnalytics(deps: AnalyticsDeps): () => void {
     disable();
     if (hooks.handler === navigate) hooks.handler = null;
     if (state.onLoad === loaded) state.onLoad = null;
-    // Restore only our own wrappers, and only while nothing has wrapped them;
-    // otherwise they stay in the chain and pass calls straight through.
-    const original = (wrapper: HistoryMethod) => (wrapper as HistoryMethod & { __original: HistoryMethod }).__original;
-    if (hooks.push && deps.history.pushState === hooks.push) {
-      deps.history.pushState = original(hooks.push);
-      hooks.push = null;
-    }
-    if (hooks.replace && deps.history.replaceState === hooks.replace) {
-      deps.history.replaceState = original(hooks.replace);
-      hooks.replace = null;
-    }
+    // The history wrappers stay, like the popstate watcher: unmounted
+    // navigations must still taint, whether or not gtag.js has loaded.
   };
 }
