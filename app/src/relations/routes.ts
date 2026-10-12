@@ -44,12 +44,12 @@ const PUBLIC_RELATION = `EXISTS (SELECT 1 FROM posts visible_post JOIN blogs vis
   WHERE visible_post.id=l.source_post_id AND visible_post.blog_id=l.source_blog_id AND visible_blog.status='verified') AND EXISTS (SELECT 1 FROM relation_observations public_o WHERE public_o.post_id=l.source_post_id AND public_o.last_success_at IS NOT NULL AND public_o.status<>'reparse-pending') AND NOT EXISTS (SELECT 1 FROM admin_relation_overrides hidden_link
   WHERE hidden_link.source_post_id=l.source_post_id AND hidden_link.target_url_hash=SHA2(l.target_url,256)
   AND BINARY hidden_link.target_url=BINARY l.target_url AND hidden_link.location=l.location AND hidden_link.hidden=TRUE)`;
-type RelationCache = { revision: number; flights: Map<string, Promise<unknown>> };
+type RelationCache = { revision: number; active: number };
 const relationCaches = new WeakMap<Pool, RelationCache>();
 function cacheFor(pool: Pool): RelationCache {
   let cache = relationCaches.get(pool);
   if (!cache) {
-    cache = { revision: 0, flights: new Map() };
+    cache = { revision: 0, active: 0 };
     relationCaches.set(pool, cache);
   }
   return cache;
@@ -58,7 +58,6 @@ function cacheFor(pool: Pool): RelationCache {
 export async function invalidateRelationCache(pool: Pool) {
   const cache = cacheFor(pool);
   cache.revision++;
-  cache.flights.clear();
   const c = await pool.getConnection();
   try {
     await c.beginTransaction();
@@ -72,12 +71,12 @@ export async function invalidateRelationCache(pool: Pool) {
     c.release();
   }
 }
-async function cachedProjection<T>(pool: Pool, key: string, _ttl: number, build: () => Promise<T>): Promise<T> {
+/** Bound live reads without sharing a result across request boundaries. */
+async function cachedProjection<T>(pool: Pool, _key: string, _ttl: number, build: () => Promise<T>): Promise<T> {
   const cache = cacheFor(pool);
-  const pending = cache.flights.get(key);
-  if (pending) return pending as Promise<T>;
-  if (cache.flights.size >= 4) throw Object.assign(Error('relation_projection_busy'), { statusCode: 503 });
-  const task = (async () => {
+  if (cache.active >= 4) throw Object.assign(Error('relation_projection_busy'), { statusCode: 503 });
+  cache.active++;
+  try {
     for (let attempt = 0; attempt < 2; attempt++) {
       const revision = cache.revision;
       const dto = await build();
@@ -85,11 +84,9 @@ async function cachedProjection<T>(pool: Pool, key: string, _ttl: number, build:
       return dto;
     }
     throw Error('relation_projection_changed');
-  })().finally(() => {
-    if (cache.flights.get(key) === task) cache.flights.delete(key);
-  });
-  cache.flights.set(key, task);
-  return task;
+  } finally {
+    cache.active--;
+  }
 }
 async function buildSnapshot(pool: Pool, days: number, now: Date, attempt = 0): Promise<RelationDTO> {
   await pool.query('INSERT IGNORE INTO relation_projection_state (id,revision) VALUES (1,0)');

@@ -35,50 +35,57 @@ describe('isolated malformed labels', () => {
     expect(normalizeSourceTags(['🍵', '\uD800']).tags).toEqual(['🍵']);
   });
 });
-describe('bounded API singleflight cache', () => {
-  it('coalesces simultaneous loads but rechecks every later completed request', async () => {
-    let now = 0;
-    const cache = new TopicResponseCache(1, 3, () => now);
-    const load = vi.fn(async () => ({ n: 1 }));
-    const results = await Promise.all(Array.from({ length: 15 }, () => cache.get('same', load)));
-    expect(load).toHaveBeenCalledTimes(1);
-    expect(results[0]).toEqual({ n: 1 });
-    now = 59999;
-    await cache.get('same', load);
-    expect(load).toHaveBeenCalledTimes(2);
-    now = 60001;
-    await cache.get('same', load);
-    expect(load).toHaveBeenCalledTimes(3);
+describe('bounded fresh API reads', () => {
+  it('does not give request B an older in-flight result after a visibility commit', async () => {
+    const cache = new TopicResponseCache(60000, 1);
+    let visible = true;
+    const entered = Promise.withResolvers<void>();
+    const release = Promise.withResolvers<void>();
+    const first = cache.get('same', async () => {
+      const snapshot = visible;
+      entered.resolve();
+      await release.promise;
+      return snapshot;
+    });
+    await entered.promise;
+    visible = false; // Simulated committed hide; request B starts afterwards.
+    const secondLoad = vi.fn(async () => visible);
+    expect(await cache.get('same', secondLoad)).toBe(false);
+    expect(secondLoad).toHaveBeenCalledTimes(1);
+    release.resolve();
+    expect(await first).toBe(true);
     expect(cache.ttlMs).toBe(0);
   });
-  it('bounds cached keys and does not cache failed SQL', async () => {
-    const cache = new TopicResponseCache(120000, 2);
-    const load = vi.fn(async () => 1);
-    for (const key of ['a', 'b', 'c', 'a']) await cache.get(key, load);
-    expect(load).toHaveBeenCalledTimes(4);
+  it('limits real concurrent reads, including same keys, and clear cannot reset capacity', async () => {
+    const cache = new TopicResponseCache(120000, 1);
+    const release = Promise.withResolvers<void>();
+    const loads = Array.from({ length: 8 }, (_, i) =>
+      cache.get('same', async () => {
+        await release.promise;
+        return i;
+      }),
+    );
+    await expect(cache.get('same', async () => 9)).rejects.toMatchObject({ statusCode: 503 });
+    await expect(cache.get('different', async () => 9)).rejects.toMatchObject({ statusCode: 503 });
+    cache.clear();
+    await expect(cache.get('after-clear', async () => 9)).rejects.toMatchObject({ statusCode: 503 });
+    release.resolve();
+    expect(await Promise.all(loads)).toEqual([0, 1, 2, 3, 4, 5, 6, 7]);
+    expect(await cache.get('same', async () => 10)).toBe(10);
+  });
+  it('releases capacity after asynchronous rejection or synchronous throw and never reuses failures', async () => {
+    const cache = new TopicResponseCache();
     const failure = vi.fn(async () => {
       throw Error('query failure');
     });
-    await expect(cache.get('broken', failure)).rejects.toThrow();
-    await expect(cache.get('broken', failure)).rejects.toThrow();
-    expect(failure).toHaveBeenCalledTimes(2);
-  });
-  it('bounds different in-flight keys and invalidation clears stored responses', async () => {
-    const cache = new TopicResponseCache(120000, 1);
-    let release!: (v: number) => void;
-    const first = cache.get(
-      'a',
-      () =>
-        new Promise<number>((r) => {
-          release = r;
-        }),
-    );
-    await Promise.resolve();
-    await expect(cache.get('b', async () => 2)).rejects.toMatchObject({ statusCode: 503 });
-    release(1);
-    await first;
-    cache.clear();
-    expect(await cache.get('a', async () => 3)).toBe(3);
+    for (let i = 0; i < 10; i++) await expect(cache.get('broken', failure)).rejects.toThrow('query failure');
+    await expect(
+      cache.get('sync', () => {
+        throw Error('sync failure');
+      }),
+    ).rejects.toThrow('sync failure');
+    expect(failure).toHaveBeenCalledTimes(10);
+    expect(await cache.get('broken', async () => 42)).toBe(42);
   });
 });
 describe('public fallback service token', () => {

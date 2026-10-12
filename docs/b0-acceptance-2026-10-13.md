@@ -12,7 +12,7 @@
 
 獨立審查另外發現一篇未來日期文章會影響少數統計。已補齊 overview／catalog／authors／標籤關聯與篇數／content coverage／relation coverage 的發布日期條件；原資料保留。新 SQL fixture 同時驗 past、undated、future：只計前兩篇，future-only 標籤不出現；改為已發布後下一次讀立即計入。舊測試中「未來文章也算來源篇數」的期待一併更正。
 
-公開 HTML/RSC/no-store 既有實測見 [隱私部署紀錄](privacy-deployment-2026-10-13.md)。本次最終 build 仍要重驗 seed/rejected/moved/delete 的 SSR/RSC；未完成前不把它標成完成。
+公開 HTML/RSC/no-store 既有實測見 [隱私部署紀錄](privacy-deployment-2026-10-13.md)。b011873 的同一份 immutable Next build 已於 19:44–19:46 UTC 完成下方可追溯的重驗；這是序列撤下測試，不代表後述並行缺口已解決。
 
 ## 正常瀏覽遇到 429
 
@@ -20,7 +20,7 @@ GPT-6.1 Sol 逐頁審查重現大量 favicon 消耗 global 240/min 配額，後�
 
 直接 loopback、無 CF/forwarded／登入／API或service credential 的既定公開資料 GET/HEAD，改用獨立而有界的 render 2000/min 桶；不接受外部來源或任意 `/api/*`。它不是容量無上限承諾，極高的共同 SSR 負載仍會回429；此時不以過期資料掩蓋失敗。已測不可透過 forwarding headers、寫入、admin、auth 或編碼前綴取得此桶，並測 icon 多次404不耗動態配額。
 
-Opus 5.5 回應 model/finish 均確認（`claude-opus-5-5`、`stop`）。採納額外 forwarding header 排除、HEAD／編碼路徑／favicon404與穿越測試。overview completed cache 已移除，僅 single-flight；故其 TTL 延遲疑慮不適用。關係首頁/blogroll 是獨立表，文章 relation_links 要求 source_post_id，不能用 LEFT JOIN 把已刪文章的邊救回公開查詢；另外補 source blog ownership 一致性。UTC 儲存、連線 timezone Z，fixture 包含前後日期邊界。
+Opus 5.5 回應 model/finish 均確認（`claude-opus-5-5`、`stop`）。採納額外 forwarding header 排除、HEAD／編碼路徑／favicon404與穿越測試。當時 overview completed cache 已移除但仍有 single-flight；TTL 雖為0，後續獨立審查證實共享未完成結果仍有並行缺口，見下方修正。關係首頁/blogroll 是獨立表，文章 relation_links 要求 source_post_id，不能用 LEFT JOIN 把已刪文章的邊救回公開查詢；另外補 source blog ownership 一致性。UTC 儲存、連線 timezone Z，fixture 包含前後日期邊界。
 
 Review 原始紀錄（gitignore）：`.reviews/b0-f4/opus-b0-review.json`、`render-rate-review.md`、`b0-f3-audit.md`、SQL／unit logs。未含金鑰、連線字串或非公開內容。
 
@@ -46,9 +46,9 @@ Review 原始紀錄（gitignore）：`.reviews/b0-f4/opus-b0-review.json`、`ren
 - release：`/home/deck/.local/share/blog-observe/releases/b011873255f9bbf30c252df2ca65ead0ef1c306e`；green gateway18175／web18173，固定edge18160不中斷切換。blue a45b06a保留為安全回滾；沒有把舊unsafe版本重新啟動。
 - 建置前153GiB、切換後151GiB可用，未建立完整備份、未刪除任何既有資料。Worker仍單一，改用此release；active favicon job自動跟隨green。
 
-### 隔離首請求矩陣
+### 舊隔離首請求紀錄（缺少版本 metadata，不作最終 build 驗收）
 
-最終發布tree（19 migrations）通過27組SQL整合測試，76項API/搜尋/關係/sitemap首讀檢查。另以同一份正式Next build、隨機18169資料庫與18176/18177 isolated gateway/web暖讀後實測：
+19 migrations 的原始 SQL 整合測試有27組、76項API/搜尋/關係/sitemap首讀檢查。下列舊SSR/RSC artifact 缺少SHA／BUILD_ID／UTC，因此只能保留為歷史結果，不能證明與最終正式build一致；已由後段明確列版本的重跑紀錄取代：
 
 | 動作 | HTML／RSC／RSC-prefetch 回應數 | 結果 |
 | --- | --- | --- |
@@ -75,3 +75,38 @@ Origin query不使用完成結果快取，Next這些公開頁dynamic/no-store，
 全部無Age。首頁、`/api/v1/openapi.json`、真正404 `/deploy-b0-missing/` 均有 **`Strict-Transport-Security: max-age=86400`**，沒有includeSubDomains/preload。health200、OAuth302/S256/精確callback、SSRF400、tag/youtube200。原始JSON在主repo `.reviews/b0-public-verification.json`。
 
 測量前load1/5/15為5.01/7.68/6.31，後為30.14/13.90/8.50；期間兩個UI reviewer同時執行瀏覽器，不能把差值全部歸因於部署。UI真實檢查另遇首頁與topics timeout500、數頁429，因此這批**不宣稱整站UI通過**。單首頁受控network診斷58請求中有25個Next RSC預取、14favicon均200；favicon配額已修，但no-store模式的Link自動預取仍放大SSR負載。正在由獨立Opus instance關閉自動預取並處理手機搜尋/API status可讀性，修完先candidate review。未放寬公開IP配額、未恢復cache來掩蓋問題。
+
+
+## 補正：不可變 build 的原始驗收證據
+
+為補足舊 artifact 缺少版本資訊，重新啟動保留的 b011873 release；gateway 和 Next standalone 的 `/proc/<pid>/cwd` 均核對實際不可變 release 路徑，gateway `app.js` Git blob 也與該 commit 相符。Next原始與standalone BUILD_ID相同。**沒有重新建置、沒有截圖瀏覽器、沒有正式資料寫入。**
+
+- release SHA：`b011873255f9bbf30c252df2ca65ead0ef1c306e`。
+- Next BUILD_ID：`TJrsq78INga04l4V8V_sE`。
+- seed/rejected/moved/delete：2026-10-12T19:44:22.346Z → 2026-10-12T19:45:59.711Z，48 responses全過。
+- future：2026-10-12T19:46:00.861Z → 2026-10-12T19:46:25.214Z，12 responses全過。
+- 兩份 JSON 均包含 releaseSHA、nextBuildId、UTC 起訖、gateway/web PID與cwd、gatewayGitBlob、buildIdSha256、isolatedPorts（DB18169/gateway18176/web18177），以及每一個回應狀態、no-store、時間與redirect。
+- 原始紀錄：[48筆 JSON](/home/deck/.t3/projects/blog-observe-tw/.reviews/b0-ssr-provenance/rsc-visibility-result.json)、[12筆 JSON](/home/deck/.t3/projects/blog-observe-tw/.reviews/b0-ssr-provenance/future-rsc-visibility-result.json)。舊無版本JSON保留，但不再拿它當最終build provenance。
+
+## 並行 fresh-read 補修（候選，尚未宣稱 B0 全通過）
+
+獨立 Codex 審查用 deferred loader 重現：A先讀visible資料並暫停，hide commit後B同key讀取時會共用A的舊Promise，B自己的loader沒有執行；relations真實入口搭配fake pool也可重現。**這是程式語義的隔離重現，不是已確認正式站實際洩漏。**程序內clear／revision無法涵蓋CLI、worker和其他process的全部寫入，所以不拿它當可靠跨程序撤銷機制。
+
+最小修法讓每個request各自fresh load，不共用完成或未完成結果；topic/overview/SEO wrapper每實例最多8個讀取，relations每pool最多4，超量回503而非舊內容。clear/invalidate不重設active，finally釋放容量。102項純unit回歸含A→commit→B、clear期間容量、不同行為失敗排空和SEO入口；Opus安全review已完成（claude-opus-5-5、finish=stop），未發現阻擋問題；採納真實DB barrier與其他cache掃描建議，部署與最終驗收仍待完成。前一版48+12序列測試通過不能抹除這個並行缺口。
+
+
+### 最終驗收語意與尚待完成項目
+
+撤下保證以資料庫交易 **commit** 為界：A若在commit之前已開始讀取，可完成並回傳它已讀到的舊結果；commit之後才開始的新匿名請求B，必須獨立查詢，不可共用A的未完成Promise。測試必須使用可手動釋放的barrier，不以sleep、重試或TTL等候製造通過。下一輪final candidate測試須記錄A開始、commit、B開始、B完成、A完成的UTC與sequence，涵蓋hide／rejected／moved／future及關係圖、sitemap。artifact需包含releaseSHA、Next BUILD_ID、source tree hash，並分開記錄DB、gateway、web埠。
+
+上述b011873的48+12筆只是已補版本metadata的**序列**證據；最終fresh-read candidate的barrier／SSR／RSC尚待完成。F3/F4保持暫停，no-store與Cloudflare兩條Disabled規則不變。
+
+Opus原始安全review與處理紀錄：worktree `.reviews/b0-f4/opus-fresh-read-review-retry.json`、`fresh-read-review-outcome.md`。第一次回覆截斷不計有效review。九個wrapper各有最多8個邏輯讀取（包含巢狀SEO工作），relations每pool4個，並不是全服務只准8個；底層mysql仍4連線與64排隊上限。實際queue/負載由部署後測量，沒有提高DB連線數。
+
+### Barrier 實作與部署前檢查
+
+新增 `tests/integration/visibility-barrier.mjs` 與 `tools/test-visibility-barrier.mjs`。2026-10-12 19:59 UTC 的隔離API-only實驗通過23個case：hide／rejected／moved／future／delete × overview／topic／relations／topics sitemap，另三種站點狀態的blogs sitemap；future／delete不應隱藏仍公開的部落格本身，該站點sitemap組明列不適用。727個UTC/sequence事件保留在worktree `.reviews/b0-f4/barrier-api.json`，DB18169、gateway33399、web=null。這不是最終Next build驗收。
+
+負控制在獨立程序重現舊single-flight，只有A已捕捉舊SQL→commit→B開始→B無法完成而deadline失敗的完整事件順序，才視為成功抓出缺口；artifact本身仍 `passed:false`，見 `.reviews/b0-f4/barrier-negative.json`。正常模式不使用sleep、重試或TTL。獨立GPT-6.1 Sol另外核對barrier位置、B correlation＋同SQL指紋，以及Next測試preload僅在原始fetch下層附追蹤header，不改Next cache key、no-store、回應或SQL條件。
+
+UI小修由Opus實作（7a89af2），獨立GPT-6.1 Sol的候選實測：首頁自動RSC prefetch=0，點擊導覽保留client navigation，390px搜尋可展開，API status九個端點完整顯示。最終fresh-read build完成後仍須在同build跑HTML/RSC barrier，再切流；不以這份API-only結果替代。

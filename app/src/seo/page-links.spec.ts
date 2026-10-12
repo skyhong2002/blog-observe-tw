@@ -167,7 +167,7 @@ describe('bounded API canonical links', () => {
     expect(await enrichPageLinks(pool, '/api/v1/topics', payload)).toBe(payload);
     expect(calls).toHaveLength(0);
   });
-  it('uses bounded single-flight batches and rechecks visibility after completion', async () => {
+  it('bounds independent batches and does not enrich overflow requests with another request result', async () => {
     let release!: () => void;
     const wait = new Promise<void>((resolve) => {
       release = resolve;
@@ -181,11 +181,50 @@ describe('bounded API canonical links', () => {
     };
     const tasks = Array.from({ length: 12 }, () => enrichPageLinks(pool, '/api/blogs', payload));
     release();
-    await Promise.all(tasks);
-    expect(calls).toHaveLength(3);
+    const outputs = (await Promise.all(tasks)) as Array<typeof payload & { blogs: Array<{ canonicalPath?: string }> }>;
+    expect(calls).toHaveLength(24); // Eight admitted requests, three fresh queries each.
+    expect(outputs.slice(0, 8).every((result) => result.blogs[0].canonicalPath === canonical)).toBe(true);
+    // Enrichment's existing failure path returns the untouched DTO, not someone else's successful lookup.
+    expect(outputs.slice(8).every((result) => result === payload)).toBe(true);
+    expect(outputs.slice(8).every((result) => !('canonicalPath' in result.blogs[0]))).toBe(true);
     await enrichPageLinks(pool, '/api/blogs', payload);
-    expect(calls).toHaveLength(6);
+    expect(calls).toHaveLength(27);
     expect(payload.blogs[1]).not.toHaveProperty('canonicalPath');
+  });
+  it('does a fresh canonical lookup for B after hide while A holds a pre-hide lookup', async () => {
+    const base = fixture();
+    const entered = Promise.withResolvers<void>(),
+      release = Promise.withResolvers<void>();
+    let hidden = false,
+      held = false;
+    const pool = {
+      query: async (sql: string, args: unknown[]) => {
+        if (sql.includes("r.kind='blog'")) {
+          if (hidden) return [[]];
+          const old = await base.pool.query(sql, args);
+          if (!held) {
+            held = true;
+            entered.resolve();
+            await release.promise;
+          }
+          return old;
+        }
+        return base.pool.query(sql, args);
+      },
+    } as unknown as Pool;
+    const payload = { blogs: [{ slug: 'writer', name: '作者' }] };
+    const first = enrichPageLinks(pool, '/api/blogs', payload);
+    await entered.promise;
+    hidden = true;
+    try {
+      const before = base.calls.length;
+      const second = (await enrichPageLinks(pool, '/api/blogs', payload)) as typeof payload;
+      expect(base.calls.length).toBeGreaterThan(before);
+      expect(second.blogs[0]).not.toHaveProperty('canonicalPath');
+    } finally {
+      release.resolve();
+    }
+    expect(await first).toMatchObject({ blogs: [{ canonicalPath: canonical }] });
   });
   it('caps unique references and skips oversized/deep payloads without a database lookup', async () => {
     const { pool, calls } = fixture();

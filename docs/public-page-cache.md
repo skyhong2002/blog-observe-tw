@@ -7,7 +7,7 @@
 | 公開 HTML：首頁、文章、來源、話題、作者、標籤、關係、流量 | 0 | Next force-dynamic，每次請求重讀 |
 | Next gateway fetch / React | 0 | fetch no-store；React memoize 只限同一次 render |
 | 瀏覽器資料 loader／搜尋建議 | 0 | 不存 Map/localStorage，fetch no-store；分頁再讀 |
-| gateway API／SEO 結果 | 0 | 只合併同時進行的請求，不保留已完成結果 |
+| gateway API／SEO 結果 | 0 | 每個請求各自fresh read；不共用進行中或已完成結果。每wrapper最多8個並行讀取／relations每pool4個（不是全服務總量），超量503，不回舊內容 |
 | 關係資料投影 | 0（公開讀） | 每次讀 SQL；worker 的診斷 snapshot 不供公開回應 |
 | sitemap | 0 | 重新查公開證據；HTTP no-store |
 | edge／Cloudflare 可變內容 | 0 | private,no-store；剝除上游 CDN override，Cloudflare 協助者已停用首頁／API 規則並清除該主機 edge 物件 |
@@ -27,3 +27,5 @@
 CF 驗收必須是正常無 Cookie／query／Authorization 的 GET /，確認既有 HIT／Age 已消失，連續兩次確認 no-store 與 BYPASS／DYNAMIC。加 query、RSC 或 Cookie 的 bypass 不能當作舊 CF 物件已撤銷的證據；Cloudflare 沒有掛接隔離資料库，不能宣稱直接對 CF 做了 fixture 隱藏測試。
 
 2026-10-13 最新要求：沒有任何「s-maxage ≤ 60 秒即可恢復」例外。origin、Next、Cloudflare 三層主動失效證據不齊前，一律維持 bypass + no-store。[部署與驗收紀錄](privacy-deployment-2026-10-13.md)。
+
+新的並行撤下測試：`B0_BARRIER_ARTIFACT=.reviews/barrier.json npm run test:visibility -- --env-file <私有18169 clone設定>`。只接受隨機隔離DB；A的SQL結果由barrier暫停，commit後B須完成獨立讀取才釋放A，無sleep／TTL／重試。API-only run不冒充Next驗收；finalrelease需傳實際BUILD_ID與獨立Next PID／埠，Next僅載入測試用correlation preloader。已在commit前開始的A允許完成舊snapshot，commit後的新B不能共用該snapshot。

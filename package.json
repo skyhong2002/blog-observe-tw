@@ -33,6 +33,7 @@
     "topics:once": "node --env-file-if-exists=.env tools/topics-once.ts",
     "vocabulary:sync": "node --env-file-if-exists=.env tools/topics-once.ts --sync",
     "test:integration": "node tools/test-integration.mjs",
+    "test:visibility": "node tools/test-visibility-barrier.mjs",
     "content:once": "node --env-file-if-exists=.env tools/content-once.ts",
     "test:web": "node --test web/test/*.test.ts",
     "docs:api": "node tools/gen-api-docs.ts",

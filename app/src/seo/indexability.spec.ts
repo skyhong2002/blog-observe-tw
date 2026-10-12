@@ -26,7 +26,7 @@ describe('shared topic page indexability', () => {
     for (const label of ['C++', 'C#', 'AI', '台灣'])
       expect(topicIndexability(counts, 'current', { ...active, label }).indexable).toBe(true);
   });
-  it('shares one cold projection and reuses it for a low-frequency blog', async () => {
+  it('runs independent bounded projections and preserves the low-frequency blog policy', async () => {
     const query = vi.fn(async (sql: string) => {
       if (sql.includes('FROM topic_current')) return [[{ id: 'current' }]];
       if (sql.startsWith('WITH ')) return [[]];
@@ -45,13 +45,55 @@ describe('shared topic page indexability', () => {
       release: vi.fn(),
     };
     const pool = { getConnection: vi.fn(async () => connection) } as unknown as Pool;
-    const results = await Promise.all(Array.from({ length: 20 }, () => getPageIndexability(pool, 'blog', '1')));
+    const results = await Promise.all(Array.from({ length: 8 }, () => getPageIndexability(pool, 'blog', '1')));
     expect(results.every((row) => row.indexable && row.posts === 0 && row.currentVersion === 'current')).toBe(true);
-    expect(pool.getConnection).toHaveBeenCalledTimes(1);
-    expect(query).toHaveBeenCalledTimes(3);
+    expect(pool.getConnection).toHaveBeenCalledTimes(8);
+    expect(query).toHaveBeenCalledTimes(24);
     await getPageIndexability(pool, 'blog', '1');
-    expect(query).toHaveBeenCalledTimes(6);
+    expect(query).toHaveBeenCalledTimes(27);
     expect(await getPageIndexability(pool, 'blog', '2')).toMatchObject({ indexable: true, indexabilityReason: null, posts: 0 });
+  });
+  it('does not reuse an older projection still awaiting transaction completion', async () => {
+    const entered = Promise.withResolvers<void>(),
+      release = Promise.withResolvers<void>();
+    let visible = true,
+      held = false,
+      reads = 0;
+    const pool = {
+      getConnection: async () => ({
+        beginTransaction: async () => {},
+        rollback: async () => {},
+        release: () => {},
+        commit: async () => {
+          if (!held) {
+            held = true;
+            entered.resolve();
+            await release.promise;
+          }
+        },
+        query: async (sql: string) => {
+          reads++;
+          if (sql.includes('FROM topic_current')) return [[{ id: 'current' }]];
+          if (sql.startsWith('WITH ')) return [[]];
+          return [
+            visible
+              ? [{ entity_id: '1', slug: 'writer', status: 'verified', url: 'https://writer.example/', posts: 1, lastmod: null }]
+              : [],
+          ];
+        },
+      }),
+    } as unknown as Pool;
+    const a = getPageIndexability(pool, 'blog', '1');
+    await entered.promise;
+    visible = false;
+    try {
+      const before = reads;
+      expect((await getPageIndexability(pool, 'blog', '1')).posts).toBe(0);
+      expect(reads).toBeGreaterThan(before);
+    } finally {
+      release.resolve();
+    }
+    expect((await a).posts).toBe(1);
   });
   it('keeps a one-post, one-blog topic in the deployed sitemap set', async () => {
     const id = 'a'.repeat(64);
