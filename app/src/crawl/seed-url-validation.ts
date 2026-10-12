@@ -32,7 +32,7 @@ export type SeedUrlValidation = {
     researchEvidence: SeedResearchEvidence[];
   };
 };
-export type SeedValidationOptions = FeedCrawlerOptions & { maxSourceRequests?: number; now?: () => Date };
+export type SeedValidationOptions = FeedCrawlerOptions & { maxSourceRequests?: number; requireSyndication?: boolean; now?: () => Date };
 
 const parser = new XMLParser({ ignoreAttributes: false, removeNSPrefix: true, parseTagValue: false });
 const domainPattern = /(?:https?:\/\/)?(?:www\.)?(?:[a-z0-9-]+\.)+[a-z]{2,}(?:\/[^\s]*)?/gi;
@@ -399,6 +399,10 @@ export async function validateSeedUrl(input: SeedUrlInput, options: SeedValidati
       }
       if (info.comments || isCommentsSource(check.finalUrl)) {
         check.reason = 'comments_feed';
+        continue;
+      }
+      if (options.requireSyndication && info.type === 'sitemap') {
+        check.reason = 'syndication_required';
         continue;
       }
       if (info.indexUrls) {

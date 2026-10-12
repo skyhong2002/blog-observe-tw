@@ -25,7 +25,25 @@ function evidenceText(value: Candidate['sourceEvidence']) {
           }
         })()
       : value;
-  return `RSS 偵測：${String(evidence.rssDetection || '待執行')} · 路徑：${String(evidence.discoveryPath || evidence.sourceUrl || '待補')}`;
+  const review =
+    evidence.automaticReview && typeof evidence.automaticReview === 'object' ? (evidence.automaticReview as Record<string, unknown>) : null;
+  const reasons: Record<string, string> = {
+    needs_publication_home: '原連結是文章或子頁，尚未確認所屬首頁',
+    identity_not_confirmed: '首頁名稱尚未與來源名稱一致',
+    platform_root: '平台總站，無法辨識個別作者',
+    not_a_blog_publication: '連結不是部落格來源',
+    missing_identity_name: '來源沒有可核對的名稱',
+    no_verified_feed_or_sitemap: '尚未取得有效 RSS／Atom',
+    feed_home_identity_mismatch: 'RSS 的首頁指向與候選不一致',
+    feed_name_identity_mismatch: 'RSS 名稱與候選身份不一致',
+    feed_entries_outside_publication: 'RSS 混有其他站點文章',
+    robots_disallowed: 'robots 或來源存取規則限制',
+    homepage_http_403: '來源拒絕存取（403）',
+    empty_feed: 'RSS 尚無可驗證文章',
+    timeout: '來源回應逾時，保留待重試',
+  };
+  const state = review ? reasons[String(review.reason)] || String(review.reason) : String(evidence.rssDetection || '待執行');
+  return `自動驗證：${state} · 路徑：${String(evidence.discoveryPath || evidence.sourceUrl || '待補')}`;
 }
 
 export default function DiscoveryReview() {
@@ -45,7 +63,7 @@ export default function DiscoveryReview() {
     const payload = (await response.json()) as { candidates?: Candidate[] };
     setLoaded(true);
     setItems(payload.candidates ?? []);
-    setMessage(`${payload.candidates?.length ?? 0} 筆待審候選`);
+    setMessage(`${payload.candidates?.length ?? 0} 筆保留候選`);
   }, []);
   // Candidate data is loaded once when the operator opens the page.
   useEffect(() => {

@@ -1,0 +1,224 @@
+import { XMLParser, XMLValidator } from 'fast-xml-parser';
+import { type FeedCrawlerOptions, isAllowedCrawlUrl, parseFeed, politeFetch, readFeedBody } from './feed.ts';
+import { seedIdentityKey } from './seed-url-resolution.ts';
+import { isSeedPlatformRoot, type SeedUrlValidation, validateSeedUrl } from './seed-url-validation.ts';
+
+export const CANDIDATE_POLICY = 'rss-publication-v1';
+export type DiscoveryCandidate = { id: number; url: string; name: string | null; status: string; source_type: string };
+export type CandidateCheck = {
+  policy: string;
+  id: number;
+  inputUrl: string;
+  checkedAt: string;
+  eligible: boolean;
+  reason: string;
+  verification?: SeedUrlValidation;
+  feed?: { url: string; type: 'rss' | 'atom'; title: string; identityUrl: string; entries: number; sample: string[] };
+};
+const platforms = new Set([
+  'medium.com',
+  'vocus.cc',
+  'substack.com',
+  'wordpress.com',
+  'blogspot.com',
+  'pixnet.net',
+  'tumblr.com',
+  'bearblog.dev',
+  'github.io',
+]);
+const nonPublications = [
+  'facebook.com',
+  'instagram.com',
+  'youtube.com',
+  'youtu.be',
+  'twitter.com',
+  'x.com',
+  'threads.net',
+  'github.com',
+  'wikipedia.org',
+  'w3.org',
+  'creativecommons.org',
+  'discord.com',
+  't.me',
+  'line.me',
+  'apple.com',
+  'google.com',
+  'amazon.com',
+  'amazon.co.jp',
+  'gumroad.com',
+  'patreon.com',
+  'ko-fi.com',
+  'buymeacoffee.com',
+];
+export function candidatePreflight(candidate: DiscoveryCandidate): string | null {
+  if (candidate.status !== 'candidate') return 'decision_already_exists';
+  if (!isAllowedCrawlUrl(candidate.url) || candidate.url.length > 1024) return 'unsafe_or_invalid_url';
+  const u = new URL(candidate.url);
+  const host = u.hostname.replace(/^www\./, '');
+  if (nonPublications.some((h) => host === h || host.endsWith(`.${h}`))) return 'not_a_blog_publication';
+  if (isSeedPlatformRoot(candidate.url) || (platforms.has(host) && u.pathname === '/')) return 'platform_root';
+  // Never turn a contributed article, category, product or arbitrary path into a new publication.
+  if (host === 'medium.com') {
+    if (!/^\/(?:@[\w.-]+|[\w-]+)\/?$/.test(u.pathname)) return 'needs_publication_home';
+  } else if (host === 'vocus.cc') {
+    if (!/^\/(?:salon|user)\/[^/]+\/?$/.test(u.pathname)) return 'needs_publication_home';
+  } else if (!/^\/(?:blog\/?|blogs\/?)?$/.test(u.pathname)) return 'needs_publication_home';
+  if (u.search) return 'needs_publication_home';
+  if (!candidate.name?.trim()) return 'missing_identity_name';
+  return null;
+}
+const array = (x: unknown): unknown[] => (x == null ? [] : Array.isArray(x) ? x : [x]);
+const object = (x: unknown): Record<string, unknown> =>
+  x && typeof x === 'object' && !Array.isArray(x) ? (x as Record<string, unknown>) : {};
+const normalized = (s: string) =>
+  s
+    .normalize('NFKC')
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}]/gu, '');
+/** Partial shared words are insufficient for unattended approval (Quill Writer != Another Writer). */
+export function candidateIdentityConfirmed(
+  name: string | null,
+  verification: Pick<SeedUrlValidation, 'title' | 'siteName' | 'author'>,
+  feedTitle: string,
+): boolean {
+  const identity = normalized((name || '').replace(/(?:https?:\/\/)?(?:www\.)?(?:[a-z0-9-]+\.)+[a-z]{2,}(?:\/[^\s]*)?/gi, ''));
+  if (
+    identity.length < 2 ||
+    (!/\p{Script=Han}/u.test(identity) && identity.length < 4) ||
+    ['writer', 'author', 'blog', 'blogroll', 'blogger', 'wordpress', 'homepage', '網站', '部落格', '作者', '首頁'].includes(identity)
+  )
+    return false;
+  return (
+    [verification.title, verification.siteName, verification.author].some((text) => normalized(text).includes(identity)) &&
+    normalized(feedTitle).includes(identity)
+  );
+}
+export function publicationContains(value: string, home: string): boolean {
+  try {
+    if (!isAllowedCrawlUrl(value)) return false;
+    const v = new URL(value),
+      h = new URL(home);
+    if (v.hostname.replace(/^www\./, '') !== h.hostname.replace(/^www\./, '')) return false;
+    const path = h.pathname.replace(/\/$/, '');
+    return !path || v.pathname === path || v.pathname.startsWith(`${path}/`);
+  } catch {
+    return false;
+  }
+}
+/** Independent homepage name evidence plus an actual, non-empty RSS/Atom belonging to that publication. */
+export async function validateCandidate(candidate: DiscoveryCandidate, options: FeedCrawlerOptions = {}): Promise<CandidateCheck> {
+  const result: CandidateCheck = {
+    policy: CANDIDATE_POLICY,
+    id: candidate.id,
+    inputUrl: candidate.url,
+    checkedAt: new Date().toISOString(),
+    eligible: false,
+    reason: candidatePreflight(candidate) || 'unverified',
+  };
+  if (result.reason !== 'unverified') return result;
+  const verification = await validateSeedUrl(
+    { id: candidate.id, name: candidate.name!, url: candidate.url },
+    { ...options, requireSyndication: true, maxSourceRequests: 8 },
+  );
+  result.verification = verification;
+  if (!verification.validated || !verification.finalUrl) {
+    result.reason = verification.reason;
+    return result;
+  }
+  if (candidatePreflight({ ...candidate, url: verification.finalUrl })) {
+    result.reason = 'redirect_not_publication_home';
+    return result;
+  }
+  const source = verification.feedSources.find((s) => s.type === 'rss' || s.type === 'atom');
+  if (!source) {
+    result.reason = 'rss_or_atom_required';
+    return result;
+  }
+  try {
+    const response = await politeFetch(source.url, {}, options);
+    if (!response.ok) {
+      result.reason = `feed_http_${response.status}`;
+      return result;
+    }
+    const xml = await readFeedBody(response);
+    if (/<!DOCTYPE|<!ENTITY/i.test(xml) || XMLValidator.validate(xml) !== true) {
+      result.reason = 'unsafe_xml';
+      return result;
+    }
+    const root = object(new XMLParser({ ignoreAttributes: false, removeNSPrefix: true, parseTagValue: false }).parse(xml));
+    const channel = object(object(root.rss).channel),
+      atom = object(root.feed),
+      meta = Object.keys(channel).length ? channel : atom;
+    const title = typeof meta.title === 'string' ? meta.title.trim() : '';
+    const finalFeed = new URL(response.url || source.url);
+    if (
+      /(?:^|\/)comments?(?:\/|$)/i.test(finalFeed.pathname) ||
+      /^comments?(?:-|$)/i.test(finalFeed.searchParams.get('feed') || '') ||
+      /^(?:comments? (?:on|for)\b)|comments? feed|(?:留言|評論)(?:摘要|訂閱|回應|feed)/i.test(title)
+    ) {
+      result.reason = 'comments_feed';
+      return result;
+    }
+
+    const identities = array(meta.link).flatMap((l) =>
+      typeof l === 'string'
+        ? [l]
+        : (!object(l)['@_rel'] || object(l)['@_rel'] === 'alternate') && typeof object(l)['@_href'] === 'string'
+          ? [String(object(l)['@_href'])]
+          : [],
+    );
+    const identity = identities.find((u) => {
+      try {
+        return seedIdentityKey(new URL(u, source.url).href) === seedIdentityKey(verification.finalUrl!);
+      } catch {
+        return false;
+      }
+    });
+    if (!identity) {
+      result.reason = 'feed_home_identity_mismatch';
+      return result;
+    }
+    if (!candidateIdentityConfirmed(candidate.name, verification, title)) {
+      result.reason = 'feed_name_identity_mismatch';
+      return result;
+    }
+    const entries = parseFeed(xml, response.url || source.url);
+    if (
+      !entries.length ||
+      entries.some(
+        (e) =>
+          !e.title.trim() ||
+          e.title === '未命名文章' ||
+          seedIdentityKey(e.url) === seedIdentityKey(source.url) ||
+          seedIdentityKey(e.url) === seedIdentityKey(verification.finalUrl!),
+      )
+    ) {
+      result.reason = 'empty_feed';
+      return result;
+    }
+    if (entries.some((e) => !publicationContains(e.url, verification.finalUrl!))) {
+      result.reason = 'feed_entries_outside_publication';
+      return result;
+    }
+    result.feed = {
+      url: response.url || source.url,
+      type: source.type as 'rss' | 'atom',
+      title: title.slice(0, 255),
+      identityUrl: new URL(identity, source.url).href,
+      entries: entries.length,
+      sample: entries.slice(0, 3).map((e) => e.url),
+    };
+    result.reason = 'verified_homepage_and_rss';
+    result.eligible = true;
+  } catch (error) {
+    const m = error instanceof Error ? error.message : '';
+    result.reason = /robots/i.test(m)
+      ? 'robots_disallowed'
+      : /unsafe/i.test(m)
+        ? 'unsafe_destination'
+        : /timeout|aborted/i.test(m)
+          ? 'timeout'
+          : 'feed_verification_failed';
+  }
+  return result;
+}
