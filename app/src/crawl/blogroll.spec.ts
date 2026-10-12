@@ -243,3 +243,89 @@ it('aborts on page cache storage errors rather than reporting an upstream fetch 
   await expect(discoverBlogrolls(f.store, f.options)).rejects.toThrow('database unavailable');
   expect(f.store.release).toHaveBeenCalledOnce();
 });
+
+const partyRoot = 'https://blogblog.club/party';
+const monthRecap = 'https://host.test/month-recap';
+const monthTopic = 'https://host.test/month-topic';
+const monthSection = (participants: string[], recap = true) => `<h3>第 1 期：推坑</h3><ul>
+<li>主題頁面：<a href="${monthTopic}">本月主題</a></li>
+${recap ? `<li>回顧文章：<a href="${monthRecap}">本月回顧</a></li>` : ''}
+<li>參與者（共 ${participants.length} 篇）：${participants.map((url) => `<a href="${url}">投稿作者</a>`).join('')}</li></ul>`;
+
+it('keeps late monthly sources within the link budget and prefers recap to topic', () => {
+  const submissions = Array.from({ length: 1010 }, (_, i) => `https://writer${i}.test/post`);
+  const html = `<main><h2>第 2 期：新主題</h2><ul><li>主題頁面：<a href="https://current.test/topic">主題</a></li>
+  <li>參與者（共 1010 篇）：${submissions.map((url) => `<a href="${url}">投稿</a>`).join('')}</li></ul>${monthSection([target])}</main>`;
+  const links = parseBlogrollPage(html, partyRoot, 'party');
+  expect(links).toHaveLength(1000);
+  expect(links.filter((link) => link.follow).map((link) => link.url)).toEqual(['https://current.test/topic', monthRecap]);
+  expect(links.find((link) => link.url === monthTopic)?.follow).toBe(false);
+  expect(parseBlogrollPage(html, 'https://elsewhere.test/party', 'party').some((link) => link.follow)).toBe(false);
+  expect(parseBlogrollPage(html, 'https://blogblog.club/random', 'party').some((link) => link.follow)).toBe(false);
+});
+
+it('recovers omitted party links via one labelled month source and measures exact URL coverage', async () => {
+  const f = fixture({
+    [partyRoot]: `<main>${monthSection([target])}</main>`,
+    [monthRecap]: `<main><a href="${target}">投稿者</a><a href="https://third.test/more">更多文章</a></main>`,
+  });
+  const report = await discoverBlogrolls(f.store, {
+    ...f.options,
+    roots: [{ url: partyRoot, kind: 'party' }],
+    maxLinksPerPage: 2,
+  });
+  expect(report.requests).toBe(2);
+  expect(report.truncated).toBe(true);
+  expect(report.blogrollEdges).toBe(0);
+  expect(report.partyCoverage).toEqual([
+    { rootUrl: partyRoot, status: 'measured', omitted: 1, recovered: 1, remaining: 0, overflow: false },
+  ]);
+  expect(f.observations.find((o) => o.targetUrl === target)).toMatchObject({
+    relation: 'party',
+    sourceUrl: monthRecap,
+    path: [partyRoot, monthRecap, target],
+  });
+  expect(f.fetcher.mock.calls.some(([url]) => [target, monthTopic, 'https://third.test/more'].includes(String(url)))).toBe(false);
+});
+
+it('replays cached party month sources after 304 without claiming unmeasured omission coverage', async () => {
+  const f = fixture({ [partyRoot]: `<main>${monthSection([target])}</main>`, [monthRecap]: `<main><a href="${target}">投稿者</a></main>` });
+  const options = { ...f.options, roots: [{ url: partyRoot, kind: 'party' as const }] };
+  await discoverBlogrolls(f.store, options);
+  f.pages.get(monthRecap)!.links[0].follow = true; // Cached child metadata must not enable a third hop.
+  const original = f.fetcher.getMockImplementation()!;
+  f.fetcher.mockImplementation(async (input, init) =>
+    [partyRoot, monthRecap].includes(String(input)) ? new Response(null, { status: 304 }) : original(input, init),
+  );
+  const report = await discoverBlogrolls(f.store, options);
+  expect(report.requests).toBe(2);
+  expect(report.pages.map((page) => page.status)).toEqual(['not-modified', 'not-modified']);
+  expect(report.partyCoverage).toEqual([
+    { rootUrl: partyRoot, status: 'cached-unknown', omitted: null, recovered: 0, remaining: null, overflow: false },
+  ]);
+  expect(f.observations.filter((o) => o.sourceUrl === monthRecap)).toHaveLength(2);
+  expect(f.fetcher.mock.calls.some(([url]) => String(url) === target)).toBe(false);
+});
+
+it('counts party month fetches and failures in page budgets without retrying a forbidden source', async () => {
+  const f = fixture({ [partyRoot]: `<main>${monthSection([target], false)}</main>`, [monthTopic]: { status: 403 } });
+  const options = { ...f.options, roots: [{ url: partyRoot, kind: 'party' as const }] };
+  const capped = await discoverBlogrolls(f.store, { ...options, maxPages: 1 });
+  expect(capped.requests).toBe(1);
+  expect(capped.truncated).toBe(true);
+  expect(f.fetcher.mock.calls.some(([url]) => String(url) === monthTopic)).toBe(false);
+  const report = await discoverBlogrolls(f.store, options);
+  expect(report.requests).toBe(2);
+  expect(report.pages.at(-1)).toMatchObject({ url: monthTopic, status: 'error', error: 'HTTP 403' });
+  expect(f.fetcher.mock.calls.filter(([url]) => String(url) === monthTopic)).toHaveLength(1);
+});
+
+it('retains the monthly host submissions before other participants because recap parsing excludes its own host', () => {
+  const links = parseBlogrollPage(
+    `<main>${monthSection(['https://other.test/post', 'https://host.test/my-submission'])}</main>`,
+    partyRoot,
+    'party',
+    3,
+  );
+  expect(links.map((link) => link.url)).toEqual([monthRecap, monthTopic, 'https://host.test/my-submission']);
+});

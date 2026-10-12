@@ -4,10 +4,12 @@
 
 ## blogblog.club
 
-探索器每週從 `https://blogblog.club/blogrollroll` 的表格第一欄取得部落卷網址，再讀取各部落卷正文內的外站連結。這是一層有界展開：部落卷內的候選不會再遞迴抓取。`/party`、`/random` 另外收集第一層投稿連結。
+探索器每週從 `https://blogblog.club/blogrollroll` 的表格第一欄取得部落卷網址，再讀取各部落卷正文內的外站連結。這是一層有界展開：部落卷內的候選不會再遞迴抓取。`/party` 另外讀取同頁各月份明確標示的「回顧文章」，尚無回顧時讀「主題頁面」，再收集該頁的外站候選；`/random` 維持第一層連結。月份子頁的關係仍是 `party`，不會冒充部落卷；子頁和一般投稿都不會再遞迴。
 
 - 所有頁面與轉址沿用 DNS 釘選、公開 IP／80/443 限制、robots.txt、含聯絡方式的 User-Agent、每站至少 1.5 秒間隔、10 秒 timeout 與 5 MiB 回應上限。
 - 每輪最多 32 次頁面抓取（失敗、304、無條件重試都計入；robots／轉址另由共用 fetcher 限制）、每頁 1,000 個連結／700 KiB 解析快取、全輪 5,000 筆觀察。達上限回報 `truncated`。
+- `/party` 根頁優先保留每月回顧／主題與非投稿資料，再保留月份主持站自己的投稿（其回顧頁會排除同站連結），最後收集其餘投稿；因此頁尾月份不會因根頁截斷而失去展開入口。每月最多選一個明確標示的來源，不猜分頁網址，不以候選網址作為抓取清單。
+- `partyCoverage` 對新抓根頁回報去重後被排除的網址數、月份子頁實際補回數與剩餘數；只在本輪記憶體保存最多 5,000 個排除網址的 SHA-256，超量明示 `overflow`。304 根頁未保存排除清單，回報 `cached-unknown`，仍遍歷月份子頁，不宣稱覆蓋完整。根頁達上限仍維持 `truncated`。
 - `discovery_pages` 保存 ETag、Last-Modified、最終網址、正文 SHA-256、parser version 與解析後的連結。304 仍回放快取的連結與子頁；解析器版本、頁面類型或最終網址不相符時不用舊解析快取。
 - `discovery_edges` 保存 root／source／target、原入口與轉址後來源、完整路徑、anchor、正文 hash、首次／末次觀察時間。同一站由不同部落卷發現的路徑分別保留；抓取去重與路徑去重獨立。
 - 候選存入 `discovery_candidates`，不自動核准。已核准／拒絕狀態、人工 evidence 與已完成的 RSS 檢查不被覆寫。`blog_links` 的 ID 關係適用已收錄站點；尚無 blog ID 的探索關係保存在 URL 層級的 `discovery_edges`。
@@ -44,3 +46,9 @@ blog 的資料庫、Redis namespace、佇列、cookie jar、Playwright profile �
 204 項測試、TypeScript、Biome 與 production build 通過；隔離 MariaDB 還原驗證涵蓋鎖競爭、304 回放、跨來源同網址、UTC 時間往返、人工 evidence／拒絕狀態保護及交易失敗回滾。正式執行前後其他來源的候選 checksum 一致。Codex／Opus 審查與處理紀錄保留於忽略版控的 `.reviews/`。
 
 切換後 `blog.observe.tw`、`/healthz`、目錄與來源頁均 200；Google OAuth 起始 302，S256 與 callback 正確；proxy SSRF 回歸請求回 400；tag／youtube 首頁仍 200。前一 release `9400b6a` 與 service drop-in 備份保留，可回滾。
+
+## 同樂會月份覆蓋修正（parser v2）
+
+2026-10-12 以禮貌抓取讀取根頁與 11 個官方回顧／主題來源（全部 200），未寫入正式資料庫。根頁有 1,044 個外站 anchor；正規化、排除及去重後為 1,011 個候選 URL，真正超出每頁上限的是 11 個 URL。新排序保留 1,000 個，再以月份頁補回其餘 11 個，這次快照的根頁剩餘數為 0；不表示未來來源也必然完整。含根頁的此項測量共 12 頁，2,000 以下觀察，未提高既有工作上限。私人證據保留於 `.reviews/party-coverage/`。
+
+回歸涵蓋頁尾月份入口、回顧優先／主題備援、主持站投稿優先、精確 URL 覆蓋、304 重播、`party` 關係與完整來源路徑、禁止第三層展開、頁數上限及 403 不重試。解析器版本提升會重建舊快取；仍共用原 named lock、SSRF 防護和候選審核狀態保護。本節是修改後的研究／測試紀錄，正式執行結果另由部署驗收記錄。

@@ -1,5 +1,6 @@
 import type { FeedCrawlerOptions } from './feed.ts';
 
+/** follow permits one root-level expansion only: listed blogroll or explicitly labelled party month source. */
 export type BlogrollLink = { url: string; text: string; follow: boolean };
 export type DiscoveryPage = {
   url: string;
