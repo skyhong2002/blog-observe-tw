@@ -22,3 +22,7 @@ Similarweb 的 Similar Sites 結果只能當候選站和相似關係，不能當
 ## 資源隔離
 
 blog 的資料庫、Redis namespace、佇列、cookie jar、Playwright profile 和快照目錄都必須獨立於 tag.observe.tw 與 youtube.observe.tw。抓取工作也應有單一排程器，避免同一個來源由多個服務重複請求。
+
+## 缺網址種子配對（提案）
+
+從既有候選與 blogroll 產生有出處的名稱配對建議，透過獨立的人工確認交易綁定既有 seed；目前候選 approve 不會替 seed 補網址。詳細規則、平台身份邊界與 UI／資料模型設計見 [種子網址配對提案](seed-url-matching-proposal.md)。本次僅提出方案，未自動寫入或收錄。
