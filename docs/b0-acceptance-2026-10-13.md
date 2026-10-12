@@ -28,7 +28,9 @@ Review 原始紀錄（gitignore）：`.reviews/b0-f4/opus-b0-review.json`、`ren
 
 ## 歷史 fallback 與 20 筆樣本
 
-[完整二十筆資料與舊→新網址驗收](topic-history-acceptance-2026-10-13.md)：4,769 累積話題、710 個近30/90天皆無 fresh 命中的話題；有可公開歷史文章才保留頁面，真正完全無證據不憑空產生 fallback。薄頁 noindex 政策未新增。
+[完整二十筆資料與舊→新網址驗收](topic-history-acceptance-2026-10-13.md)：以正式版 `42711cf`、UTC **2026-10-12T21:05:23.000Z** 為準，**4,769** 累積話題、**838** 個近30/90天皆無 fresh 命中的話題；有可公開歷史文章才保留頁面，真正完全無證據不憑空產生 fallback。薄頁 noindex 政策未新增。 統計為依序執行的唯讀 SELECT，**不是同一個交易快照**。SSR 固定呈現預設 30 天與歷史 fallback，90 天由 client 呼叫 API；本次 90 天零篇證據是 API 與發布日期核對，不能稱為 90 天 SSR。
+
+B0 的具體條件已補證，可繼續 F3／F4 candidate；全部 UI 並未因此通過。Cloudflare 兩條規則維持 Disabled；tag 備份期間磁碟凍結仍有效，不進行大型建置或 artifact。
 
 正式瀏覽器範例（1280 寬，先明確設 opt-out，GA 資源0，未送合成事件）：
 
