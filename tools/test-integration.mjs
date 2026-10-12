@@ -63,6 +63,8 @@ try {
     ['content-topics', '../app/src/topics/content.integration.ts', 'runContentTopicsIntegration'],
     ['content-feed', '../app/src/crawl/feed-content.integration.ts', 'runFeedContentIntegration'],
     ['content', '../app/src/content/content.integration.ts', 'runContentIntegration'],
+    ['public-api', '../app/src/public-api/integration.ts', 'runPublicApiIntegration'],
+    ['api-keys', '../app/src/reader/api-keys.integration.ts', 'runApiKeyIntegration'],
     ['admin', '../tests/integration/admin.mjs', 'runAdminIntegration'],
   ];
   for (const [label, module, entry] of suites) {

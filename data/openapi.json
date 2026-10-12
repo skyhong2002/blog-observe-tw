@@ -1,0 +1,3666 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "部落格觀察 API",
+    "version": "1",
+    "summary": "公開取用最新文章、部落格目錄、正文提及關係與話題排行；資料只涵蓋已收錄且驗證的部落格。",
+    "description": "- 基底網址 `https://blog.observe.tw`。公開查詢使用 `GET`（也接受 `HEAD`），回傳 UTF-8 JSON。\n- API 狀態頁：`/api/status`。瀏覽器以 HTML 顯示；以 `Accept: application/json` 取得 JSON，只顯示 API 狀態與端點用途。JSON 欄位為 `status`、`version`、`endpoints`（每項 `path`、`summary`）與 `updatedAt`；這是狀態回應產生時間，不是文章資料更新時間。此回應為 `no-store`，不提供內部主機或爬蟲維運資訊。\n- 公開查詢不需要金鑰。每個 IP 每分鐘最多 60 次，超過回 `429`；回應帶 `x-ratelimit-limit`、`x-ratelimit-remaining`、`x-ratelimit-reset`。登入後可在 `/my/` 建立個人 API 金鑰（每人最多 3 把），以 `x-api-key: blog_…` 傳送，每把每分鐘 1000 次；伺服器只存 SHA-256 摘要，完整金鑰只顯示一次。無效或撤銷的金鑰回 `401`。為防止隨機金鑰探測，首次出現或未快取的金鑰須先通過每 IP 每分鐘 60 次的匿名／驗證桶；若該桶已用完會先回 `429`，請等窗口重設後重試。已快取且有效的金鑰不受此 IP 桶限制，每把每分鐘 1000 次額度不變。金鑰不能用來登入、管理或讀取私人資料，`Authorization` 不是本 API 的金鑰認證方式。\n- 允許跨網域：`Access-Control-Allow-Origin: *`，不接受跨域 cookie 認證。瀏覽器可讀取限流標頭與 `Retry-After`；遇 `429` 請依 `Retry-After` 秒數退避。共享快取上的限流標頭可能是產生回應時的快照，不能當作即時餘額；來源站仍對實際到站請求計額。\n- 時間一律使用 UTC ISO 8601（例如 `2026-10-12T00:00:00.000Z`）；「一天」指台北時間（UTC+8）的日曆日，`hours` 則是連續經過的小時數。未知日期回 `null`，不以抓取日期冒充發文日期。\n- 匿名成功回應帶 `cache-control: public, max-age=0, s-maxage=120, stale-while-revalidate=180`。文章依各站 RSS／抓取排程分批更新，關係快照約每 5 分鐘，話題查詢快取約 2 分鐘；低頻部落格不因久未發文而失效。請至少間隔 120 秒輪詢，關係以 5 分鐘以上為宜。更新與歷史回補有延遲，不保證每輪都有新資料。\n- 帶 `x-api-key` 或 `Authorization` 的請求與錯誤回應為 `private, no-store` 或 `no-store`，不得進共享快取。快取標頭不代表 CDN 已快取該端點；目前 Cloudflare 的專用 HTML 規則只涵蓋首頁。\n- 錯誤格式為 `{\"error\":\"...\"}`：`400` 參數／游標錯誤、`401` 無效金鑰、`404` 找不到、`405` 不支援的方法、`429` 太頻繁、`503` 暫時無法提供服務。未知參數、重複參數與不合法的時間窗口會回 `400`。\n- 路徑參數請 URL 編碼（例如話題 `rss:1` 寫成 `rss%3A1`），路徑結尾不要加 `/`。文章與目錄使用 `limit`、`cursor`／`nextCursor`；游標是不透明字串，請原樣傳回並保持原查詢條件。`nextCursor: null` 表示這個結果已到尾頁。\n- `v1` 內只做向後相容的變更（新增欄位、新增端點）；移除或改名會先公告。客戶端應忽略未知的新欄位。既有站內 `/api/*` 介面保留給網站使用，不是本文件的穩定公開契約；本站沒有舊版 PHP API。\n- 部落格文章、標題與圖片著作權屬原作者。API 只提供標題、原文連結、統計及最多 500 字元的短摘要，不提供全文；私人追蹤、個人 RSS、候選證據、管理及 AI 原始輸入不在公開 API。使用統計請註明「資料來源：部落格觀察 blog.observe.tw」，閱讀文章請連回原站。\n- 不寫程式也能追：訂閱各部落格原站提供的 RSS／Atom；登入 `/my/` 可管理追蹤與匯出 `/me/opml` 給閱讀器，OPML 只包含已成功抓取的 RSS／Atom，沒有可用 feed 的站會略過，請到原站確認訂閱方式。`/me/feed.xml` 是需要瀏覽器登入 session 的私人摘要 RSS，不是可公開分享或以 API 金鑰讀取的 feed。\n- 正文提及是交流訊號，不是抄襲或背書判斷。引用占比的分母為來源站在窗口內所有已解析、指向已收錄目標的「文章—目標部落格」提及數；一篇提及三站會計三筆，不是占全站文章的百分比。覆蓋與截斷欄位應與排行一起閱讀。\n- 話題包含原站 RSS category 與新文易數同步詞庫。詞庫的版本、同步時間與 coverage 隨回應提供；observed-article-window 僅代表觀測窗口內出現的詞，不代表完整詞庫。每站同詞文章依 1、0.5、0.25… 遞減計分。",
+    "contact": {
+      "name": "部落格觀察",
+      "url": "https://blog.observe.tw/api/"
+    },
+    "x-quickstart": [
+      {
+        "label": "最新文章與游標分頁（curl + jq）",
+        "lang": "sh",
+        "code": "BASE='https://blog.observe.tw'\npage=$(curl --fail-with-body -sS \"$BASE/api/v1/articles?hours=720&limit=10\")\nprintf '%s\\n' \"$page\" | jq '.items[] | {title, url, blogName, publishedAt}'\ncursor=$(printf '%s\\n' \"$page\" | jq -r '.nextCursor // empty')\nif [ -n \"$cursor\" ]; then\n  curl --fail-with-body -sS -G \"$BASE/api/v1/articles\" --data-urlencode \"hours=720\" --data-urlencode \"limit=10\" --data-urlencode \"cursor=$cursor\" | jq '.items'\nfi"
+      },
+      {
+        "label": "某部落格的文章與提及關係（curl + jq）",
+        "lang": "sh",
+        "code": "BASE='https://blog.observe.tw'\nslug=$(curl --fail-with-body -sS \"$BASE/api/v1/blogs?limit=1\" | jq -r '.items[0].slug // empty')\nif [ -n \"$slug\" ]; then\n  encoded=$(printf '%s' \"$slug\" | jq -sRr @uri)\n  curl --fail-with-body -sS \"$BASE/api/v1/blogs/$encoded/articles?hours=2160&limit=10\" | jq '.items'\n  curl --fail-with-body -sS \"$BASE/api/v1/blogs/$encoded/relations?hours=2160\" | jq '.outgoing, .incoming, .coverage'\nfi"
+      },
+      {
+        "label": "誰提到誰、熱門話題與部落格目錄（curl + jq）",
+        "lang": "sh",
+        "code": "curl --fail-with-body -sS 'https://blog.observe.tw/api/v1/relations?hours=720' | jq '.nodes, .edges, .coverage'\ncurl --fail-with-body -sS 'https://blog.observe.tw/api/v1/topics?hours=168&limit=10' | jq '.items, .vocabulary'\ncurl --fail-with-body -sS -G 'https://blog.observe.tw/api/v1/blogs' --data-urlencode 'q=旅行' --data-urlencode 'limit=20' | jq '.items, .nextCursor'"
+      },
+      {
+        "label": "JavaScript：有上限的文章分頁（瀏覽器或 Node 24）",
+        "lang": "js",
+        "code": "const endpoint = 'https://blog.observe.tw/api/v1/articles';\nlet cursor = null;\nfor (let page = 0; page < 3; page++) {\n  const query = new URLSearchParams({ hours: \"720\", limit: \"50\" });\n  if (cursor) query.set(\"cursor\", cursor);\n  const response = await fetch(endpoint + \"?\" + query);\n  if (!response.ok) throw new Error(\"HTTP \" + response.status + \": \" + await response.text());\n  const result = await response.json();\n  for (const article of result.items) console.log(article.blogName, article.title, article.url);\n  cursor = result.nextCursor;\n  if (!cursor) break;\n  await new Promise(resolve => setTimeout(resolve, 1100));\n}\n// 這是同一輪分頁；開始下一輪輪詢前至少等 120 秒。"
+      }
+    ]
+  },
+  "servers": [
+    {
+      "url": "https://blog.observe.tw"
+    }
+  ],
+  "externalDocs": {
+    "description": "API 文件",
+    "url": "https://blog.observe.tw/api/"
+  },
+  "tags": [
+    {
+      "name": "articles",
+      "description": "最新文章與搜尋"
+    },
+    {
+      "name": "blogs",
+      "description": "部落格目錄"
+    },
+    {
+      "name": "relations",
+      "description": "部落格提及關係"
+    },
+    {
+      "name": "topics",
+      "description": "話題與關鍵字"
+    },
+    {
+      "name": "meta",
+      "description": "API 本身"
+    }
+  ],
+  "paths": {
+    "/api/v1/articles": {
+      "get": {
+        "operationId": "articles",
+        "tags": [
+          "articles"
+        ],
+        "summary": "最新文章與標題搜尋",
+        "description": "依發文時間（未知時用首次收錄時間）再依 ID 由新到舊；publishedAt 仍保留 null。游標固定第一頁窗口與篩選條件，後續請保持相同參數。",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "每頁筆數",
+            "schema": {
+              "type": "integer",
+              "description": "",
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "description": "上一頁的 nextCursor，不可修改或跨篩選條件使用",
+            "schema": {
+              "type": "string",
+              "description": "",
+              "maxLength": 2048
+            }
+          },
+          {
+            "name": "hours",
+            "in": "query",
+            "description": "最近幾小時；不得與 since/until 同時使用",
+            "schema": {
+              "type": "integer",
+              "description": "",
+              "minimum": 1,
+              "maximum": 2160,
+              "default": 720
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "description": "名稱或標題的純文字包含搜尋；不是 SQL／正規表示式",
+            "schema": {
+              "type": "string",
+              "description": "",
+              "maxLength": 100
+            }
+          },
+          {
+            "name": "since",
+            "in": "query",
+            "description": "窗口起點（UTC ISO 8601，秒或三位毫秒且以 Z 結尾），必須與 until 成對，跨度最多 90 天",
+            "schema": {
+              "type": "string",
+              "description": "",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "until",
+            "in": "query",
+            "description": "窗口終點（UTC ISO 8601，秒或三位毫秒且以 Z 結尾），必須與 since 成對",
+            "schema": {
+              "type": "string",
+              "description": "",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "blog",
+            "in": "query",
+            "description": "限制部落格代碼",
+            "schema": {
+              "type": "string",
+              "description": ""
+            }
+          }
+        ],
+        "security": [
+          {},
+          {
+            "personalApiKey": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "headers": {
+              "cache-control": {
+                "description": "匿名成功回應可共享快取；帶金鑰／Authorization 或錯誤不得共享",
+                "schema": {
+                  "type": "string",
+                  "description": ""
+                }
+              },
+              "x-ratelimit-limit": {
+                "description": "目前額度上限",
+                "schema": {
+                  "type": "integer",
+                  "description": ""
+                }
+              },
+              "x-ratelimit-remaining": {
+                "description": "產生回應當時剩餘額度；共享快取可能為舊快照",
+                "schema": {
+                  "type": "integer",
+                  "description": ""
+                }
+              },
+              "x-ratelimit-reset": {
+                "description": "目前窗口重設的秒數",
+                "schema": {
+                  "type": "integer",
+                  "description": ""
+                }
+              },
+              "Access-Control-Allow-Origin": {
+                "schema": {
+                  "type": "string",
+                  "description": "",
+                  "const": "*"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ArticlePage"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "invalid_query／invalid_cursor",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "invalid_api_key",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "not_found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "method_not_allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "rate_limit_exceeded（請依 Retry-After 退避）",
+            "headers": {
+              "Retry-After": {
+                "schema": {
+                  "type": "integer",
+                  "description": ""
+                },
+                "description": "建議等待秒數"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "head": {
+        "operationId": "articlesHead",
+        "tags": [
+          "articles"
+        ],
+        "summary": "最新文章與標題搜尋（只取標頭）",
+        "description": "依發文時間（未知時用首次收錄時間）再依 ID 由新到舊；publishedAt 仍保留 null。游標固定第一頁窗口與篩選條件，後續請保持相同參數。",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "每頁筆數",
+            "schema": {
+              "type": "integer",
+              "description": "",
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "description": "上一頁的 nextCursor，不可修改或跨篩選條件使用",
+            "schema": {
+              "type": "string",
+              "description": "",
+              "maxLength": 2048
+            }
+          },
+          {
+            "name": "hours",
+            "in": "query",
+            "description": "最近幾小時；不得與 since/until 同時使用",
+            "schema": {
+              "type": "integer",
+              "description": "",
+              "minimum": 1,
+              "maximum": 2160,
+              "default": 720
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "description": "名稱或標題的純文字包含搜尋；不是 SQL／正規表示式",
+            "schema": {
+              "type": "string",
+              "description": "",
+              "maxLength": 100
+            }
+          },
+          {
+            "name": "since",
+            "in": "query",
+            "description": "窗口起點（UTC ISO 8601，秒或三位毫秒且以 Z 結尾），必須與 until 成對，跨度最多 90 天",
+            "schema": {
+              "type": "string",
+              "description": "",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "until",
+            "in": "query",
+            "description": "窗口終點（UTC ISO 8601，秒或三位毫秒且以 Z 結尾），必須與 since 成對",
+            "schema": {
+              "type": "string",
+              "description": "",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "blog",
+            "in": "query",
+            "description": "限制部落格代碼",
+            "schema": {
+              "type": "string",
+              "description": ""
+            }
+          }
+        ],
+        "security": [
+          {},
+          {
+            "personalApiKey": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "headers": {
+              "cache-control": {
+                "description": "匿名成功回應可共享快取；帶金鑰／Authorization 或錯誤不得共享",
+                "schema": {
+                  "type": "string",
+                  "description": ""
+                }
+              },
+              "x-ratelimit-limit": {
+                "description": "目前額度上限",
+                "schema": {
+                  "type": "integer",
+                  "description": ""
+                }
+              },
+              "x-ratelimit-remaining": {
+                "description": "產生回應當時剩餘額度；共享快取可能為舊快照",
+                "schema": {
+                  "type": "integer",
+                  "description": ""
+                }
+              },
+              "x-ratelimit-reset": {
+                "description": "目前窗口重設的秒數",
+                "schema": {
+                  "type": "integer",
+                  "description": ""
+                }
+              },
+              "Access-Control-Allow-Origin": {
+                "schema": {
+                  "type": "string",
+                  "description": "",
+                  "const": "*"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "invalid_query／invalid_cursor"
+          },
+          "401": {
+            "description": "invalid_api_key"
+          },
+          "404": {
+            "description": "not_found"
+          },
+          "405": {
+            "description": "method_not_allowed"
+          },
+          "429": {
+            "description": "rate_limit_exceeded（請依 Retry-After 退避）",
+            "headers": {
+              "Retry-After": {
+                "schema": {
+                  "type": "integer",
+                  "description": ""
+                },
+                "description": "建議等待秒數"
+              }
+            }
+          },
+          "503": {
+            "description": "unavailable"
+          }
+        }
+      }
+    },
+    "/api/v1/blogs": {
+      "get": {
+        "operationId": "blogs",
+        "tags": [
+          "blogs"
+        ],
+        "summary": "已驗證部落格目錄",
+        "description": "依 ID 由小到大，使用游標續頁；不公開未核准的探索候選。",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "每頁筆數",
+            "schema": {
+              "type": "integer",
+              "description": "",
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "description": "上一頁的 nextCursor，不可修改或跨篩選條件使用",
+            "schema": {
+              "type": "string",
+              "description": "",
+              "maxLength": 2048
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "description": "名稱或標題的純文字包含搜尋；不是 SQL／正規表示式",
+            "schema": {
+              "type": "string",
+              "description": "",
+              "maxLength": 100
+            }
+          }
+        ],
+        "security": [
+          {},
+          {
+            "personalApiKey": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "headers": {
+              "cache-control": {
+                "description": "匿名成功回應可共享快取；帶金鑰／Authorization 或錯誤不得共享",
+                "schema": {
+                  "type": "string",
+                  "description": ""
+                }
+              },
+              "x-ratelimit-limit": {
+                "description": "目前額度上限",
+                "schema": {
+                  "type": "integer",
+                  "description": ""
+                }
+              },
+              "x-ratelimit-remaining": {
+                "description": "產生回應當時剩餘額度；共享快取可能為舊快照",
+                "schema": {
+                  "type": "integer",
+                  "description": ""
+                }
+              },
+              "x-ratelimit-reset": {
+                "description": "目前窗口重設的秒數",
+                "schema": {
+                  "type": "integer",
+                  "description": ""
+                }
+              },
+              "Access-Control-Allow-Origin": {
+                "schema": {
+                  "type": "string",
+                  "description": "",
+                  "const": "*"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BlogPage"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "invalid_query／invalid_cursor",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "invalid_api_key",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "not_found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "method_not_allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "rate_limit_exceeded（請依 Retry-After 退避）",
+            "headers": {
+              "Retry-After": {
+                "schema": {
+                  "type": "integer",
+                  "description": ""
+                },
+                "description": "建議等待秒數"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "head": {
+        "operationId": "blogsHead",
+        "tags": [
+          "blogs"
+        ],
+        "summary": "已驗證部落格目錄（只取標頭）",
+        "description": "依 ID 由小到大，使用游標續頁；不公開未核准的探索候選。",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "每頁筆數",
+            "schema": {
+              "type": "integer",
+              "description": "",
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "description": "上一頁的 nextCursor，不可修改或跨篩選條件使用",
+            "schema": {
+              "type": "string",
+              "description": "",
+              "maxLength": 2048
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "description": "名稱或標題的純文字包含搜尋；不是 SQL／正規表示式",
+            "schema": {
+              "type": "string",
+              "description": "",
+              "maxLength": 100
+            }
+          }
+        ],
+        "security": [
+          {},
+          {
+            "personalApiKey": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "headers": {
+              "cache-control": {
+                "description": "匿名成功回應可共享快取；帶金鑰／Authorization 或錯誤不得共享",
+                "schema": {
+                  "type": "string",
+                  "description": ""
+                }
+              },
+              "x-ratelimit-limit": {
+                "description": "目前額度上限",
+                "schema": {
+                  "type": "integer",
+                  "description": ""
+                }
+              },
+              "x-ratelimit-remaining": {
+                "description": "產生回應當時剩餘額度；共享快取可能為舊快照",
+                "schema": {
+                  "type": "integer",
+                  "description": ""
+                }
+              },
+              "x-ratelimit-reset": {
+                "description": "目前窗口重設的秒數",
+                "schema": {
+                  "type": "integer",
+                  "description": ""
+                }
+              },
+              "Access-Control-Allow-Origin": {
+                "schema": {
+                  "type": "string",
+                  "description": "",
+                  "const": "*"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "invalid_query／invalid_cursor"
+          },
+          "401": {
+            "description": "invalid_api_key"
+          },
+          "404": {
+            "description": "not_found"
+          },
+          "405": {
+            "description": "method_not_allowed"
+          },
+          "429": {
+            "description": "rate_limit_exceeded（請依 Retry-After 退避）",
+            "headers": {
+              "Retry-After": {
+                "schema": {
+                  "type": "integer",
+                  "description": ""
+                },
+                "description": "建議等待秒數"
+              }
+            }
+          },
+          "503": {
+            "description": "unavailable"
+          }
+        }
+      }
+    },
+    "/api/v1/blogs/{slug}": {
+      "get": {
+        "operationId": "blogsSlug",
+        "tags": [
+          "blogs"
+        ],
+        "summary": "單一部落格資料",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "description": "從目錄取得的部落格代碼",
+            "schema": {
+              "type": "string",
+              "description": ""
+            },
+            "example": "skyhong-tw"
+          }
+        ],
+        "security": [
+          {},
+          {
+            "personalApiKey": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "headers": {
+              "cache-control": {
+                "description": "匿名成功回應可共享快取；帶金鑰／Authorization 或錯誤不得共享",
+                "schema": {
+                  "type": "string",
+                  "description": ""
+                }
+              },
+              "x-ratelimit-limit": {
+                "description": "目前額度上限",
+                "schema": {
+                  "type": "integer",
+                  "description": ""
+                }
+              },
+              "x-ratelimit-remaining": {
+                "description": "產生回應當時剩餘額度；共享快取可能為舊快照",
+                "schema": {
+                  "type": "integer",
+                  "description": ""
+                }
+              },
+              "x-ratelimit-reset": {
+                "description": "目前窗口重設的秒數",
+                "schema": {
+                  "type": "integer",
+                  "description": ""
+                }
+              },
+              "Access-Control-Allow-Origin": {
+                "schema": {
+                  "type": "string",
+                  "description": "",
+                  "const": "*"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "",
+                  "properties": {
+                    "blog": {
+                      "allOf": [
+                        {
+                          "$ref": "#/components/schemas/Blog"
+                        },
+                        {
+                          "type": "object",
+                          "description": "",
+                          "properties": {
+                            "feeds": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "description": "",
+                                "properties": {
+                                  "url": {
+                                    "type": "string",
+                                    "description": "原站 feed 位址"
+                                  },
+                                  "type": {
+                                    "type": "string",
+                                    "description": "rss／atom／sitemap"
+                                  }
+                                },
+                                "required": [
+                                  "url",
+                                  "type"
+                                ]
+                              },
+                              "description": ""
+                            }
+                          },
+                          "required": [
+                            "feeds"
+                          ]
+                        }
+                      ]
+                    }
+                  },
+                  "required": [
+                    "blog"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "invalid_query／invalid_cursor",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "invalid_api_key",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "not_found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "method_not_allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "rate_limit_exceeded（請依 Retry-After 退避）",
+            "headers": {
+              "Retry-After": {
+                "schema": {
+                  "type": "integer",
+                  "description": ""
+                },
+                "description": "建議等待秒數"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "head": {
+        "operationId": "blogsSlugHead",
+        "tags": [
+          "blogs"
+        ],
+        "summary": "單一部落格資料（只取標頭）",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "description": "從目錄取得的部落格代碼",
+            "schema": {
+              "type": "string",
+              "description": ""
+            },
+            "example": "skyhong-tw"
+          }
+        ],
+        "security": [
+          {},
+          {
+            "personalApiKey": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "headers": {
+              "cache-control": {
+                "description": "匿名成功回應可共享快取；帶金鑰／Authorization 或錯誤不得共享",
+                "schema": {
+                  "type": "string",
+                  "description": ""
+                }
+              },
+              "x-ratelimit-limit": {
+                "description": "目前額度上限",
+                "schema": {
+                  "type": "integer",
+                  "description": ""
+                }
+              },
+              "x-ratelimit-remaining": {
+                "description": "產生回應當時剩餘額度；共享快取可能為舊快照",
+                "schema": {
+                  "type": "integer",
+                  "description": ""
+                }
+              },
+              "x-ratelimit-reset": {
+                "description": "目前窗口重設的秒數",
+                "schema": {
+                  "type": "integer",
+                  "description": ""
+                }
+              },
+              "Access-Control-Allow-Origin": {
+                "schema": {
+                  "type": "string",
+                  "description": "",
+                  "const": "*"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "invalid_query／invalid_cursor"
+          },
+          "401": {
+            "description": "invalid_api_key"
+          },
+          "404": {
+            "description": "not_found"
+          },
+          "405": {
+            "description": "method_not_allowed"
+          },
+          "429": {
+            "description": "rate_limit_exceeded（請依 Retry-After 退避）",
+            "headers": {
+              "Retry-After": {
+                "schema": {
+                  "type": "integer",
+                  "description": ""
+                },
+                "description": "建議等待秒數"
+              }
+            }
+          },
+          "503": {
+            "description": "unavailable"
+          }
+        }
+      }
+    },
+    "/api/v1/blogs/{slug}/articles": {
+      "get": {
+        "operationId": "blogsSlugArticles",
+        "tags": [
+          "articles"
+        ],
+        "summary": "某部落格的文章",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "description": "從目錄取得的部落格代碼",
+            "schema": {
+              "type": "string",
+              "description": ""
+            },
+            "example": "skyhong-tw"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "每頁筆數",
+            "schema": {
+              "type": "integer",
+              "description": "",
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "description": "上一頁的 nextCursor，不可修改或跨篩選條件使用",
+            "schema": {
+              "type": "string",
+              "description": "",
+              "maxLength": 2048
+            }
+          },
+          {
+            "name": "hours",
+            "in": "query",
+            "description": "最近幾小時；不得與 since/until 同時使用",
+            "schema": {
+              "type": "integer",
+              "description": "",
+              "minimum": 1,
+              "maximum": 2160,
+              "default": 720
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "description": "名稱或標題的純文字包含搜尋；不是 SQL／正規表示式",
+            "schema": {
+              "type": "string",
+              "description": "",
+              "maxLength": 100
+            }
+          },
+          {
+            "name": "since",
+            "in": "query",
+            "description": "窗口起點（UTC ISO 8601，秒或三位毫秒且以 Z 結尾），必須與 until 成對，跨度最多 90 天",
+            "schema": {
+              "type": "string",
+              "description": "",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "until",
+            "in": "query",
+            "description": "窗口終點（UTC ISO 8601，秒或三位毫秒且以 Z 結尾），必須與 since 成對",
+            "schema": {
+              "type": "string",
+              "description": "",
+              "format": "date-time"
+            }
+          }
+        ],
+        "security": [
+          {},
+          {
+            "personalApiKey": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "headers": {
+              "cache-control": {
+                "description": "匿名成功回應可共享快取；帶金鑰／Authorization 或錯誤不得共享",
+                "schema": {
+                  "type": "string",
+                  "description": ""
+                }
+              },
+              "x-ratelimit-limit": {
+                "description": "目前額度上限",
+                "schema": {
+                  "type": "integer",
+                  "description": ""
+                }
+              },
+              "x-ratelimit-remaining": {
+                "description": "產生回應當時剩餘額度；共享快取可能為舊快照",
+                "schema": {
+                  "type": "integer",
+                  "description": ""
+                }
+              },
+              "x-ratelimit-reset": {
+                "description": "目前窗口重設的秒數",
+                "schema": {
+                  "type": "integer",
+                  "description": ""
+                }
+              },
+              "Access-Control-Allow-Origin": {
+                "schema": {
+                  "type": "string",
+                  "description": "",
+                  "const": "*"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ArticlePage"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "invalid_query／invalid_cursor",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "invalid_api_key",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "not_found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "method_not_allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "rate_limit_exceeded（請依 Retry-After 退避）",
+            "headers": {
+              "Retry-After": {
+                "schema": {
+                  "type": "integer",
+                  "description": ""
+                },
+                "description": "建議等待秒數"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "head": {
+        "operationId": "blogsSlugArticlesHead",
+        "tags": [
+          "articles"
+        ],
+        "summary": "某部落格的文章（只取標頭）",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "description": "從目錄取得的部落格代碼",
+            "schema": {
+              "type": "string",
+              "description": ""
+            },
+            "example": "skyhong-tw"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "每頁筆數",
+            "schema": {
+              "type": "integer",
+              "description": "",
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "description": "上一頁的 nextCursor，不可修改或跨篩選條件使用",
+            "schema": {
+              "type": "string",
+              "description": "",
+              "maxLength": 2048
+            }
+          },
+          {
+            "name": "hours",
+            "in": "query",
+            "description": "最近幾小時；不得與 since/until 同時使用",
+            "schema": {
+              "type": "integer",
+              "description": "",
+              "minimum": 1,
+              "maximum": 2160,
+              "default": 720
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "description": "名稱或標題的純文字包含搜尋；不是 SQL／正規表示式",
+            "schema": {
+              "type": "string",
+              "description": "",
+              "maxLength": 100
+            }
+          },
+          {
+            "name": "since",
+            "in": "query",
+            "description": "窗口起點（UTC ISO 8601，秒或三位毫秒且以 Z 結尾），必須與 until 成對，跨度最多 90 天",
+            "schema": {
+              "type": "string",
+              "description": "",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "until",
+            "in": "query",
+            "description": "窗口終點（UTC ISO 8601，秒或三位毫秒且以 Z 結尾），必須與 since 成對",
+            "schema": {
+              "type": "string",
+              "description": "",
+              "format": "date-time"
+            }
+          }
+        ],
+        "security": [
+          {},
+          {
+            "personalApiKey": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "headers": {
+              "cache-control": {
+                "description": "匿名成功回應可共享快取；帶金鑰／Authorization 或錯誤不得共享",
+                "schema": {
+                  "type": "string",
+                  "description": ""
+                }
+              },
+              "x-ratelimit-limit": {
+                "description": "目前額度上限",
+                "schema": {
+                  "type": "integer",
+                  "description": ""
+                }
+              },
+              "x-ratelimit-remaining": {
+                "description": "產生回應當時剩餘額度；共享快取可能為舊快照",
+                "schema": {
+                  "type": "integer",
+                  "description": ""
+                }
+              },
+              "x-ratelimit-reset": {
+                "description": "目前窗口重設的秒數",
+                "schema": {
+                  "type": "integer",
+                  "description": ""
+                }
+              },
+              "Access-Control-Allow-Origin": {
+                "schema": {
+                  "type": "string",
+                  "description": "",
+                  "const": "*"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "invalid_query／invalid_cursor"
+          },
+          "401": {
+            "description": "invalid_api_key"
+          },
+          "404": {
+            "description": "not_found"
+          },
+          "405": {
+            "description": "method_not_allowed"
+          },
+          "429": {
+            "description": "rate_limit_exceeded（請依 Retry-After 退避）",
+            "headers": {
+              "Retry-After": {
+                "schema": {
+                  "type": "integer",
+                  "description": ""
+                },
+                "description": "建議等待秒數"
+              }
+            }
+          },
+          "503": {
+            "description": "unavailable"
+          }
+        }
+      }
+    },
+    "/api/v1/relations": {
+      "get": {
+        "operationId": "relations",
+        "tags": [
+          "relations"
+        ],
+        "summary": "誰提到誰與互相提及排行",
+        "description": "只計正文且雙方均為已驗證部落格。全站圖最多 500 條邊，排行有獨立上限；請檢查 coverage 截斷標記。",
+        "parameters": [
+          {
+            "name": "hours",
+            "in": "query",
+            "description": "最近 7／30／90 天",
+            "schema": {
+              "type": "integer",
+              "description": "",
+              "enum": [
+                168,
+                720,
+                2160
+              ],
+              "default": 720
+            }
+          }
+        ],
+        "security": [
+          {},
+          {
+            "personalApiKey": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "headers": {
+              "cache-control": {
+                "description": "匿名成功回應可共享快取；帶金鑰／Authorization 或錯誤不得共享",
+                "schema": {
+                  "type": "string",
+                  "description": ""
+                }
+              },
+              "x-ratelimit-limit": {
+                "description": "目前額度上限",
+                "schema": {
+                  "type": "integer",
+                  "description": ""
+                }
+              },
+              "x-ratelimit-remaining": {
+                "description": "產生回應當時剩餘額度；共享快取可能為舊快照",
+                "schema": {
+                  "type": "integer",
+                  "description": ""
+                }
+              },
+              "x-ratelimit-reset": {
+                "description": "目前窗口重設的秒數",
+                "schema": {
+                  "type": "integer",
+                  "description": ""
+                }
+              },
+              "Access-Control-Allow-Origin": {
+                "schema": {
+                  "type": "string",
+                  "description": "",
+                  "const": "*"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Relations"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "invalid_query／invalid_cursor",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "invalid_api_key",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "not_found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "method_not_allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "rate_limit_exceeded（請依 Retry-After 退避）",
+            "headers": {
+              "Retry-After": {
+                "schema": {
+                  "type": "integer",
+                  "description": ""
+                },
+                "description": "建議等待秒數"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "head": {
+        "operationId": "relationsHead",
+        "tags": [
+          "relations"
+        ],
+        "summary": "誰提到誰與互相提及排行（只取標頭）",
+        "description": "只計正文且雙方均為已驗證部落格。全站圖最多 500 條邊，排行有獨立上限；請檢查 coverage 截斷標記。",
+        "parameters": [
+          {
+            "name": "hours",
+            "in": "query",
+            "description": "最近 7／30／90 天",
+            "schema": {
+              "type": "integer",
+              "description": "",
+              "enum": [
+                168,
+                720,
+                2160
+              ],
+              "default": 720
+            }
+          }
+        ],
+        "security": [
+          {},
+          {
+            "personalApiKey": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "headers": {
+              "cache-control": {
+                "description": "匿名成功回應可共享快取；帶金鑰／Authorization 或錯誤不得共享",
+                "schema": {
+                  "type": "string",
+                  "description": ""
+                }
+              },
+              "x-ratelimit-limit": {
+                "description": "目前額度上限",
+                "schema": {
+                  "type": "integer",
+                  "description": ""
+                }
+              },
+              "x-ratelimit-remaining": {
+                "description": "產生回應當時剩餘額度；共享快取可能為舊快照",
+                "schema": {
+                  "type": "integer",
+                  "description": ""
+                }
+              },
+              "x-ratelimit-reset": {
+                "description": "目前窗口重設的秒數",
+                "schema": {
+                  "type": "integer",
+                  "description": ""
+                }
+              },
+              "Access-Control-Allow-Origin": {
+                "schema": {
+                  "type": "string",
+                  "description": "",
+                  "const": "*"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "invalid_query／invalid_cursor"
+          },
+          "401": {
+            "description": "invalid_api_key"
+          },
+          "404": {
+            "description": "not_found"
+          },
+          "405": {
+            "description": "method_not_allowed"
+          },
+          "429": {
+            "description": "rate_limit_exceeded（請依 Retry-After 退避）",
+            "headers": {
+              "Retry-After": {
+                "schema": {
+                  "type": "integer",
+                  "description": ""
+                },
+                "description": "建議等待秒數"
+              }
+            }
+          },
+          "503": {
+            "description": "unavailable"
+          }
+        }
+      }
+    },
+    "/api/v1/blogs/{slug}/relations": {
+      "get": {
+        "operationId": "blogsSlugRelations",
+        "tags": [
+          "relations"
+        ],
+        "summary": "某部落格提到誰、被誰提到",
+        "description": "單站關係不受全站圖形 500 邊上限影響，最多 500 邊及 20 筆公開連結證據；不提供正文片段。",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "description": "從目錄取得的部落格代碼",
+            "schema": {
+              "type": "string",
+              "description": ""
+            },
+            "example": "skyhong-tw"
+          },
+          {
+            "name": "hours",
+            "in": "query",
+            "description": "最近 7／30／90 天",
+            "schema": {
+              "type": "integer",
+              "description": "",
+              "enum": [
+                168,
+                720,
+                2160
+              ],
+              "default": 720
+            }
+          }
+        ],
+        "security": [
+          {},
+          {
+            "personalApiKey": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "headers": {
+              "cache-control": {
+                "description": "匿名成功回應可共享快取；帶金鑰／Authorization 或錯誤不得共享",
+                "schema": {
+                  "type": "string",
+                  "description": ""
+                }
+              },
+              "x-ratelimit-limit": {
+                "description": "目前額度上限",
+                "schema": {
+                  "type": "integer",
+                  "description": ""
+                }
+              },
+              "x-ratelimit-remaining": {
+                "description": "產生回應當時剩餘額度；共享快取可能為舊快照",
+                "schema": {
+                  "type": "integer",
+                  "description": ""
+                }
+              },
+              "x-ratelimit-reset": {
+                "description": "目前窗口重設的秒數",
+                "schema": {
+                  "type": "integer",
+                  "description": ""
+                }
+              },
+              "Access-Control-Allow-Origin": {
+                "schema": {
+                  "type": "string",
+                  "description": "",
+                  "const": "*"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BlogRelations"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "invalid_query／invalid_cursor",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "invalid_api_key",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "not_found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "method_not_allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "rate_limit_exceeded（請依 Retry-After 退避）",
+            "headers": {
+              "Retry-After": {
+                "schema": {
+                  "type": "integer",
+                  "description": ""
+                },
+                "description": "建議等待秒數"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "head": {
+        "operationId": "blogsSlugRelationsHead",
+        "tags": [
+          "relations"
+        ],
+        "summary": "某部落格提到誰、被誰提到（只取標頭）",
+        "description": "單站關係不受全站圖形 500 邊上限影響，最多 500 邊及 20 筆公開連結證據；不提供正文片段。",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "description": "從目錄取得的部落格代碼",
+            "schema": {
+              "type": "string",
+              "description": ""
+            },
+            "example": "skyhong-tw"
+          },
+          {
+            "name": "hours",
+            "in": "query",
+            "description": "最近 7／30／90 天",
+            "schema": {
+              "type": "integer",
+              "description": "",
+              "enum": [
+                168,
+                720,
+                2160
+              ],
+              "default": 720
+            }
+          }
+        ],
+        "security": [
+          {},
+          {
+            "personalApiKey": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "headers": {
+              "cache-control": {
+                "description": "匿名成功回應可共享快取；帶金鑰／Authorization 或錯誤不得共享",
+                "schema": {
+                  "type": "string",
+                  "description": ""
+                }
+              },
+              "x-ratelimit-limit": {
+                "description": "目前額度上限",
+                "schema": {
+                  "type": "integer",
+                  "description": ""
+                }
+              },
+              "x-ratelimit-remaining": {
+                "description": "產生回應當時剩餘額度；共享快取可能為舊快照",
+                "schema": {
+                  "type": "integer",
+                  "description": ""
+                }
+              },
+              "x-ratelimit-reset": {
+                "description": "目前窗口重設的秒數",
+                "schema": {
+                  "type": "integer",
+                  "description": ""
+                }
+              },
+              "Access-Control-Allow-Origin": {
+                "schema": {
+                  "type": "string",
+                  "description": "",
+                  "const": "*"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "invalid_query／invalid_cursor"
+          },
+          "401": {
+            "description": "invalid_api_key"
+          },
+          "404": {
+            "description": "not_found"
+          },
+          "405": {
+            "description": "method_not_allowed"
+          },
+          "429": {
+            "description": "rate_limit_exceeded（請依 Retry-After 退避）",
+            "headers": {
+              "Retry-After": {
+                "schema": {
+                  "type": "integer",
+                  "description": ""
+                },
+                "description": "建議等待秒數"
+              }
+            }
+          },
+          "503": {
+            "description": "unavailable"
+          }
+        }
+      }
+    },
+    "/api/v1/topics": {
+      "get": {
+        "operationId": "topics",
+        "tags": [
+          "topics"
+        ],
+        "summary": "熱門話題排行",
+        "description": "只列至少兩個部落格寫過的話題。依 limit 最多回應 200 筆排行；truncated 表示仍有其他結果，此端點不提供 cursor。",
+        "parameters": [
+          {
+            "name": "hours",
+            "in": "query",
+            "description": "最近 7／30／90 天",
+            "schema": {
+              "type": "integer",
+              "description": "",
+              "enum": [
+                168,
+                720,
+                2160
+              ],
+              "default": 720
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "每頁筆數",
+            "schema": {
+              "type": "integer",
+              "description": "",
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50
+            }
+          }
+        ],
+        "security": [
+          {},
+          {
+            "personalApiKey": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "headers": {
+              "cache-control": {
+                "description": "匿名成功回應可共享快取；帶金鑰／Authorization 或錯誤不得共享",
+                "schema": {
+                  "type": "string",
+                  "description": ""
+                }
+              },
+              "x-ratelimit-limit": {
+                "description": "目前額度上限",
+                "schema": {
+                  "type": "integer",
+                  "description": ""
+                }
+              },
+              "x-ratelimit-remaining": {
+                "description": "產生回應當時剩餘額度；共享快取可能為舊快照",
+                "schema": {
+                  "type": "integer",
+                  "description": ""
+                }
+              },
+              "x-ratelimit-reset": {
+                "description": "目前窗口重設的秒數",
+                "schema": {
+                  "type": "integer",
+                  "description": ""
+                }
+              },
+              "Access-Control-Allow-Origin": {
+                "schema": {
+                  "type": "string",
+                  "description": "",
+                  "const": "*"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Topics"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "invalid_query／invalid_cursor",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "invalid_api_key",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "not_found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "method_not_allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "rate_limit_exceeded（請依 Retry-After 退避）",
+            "headers": {
+              "Retry-After": {
+                "schema": {
+                  "type": "integer",
+                  "description": ""
+                },
+                "description": "建議等待秒數"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "head": {
+        "operationId": "topicsHead",
+        "tags": [
+          "topics"
+        ],
+        "summary": "熱門話題排行（只取標頭）",
+        "description": "只列至少兩個部落格寫過的話題。依 limit 最多回應 200 筆排行；truncated 表示仍有其他結果，此端點不提供 cursor。",
+        "parameters": [
+          {
+            "name": "hours",
+            "in": "query",
+            "description": "最近 7／30／90 天",
+            "schema": {
+              "type": "integer",
+              "description": "",
+              "enum": [
+                168,
+                720,
+                2160
+              ],
+              "default": 720
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "每頁筆數",
+            "schema": {
+              "type": "integer",
+              "description": "",
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50
+            }
+          }
+        ],
+        "security": [
+          {},
+          {
+            "personalApiKey": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "headers": {
+              "cache-control": {
+                "description": "匿名成功回應可共享快取；帶金鑰／Authorization 或錯誤不得共享",
+                "schema": {
+                  "type": "string",
+                  "description": ""
+                }
+              },
+              "x-ratelimit-limit": {
+                "description": "目前額度上限",
+                "schema": {
+                  "type": "integer",
+                  "description": ""
+                }
+              },
+              "x-ratelimit-remaining": {
+                "description": "產生回應當時剩餘額度；共享快取可能為舊快照",
+                "schema": {
+                  "type": "integer",
+                  "description": ""
+                }
+              },
+              "x-ratelimit-reset": {
+                "description": "目前窗口重設的秒數",
+                "schema": {
+                  "type": "integer",
+                  "description": ""
+                }
+              },
+              "Access-Control-Allow-Origin": {
+                "schema": {
+                  "type": "string",
+                  "description": "",
+                  "const": "*"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "invalid_query／invalid_cursor"
+          },
+          "401": {
+            "description": "invalid_api_key"
+          },
+          "404": {
+            "description": "not_found"
+          },
+          "405": {
+            "description": "method_not_allowed"
+          },
+          "429": {
+            "description": "rate_limit_exceeded（請依 Retry-After 退避）",
+            "headers": {
+              "Retry-After": {
+                "schema": {
+                  "type": "integer",
+                  "description": ""
+                },
+                "description": "建議等待秒數"
+              }
+            }
+          },
+          "503": {
+            "description": "unavailable"
+          }
+        }
+      }
+    },
+    "/api/v1/topics/{id}": {
+      "get": {
+        "operationId": "topicsId",
+        "tags": [
+          "topics"
+        ],
+        "summary": "某話題有哪些部落格在寫",
+        "description": "最多 100 個部落格與 100 篇文章；請檢查 truncated。",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "從話題排行取得的 ID，請 URL 編碼",
+            "schema": {
+              "type": "string",
+              "description": ""
+            },
+            "example": "rss:1"
+          },
+          {
+            "name": "hours",
+            "in": "query",
+            "description": "最近 7／30／90 天",
+            "schema": {
+              "type": "integer",
+              "description": "",
+              "enum": [
+                168,
+                720,
+                2160
+              ],
+              "default": 720
+            }
+          }
+        ],
+        "security": [
+          {},
+          {
+            "personalApiKey": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "headers": {
+              "cache-control": {
+                "description": "匿名成功回應可共享快取；帶金鑰／Authorization 或錯誤不得共享",
+                "schema": {
+                  "type": "string",
+                  "description": ""
+                }
+              },
+              "x-ratelimit-limit": {
+                "description": "目前額度上限",
+                "schema": {
+                  "type": "integer",
+                  "description": ""
+                }
+              },
+              "x-ratelimit-remaining": {
+                "description": "產生回應當時剩餘額度；共享快取可能為舊快照",
+                "schema": {
+                  "type": "integer",
+                  "description": ""
+                }
+              },
+              "x-ratelimit-reset": {
+                "description": "目前窗口重設的秒數",
+                "schema": {
+                  "type": "integer",
+                  "description": ""
+                }
+              },
+              "Access-Control-Allow-Origin": {
+                "schema": {
+                  "type": "string",
+                  "description": "",
+                  "const": "*"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TopicDetail"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "invalid_query／invalid_cursor",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "invalid_api_key",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "not_found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "method_not_allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "rate_limit_exceeded（請依 Retry-After 退避）",
+            "headers": {
+              "Retry-After": {
+                "schema": {
+                  "type": "integer",
+                  "description": ""
+                },
+                "description": "建議等待秒數"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "head": {
+        "operationId": "topicsIdHead",
+        "tags": [
+          "topics"
+        ],
+        "summary": "某話題有哪些部落格在寫（只取標頭）",
+        "description": "最多 100 個部落格與 100 篇文章；請檢查 truncated。",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "從話題排行取得的 ID，請 URL 編碼",
+            "schema": {
+              "type": "string",
+              "description": ""
+            },
+            "example": "rss:1"
+          },
+          {
+            "name": "hours",
+            "in": "query",
+            "description": "最近 7／30／90 天",
+            "schema": {
+              "type": "integer",
+              "description": "",
+              "enum": [
+                168,
+                720,
+                2160
+              ],
+              "default": 720
+            }
+          }
+        ],
+        "security": [
+          {},
+          {
+            "personalApiKey": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "headers": {
+              "cache-control": {
+                "description": "匿名成功回應可共享快取；帶金鑰／Authorization 或錯誤不得共享",
+                "schema": {
+                  "type": "string",
+                  "description": ""
+                }
+              },
+              "x-ratelimit-limit": {
+                "description": "目前額度上限",
+                "schema": {
+                  "type": "integer",
+                  "description": ""
+                }
+              },
+              "x-ratelimit-remaining": {
+                "description": "產生回應當時剩餘額度；共享快取可能為舊快照",
+                "schema": {
+                  "type": "integer",
+                  "description": ""
+                }
+              },
+              "x-ratelimit-reset": {
+                "description": "目前窗口重設的秒數",
+                "schema": {
+                  "type": "integer",
+                  "description": ""
+                }
+              },
+              "Access-Control-Allow-Origin": {
+                "schema": {
+                  "type": "string",
+                  "description": "",
+                  "const": "*"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "invalid_query／invalid_cursor"
+          },
+          "401": {
+            "description": "invalid_api_key"
+          },
+          "404": {
+            "description": "not_found"
+          },
+          "405": {
+            "description": "method_not_allowed"
+          },
+          "429": {
+            "description": "rate_limit_exceeded（請依 Retry-After 退避）",
+            "headers": {
+              "Retry-After": {
+                "schema": {
+                  "type": "integer",
+                  "description": ""
+                },
+                "description": "建議等待秒數"
+              }
+            }
+          },
+          "503": {
+            "description": "unavailable"
+          }
+        }
+      }
+    },
+    "/api/v1/openapi.json": {
+      "get": {
+        "operationId": "openapiJson",
+        "tags": [
+          "meta"
+        ],
+        "summary": "機器可讀 OpenAPI 規格",
+        "parameters": [],
+        "security": [
+          {},
+          {
+            "personalApiKey": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "headers": {
+              "cache-control": {
+                "description": "匿名成功回應可共享快取；帶金鑰／Authorization 或錯誤不得共享",
+                "schema": {
+                  "type": "string",
+                  "description": ""
+                }
+              },
+              "x-ratelimit-limit": {
+                "description": "目前額度上限",
+                "schema": {
+                  "type": "integer",
+                  "description": ""
+                }
+              },
+              "x-ratelimit-remaining": {
+                "description": "產生回應當時剩餘額度；共享快取可能為舊快照",
+                "schema": {
+                  "type": "integer",
+                  "description": ""
+                }
+              },
+              "x-ratelimit-reset": {
+                "description": "目前窗口重設的秒數",
+                "schema": {
+                  "type": "integer",
+                  "description": ""
+                }
+              },
+              "Access-Control-Allow-Origin": {
+                "schema": {
+                  "type": "string",
+                  "description": "",
+                  "const": "*"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OpenApi"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "invalid_query／invalid_cursor",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "invalid_api_key",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "not_found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "method_not_allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "rate_limit_exceeded（請依 Retry-After 退避）",
+            "headers": {
+              "Retry-After": {
+                "schema": {
+                  "type": "integer",
+                  "description": ""
+                },
+                "description": "建議等待秒數"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "head": {
+        "operationId": "openapiJsonHead",
+        "tags": [
+          "meta"
+        ],
+        "summary": "機器可讀 OpenAPI 規格（只取標頭）",
+        "parameters": [],
+        "security": [
+          {},
+          {
+            "personalApiKey": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "headers": {
+              "cache-control": {
+                "description": "匿名成功回應可共享快取；帶金鑰／Authorization 或錯誤不得共享",
+                "schema": {
+                  "type": "string",
+                  "description": ""
+                }
+              },
+              "x-ratelimit-limit": {
+                "description": "目前額度上限",
+                "schema": {
+                  "type": "integer",
+                  "description": ""
+                }
+              },
+              "x-ratelimit-remaining": {
+                "description": "產生回應當時剩餘額度；共享快取可能為舊快照",
+                "schema": {
+                  "type": "integer",
+                  "description": ""
+                }
+              },
+              "x-ratelimit-reset": {
+                "description": "目前窗口重設的秒數",
+                "schema": {
+                  "type": "integer",
+                  "description": ""
+                }
+              },
+              "Access-Control-Allow-Origin": {
+                "schema": {
+                  "type": "string",
+                  "description": "",
+                  "const": "*"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "invalid_query／invalid_cursor"
+          },
+          "401": {
+            "description": "invalid_api_key"
+          },
+          "404": {
+            "description": "not_found"
+          },
+          "405": {
+            "description": "method_not_allowed"
+          },
+          "429": {
+            "description": "rate_limit_exceeded（請依 Retry-After 退避）",
+            "headers": {
+              "Retry-After": {
+                "schema": {
+                  "type": "integer",
+                  "description": ""
+                },
+                "description": "建議等待秒數"
+              }
+            }
+          },
+          "503": {
+            "description": "unavailable"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Error": {
+        "type": "object",
+        "description": "",
+        "properties": {
+          "error": {
+            "type": "string",
+            "description": "穩定錯誤代碼"
+          }
+        },
+        "required": [
+          "error"
+        ]
+      },
+      "Article": {
+        "type": "object",
+        "description": "",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "文章 ID"
+          },
+          "title": {
+            "type": "string",
+            "description": "原文標題"
+          },
+          "url": {
+            "type": "string",
+            "description": "原文網址",
+            "format": "uri"
+          },
+          "author": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "原站署名，不代表跨站作者身分相同"
+          },
+          "publishedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "原站發文時間",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "RSS／原站提供的文章更新時間",
+            "format": "date-time"
+          },
+          "imageUrl": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "圖片網址；沒有圖片時為 null"
+          },
+          "blogSlug": {
+            "type": "string",
+            "description": "部落格代碼"
+          },
+          "blogName": {
+            "type": "string",
+            "description": "部落格名稱"
+          },
+          "summary": {
+            "type": "string",
+            "description": "純文字短摘要；不提供全文",
+            "maxLength": 500
+          },
+          "observedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "本站首次收錄時間",
+            "format": "date-time"
+          },
+          "iconUrl": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "部落格圖示"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "url",
+          "author",
+          "publishedAt",
+          "updatedAt",
+          "imageUrl",
+          "blogSlug",
+          "blogName",
+          "summary",
+          "observedAt",
+          "iconUrl"
+        ]
+      },
+      "Blog": {
+        "type": "object",
+        "description": "",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "部落格 ID"
+          },
+          "slug": {
+            "type": "string",
+            "description": "部落格代碼"
+          },
+          "name": {
+            "type": "string",
+            "description": "部落格名稱"
+          },
+          "url": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "部落格首頁"
+          },
+          "category": {
+            "type": "string",
+            "description": "原始分類，不代表權威分類"
+          },
+          "description": {
+            "type": "string",
+            "description": "公開短簡介",
+            "maxLength": 500
+          },
+          "iconUrl": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "本站圖示網址"
+          },
+          "discoveredAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "收錄時間",
+            "format": "date-time"
+          },
+          "lastCrawlSuccessAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "最近抓取成功時間",
+            "format": "date-time"
+          },
+          "lastPublishedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "最近發文時間",
+            "format": "date-time"
+          },
+          "expectedIntervalHours": {
+            "type": "integer",
+            "description": "預期更新間隔，單位小時"
+          }
+        },
+        "required": [
+          "id",
+          "slug",
+          "name",
+          "url",
+          "category",
+          "description",
+          "iconUrl",
+          "discoveredAt",
+          "lastCrawlSuccessAt",
+          "lastPublishedAt",
+          "expectedIntervalHours"
+        ]
+      },
+      "ArticlePage": {
+        "type": "object",
+        "description": "",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Article"
+            },
+            "description": ""
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "下一頁游標；null 表示末頁"
+          },
+          "window": {
+            "type": "object",
+            "description": "此輪固定窗口；游標保留窗口與篩選條件",
+            "properties": {
+              "since": {
+                "type": "string",
+                "description": "",
+                "format": "date-time"
+              },
+              "until": {
+                "type": "string",
+                "description": "",
+                "format": "date-time"
+              }
+            },
+            "required": [
+              "since",
+              "until"
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor",
+          "window"
+        ]
+      },
+      "BlogPage": {
+        "type": "object",
+        "description": "",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Blog"
+            },
+            "description": ""
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "下一頁游標"
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ]
+      },
+      "RelationNode": {
+        "type": "object",
+        "description": "",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": ""
+          },
+          "slug": {
+            "type": "string",
+            "description": ""
+          },
+          "name": {
+            "type": "string",
+            "description": ""
+          },
+          "iconUrl": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": ""
+          }
+        },
+        "required": [
+          "id",
+          "slug",
+          "name",
+          "iconUrl"
+        ]
+      },
+      "RelationEdge": {
+        "type": "object",
+        "description": "",
+        "properties": {
+          "sourceBlogId": {
+            "type": "integer",
+            "description": ""
+          },
+          "targetBlogId": {
+            "type": "integer",
+            "description": ""
+          },
+          "count": {
+            "type": "integer",
+            "description": "不同來源文章提及此目標的篇數"
+          },
+          "share": {
+            "type": "number",
+            "description": "count ÷ 來源站已解析的文章—目標站提及數，不是文章總數占比"
+          },
+          "firstMentionAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "",
+            "format": "date-time"
+          },
+          "lastMentionAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "",
+            "format": "date-time"
+          },
+          "mutual": {
+            "type": "boolean",
+            "description": "窗口內是否也有反向正文提及"
+          }
+        },
+        "required": [
+          "sourceBlogId",
+          "targetBlogId",
+          "count",
+          "share",
+          "firstMentionAt",
+          "lastMentionAt",
+          "mutual"
+        ]
+      },
+      "RelationCoverage": {
+        "type": "object",
+        "description": "解析覆蓋統計；並非所有文章皆已分析",
+        "properties": {
+          "observedPosts": {
+            "type": "integer",
+            "description": ""
+          },
+          "totalPosts": {
+            "type": "integer",
+            "description": ""
+          },
+          "failedPosts": {
+            "type": "integer",
+            "description": ""
+          },
+          "noBodyPosts": {
+            "type": "integer",
+            "description": ""
+          },
+          "unknownDatePosts": {
+            "type": "integer",
+            "description": ""
+          },
+          "unresolvedLinks": {
+            "type": "integer",
+            "description": ""
+          },
+          "truncatedPosts": {
+            "type": "integer",
+            "description": ""
+          },
+          "graphTruncated": {
+            "type": "boolean",
+            "description": ""
+          },
+          "aggregationTruncated": {
+            "type": "boolean",
+            "description": ""
+          },
+          "sampledAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "",
+            "format": "date-time"
+          },
+          "method": {
+            "type": "string",
+            "description": ""
+          },
+          "nonBodyLinks": {
+            "type": "object",
+            "description": "",
+            "properties": {
+              "sidebar": {
+                "type": "integer",
+                "description": ""
+              },
+              "blogroll": {
+                "type": "integer",
+                "description": ""
+              },
+              "comment": {
+                "type": "integer",
+                "description": ""
+              }
+            },
+            "required": [
+              "sidebar",
+              "blogroll",
+              "comment"
+            ]
+          }
+        },
+        "required": [
+          "observedPosts",
+          "totalPosts",
+          "failedPosts",
+          "noBodyPosts",
+          "unknownDatePosts",
+          "unresolvedLinks",
+          "truncatedPosts",
+          "graphTruncated",
+          "aggregationTruncated",
+          "sampledAt",
+          "method",
+          "nonBodyLinks"
+        ]
+      },
+      "Relations": {
+        "type": "object",
+        "description": "",
+        "properties": {
+          "hours": {
+            "type": "integer",
+            "description": ""
+          },
+          "days": {
+            "type": "integer",
+            "description": ""
+          },
+          "generatedAt": {
+            "type": "string",
+            "description": "",
+            "format": "date-time"
+          },
+          "nodes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RelationNode"
+            },
+            "description": ""
+          },
+          "edges": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RelationEdge"
+            },
+            "description": "全站最多 500 條圖形邊"
+          },
+          "mostMentioned": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "description": "",
+              "properties": {
+                "blogId": {
+                  "type": "integer",
+                  "description": ""
+                },
+                "mentions": {
+                  "type": "integer",
+                  "description": ""
+                },
+                "incomingBlogs": {
+                  "type": "integer",
+                  "description": ""
+                }
+              },
+              "required": [
+                "blogId",
+                "mentions",
+                "incomingBlogs"
+              ]
+            },
+            "description": ""
+          },
+          "mutual": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "description": "",
+              "properties": {
+                "sourceBlogId": {
+                  "type": "integer",
+                  "description": ""
+                },
+                "targetBlogId": {
+                  "type": "integer",
+                  "description": ""
+                },
+                "forwardCount": {
+                  "type": "integer",
+                  "description": ""
+                },
+                "reverseCount": {
+                  "type": "integer",
+                  "description": ""
+                }
+              },
+              "required": [
+                "sourceBlogId",
+                "targetBlogId",
+                "forwardCount",
+                "reverseCount"
+              ]
+            },
+            "description": ""
+          },
+          "coverage": {
+            "$ref": "#/components/schemas/RelationCoverage"
+          }
+        },
+        "required": [
+          "hours",
+          "days",
+          "generatedAt",
+          "nodes",
+          "edges",
+          "mostMentioned",
+          "mutual",
+          "coverage"
+        ]
+      },
+      "BlogRelations": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/Relations"
+          },
+          {
+            "type": "object",
+            "description": "",
+            "properties": {
+              "blogId": {
+                "type": "integer",
+                "description": ""
+              },
+              "outgoing": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/RelationEdge"
+                },
+                "description": ""
+              },
+              "incoming": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/RelationEdge"
+                },
+                "description": ""
+              },
+              "evidence": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "description": "",
+                  "properties": {
+                    "postId": {
+                      "type": "integer",
+                      "description": ""
+                    },
+                    "postTitle": {
+                      "type": "string",
+                      "description": ""
+                    },
+                    "postUrl": {
+                      "type": "string",
+                      "description": ""
+                    },
+                    "targetUrl": {
+                      "type": "string",
+                      "description": ""
+                    },
+                    "anchor": {
+                      "type": "string",
+                      "description": ""
+                    },
+                    "publishedAt": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "",
+                      "format": "date-time"
+                    },
+                    "sourceBlogId": {
+                      "type": "integer",
+                      "description": ""
+                    },
+                    "targetBlogId": {
+                      "type": "integer",
+                      "description": ""
+                    },
+                    "location": {
+                      "type": "string",
+                      "description": "",
+                      "enum": [
+                        "body"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "postId",
+                    "postTitle",
+                    "postUrl",
+                    "targetUrl",
+                    "anchor",
+                    "publishedAt",
+                    "sourceBlogId",
+                    "targetBlogId",
+                    "location"
+                  ]
+                },
+                "description": ""
+              },
+              "profileTruncated": {
+                "type": "boolean",
+                "description": ""
+              }
+            },
+            "required": [
+              "blogId",
+              "outgoing",
+              "incoming",
+              "evidence",
+              "profileTruncated"
+            ]
+          }
+        ]
+      },
+      "Vocabulary": {
+        "type": "object",
+        "description": "",
+        "properties": {
+          "status": {
+            "type": "string",
+            "description": "",
+            "enum": [
+              "ready",
+              "unavailable"
+            ]
+          },
+          "source": {
+            "type": "string",
+            "description": ""
+          },
+          "version": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": ""
+          },
+          "coverage": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": ""
+          },
+          "syncedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "",
+            "format": "date-time"
+          },
+          "window": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "description": "",
+            "properties": {
+              "since": {
+                "type": "string",
+                "description": "",
+                "format": "date-time"
+              },
+              "until": {
+                "type": "string",
+                "description": "",
+                "format": "date-time"
+              }
+            },
+            "required": [
+              "since",
+              "until"
+            ]
+          },
+          "invalidTagCount": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "description": ""
+          },
+          "normalizedTagCount": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "description": ""
+          },
+          "tagNormalization": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": ""
+          },
+          "upstreamSnapshotConsistent": {
+            "type": "boolean",
+            "description": ""
+          }
+        },
+        "required": [
+          "status",
+          "source",
+          "version",
+          "coverage",
+          "syncedAt",
+          "window",
+          "invalidTagCount",
+          "normalizedTagCount",
+          "tagNormalization",
+          "upstreamSnapshotConsistent"
+        ]
+      },
+      "Topic": {
+        "type": "object",
+        "description": "",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "rss:<數字> 或 tag:<版本內詞彙 ID>"
+          },
+          "label": {
+            "type": "string",
+            "description": ""
+          },
+          "source": {
+            "type": "string",
+            "description": "",
+            "enum": [
+              "rss-category",
+              "tag-vocabulary"
+            ]
+          },
+          "score": {
+            "type": "number",
+            "description": "各站依 1、0.5、0.25… 加總"
+          },
+          "posts": {
+            "type": "integer",
+            "description": ""
+          },
+          "blogs": {
+            "type": "integer",
+            "description": ""
+          }
+        },
+        "required": [
+          "id",
+          "label",
+          "source",
+          "score",
+          "posts",
+          "blogs"
+        ]
+      },
+      "Topics": {
+        "type": "object",
+        "description": "",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Topic"
+            },
+            "description": ""
+          },
+          "nextCursor": {
+            "type": "null",
+            "description": "排行僅提供有界快照，不提供游標續頁"
+          },
+          "hours": {
+            "type": "integer",
+            "description": ""
+          },
+          "vocabulary": {
+            "$ref": "#/components/schemas/Vocabulary"
+          },
+          "minimumBlogs": {
+            "type": "integer",
+            "description": "",
+            "const": 2
+          },
+          "generatedAt": {
+            "type": "string",
+            "description": "",
+            "format": "date-time"
+          },
+          "truncated": {
+            "type": "boolean",
+            "description": ""
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor",
+          "hours",
+          "vocabulary",
+          "minimumBlogs",
+          "generatedAt",
+          "truncated"
+        ]
+      },
+      "TopicDetail": {
+        "type": "object",
+        "description": "",
+        "properties": {
+          "hours": {
+            "type": "integer",
+            "description": ""
+          },
+          "generatedAt": {
+            "type": "string",
+            "description": "",
+            "format": "date-time"
+          },
+          "topic": {
+            "type": "object",
+            "description": "",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": ""
+              },
+              "label": {
+                "type": "string",
+                "description": ""
+              },
+              "source": {
+                "type": "string",
+                "description": ""
+              }
+            },
+            "required": [
+              "id",
+              "label",
+              "source"
+            ]
+          },
+          "vocabulary": {
+            "$ref": "#/components/schemas/Vocabulary"
+          },
+          "blogs": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "description": "",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "description": ""
+                },
+                "slug": {
+                  "type": "string",
+                  "description": ""
+                },
+                "name": {
+                  "type": "string",
+                  "description": ""
+                },
+                "posts": {
+                  "type": "integer",
+                  "description": ""
+                },
+                "score": {
+                  "type": "number",
+                  "description": ""
+                }
+              },
+              "required": [
+                "id",
+                "slug",
+                "name",
+                "posts",
+                "score"
+              ]
+            },
+            "description": ""
+          },
+          "articles": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "description": "",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "description": ""
+                },
+                "title": {
+                  "type": "string",
+                  "description": ""
+                },
+                "url": {
+                  "type": "string",
+                  "description": ""
+                },
+                "publishedAt": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "",
+                  "format": "date-time"
+                },
+                "blogSlug": {
+                  "type": "string",
+                  "description": ""
+                },
+                "blogName": {
+                  "type": "string",
+                  "description": ""
+                }
+              },
+              "required": [
+                "id",
+                "title",
+                "url",
+                "publishedAt",
+                "blogSlug",
+                "blogName"
+              ]
+            },
+            "description": ""
+          },
+          "truncated": {
+            "type": "boolean",
+            "description": ""
+          }
+        },
+        "required": [
+          "hours",
+          "generatedAt",
+          "topic",
+          "vocabulary",
+          "blogs",
+          "articles",
+          "truncated"
+        ]
+      },
+      "OpenApi": {
+        "type": "object",
+        "description": "OpenAPI 3.1 規格；包含 info、servers、paths、components、tags。",
+        "required": [
+          "openapi",
+          "info",
+          "paths",
+          "components"
+        ],
+        "properties": {
+          "openapi": {
+            "type": "string",
+            "description": "",
+            "const": "3.1.0"
+          },
+          "info": {
+            "type": "object"
+          },
+          "paths": {
+            "type": "object"
+          },
+          "components": {
+            "type": "object"
+          }
+        }
+      }
+    },
+    "securitySchemes": {
+      "personalApiKey": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "x-api-key",
+        "description": "選用的個人公開查詢額度金鑰；不授權私人資料。登入 /my/ 申請，完整值只顯示一次。"
+      }
+    }
+  }
+}

@@ -85,6 +85,13 @@
       "when": 1791796174126,
       "tag": "0011_content_evidence",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "5",
+      "when": 1791805861953,
+      "tag": "0012_personal_api_keys",
+      "breakpoints": true
     }
   ]
 }

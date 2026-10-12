@@ -299,7 +299,7 @@ async function projectionResponse(reply: FastifyReply, build: () => Promise<unkn
   }
 }
 export async function registerRelationRoutes(app: FastifyInstance, pool: Pool) {
-  const read = (days: number) => cachedProjection(pool, `global:${days}`, 300000, () => readRelationSnapshot(pool, days));
+  const read = (days: number) => readPublicRelations(pool, days);
   app.get('/api/relations', async (request, reply) => {
     const days = relationDays((request.query as { days?: unknown }).days);
     if (days === null) return reply.code(400).send({ error: 'invalid_days' });
@@ -311,57 +311,63 @@ export async function registerRelationRoutes(app: FastifyInstance, pool: Pool) {
     const { slug } = request.params as { slug: string };
     const [[blog]] = await pool.query<RowDataPacket[]>("SELECT id,slug,name FROM blogs WHERE slug=? AND status<>'moved'", [slug]);
     if (!blog) return reply.code(404).send({ error: 'blog_not_found' });
-    return projectionResponse(reply, () =>
-      cachedProjection(pool, `profile:${blog.id}:${days}`, 60000, async () => {
-        // Profile edges are queried separately so the global 500-edge graph cap never hides a source's links.
-        const now = new Date();
-        const cutoff = new Date(now.getTime() - days * 86400000);
-        const [rows] = await pool.query<RowDataPacket[]>(
-          `SELECT e.* FROM (
+    return projectionResponse(reply, () => readBlogRelations(pool, { id: Number(blog.id) }, days));
+  });
+}
+
+export function readBlogRelations(pool: Pool, blog: { id: number }, days: number) {
+  return cachedProjection(pool, `profile:${blog.id}:${days}`, 60000, async () => {
+    // Profile edges are queried separately so the global 500-edge graph cap never hides a source's links.
+    const now = new Date();
+    const cutoff = new Date(now.getTime() - days * 86400000);
+    const [rows] = await pool.query<RowDataPacket[]>(
+      `SELECT e.* FROM (
       SELECT l.source_blog_id sourceBlogId,l.target_blog_id targetBlogId,COUNT(DISTINCT l.source_post_id) count,
         SUM(COUNT(DISTINCT l.source_post_id)) OVER (PARTITION BY l.source_blog_id) denominator,MIN(p.published_at) firstMentionAt,MAX(p.published_at) lastMentionAt
       FROM relation_links l JOIN posts p ON p.id=l.source_post_id JOIN blogs a ON a.id=l.source_blog_id JOIN blogs b ON b.id=l.target_blog_id
       WHERE ${PUBLIC_RELATION} AND l.source_blog_id IN (SELECT relevant.source_id FROM (SELECT ? source_id UNION SELECT source_blog_id FROM relation_links WHERE target_blog_id=?) relevant) AND l.location='body' AND l.source_blog_id<>l.target_blog_id AND a.status='verified' AND b.status='verified' AND p.published_at>=? AND p.published_at<=?
       GROUP BY l.source_blog_id,l.target_blog_id) e WHERE sourceBlogId=? OR targetBlogId=? ORDER BY count DESC,sourceBlogId,targetBlogId LIMIT 1001`,
-          [blog.id, blog.id, cutoff, now, blog.id, blog.id],
-        );
-        const edges = projectRelations(
-          rows.slice(0, 1000).map((r) => ({
-            sourceBlogId: Number(r.sourceBlogId),
-            targetBlogId: Number(r.targetBlogId),
-            count: Number(r.count),
-            denominator: Number(r.denominator),
-            firstMentionAt: r.firstMentionAt,
-            lastMentionAt: r.lastMentionAt,
-          })),
-        );
-        const ids = [...new Set([Number(blog.id), ...edges.flatMap((e) => [e.sourceBlogId, e.targetBlogId])])];
-        const [nodes] = await pool.query<RowDataPacket[]>('SELECT id,slug,name FROM blogs WHERE id IN (?)', [ids]);
-        const [evidence] = await pool.query<RowDataPacket[]>(
-          `SELECT p.id postId,p.title postTitle,p.url postUrl,l.target_url targetUrl,l.anchor_text anchor,p.published_at publishedAt,
+      [blog.id, blog.id, cutoff, now, blog.id, blog.id],
+    );
+    const edges = projectRelations(
+      rows.slice(0, 1000).map((r) => ({
+        sourceBlogId: Number(r.sourceBlogId),
+        targetBlogId: Number(r.targetBlogId),
+        count: Number(r.count),
+        denominator: Number(r.denominator),
+        firstMentionAt: r.firstMentionAt,
+        lastMentionAt: r.lastMentionAt,
+      })),
+    );
+    const ids = [...new Set([Number(blog.id), ...edges.flatMap((e) => [e.sourceBlogId, e.targetBlogId])])];
+    const [nodes] = await pool.query<RowDataPacket[]>('SELECT id,slug,name FROM blogs WHERE id IN (?)', [ids]);
+    const [evidence] = await pool.query<RowDataPacket[]>(
+      `SELECT p.id postId,p.title postTitle,p.url postUrl,l.target_url targetUrl,l.anchor_text anchor,p.published_at publishedAt,
       l.source_blog_id sourceBlogId,l.target_blog_id targetBlogId,l.location
       FROM relation_links l JOIN posts p ON p.id=l.source_post_id JOIN blogs a ON a.id=l.source_blog_id JOIN blogs b ON b.id=l.target_blog_id
       WHERE ${PUBLIC_RELATION} AND l.location='body' AND (l.source_blog_id=? OR l.target_blog_id=?) AND l.source_blog_id<>l.target_blog_id
       AND a.status='verified' AND b.status='verified' AND p.published_at>=? AND p.published_at<=?
       ORDER BY p.published_at DESC,l.source_post_id,l.ordinal LIMIT 20`,
-          [blog.id, blog.id, cutoff, now],
-        );
-        const coverage = await loadRelationCoverage(pool, Number(blog.id));
-        return {
-          days,
-          generatedAt: now.toISOString(),
-          mostMentioned: [],
-          mutual: [],
-          coverage: { ...coverage, graphTruncated: rows.length > 1000, aggregationTruncated: false },
-          blogId: Number(blog.id),
-          nodes: nodes.map((r) => ({ id: Number(r.id), slug: r.slug, name: r.name, iconUrl: iconUrl(r.slug) })),
-          edges,
-          outgoing: edges.filter((e) => e.sourceBlogId === blog.id),
-          incoming: edges.filter((e) => e.targetBlogId === blog.id),
-          evidence: evidence.map((r) => ({ ...r, publishedAt: iso(r.publishedAt) })),
-          profileTruncated: rows.length > 1000,
-        };
-      }),
+      [blog.id, blog.id, cutoff, now],
     );
+    const coverage = await loadRelationCoverage(pool, Number(blog.id));
+    return {
+      days,
+      generatedAt: now.toISOString(),
+      mostMentioned: [],
+      mutual: [],
+      coverage: { ...coverage, graphTruncated: rows.length > 1000, aggregationTruncated: false },
+      blogId: Number(blog.id),
+      nodes: nodes.map((r) => ({ id: Number(r.id), slug: r.slug, name: r.name, iconUrl: iconUrl(r.slug) })),
+      edges,
+      outgoing: edges.filter((e) => e.sourceBlogId === blog.id),
+      incoming: edges.filter((e) => e.targetBlogId === blog.id),
+      evidence: evidence.map((r) => ({ ...r, publishedAt: iso(r.publishedAt) })),
+      profileTruncated: rows.length > 1000,
+    };
   });
+}
+
+export function readPublicRelations(pool: Pool, days: number) {
+  return cachedProjection(pool, `global:${days}`, 300000, () => readRelationSnapshot(pool, days));
 }

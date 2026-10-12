@@ -481,5 +481,6 @@ export * from '../admin/schema.ts';
 export * from '../ai/schema.ts';
 export * from '../content/schema.ts';
 export * from '../jobs/schema.ts';
+export * from '../reader/schema.ts';
 export * from '../relations/schema.ts';
 export * from '../topics/schema.ts';

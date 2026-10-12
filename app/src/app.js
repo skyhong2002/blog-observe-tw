@@ -12,13 +12,21 @@ import { loadAuthorCatalog } from './catalog-authors.js';
 import { registerContentRoutes } from './content/routes.ts';
 import { createDb } from './db/client.ts';
 import { loadOverview } from './overview.js';
+import { clientIp } from './public-api/client-ip.ts';
+import { installPublicApiPolicy, publicApiPath } from './public-api/middleware.ts';
+import { queryValues } from './public-api/query.ts';
 import { publicPost, publicRss } from './public-post.ts';
+import { createApiKeyService } from './reader/api-keys.ts';
+import { registerApiKeyRoutes } from './reader/key-routes.ts';
 import { registerRelationRoutes } from './relations/routes.ts';
 import { registerSearchRoutes } from './search.ts';
 import { registerTopicRoutes } from './topics/routes.ts';
 import { createUiProxy } from './ui-proxy.js';
+import { registerApiStatus } from './v1/api-status.ts';
 import { iconManifest, registerFavicons } from './v1/favicon-routes.ts';
 import { iconUrl } from './v1/icons.ts';
+import { buildOpenApi } from './v1/openapi.ts';
+import { registerPublicApi } from './v1/routes.ts';
 import { registerSimilarwebTraffic } from './v1/similarweb-routes.ts';
 
 const esc = (value) =>
@@ -26,22 +34,42 @@ const esc = (value) =>
 const sameOrigin = (request, origin) => !request.headers.origin || request.headers.origin === origin;
 
 export async function buildApp(config, { logger = false, store = null } = {}) {
-  const app = Fastify({ logger, logController: new LogController({ disableRequestLogging: true }), exposeHeadRoutes: true });
+  const app = Fastify({
+    logger: logger
+      ? {
+          ...(typeof logger === 'object' ? logger : {}),
+          redact: ['req.headers.x-api-key', 'req.headers.authorization', 'req.headers.cookie', 'res.headers.set-cookie'],
+        }
+      : false,
+    logController: new LogController({ disableRequestLogging: true }),
+    exposeHeadRoutes: true,
+  });
   installPrivateCachePolicy(app);
+  app.setErrorHandler((error, request, reply) => {
+    if (publicApiPath(request.url)) {
+      const status = error.statusCode >= 400 && error.statusCode < 500 ? error.statusCode : 503;
+      return reply.code(status).send({
+        error: status === 400 ? 'invalid_query' : status === 404 ? 'not_found' : status === 405 ? 'method_not_allowed' : 'unavailable',
+      });
+    }
+    return reply.send(error);
+  });
   const own = store || createDb(config.blogDbUrl);
   const { pool } = own;
   const startedAt = Date.now();
+  const keys = createApiKeyService(pool);
+  installPublicApiPolicy(app, keys);
   await app.register(rateLimit, {
     global: true,
     timeWindow: '1 minute',
     max: 240,
-    // Cloudflare terminates the public tunnel. Use its client address when
-    // present, otherwise Fastify's peer address; never bypass the limiter
-    // merely because a header is absent.
-    keyGenerator: (request) => {
-      const forwarded = request.headers['cf-connecting-ip'];
-      return typeof forwarded === 'string' && forwarded.length <= 64 ? forwarded : request.ip;
-    },
+    allowList: (request) => publicApiPath(request.url),
+    keyGenerator: clientIp,
+  });
+  registerPublicApi(app, pool);
+  app.get('/api/v1/openapi.json', { config: { rateLimit: false } }, async (request) => {
+    queryValues(request.query, []);
+    return buildOpenApi();
   });
   registerFavicons(app);
   registerSimilarwebTraffic(app, pool);
@@ -149,6 +177,7 @@ export async function buildApp(config, { logger = false, store = null } = {}) {
   });
 
   const login = registerLogin(app, config.login ? dbLoginStore(own.db, { pool, adminEmails: config.adminEmails }) : null, config.login);
+  registerApiKeyRoutes(app, { pool, login, keys, publicOrigin: config.publicOrigin, sessionSecret: config.login?.sessionSecret || '' });
   app.get('/api/me/capabilities', async (request, reply) => {
     reply.header('cache-control', 'no-store');
     const user = await login.currentUser(request);
@@ -205,14 +234,14 @@ export async function buildApp(config, { logger = false, store = null } = {}) {
     const user = await requireUser(request, reply);
     if (!user) return;
     const [follows] = await pool.query(
-      'SELECT b.name,b.url FROM user_follows f JOIN blogs b ON b.id=f.blog_id WHERE f.user_id=? ORDER BY b.name',
+      "SELECT b.name,b.url,(SELECT fs.url FROM feed_sources fs WHERE fs.blog_id=b.id AND fs.last_success_at IS NOT NULL AND fs.type IN ('rss','atom') ORDER BY fs.last_success_at DESC,fs.id LIMIT 1) AS feedUrl FROM user_follows f JOIN blogs b ON b.id=f.blog_id WHERE f.user_id=? ORDER BY b.name",
       [user.id],
     );
     const outlines = follows
-      .filter((item) => item.url)
+      .filter((item) => item.url && item.feedUrl)
       .map(
         (item) =>
-          `<outline type="rss" text="${esc(item.name)}" title="${esc(item.name)}" htmlUrl="${esc(item.url)}" xmlUrl="${esc(item.url)}"/>`,
+          `<outline type="rss" text="${esc(item.name)}" title="${esc(item.name)}" htmlUrl="${esc(item.url)}" xmlUrl="${esc(item.feedUrl)}"/>`,
       )
       .join('');
     return reply
@@ -269,9 +298,13 @@ export async function buildApp(config, { logger = false, store = null } = {}) {
   });
 
   const proxyToUi = createUiProxy(config.uiOrigin);
+  registerApiStatus(app, proxyToUi);
+  app.get('/api', proxyToUi);
+  app.get('/api/', proxyToUi);
   const handler = async (request, reply) => {
     // Unknown API/auth routes must never cycle through Next's rewrites.
-    if (/^\/(api|auth)(?:\/|$)/.test(request.url)) return reply.code(404).send({ error: 'not found' });
+    if (/^\/(api|auth)(?:\/|$)/.test(request.url))
+      return reply.code(404).send({ error: publicApiPath(request.url) ? 'not_found' : 'not found' });
     return proxyToUi(request, reply);
   };
   app.route({ method: ['GET', 'HEAD'], url: '/', handler });

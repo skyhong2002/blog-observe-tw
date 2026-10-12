@@ -43,7 +43,7 @@ export function createUiProxy(origin, { request = undiciRequest, timeout = 15000
     if (target.host !== base.host) return reply.code(400).send({ error: 'invalid upstream' });
     const headers = {};
     for (const [key, value] of Object.entries(req.headers))
-      if (!HOP.has(key) && key !== 'host' && key !== 'cookie' && key !== 'authorization') headers[key] = value;
+      if (!HOP.has(key) && key !== 'host' && key !== 'cookie' && key !== 'authorization' && key !== 'x-api-key') headers[key] = value;
     headers['x-forwarded-host'] = req.headers.host ?? '';
     headers['x-forwarded-proto'] = req.headers['x-forwarded-proto'] ?? 'https';
     let upstream;

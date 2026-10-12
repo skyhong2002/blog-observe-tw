@@ -6,9 +6,10 @@ import { SOURCE } from './snapshot-client.ts';
 
 // Native feed categories remain live evidence; neither curated tags nor source tables are mutated.
 // Vocabulary category mapping is exact normalized-label equality; title/body matches are versioned.
-const evidence = (
+export const evidence = (
   blogScoped = false,
-) => `scoped_posts AS (SELECT p.id,p.blog_id,p.published_at,p.content_hash FROM posts p JOIN blogs b ON b.id=p.blog_id WHERE p.published_at>=? AND p.published_at<=? AND b.status<>'moved' ${blogScoped ? 'AND b.slug=?' : ''}), evidence AS (
+  verifiedOnly = false,
+) => `scoped_posts AS (SELECT p.id,p.blog_id,p.published_at,p.content_hash FROM posts p JOIN blogs b ON b.id=p.blog_id WHERE p.published_at>=? AND p.published_at<=? AND ${verifiedOnly ? "b.status='verified'" : "b.status<>'moved'"} ${blogScoped ? 'AND b.slug=?' : ''}), evidence AS (
  SELECT p.id post_id,p.blog_id,p.published_at,CONCAT('rss:',t.id) topic_id,t.label,'rss-category' source
  FROM scoped_posts p JOIN post_tags pt ON pt.post_id=p.id JOIN tags t ON t.id=pt.tag_id
  WHERE pt.source_type='crawler' AND pt.status='active' AND t.visibility='public' AND t.status='active'
@@ -59,19 +60,19 @@ const item = (r: RowDataPacket) => ({
   posts: Number(r.posts),
   blogs: Number(r.blogs),
 });
-async function ranking(pool: Pool, days: number, slug?: string) {
+export async function ranking(pool: Pool, days: number, slug?: string, verifiedOnly = false, limit = 100) {
   const args: unknown[] = [...range(days)];
   if (slug) args.push(slug);
   const [rows] = await pool.query<RowDataPacket[]>(
-    `WITH ${evidence(Boolean(slug))}, per_blog AS (
+    `WITH ${evidence(Boolean(slug), verifiedOnly)}, per_blog AS (
     SELECT r.topic_id,r.label,r.source,r.blog_id,COUNT(DISTINCT r.post_id) n FROM recent r
     GROUP BY r.topic_id,r.label,r.source,r.blog_id)
     SELECT topic_id,label,source,SUM(2*(1-POW(0.5,n))) score,SUM(n) posts,COUNT(*) blogs FROM per_blog
     GROUP BY topic_id,label,source HAVING COUNT(*)>=${slug ? 1 : 2}
-    ORDER BY score DESC,blogs DESC,posts DESC,topic_id LIMIT 101`,
+    ORDER BY score DESC,blogs DESC,posts DESC,topic_id LIMIT ${Math.min(200, Math.max(1, limit)) + 1}`,
     args,
   );
-  return { items: rows.slice(0, 100).map(item), truncated: rows.length > 100 };
+  return { items: rows.slice(0, limit).map(item), truncated: rows.length > limit };
 }
 const caches = new WeakMap<Pool, Set<TopicResponseCache>>();
 export function invalidateTopicCache(pool: Pool) {
