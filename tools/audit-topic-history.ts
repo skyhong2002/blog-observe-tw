@@ -88,7 +88,7 @@ export async function auditTopicHistory(pool: Pool, seed = DEFAULT_SEED) {
     .sort((a, b) => a.order.localeCompare(b.order) || a.topic.canonicalId.localeCompare(b.topic.canonicalId))
     .map(({ topic }) => topic);
   const random20 = sampled.slice(0, 20);
-  const historicalOnlyExamples = sampled.filter((t) => t.articles90Days === 0 && t.historicalArticles > 0).slice(0, 3);
+  const historicalOnlyExamples = sampled.filter((t) => t.articles90Days === 0 && t.observedArticles90Days === 0 && t.historicalArticles > 0).slice(0, 3);
   const named = SPECIAL_LABELS.map((label) => ({
     requestedLabel: label,
     topic: population.find((t) => normalizeTerm(t.label) === normalizeTerm(label)) ?? null,
