@@ -6,6 +6,7 @@ import { registerAdminRoutes } from './admin/routes.ts';
 import { registerAiRoutes } from './ai/routes.ts';
 import { registerLogin } from './auth/google-login.ts';
 import { dbLoginStore } from './auth/store.ts';
+import { installPrivateCachePolicy } from './cache-policy.ts';
 import { loadCatalog } from './catalog.js';
 import { loadAuthorCatalog } from './catalog-authors.js';
 import { registerContentRoutes } from './content/routes.ts';
@@ -26,6 +27,7 @@ const sameOrigin = (request, origin) => !request.headers.origin || request.heade
 
 export async function buildApp(config, { logger = false, store = null } = {}) {
   const app = Fastify({ logger, logController: new LogController({ disableRequestLogging: true }), exposeHeadRoutes: true });
+  installPrivateCachePolicy(app);
   const own = store || createDb(config.blogDbUrl);
   const { pool } = own;
   const startedAt = Date.now();

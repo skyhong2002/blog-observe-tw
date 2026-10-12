@@ -62,6 +62,14 @@ redirect validation, timeout and response-size rules. A batch handles at most
 five articles with a two-minute wall-clock bound and resumes remaining work later.
 Budget exhaustion is a deferral, not evidence that a blog failed.
 
+HTML pages may be parsed up to the existing 5 MiB HTTP response limit; the
+selected body is then limited to 128 KiB of text and 256 KiB of HTML. Large
+headers or scripts do not consume the stored article-body allowance. Adapter
+`blog-content-v2` prioritizes retrying older incomplete HTML observations marked
+`content-limit`, within the same budgets. A version change alone does not refetch
+complete RSS/API evidence. Previously truncated history payloads still require
+a fresh article-page fetch to recover their omitted content.
+
 Before release, back up the formal database and apply only the additive migration.
 Validate real SQL ingestion, public summary boundaries, platform fixtures,
 idempotence and budget behavior against the disposable port-18169 database.
