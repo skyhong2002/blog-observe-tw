@@ -19,11 +19,19 @@ function sectionsFor(_pathname: string) {
   );
 }
 
+// Topic pages render this block themselves, after their content, with the payload's
+// vocabulary and coverage notes (components/public/TopicMethod.tsx); the layout's
+// footer leaves it out there so a page never has two. When the topic page never
+// mounts (app/error.tsx, app/not-found.tsx), TopicMethodFallback renders it instead.
+export const OWN_METHOD = /^\/topics(\/|$)/;
+
 // The footer's collapsible 資料來源與計算方式: the blocks for this page, the page's
 // own notes, then a link to the full write-up. Hidden on that page itself.
-export default function FooterMethod({ notes }: { notes?: React.ReactNode }) {
+// `page` marks the copy a page renders itself (see OWN_METHOD).
+export default function FooterMethod({ notes, page = false }: { notes?: React.ReactNode; page?: boolean }) {
   const pathname = usePathname();
   if (pathname === METHOD_HREF || `${pathname}/` === METHOD_HREF) return null;
+  if (!page && OWN_METHOD.test(pathname)) return null;
   return (
     <details className="group border-t border-zinc-200 dark:border-zinc-800">
       <summary className="flex cursor-pointer list-none items-center justify-between gap-4 py-4 text-sm font-medium text-zinc-900 dark:text-zinc-100 hover:text-brand-700 dark:hover:text-brand-400 [&::-webkit-details-marker]:hidden">

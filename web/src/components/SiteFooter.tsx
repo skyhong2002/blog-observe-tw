@@ -10,7 +10,8 @@ import Wordmark from './Wordmark';
 // The one footer for every page: this page's 資料來源與計算方式, then a full-width
 // band with the brand, live collection numbers, channels and the link columns,
 // then the rights line. Pages may add their own method notes (`notes`) after the
-// blocks FooterMethod picks for them.
+// blocks FooterMethod picks for them. Topic pages render FooterMethod after their
+// own content instead, with their payload's notes, and it is left out here.
 
 export const methodHeading = 'font-medium text-zinc-900 dark:text-zinc-100';
 

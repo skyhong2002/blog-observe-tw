@@ -3,31 +3,34 @@
 // One view for the prerendered 30-day ranking and the browser's ?days=7|90; see app/topics/page.tsx.
 
 import { useSearchParams } from 'next/navigation';
+import FooterMethod from '@/components/FooterMethod';
 import Link from '@/components/NoPrefetchLink';
 import SectionTabs from '@/components/SectionTabs';
 import TableScroller from '@/components/TableScroller';
-import VocabularyNotice from '@/components/VocabularyNotice';
+import { VocabularySummary } from '@/components/VocabularyNotice';
 import { topicLink } from '@/lib/page-links';
 import { type Period, periodOf, TOPICS_PERIOD, topicsApiPath } from '@/lib/public-query';
 import { table } from '@/lib/table-styles';
-import { formatLift, liftExplanation, matchingPolicyText, matchingReasonLabel, matchSplit, type Topics } from '@/lib/topics';
+import { formatLift, liftExplanation, matchingReasonLabel, matchSplit, type Topics } from '@/lib/topics';
 import { asIs, type PublicLoad, usePublicJson } from '@/lib/use-public-json';
+import TopicMethod from './TopicMethod';
 
+// The ranking comes first; how it is computed and the vocabulary's full record
+// sit in this page's 資料來源與計算方式 (TopicMethod), closed until asked for.
 export default function TopicRankingView({ days, load }: { days: Period; load: PublicLoad<Topics> }) {
+  const data = load.status === 'ready' ? load.data : null;
   return (
     <div className="space-y-5 pb-8">
       <header>
         <h1 className="text-2xl font-semibold">大家正在寫什麼</h1>
-        <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
-          從不同部落格的文章，看持續被書寫的話題。同站對同一詞的貢獻逐篇遞減，讓大量發文的站不會獨占排行。
-        </p>
+        <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">從不同部落格的文章，看持續被書寫的話題。</p>
       </header>
       <SectionTabs
         label="話題期間"
         tabs={[7, 30, 90].map((d) => ({ href: `/topics/?days=${d}`, label: `近 ${d} 天`, current: String(d) === days }))}
       />
-      {load.status === 'ready' ? (
-        <TopicRows days={days} data={load.data} />
+      {data ? (
+        <TopicRows days={days} data={data} />
       ) : load.status === 'pending' ? (
         <p role="status" aria-busy="true" className="text-zinc-500">
           正在載入近 {days} 天的話題…
@@ -35,6 +38,14 @@ export default function TopicRankingView({ days, load }: { days: Period; load: P
       ) : (
         <p role="status">話題資料暫時無法讀取，請稍後再試。</p>
       )}
+      <FooterMethod
+        page
+        notes={
+          data ? (
+            <TopicMethod vocabulary={data.vocabulary} matchingPolicy={data.matchingPolicy} coverage={data.coverage} ranking />
+          ) : null
+        }
+      />
     </div>
   );
 }
@@ -109,18 +120,14 @@ function TopicRows({ days, data }: { days: Period; data: Topics }) {
       {!data.items.length ? (
         <p className="py-8 text-zinc-500">這段期間尚無跨至少 {data.minimumBlogs} 個部落格的共同話題；個別站的主題可在部落格頁查看。</p>
       ) : null}
-      <p className="text-xs text-zinc-500">
-        {matchingPolicyText(data.matchingPolicy)}排行仍依加權貢獻排序。{liftTitle}
-      </p>
-      <VocabularyNotice data={data.vocabulary} />
-      {data.coverage ? (
-        <p className="text-xs text-zinc-500">
-          期間內 {data.coverage.datedPosts} 篇；可辨識正文 {data.coverage.bodyObservedPosts} 篇，標題或正文命中共同關鍵字{' '}
-          {data.coverage.matchedPosts} 篇。比對達上限 {data.coverage.cappedPosts} 篇保留未完整標記。日期未知{' '}
-          {data.coverage.unknownDatePosts} 篇不列入期間排行。
-          {data.truncated ? '僅顯示前 100 項。' : ''}
+      {data.truncated ? <p className="text-xs text-zinc-500">僅顯示前 {data.items.length} 項。</p> : null}
+      {/* Partial coverage stays in view; the full period counts are in TopicMethod. */}
+      {data.coverage && data.coverage.cappedPosts > 0 ? (
+        <p role="note" className="text-xs font-medium text-zinc-700 dark:text-zinc-300">
+          期間內有 {data.coverage.cappedPosts} 篇比對達上限，保留未完整標記。
         </p>
       ) : null}
+      <VocabularySummary data={data.vocabulary} />
     </>
   );
 }

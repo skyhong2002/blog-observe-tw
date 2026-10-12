@@ -178,3 +178,13 @@ GPT-6.1 Sol於2026-10-12T20:23:54.443Z實際讀三頁各1280×900／390×900，�
 freshgate20:22:33Z：load3.76/6.01/6.32、blog final200 TTFB1.226s、otherbrowser root1/build0，允許開本thread唯一browser，頁間5秒。途中root量到load>12後發停止通知；reviewer20:23:27Z核load17.29，停止時最後in-flight畫面已自然完成、browser20:23:30.370Zclose。之後只讀既有圖，無補拍、重試或正式導航；本批實際存在的`gate-before.json`、`browser-closed.json`及`reviewer-original-notes.json`內loadInterruption保留時間；**沒有產生gate-after.json**，先前引用錯誤已更正，未事後補建。停止觀測UTC20:23:27Z、關閉20:23:30.370Z以原始reviewer紀錄與browser-closed為準。不能把此批稱為持續健康負載；後續capture仍暫停。
 
 此補證只覆蓋歷史fallback多/少資料，沒有補齊整個`/topics/[key]/`的empty/error/permission等狀態，因此權威主表與總數維持pending原狀。三個本次修正route的正式browserretest仍未做，不將歷史頁當作它們的驗收。
+
+## 話題方法說明收合：程式修正完成，candidate 畫面待驗
+
+本批以 `origin/main` 的 `0b7d42e`（先前實作起點 `3ad4191`，差異只有證據文件）為基礎。Opus 5.5 實作將長方法、上游窗口、品質與容量資訊移入既有「本頁資料來源與計算方式」原生 details；手機先呈現文章，保留必要來源與確認狀態。error／404 的 topic-only fallback 也補上通用方法區塊。
+
+- 實作原始紀錄：`/home/deck/.t3/projects/blog-observe-tw/.reviews/topic-method-ui/opus-implementation.jsonl`、`opus-fixes.jsonl`；兩者實際 model `claude-opus-5-5`，result success。
+- 獨立 source reviewer：GPT-6.1 Sol；原始 model log 與 UTC 見 `/home/deck/.t3/projects/blog-observe-tw/.reviews/topic-method-ui/codex-source-review.md`、`codex-source-rereview.md`。TM-S1 已補 error／404 fallback；TM-S2 建議採納，本輪 source-string 測試移到 ignored review 目錄保留，未當作視覺證據。
+- 已執行既有 web tests：172 passed；前端 TypeScript `--noEmit --incremental false` 通過。log：`.reviews/topic-method-ui/web-tests.log`、`typecheck.log`。
+- **尚未建置、部署或拍攝本批 candidate**：tag 備份期間磁碟凍結。1280／390、tag 對照、鍵盤展開／收合、error／404 單一 details、資料多／少／空狀態仍待實際獨立 review；沒有新 screenshot，也沒有把 source review 當畫面 pass。
+- 權威主表狀態與計數不變；topic UI-H01 仍是 issues，不能宣稱整 route 已通過。

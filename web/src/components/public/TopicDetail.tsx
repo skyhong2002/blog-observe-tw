@@ -6,9 +6,10 @@
 import { useSearchParams } from 'next/navigation';
 import { useState } from 'react';
 import BlogIcon from '@/components/BlogIcon';
+import FooterMethod from '@/components/FooterMethod';
 import Link from '@/components/NoPrefetchLink';
 import SectionTabs from '@/components/SectionTabs';
-import VocabularyNotice from '@/components/VocabularyNotice';
+import { VocabularySummary } from '@/components/VocabularyNotice';
 import { taipei } from '@/lib/api';
 import { externalHref } from '@/lib/images';
 import { blogLink, TOPIC_DETAIL_PERIOD, topicHref, topicLink } from '@/lib/page-links';
@@ -16,11 +17,9 @@ import { isHistoryCursor, type Period, periodOf, topicApiPath } from '@/lib/publ
 import {
   evidenceLabel,
   exclusionReasonLabel,
-  formatPercent,
   historyRows,
   historySummary,
   inactiveReasonLabel,
-  matchingPolicyText,
   matchingReasonLabel,
   recorded,
   type TopicDetail,
@@ -28,6 +27,7 @@ import {
   topicArticleMode,
 } from '@/lib/topics';
 import { asIs, type PublicLoad, usePublicJson } from '@/lib/use-public-json';
+import TopicMethod from './TopicMethod';
 
 /** Source article count and last observed post, omitting whichever the payload did not record. */
 function sourceActivity(topic: NonNullable<TopicDetail['topic']>) {
@@ -38,16 +38,6 @@ function sourceActivity(topic: NonNullable<TopicDetail['topic']>) {
   ]
     .filter(Boolean)
     .join(' · ');
-}
-
-/** Threshold and baseline period behind a title-only term, from whichever the payload recorded. */
-function frequencyBasis(data: TopicDetail) {
-  const baseline = data.vocabulary.frequencyBaseline;
-  const ratio = data.matchingPolicy?.frequency?.highFrequencyRatio ?? baseline?.thresholdRatio;
-  const period = baseline
-    ? `${taipei(baseline.since)} 至 ${taipei(baseline.until)}`
-    : `近 ${data.matchingPolicy?.frequency?.baselineDays ?? 365} 天`;
-  return `門檻：基準期間命中文章占比超過 ${formatPercent(ratio)}。基準期間：${period}。`;
 }
 
 /** The original article, with SourceLink's open_original marker; a non-http(s) URL stays plain text. */
@@ -67,9 +57,10 @@ function ArticleTitle({ url, title }: { url: string; title: string }) {
   );
 }
 
+/** Follows the articles in the markup (phones read articles first); the wide layout puts it in the left column. */
 function TopicBlogs({ blogs }: { blogs: TopicDetail['blogs'] }) {
   return (
-    <section className="rounded-xl border border-zinc-300 p-4 dark:border-zinc-800">
+    <section className="rounded-xl border border-zinc-300 p-4 lg:order-first dark:border-zinc-800">
       <h2 className="font-semibold">哪些部落格在寫</h2>
       <ul className="mt-3 divide-y divide-zinc-200 dark:divide-zinc-800">
         {blogs.map((b) => (
@@ -198,6 +189,8 @@ export default function TopicDetailView({
   label?: string;
 }) {
   const data = load.status === 'ready' ? load.data : null;
+  // Articles (or the history fallback) come first; how they were matched and the
+  // vocabulary's full record sit in the page's 資料來源與計算方式, closed until asked for.
   return (
     <div className="space-y-5 pb-8">
       <Link href="/topics/" className="text-sm text-brand-700 dark:text-brand-400">
@@ -223,7 +216,7 @@ export default function TopicDetailView({
               。這個詞仍保留在來源資料中，但不會用來比對文章，所以這裡沒有部落格與文章。
             </p>
           </section>
-          <VocabularyNotice data={data.vocabulary} />
+          <VocabularySummary data={data.vocabulary} />
         </>
       ) : data?.topic?.inactiveReason ? (
         <>
@@ -235,7 +228,7 @@ export default function TopicDetailView({
             </p>
             {sourceActivity(data.topic) ? <p className="mt-1 text-xs text-zinc-500">{sourceActivity(data.topic)}</p> : null}
           </section>
-          <VocabularyNotice data={data.vocabulary} />
+          <VocabularySummary data={data.vocabulary} />
         </>
       ) : data?.topic ? (
         <>
@@ -249,22 +242,17 @@ export default function TopicDetailView({
             </p>
           ) : null}
           {data.topic.matchingReason ? (
-            <section role="note" className="rounded-xl border border-zinc-300 p-4 text-sm dark:border-zinc-800">
-              <h2 className="font-semibold">{matchingReasonLabel(data.topic.matchingReason)}</h2>
-              <p className="mt-2 text-zinc-600 dark:text-zinc-400">
-                這個詞在長期文章中出現得很普遍，排行與升溫倍率只計標題命中；正文命中仍留在頻率統計，詞也沒有從詞庫刪除。
-              </p>
-              <p className="mt-1 text-xs text-zinc-500">{frequencyBasis(data)}</p>
-            </section>
+            <p role="note" className="text-sm text-zinc-600 dark:text-zinc-400">
+              {matchingReasonLabel(data.topic.matchingReason)}：排行與升溫倍率只計標題命中。
+            </p>
           ) : null}
           {topicArticleMode(data) === 'history' && data.history ? (
             <div className={data.blogs.length ? 'grid gap-5 lg:grid-cols-[1fr_2fr]' : undefined}>
-              {data.blogs.length ? <TopicBlogs blogs={data.blogs} /> : null}
               <TopicHistorySection id={id} days={days} history={data.history} />
+              {data.blogs.length ? <TopicBlogs blogs={data.blogs} /> : null}
             </div>
           ) : (
             <div className="grid gap-5 lg:grid-cols-[1fr_2fr]">
-              <TopicBlogs blogs={data.blogs} />
               <section>
                 <h2 className="font-semibold">相關文章</h2>
                 <ul className="mt-3 divide-y divide-zinc-200 dark:divide-zinc-800">
@@ -279,11 +267,11 @@ export default function TopicDetailView({
                 </ul>
                 {!data.articles.length ? <p className="py-6 text-zinc-500">此期間尚無已比對文章。</p> : null}
               </section>
+              <TopicBlogs blogs={data.blogs} />
             </div>
           )}
-          <p className="text-xs text-zinc-500">{matchingPolicyText(data.matchingPolicy)}</p>
-          <VocabularyNotice data={data.vocabulary} />
           {data.truncated ? <p className="text-xs text-zinc-500">僅顯示部分來源與文章。</p> : null}
+          <VocabularySummary data={data.vocabulary} />
         </>
       ) : load.status === 'gone' ? (
         <p role="status" className="text-sm text-zinc-500">
@@ -294,8 +282,18 @@ export default function TopicDetailView({
           正在載入近 {days} 天的話題資料…
         </p>
       ) : (
-        <p className="text-sm text-zinc-500">目前無法讀取此話題，可能尚未完成同步或不在目前詞庫版本。</p>
+        <p role="alert" className="text-sm text-zinc-700 dark:text-zinc-300">
+          目前無法讀取此話題，可能尚未完成同步或不在目前詞庫版本。
+        </p>
       )}
+      <FooterMethod
+        page
+        notes={
+          data ? (
+            <TopicMethod vocabulary={data.vocabulary} matchingPolicy={data.matchingPolicy} matchingReason={data.topic?.matchingReason} />
+          ) : null
+        }
+      />
     </div>
   );
 }

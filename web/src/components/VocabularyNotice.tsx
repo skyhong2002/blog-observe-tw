@@ -17,6 +17,12 @@ const count = (value: number | null | undefined, unit = '個') => {
   const n = recorded(value);
   return n === null ? '未記錄' : `${n.toLocaleString('zh-TW')} ${unit}`;
 };
+/** Long-term baseline not yet fully matched by the current version: its hit counts are a lower bound. */
+const baselinePending = (b: FrequencyBaseline | null | undefined) => {
+  const total = recorded(b?.totalPosts);
+  const covered = recorded(b?.coveredPosts);
+  return covered !== null && total !== null && covered < total;
+};
 
 /** Shown only when the gateway sent an active set: no numbers are invented for older payloads. */
 function ActiveMatching({ set, total }: { set: ActiveSet; total: number | null }) {
@@ -83,7 +89,7 @@ function FrequencyRule({ baseline }: { baseline: FrequencyBaseline }) {
           {count(covered, '篇')}／{count(total, '篇')}
         </dd>
       </dl>
-      {covered !== null && total !== null && covered < total ? (
+      {baselinePending(baseline) ? (
         <p className="mt-2">尚有文章未依目前版本完成比對，命中篇數為已觀測到的下限，不代表已涵蓋完整全文。</p>
       ) : null}
     </div>
@@ -139,14 +145,47 @@ function TagQuality({ data }: { data: VocabularyStatus }) {
   );
 }
 
-export default function VocabularyNotice({ data }: { data: VocabularyStatus }) {
+const tagSite = (
+  <a href="https://tag.observe.tw" className="underline">
+    新文易數
+  </a>
+);
+
+/**
+ * What a topic page keeps above the fold: the source in one sentence, and only
+ * the warnings a reader needs before trusting the numbers (a partial snapshot,
+ * an unfinished re-match, no sync yet). The full record is VocabularyMethod,
+ * inside the page's 資料來源與計算方式.
+ */
+export function VocabularySummary({ data }: { data: VocabularyStatus }) {
+  if (data.status !== 'ready') {
+    return <p className="text-xs text-zinc-500">共同關鍵字尚未完成同步；話題排行會在同步完成後顯示，請稍後再查看。</p>;
+  }
+  const warnings = [
+    data.coverage === 'observed-article-window' ? '共同關鍵字僅涵蓋上游文章觀測窗口，屬部分快照，不代表完整詞庫。' : '',
+    baselinePending(data.frequencyBaseline) ? '長期基準尚未依目前版本完成比對，高頻詞命中篇數為已觀測到的下限。' : '',
+  ].filter(Boolean);
+  return (
+    <div className="min-w-0 space-y-1 text-xs text-zinc-500">
+      <p>
+        話題詞取自{tagSite}的共同關鍵字{data.syncedAt ? `，${taipei(data.syncedAt)} 同步` : ''}。計算方式與詞庫細節見下方「本頁的資料來源與計算方式」。
+      </p>
+      {warnings.length ? (
+        <p role="note" className="font-medium text-zinc-700 dark:text-zinc-300">
+          {warnings.join('')}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+/** The full vocabulary record (source, version, window, tag quality, capacity, baseline, backfill), for 資料來源與計算方式. */
+export function VocabularyMethod({ data }: { data: VocabularyStatus }) {
   return (
     <div className="min-w-0 space-y-1 text-xs text-zinc-500">
       <p>
         話題只使用取自
-        <a href="https://tag.observe.tw" className="underline">
-          新文易數
-        </a>
+        {tagSite}
         的共同關鍵字；部落格 RSS 的自訂分類仍保留為原始資料，但不另外組成話題詞庫。只差在大小寫或全半形的寫法（如 AI／ai）合併為一列。
       </p>
       {data.status === 'ready' ? (
@@ -166,14 +205,14 @@ export default function VocabularyNotice({ data }: { data: VocabularyStatus }) {
           <TagQuality data={data} />
           {data.activeSet ? <ActiveMatching set={data.activeSet} total={recorded(data.totalSourceTerms)} /> : null}
           {data.frequencyBaseline ? <FrequencyRule baseline={data.frequencyBaseline} /> : null}
-          <details>
-            <summary className="cursor-pointer">詞庫更新與補比對</summary>
+          <div className="rounded-lg border border-zinc-200 p-3 dark:border-zinc-800">
+            <p className="font-medium text-zinc-600 dark:text-zinc-400">詞庫更新與補比對</p>
             <p className="mt-1">
               目前窗口以每 15 分鐘更新為目標，同步失敗或超出處理預算時可能延後。新詞會優先補比對近 48
               小時的文章；較早的文章不代表已全面重新比對。
               {data.coverage === 'observed-article-window' ? '完整快照與 changes 增量同步尚未啟用，詞庫仍是部分觀測窗口。' : ''}
             </p>
-          </details>
+          </div>
         </>
       ) : (
         <p>共同關鍵字尚未完成同步；話題排行會在同步完成後顯示，請稍後再查看。</p>
