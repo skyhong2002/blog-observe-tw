@@ -26,7 +26,7 @@ export default function SourceProfile({ blog, sidebar }: { blog: Blog; sidebar?:
       <header className="mb-4 flex flex-wrap items-center justify-between gap-x-6 gap-y-3 border-b border-zinc-300 pb-4 dark:border-zinc-700">
         <div>
           <div className="flex flex-wrap items-center gap-2.5">
-            <BlogIcon media={blog.slug} title={blog.name} size={32} className="rounded" />
+            <BlogIcon media={blog.slug} iconUrl={blog.iconUrl} title={blog.name} size={32} className="rounded" />
             <h1 className="text-2xl font-semibold tracking-tight">{blog.name}</h1>
             <FollowButton slug={blog.slug} />
           </div>

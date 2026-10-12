@@ -28,7 +28,7 @@ export default function RelationLists({
                   href={`/blogs/${n?.slug ?? ''}/`}
                   title={n?.name ?? '部落格'}
                 >
-                  <BlogIcon media={n?.slug ?? ''} title={n?.name ?? '部落格'} size={18} />
+                  <BlogIcon media={n?.slug ?? ''} iconUrl={n?.iconUrl} title={n?.name ?? '部落格'} size={18} />
                   <span className="min-w-0 truncate">{n?.name ?? '部落格'}</span>
                 </Link>
                 <span

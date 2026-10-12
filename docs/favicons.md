@@ -59,3 +59,11 @@ node --env-file=/home/deck/.config/blog-observe.env tools/fetch-favicons.ts --al
 每個候選來源的 HTTP 狀態、轉址結果及 robots／MIME／解碼限制原因現在分別存於私人 catalog 的 `sourceChecks`，方便下次查修；不對外公開原始 catalog。成功的 5 張均驗證為 192 × 192 PNG，revision 與檔案 SHA-256 一致。
 
 新收錄站另由 `blogs-missing-icons` 每15分鐘檢查 verified 缺圖站，每批最多10站／120秒，使用與CLI／月刷新完全相同的exclusive lock；最近七天失敗的相同網址不重抓。依未嘗試、最舊嘗試順序輪轉，原圖檔缺失或站點身份變更會重新取得。可用 `BLOG_MISSING_FAVICONS_ENABLED=false` 暫停，不影響既有圖示供應。
+
+## API 與 ISR 的圖示對照
+
+所有伺服器端 DTO 必須先讀取 `iconManifest()`，再將該快照顯式傳給 `iconUrl(slug, manifest)`；不可直接使用 Git 內的 `favicon-local.json`（正式圖示位於 `BLOG_FAVICON_ROOT`，Git 內可以是空物件）。公開 v1、目錄、overview／搜尋建議、關係與私人追蹤清單皆使用同一份經欄位過濾的執行期快照，URL 保留 revision。
+
+目錄等元件將回應的 `iconUrl` 傳給共用 `BlogIcon`，使 ISR HTML 在 JavaScript 執行前已有圖片。瀏覽器載入 `/api/icons` 後以最新 revision 更新；沒有圖示或載入失敗時顯示首字預設圖示，不留空白。這不影響文章沒有配圖時僅顯示文字的規則。私人追蹤回應仍要求登入且為 `no-store`。
+
+回歸驗證：`app/src/v1/runtime-icons.spec.ts` 使用獨立臨時 runtime 目錄，驗證空 bundled manifest、各 API DTO、版本更新與讀取失敗保留快照；`web/test/media-icons.test.ts` 驗證 SSR 選圖、版本優先與失敗回退。部署前以新 gateway 建置 ISR，確認 `/blogs/` 原始 HTML 含 `/favicons/` 的 `<img>`；同時驗證 `/api/v1/blogs?limit=50` 的已存圖示 URL 與 `/api/icons` revision 相符。

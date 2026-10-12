@@ -25,7 +25,7 @@ describe('complete blog catalog', () => {
     const pool = fixture();
     const data = await loadCatalog(pool, { page: '999' });
     expect(data.pagination).toEqual({ page: 6, pages: 6, pageSize: 50, total: 275 });
-    expect(data.blogs).toEqual([{ id: 251, slug: 'after-200', name: '第 251 個站', postCount: 4 }]);
+    expect(data.blogs).toEqual([{ id: 251, slug: 'after-200', name: '第 251 個站', postCount: 4, iconUrl: null }]);
     expect(data.totals).toEqual({ blogs: 275, posts: 12000, withUrls: 264, authors: 230 });
     expect(data.categories).toEqual([
       { value: '生活', count: 210 },

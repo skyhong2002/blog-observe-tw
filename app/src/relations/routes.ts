@@ -2,6 +2,7 @@ import type { FastifyInstance, FastifyReply } from 'fastify';
 import type { Pool, RowDataPacket } from 'mysql2/promise';
 import type { BatchOptions, BatchResult } from '../jobs/contracts.ts';
 import { withJobLease } from '../jobs/lease.ts';
+import { iconManifest } from '../v1/favicon-routes.ts';
 import { iconUrl } from '../v1/icons.ts';
 
 export type RelationEdge = {
@@ -277,11 +278,12 @@ export async function loadRelations(pool: Pool, days = 90, now = new Date()): Pr
     nodeIds.add(pair.targetBlogId);
   }
   const [nodes] = nodeIds.size ? await pool.query<RowDataPacket[]>('SELECT id,slug,name FROM blogs WHERE id IN (?)', [[...nodeIds]]) : [[]];
+  const icons = await iconManifest();
   const coverage = await loadRelationCoverage(pool);
   return {
     days,
     generatedAt: now.toISOString(),
-    nodes: nodes.map((r) => ({ id: Number(r.id), slug: r.slug, name: r.name, iconUrl: iconUrl(r.slug) })),
+    nodes: nodes.map((r) => ({ id: Number(r.id), slug: r.slug, name: r.name, iconUrl: iconUrl(r.slug, icons) })),
     edges,
     mostMentioned,
     mutual: mutual.slice(0, 100),
@@ -350,6 +352,7 @@ export function readBlogRelations(pool: Pool, blog: { id: number }, days: number
       ORDER BY p.published_at DESC,l.source_post_id,l.ordinal LIMIT 20`,
       [blog.id, blog.id, cutoff, now],
     );
+    const icons = await iconManifest();
     const coverage = await loadRelationCoverage(pool, Number(blog.id));
     return {
       days,
@@ -358,7 +361,7 @@ export function readBlogRelations(pool: Pool, blog: { id: number }, days: number
       mutual: [],
       coverage: { ...coverage, graphTruncated: rows.length > 1000, aggregationTruncated: false },
       blogId: Number(blog.id),
-      nodes: nodes.map((r) => ({ id: Number(r.id), slug: r.slug, name: r.name, iconUrl: iconUrl(r.slug) })),
+      nodes: nodes.map((r) => ({ id: Number(r.id), slug: r.slug, name: r.name, iconUrl: iconUrl(r.slug, icons) })),
       edges,
       outgoing: edges.filter((e) => e.sourceBlogId === blog.id),
       incoming: edges.filter((e) => e.targetBlogId === blog.id),

@@ -1,5 +1,7 @@
 import { publicPost } from './public-post.ts';
 import { TopicResponseCache } from './topics/cache.ts';
+import { iconManifest } from './v1/favicon-routes.ts';
+import { iconUrl } from './v1/icons.ts';
 
 const overviewCaches = new WeakMap();
 export function loadOverview(pool) {
@@ -20,10 +22,11 @@ const blogFields = `b.id,b.slug,b.name,b.url,b.category,b.description,b.status,b
   latest.id latestPostId,latest.title latestPostTitle,latest.url latestPostUrl,latest.published_at latestPostPublishedAt`;
 const latestJoin = `LEFT JOIN posts latest ON latest.id=(SELECT lp.id FROM posts lp WHERE lp.blog_id=b.id
   AND (lp.published_at IS NULL OR lp.published_at<=UTC_TIMESTAMP()) ORDER BY lp.published_at DESC,lp.id DESC LIMIT 1)`;
-const blogDto = (row) => {
+const blogDto = (row, icons) => {
   const { latestPostId, latestPostTitle, latestPostUrl, latestPostPublishedAt, ...blog } = row;
   return {
     ...blog,
+    iconUrl: iconUrl(blog.slug, icons),
     postCount: Number(blog.postCount),
     latestPost: latestPostId
       ? { id: Number(latestPostId), title: latestPostTitle, url: latestPostUrl, publishedAt: latestPostPublishedAt }
@@ -56,6 +59,7 @@ async function loadProjection(pool) {
     pool.query(`SELECT ${blogFields} FROM blogs b ${latestJoin} WHERE b.status <> 'moved' AND latest.published_at IS NOT NULL
       ORDER BY latest.published_at DESC,latest.id DESC,b.id LIMIT 20`),
   ]);
+  const icons = await iconManifest();
   const row = totalRows[0][0];
   return {
     generatedAt: new Date().toISOString(),
@@ -63,8 +67,8 @@ async function loadProjection(pool) {
     posts: postRows[0].map(publicPost),
     tags: tagRows[0],
     authors: authorRows[0],
-    blogs: blogRows[0].map(blogDto),
-    recentBlogs: recentRows[0].map(blogDto),
+    blogs: blogRows[0].map((blog) => blogDto(blog, icons)),
+    recentBlogs: recentRows[0].map((blog) => blogDto(blog, icons)),
     totals: { blogs: Number(row.blogs), posts: Number(row.posts) },
     updatedAt: row.updatedAt,
   };

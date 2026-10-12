@@ -43,7 +43,7 @@ function RelationDetails({ data }: { data: Relations }) {
     const n = nodes.get(id);
     return n ? (
       <Link className="min-w-0 break-words text-brand-700 hover:underline dark:text-brand-400" href={`/blogs/${n.slug}/`}>
-        <BlogIcon media={n.slug} title={n.name} size={16} />
+        <BlogIcon media={n.slug} iconUrl={n.iconUrl} title={n.name} size={16} />
         <span className="ml-1.5">{n.name}</span>
       </Link>
     ) : (

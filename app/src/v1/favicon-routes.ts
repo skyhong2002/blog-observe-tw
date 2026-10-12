@@ -4,6 +4,7 @@ import { join, resolve } from 'node:path';
 import type { FastifyInstance } from 'fastify';
 import bundled from '../../data/favicon-local.json' with { type: 'json' };
 
+export type IconManifest = Record<string, IconRecord>;
 type IconRecord = { revision?: string; dark?: 'invert' | 'outline' };
 const repositoryRoot = new URL('../../../', import.meta.url).pathname;
 const runtimeRoot = process.env.BLOG_FAVICON_ROOT;

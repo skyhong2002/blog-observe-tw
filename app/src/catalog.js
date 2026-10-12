@@ -1,3 +1,6 @@
+import { iconManifest } from './v1/favicon-routes.ts';
+import { iconUrl } from './v1/icons.ts';
+
 /** Complete directory projection. Overview is deliberately a bounded homepage feed. */
 const categoryLabel = "COALESCE(NULLIF(b.category,''),'未分類')";
 const statusLabel = "COALESCE(NULLIF(b.status_label,''),'待核對')";
@@ -73,10 +76,11 @@ export async function loadCatalog(pool, query = {}) {
       FROM blogs b WHERE ${condition} ORDER BY ${sortColumns[filters.sort]} ${filters.dir.toUpperCase()},b.id ASC LIMIT ? OFFSET ?`,
     [...parameters, filters.limit, (page - 1) * filters.limit],
   );
+  const icons = await iconManifest();
   const totals = totalsResult[0][0];
   const facets = (rows) => rows.map((row) => ({ value: row.value, count: Number(row.count) }));
   return {
-    blogs: blogs.map((blog) => ({ ...blog, postCount: Number(blog.postCount) })),
+    blogs: blogs.map((blog) => ({ ...blog, iconUrl: iconUrl(blog.slug, icons), postCount: Number(blog.postCount) })),
     totals: {
       blogs: Number(totals.blogs),
       posts: Number(totals.posts),

@@ -1,5 +1,6 @@
 import type { Pool, RowDataPacket } from 'mysql2/promise';
 import { publicPost, publicSummary } from '../public-post.ts';
+import { type IconManifest, iconManifest } from '../v1/favicon-routes.ts';
 import { iconUrl } from '../v1/icons.ts';
 import { type articleQuery, type blogsQuery, escapeLike } from './query.ts';
 export const iso = (value: unknown): string | null => {
@@ -9,7 +10,7 @@ export const iso = (value: unknown): string | null => {
 };
 const blogFields =
   'b.id,b.slug,b.name,b.url,b.category,b.description,b.discovered_at,b.last_crawl_success_at,b.last_published_at,b.expected_interval_hours';
-export function blogDto(row: RowDataPacket) {
+export function blogDto(row: RowDataPacket, icons: IconManifest) {
   return {
     id: Number(row.id),
     slug: row.slug,
@@ -17,7 +18,7 @@ export function blogDto(row: RowDataPacket) {
     url: row.url ?? null,
     category: row.category,
     description: publicSummary(row.description),
-    iconUrl: iconUrl(row.slug),
+    iconUrl: iconUrl(row.slug, icons),
     discoveredAt: iso(row.discovered_at),
     lastCrawlSuccessAt: iso(row.last_crawl_success_at),
     lastPublishedAt: iso(row.last_published_at),
@@ -26,7 +27,7 @@ export function blogDto(row: RowDataPacket) {
 }
 export async function findPublicBlog(pool: Pool, slug: string) {
   const [[row]] = await pool.query<RowDataPacket[]>(`SELECT ${blogFields} FROM blogs b WHERE b.slug=? AND b.status='verified'`, [slug]);
-  return row ? blogDto(row) : null;
+  return row ? blogDto(row, await iconManifest()) : null;
 }
 export async function listBlogs(pool: Pool, query: ReturnType<typeof blogsQuery>) {
   const args: unknown[] = [query.after];
@@ -41,7 +42,11 @@ export async function listBlogs(pool: Pool, query: ReturnType<typeof blogsQuery>
     args,
   );
   const selected = rows.slice(0, query.limit);
-  return { items: selected.map(blogDto), nextCursor: rows.length > query.limit ? query.next(Number(selected.at(-1)!.id)) : null };
+  const icons = await iconManifest();
+  return {
+    items: selected.map((row) => blogDto(row, icons)),
+    nextCursor: rows.length > query.limit ? query.next(Number(selected.at(-1)!.id)) : null,
+  };
 }
 export async function listArticles(pool: Pool, query: ReturnType<typeof articleQuery>) {
   const args: unknown[] = [new Date(query.since), new Date(query.until)];
@@ -66,11 +71,12 @@ export async function listArticles(pool: Pool, query: ReturnType<typeof articleQ
   );
   const selected = rows.slice(0, query.limit),
     last = selected.at(-1);
+  const icons = await iconManifest();
   return {
     items: selected.map((row) => ({
       ...publicPost({ ...row, publishedAt: iso(row.publishedAt), updatedAt: iso(row.updatedAt) }),
       observedAt: iso(row.observedAt),
-      iconUrl: iconUrl(row.blogSlug),
+      iconUrl: iconUrl(row.blogSlug, icons),
     })),
     nextCursor: rows.length > query.limit && last ? query.next(new Date(last.sortAt).getTime(), Number(last.id)) : null,
     window: { since: new Date(query.since).toISOString(), until: new Date(query.until).toISOString() },

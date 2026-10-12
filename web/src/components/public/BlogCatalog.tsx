@@ -167,7 +167,7 @@ export default function BlogCatalogView({ catalog: data, filters, status }: { ca
                           href={`/blogs/${blog.slug}/`}
                           className="flex min-w-0 items-center gap-1.5 self-center font-medium text-brand-700 hover:underline dark:text-brand-400"
                         >
-                          <BlogIcon media={blog.slug} title={blog.name} />
+                          <BlogIcon media={blog.slug} iconUrl={blog.iconUrl} title={blog.name} />
                           <span className={`${table.leadText} sm:max-w-60`} title={blog.name}>
                             {blog.name}
                           </span>

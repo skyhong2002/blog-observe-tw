@@ -52,7 +52,7 @@ export type Post = {
   imageUrl?: string | null;
   tags?: Tag[];
 };
-export type Follow = Pick<Blog, 'slug' | 'name' | 'url' | 'category'>;
+export type Follow = Pick<Blog, 'slug' | 'name' | 'url' | 'category' | 'iconUrl'>;
 export type Overview = {
   posts: Post[];
   tags: Array<Tag & { postCount: number; blogCount: number }>;

@@ -198,7 +198,8 @@ export async function buildApp(config, { logger = false, store = null } = {}) {
       'SELECT b.slug,b.name,b.url,b.category FROM user_follows f JOIN blogs b ON b.id=f.blog_id WHERE f.user_id=? ORDER BY b.name',
       [user.id],
     );
-    return { follows };
+    const icons = await iconManifest();
+    return { follows: follows.map((blog) => ({ ...blog, iconUrl: iconUrl(blog.slug, icons) })) };
   });
   app.route({
     method: ['POST', 'DELETE'],

@@ -5,6 +5,7 @@ import { type Ref, useCallback, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
 import BlogIcon from '@/components/BlogIcon';
 import SuggestInput, { type Suggestion } from '@/components/SuggestInput';
+import { suppliedIconUrl } from '@/lib/media-icons';
 
 // SuggestInput for plain GET forms rendered by server components, which cannot
 // hand a suggest function across the client boundary. `source` names where the
@@ -12,13 +13,13 @@ import SuggestInput, { type Suggestion } from '@/components/SuggestInput';
 // submitOnPick is off), or
 // opens the item's own page when it has one (a topic, a keyword with go).
 
-export type SuggestItem = { value: string; label?: string; hint?: string; media?: string; href?: string };
+export type SuggestItem = { value: string; label?: string; hint?: string; media?: string; iconUrl?: string | null; href?: string };
 export type SuggestSource = { kind: 'tags'; go?: boolean };
 type TagRow = { slug: string; label: string };
 async function suggestionsFor(source: SuggestSource, typed: string, signal: AbortSignal): Promise<SuggestItem[]> {
   const response = await fetch('/api/overview', { signal });
   if (!response.ok) return [];
-  const data: { tags?: TagRow[]; blogs?: Array<{ slug: string; name: string }> } = await response.json();
+  const data: { tags?: TagRow[]; blogs?: Array<{ slug: string; name: string; iconUrl?: unknown }> } = await response.json();
   const needle = typed.toLocaleLowerCase();
   const blogs: SuggestItem[] = (data.blogs ?? [])
     .filter((blog) => blog.name.toLocaleLowerCase().includes(needle))
@@ -26,6 +27,7 @@ async function suggestionsFor(source: SuggestSource, typed: string, signal: Abor
     .map((blog) => ({
       value: blog.name,
       media: blog.slug,
+      iconUrl: suppliedIconUrl(blog.iconUrl),
       hint: '部落格',
       href: source.go ? `/blogs/${encodeURIComponent(blog.slug)}/` : undefined,
     }));
@@ -77,7 +79,7 @@ export default function FormSuggestInput({
         key: item.href ?? item.value,
         label: item.label ?? item.value,
         hint: item.hint,
-        icon: item.media ? <BlogIcon media={item.media} title={item.label ?? item.value} /> : undefined,
+        icon: item.media ? <BlogIcon media={item.media} iconUrl={item.iconUrl} title={item.label ?? item.value} /> : undefined,
       }));
     },
     [sourceKey],

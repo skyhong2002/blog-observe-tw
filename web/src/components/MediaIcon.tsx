@@ -2,7 +2,7 @@
 
 import Image from 'next/image';
 import { useState, useSyncExternalStore } from 'react';
-import { localMediaIcon, mediaIconClass, mediaIcons } from '@/lib/media-icons';
+import { localMediaIcon, mediaIconClass, mediaIconSrc, mediaIcons } from '@/lib/media-icons';
 
 // One request for all mounted icons; monthly refreshes need no Next rebuild.
 let currentIcons = mediaIcons;
@@ -34,15 +34,19 @@ const getServerIcons = () => mediaIcons;
 
 // The single place that turns a media id into its mark. Logos live in
 // web/public/favicons (manifest: app/data/favicon-local.json); outlets without
-// a reviewed logo show their first character so rows stay aligned.
+// a reviewed logo show their first character so rows stay aligned. `iconUrl`
+// (from the payload) lets server rendering show the logo before the manifest loads.
 export default function MediaIcon({
   media,
+  iconUrl,
   title,
   size = 14,
   rem = false,
   className = '',
 }: {
   media: string;
+  /** The payload's icon URL; null or absent leaves only the /api/icons manifest. */
+  iconUrl?: string | null;
   title?: string | null;
   size?: number;
   /** Size in rem (size / 16), for layouts that scale with the root font size. */
@@ -51,8 +55,7 @@ export default function MediaIcon({
 }) {
   const icons = useSyncExternalStore(subscribe, getIcons, getServerIcons);
   const [failed, setFailed] = useState<string[]>([]);
-  const local = localMediaIcon(media, icons);
-  const src = local && !failed.includes(local) ? local : null;
+  const src = mediaIconSrc(media, icons, iconUrl, failed);
   const px = (n: number) => (rem ? `${n / 16}rem` : n);
   const box = { width: px(size), height: px(size) };
   if (src) {
@@ -67,7 +70,7 @@ export default function MediaIcon({
         referrerPolicy="no-referrer"
         onError={() => setFailed((previous) => [...previous, src])}
         style={box}
-        className={`shrink-0 rounded-sm object-contain ${mediaIconClass(media, icons)} ${className}`}
+        className={`shrink-0 rounded-sm object-contain ${src === localMediaIcon(media, icons) ? mediaIconClass(media, icons) : ''} ${className}`}
       />
     );
   }
