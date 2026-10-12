@@ -166,6 +166,20 @@ describe('window vocabulary public article API', () => {
       new TagArticleSource(async () => Response.json({ ...page, articles: [{ ...article, tags: ['bad\u0000tag'] }] })).page(window, null),
     ).rejects.toThrow('terms');
   });
+  it('accepts real-world boundary zero-width spacing while retaining source labels and rejecting embedded controls', async () => {
+    const rawTags = ['\u200B洛杉磯道奇', ' 旅行\uFEFF'];
+    const source = new TagArticleSource(async () => Response.json({ ...page, articles: [{ ...article, tags: rawTags }] }));
+    expect((await source.page(window, null)).articles[0]).toMatchObject({
+      tags: ['洛杉磯道奇', '旅行'],
+      rawTags,
+      tagNormalization: 'boundary-whitespace-v1',
+    });
+    for (const tags of [['洛\u200B杉磯'], ['\u200B'], [42], ['bad\u0000tag']]) {
+      await expect(
+        new TagArticleSource(async () => Response.json({ ...page, articles: [{ ...article, tags }] })).page(window, null),
+      ).rejects.toThrow('terms');
+    }
+  });
   it('default disabled sync makes zero network or database writes', async () => {
     const pool = { getConnection: vi.fn(), query: vi.fn() } as unknown as Pool;
     expect(await syncVocabulary(pool, { enabled: false })).toEqual({ status: 'disabled' });

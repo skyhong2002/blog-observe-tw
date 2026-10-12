@@ -8,6 +8,8 @@ export interface SourceArticle {
   media: string;
   publishedAt: string;
   tags: string[];
+  rawTags?: string[];
+  tagNormalization?: 'boundary-whitespace-v1';
 }
 export interface ArticlePage {
   articles: SourceArticle[];

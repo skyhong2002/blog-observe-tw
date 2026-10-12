@@ -44,14 +44,22 @@ export class TagArticleSource implements ArticleSource {
         throw new Error('Invalid tag source article');
       const at = Date.parse(a.publishedAt);
       if (!(at >= Date.parse(window.since) && at < Date.parse(window.until))) throw new Error('Tag article outside requested window');
-      if (
-        a.tags.length > 500 ||
-        !a.tags.every(
-          (t) => typeof t === 'string' && t.trim().length > 0 && t === t.trim() && !/[\p{Cc}\p{Cf}]/u.test(t) && t.length <= 240,
-        )
-      )
+      // A live source tag may contain a leading zero-width space/BOM from
+      // editorial copy/paste. Normalize only boundaries, preserve raw labels
+      // in staging, and continue rejecting embedded controls and malformed data.
+      if (a.tags.length > 500 || !a.tags.every((t) => typeof t === 'string' && t.length <= 240))
         throw new Error('Invalid tag source terms');
-      return { id: String(a.id), media: a.media, publishedAt: a.publishedAt, tags: a.tags as string[] };
+      const rawTags = a.tags as string[];
+      const tags = rawTags.map((t) => t.replace(/^[\s\u200B\uFEFF]+|[\s\u200B\uFEFF]+$/gu, ''));
+      if (!tags.every((t) => t.length > 0 && !/[\p{Cc}\p{Cf}]/u.test(t))) throw new Error('Invalid tag source terms');
+      const changed = tags.some((t, i) => t !== rawTags[i]);
+      return {
+        id: String(a.id),
+        media: a.media,
+        publishedAt: a.publishedAt,
+        tags,
+        ...(changed ? { rawTags, tagNormalization: 'boundary-whitespace-v1' as const } : {}),
+      };
     });
     const nextCursor = data.nextCursor as string | null;
     if (nextCursor && (!/^\d{1,15}_\d{1,19}$/.test(nextCursor) || !articles.length)) throw new Error('Invalid continuation cursor');
