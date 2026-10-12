@@ -89,20 +89,43 @@ describe('bounded private-body search', () => {
     expect(JSON.stringify(result)).not.toContain('PRIVATE_BODY_TAIL');
     expect(JSON.stringify(result)).not.toContain('secret');
   });
-  it('coalesces search requests without upstream network', async () => {
-    const query = vi
-      .fn()
-      .mockResolvedValueOnce([[{ id: 1 }]])
-      .mockResolvedValueOnce([[]]);
+  it('gives same-key requests fresh reads and preserves the two-reader capacity limit', async () => {
+    const bothEntered = Promise.withResolvers<void>();
+    const release = Promise.withResolvers<void>();
+    let scopes = 0;
+    const query = vi.fn(async (sql: string) => {
+      if (sql.includes('SELECT p.id FROM posts')) {
+        scopes++;
+        if (scopes === 2) bothEntered.resolve();
+        await release.promise;
+        return [[{ id: 1 }]];
+      }
+      return [[]];
+    });
     const app = Fastify();
     registerSearchRoutes(app, { query } as unknown as Pool);
     try {
-      const results = await Promise.all(Array.from({ length: 12 }, () => app.inject('/api/search?q=旅行')));
-      expect(results.every((r) => r.statusCode === 200)).toBe(true);
+      // .then starts injection before waiting at the deterministic barrier.
+      const first = app.inject('/api/search?q=旅行').then((response) => response);
+      const second = app.inject('/api/search?q=旅行').then((response) => response);
+      await bothEntered.promise;
+      expect(scopes).toBe(2); // A shared in-flight promise cannot satisfy this barrier.
+      const busy = await app.inject('/api/search?q=旅行');
+      expect(busy.statusCode).toBe(503);
+      expect(busy.headers['cache-control']).toBe('no-store');
       expect(query).toHaveBeenCalledTimes(2);
+      release.resolve();
+      const results = await Promise.all([first, second]);
+      expect(results.every((r) => r.statusCode === 200)).toBe(true);
+      expect(query).toHaveBeenCalledTimes(4);
       expect(results[0].json()).toMatchObject({ cacheSeconds: 0, coverage: { type: 'recent-indexed-posts' } });
+      const next = await app.inject('/api/search?q=旅行');
+      expect(next.statusCode).toBe(200);
+      expect(next.headers['cache-control']).toBe('no-store');
+      expect(query).toHaveBeenCalledTimes(6); // No completed DTO is reused either.
       expect((await app.inject('/api/search?q=x&limit=100')).statusCode).toBe(400);
     } finally {
+      release.resolve();
       await app.close();
     }
   });
