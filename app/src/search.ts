@@ -17,7 +17,7 @@ export function searchFilters(query: Record<string, unknown>) {
 }
 export async function loadSearch(pool: Pool, filters: NonNullable<ReturnType<typeof searchFilters>>) {
   const { q, page, limit, blog } = filters;
-  const scope = `SELECT p.id FROM posts p JOIN blogs b ON b.id=p.blog_id WHERE b.status<>'moved' ${blog ? 'AND b.slug=?' : ''} ORDER BY p.id DESC LIMIT ${SEARCH_SCOPE_LIMIT + 1}`;
+  const scope = `SELECT p.id FROM posts p JOIN blogs b ON b.id=p.blog_id WHERE b.status='verified' AND (p.published_at IS NULL OR p.published_at<=UTC_TIMESTAMP()) ${blog ? 'AND b.slug=?' : ''} ORDER BY p.id DESC LIMIT ${SEARCH_SCOPE_LIMIT + 1}`;
   const [scopeRows] = await pool.query<RowDataPacket[]>(scope, blog ? [blog] : []);
   const ids = scopeRows.slice(0, SEARCH_SCOPE_LIMIT).map((row) => Number(row.id));
   if (!ids.length)
@@ -34,7 +34,7 @@ export async function loadSearch(pool: Pool, filters: NonNullable<ReturnType<typ
     CASE WHEN ${body} LIKE ? ESCAPE '=' THEN SUBSTRING(${body},GREATEST(1,LOCATE(?,${body})-80),700) ELSE LEFT(p.summary,1400) END searchExcerpt,
     CASE WHEN ${body} LIKE ? ESCAPE '=' THEN 'body' ELSE 'metadata' END matchSource
     FROM posts p JOIN blogs b ON b.id=p.blog_id LEFT JOIN content_post_bodies c ON c.post_id=p.id
-    WHERE p.id IN (?) AND b.status<>'moved' AND (
+    WHERE p.id IN (?) AND b.status='verified' AND (p.published_at IS NULL OR p.published_at<=UTC_TIMESTAMP()) AND (
       p.title LIKE ? ESCAPE '=' OR p.summary LIKE ? ESCAPE '=' OR b.name LIKE ? ESCAPE '=' OR ${body} LIKE ? ESCAPE '='
       OR EXISTS(SELECT 1 FROM post_tags pt JOIN tags t ON t.id=pt.tag_id WHERE pt.post_id=p.id AND pt.status='active' AND t.status='active' AND t.visibility='public' AND t.label LIKE ? ESCAPE '='))
     ORDER BY p.id DESC LIMIT ? OFFSET ?`,
@@ -59,13 +59,13 @@ export function registerSearchRoutes(app: FastifyInstance, pool: Pool) {
   app.get<{ Querystring: Record<string, unknown> }>('/api/search', async (req, reply) => {
     const filters = searchFilters(req.query);
     if (!filters) return reply.code(400).send({ error: 'invalid_search', limits: { queryCharacters: 80, page: 50, pageSize: 20 } });
-    reply.header('cache-control', 'public, max-age=60');
+    reply.header('cache-control', 'no-store');
     try {
       return await cache.get(JSON.stringify(filters), async () => {
         if (active >= 2) throw Object.assign(Error('search_busy'), { statusCode: 503 });
         active++;
         try {
-          return { ...(await loadSearch(pool, filters)), query: filters.q, generatedAt: new Date().toISOString(), cacheSeconds: 60 };
+          return { ...(await loadSearch(pool, filters)), query: filters.q, generatedAt: new Date().toISOString(), cacheSeconds: 0 };
         } finally {
           active--;
         }

@@ -77,6 +77,10 @@ describe('bounded private-body search', () => {
       ]);
     const result = await loadSearch({ query } as unknown as Pool, { q: '10%_=', page: 1, limit: 20, blog: '' });
     expect(query.mock.calls[0][0]).toContain('LIMIT 1001');
+    for (const [sql] of query.mock.calls) {
+      expect(sql).toContain("b.status='verified'");
+      expect(sql).toContain('(p.published_at IS NULL OR p.published_at<=UTC_TIMESTAMP())');
+    }
     expect(query.mock.calls[1][0]).toContain('SUBSTRING(');
     expect(query.mock.calls[1][0]).not.toContain('c.*');
     expect(query.mock.calls[1][1][0]).toBe('%10=%=_==%');
@@ -96,7 +100,7 @@ describe('bounded private-body search', () => {
       const results = await Promise.all(Array.from({ length: 12 }, () => app.inject('/api/search?q=旅行')));
       expect(results.every((r) => r.statusCode === 200)).toBe(true);
       expect(query).toHaveBeenCalledTimes(2);
-      expect(results[0].json()).toMatchObject({ cacheSeconds: 60, coverage: { type: 'recent-indexed-posts' } });
+      expect(results[0].json()).toMatchObject({ cacheSeconds: 0, coverage: { type: 'recent-indexed-posts' } });
       expect((await app.inject('/api/search?q=x&limit=100')).statusCode).toBe(400);
     } finally {
       await app.close();

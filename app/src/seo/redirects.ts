@@ -54,7 +54,7 @@ export function createPublicPageRedirect(pool: Pool, { legacyUiPaths = false } =
       }
       return false;
     }
-    reply.header('cache-control', 'public, max-age=300, s-maxage=300').redirect(page.canonicalPath + route.query, 301);
+    reply.header('cache-control', 'no-store').redirect(page.canonicalPath + route.query, 301);
     return true;
   };
   return Object.assign(redirect, { uiPath: (request: FastifyRequest) => upstreamPaths.get(request) });

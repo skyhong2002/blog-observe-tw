@@ -25,8 +25,8 @@ const literal = (value: string) => `'${value.replaceAll("'", "''")}'`;
 // Collapse title/body evidence per article before weighting; canonical labels merge source aliases.
 export const evidence = (
   blogScoped = false,
-  verifiedOnly = true,
-) => `scoped_posts AS (SELECT p.id,p.blog_id,p.published_at,p.content_hash FROM posts p JOIN blogs b ON b.id=p.blog_id WHERE p.published_at>=? AND p.published_at<=? AND ${verifiedOnly ? "b.status='verified'" : "b.status<>'moved'"} ${blogScoped ? 'AND b.slug=?' : ''}), evidence AS (
+  _verifiedOnly = true,
+) => `scoped_posts AS (SELECT p.id,p.blog_id,p.published_at,p.content_hash FROM posts p JOIN blogs b ON b.id=p.blog_id WHERE p.published_at>=? AND p.published_at<=? AND b.status='verified' ${blogScoped ? 'AND b.slug=?' : ''}), evidence AS (
  SELECT p.id post_id,p.blog_id,p.published_at,CONCAT('tag:',t.id) topic_id,t.label,'tag-vocabulary' source,MAX(m.source='title') title_hit
  FROM scoped_posts p JOIN topic_matches_v3 m ON m.post_id=p.id JOIN topic_current c ON c.snapshot_id=m.snapshot_id AND c.source=${literal(SOURCE)}
  JOIN topic_canonical_terms_v3 t ON t.snapshot_id=m.snapshot_id AND t.id=m.term_id
@@ -332,6 +332,10 @@ export function registerTopicRoutes(app: FastifyInstance, pool: Pool) {
     const days = daysValue(req.query.days);
     if (!days) return reply.code(400).send({ error: 'invalid_days' });
     if (req.params.slug.length > 255) return reply.code(400).send({ error: 'invalid_slug' });
+    const [[blog]] = await pool.query<RowDataPacket[]>("SELECT id FROM blogs WHERE slug=? AND status='verified' LIMIT 1", [
+      req.params.slug,
+    ]);
+    if (!blog) return reply.code(404).send({ error: 'blog_not_found' });
     return cache.get(`blog:${days}:${req.params.slug}`, async () => ({
       ...metadata(),
       days,

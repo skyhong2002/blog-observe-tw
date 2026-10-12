@@ -54,7 +54,7 @@ describe('public API gateway policy', () => {
   });
   it('keeps anonymous reads public, credentials/cookies private, errors uncached, HEAD bodyless', async () => {
     const { app } = await fixture();
-    expect((await app.inject('/api/v1/articles')).headers['cache-control']).toContain('s-maxage=120');
+    expect((await app.inject('/api/v1/articles')).headers['cache-control']).toBe('no-store');
     for (const headers of [{ 'x-api-key': 'valid' }, { authorization: 'Bearer irrelevant' }, { cookie: 'blog_session=fake' }]) {
       expect((await app.inject({ url: '/api/v1/articles', headers })).headers['cache-control']).toBe('private, no-store');
     }

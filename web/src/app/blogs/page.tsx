@@ -3,10 +3,10 @@ import BlogCatalogView, { BlogCatalogFromUrl } from '@/components/public/BlogCat
 import { catalog } from '@/lib/public-api';
 import { staticPageMetadata } from '@/lib/seo';
 
-// ISR (PUBLIC_REVALIDATE_SECONDS): the prerendered page is the unfiltered first
+// Rendered per request (no-store reads, public-read.ts): the server page is the unfiltered first
 // page; ?q=&category=&status=&sort=&dir=&page=&limit= are answered in the
 // browser from the same public /api/catalog.
-export const revalidate = 120;
+export const dynamic = 'force-dynamic';
 export const metadata = staticPageMetadata('/blogs/');
 
 export default async function BlogsPage() {

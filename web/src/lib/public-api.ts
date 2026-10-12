@@ -7,20 +7,19 @@ import { PublicGatewayError, readPublic } from './public-read';
 import { gatewayOrigin } from './server-gateway';
 
 /**
- * Shared reads for ISR pages: GETs of the public, cookie-free gateway paths in
- * public-paths.ts, kept in Next's fetch cache for PUBLIC_REVALIDATE_SECONDS
- * (only 200s are stored). There is no init or header parameter. Topic detail
- * and topic page-registry reads are the exception: public-read.ts sends them
- * with `cache: 'no-store'` (NO_STORE_KINDS), and /topics/[id] is force-dynamic.
+ * Reads for the public pages: GETs of the public, cookie-free gateway paths in
+ * public-paths.ts, every one `cache: 'no-store'` (public-read.ts), for pages
+ * that are all force-dynamic. Nothing is kept across requests: whether an
+ * article may be shown is the gateway's answer to this request. There is no
+ * init or header parameter.
  *
  * Failures, including a 200 missing the fields public-contracts.ts requires,
- * throw instead of returning empty data (rules in public-read.ts): a
- * background regeneration that throws keeps the last good page, and a first
- * render that throws is an uncached error. Only publicJsonOrNull turns a 404,
- * from a path where 404 means "no such thing", into data (null).
+ * throw instead of returning empty data (rules in public-read.ts), so the
+ * request fails rather than rendering a wrong page. Only publicJsonOrNull
+ * turns a 404, from a path where 404 means "no such thing", into data (null).
  */
 
-/** One read per path per render (generateMetadata and the page share it); React's cache never spans requests. */
+/** One read per path per request (generateMetadata and the page share it); React's cache never spans requests. */
 const read = cache((path: string) => readPublic(gatewayOrigin(), path));
 
 /** A public read that must succeed; any non-2xx (404 included) throws. */

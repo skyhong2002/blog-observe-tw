@@ -87,7 +87,7 @@ export type Catalog = {
   };
 };
 // Types and formatting only, so client components may import this file. Gateway
-// reads live in server-only modules: public-api.ts (ISR) and server-gateway.ts (private).
+// reads live in server-only modules: public-api.ts (public, no-store) and server-gateway.ts (private).
 export function taipei(value?: string | null) {
   return value && Number.isFinite(Date.parse(value))
     ? new Date(value).toLocaleString('zh-TW', {

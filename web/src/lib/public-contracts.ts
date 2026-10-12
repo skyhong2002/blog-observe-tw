@@ -2,7 +2,7 @@
  * The fields public pages need from each public gateway payload, checked on
  * every 200 by the server (public-read.ts) and the browser (public-loader.ts).
  * A 200 whose shape is wrong is a failure, not an empty page or a 404: on the
- * server it throws, so ISR keeps the last good page.
+ * server it throws, so the request fails instead of rendering empty data.
  *
  * Shapes follow the gateway routes (app/src/overview.js, catalog.js,
  * catalog-authors.js, search.ts, topics/routes.ts, relations/routes.ts,

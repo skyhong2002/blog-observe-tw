@@ -93,10 +93,12 @@ export async function runPublicRoutesIntegration(pool: Pool) {
     ]);
     blogs.push(seed.insertId);
     assert.equal((await backfillPublicRoutes(pool, { kind: 'blog', afterId: String(seed.insertId - 1), missingOnly: true })).processed, 1);
+    assert.equal(await resolvePublicPage(pool, 'blog', `seed-${suffix}`), null, 'unverified seed is not publicly addressable');
+    await pool.execute("UPDATE blogs SET status='verified' WHERE id=?", [seed.insertId]);
     assert.equal(
       (await resolvePublicPage(pool, 'blog', `seed-${suffix}`))?.stableId,
       `seed-${suffix}`,
-      'pre-existing seed page remains addressable',
+      'verification restores the same stable registry key',
     );
     assert.equal((await backfillPublicRoutes(pool, { kind: 'blog', afterId: String(seed.insertId - 1), missingOnly: true })).processed, 0);
     const [tag] = await pool.execute<ResultSetHeader>(

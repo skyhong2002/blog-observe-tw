@@ -23,7 +23,7 @@ describe('complete author catalog', () => {
     expect(pool.query.mock.calls[2][0]).toContain('ORDER BY a.display_name,b.name,a.id,b.id LIMIT ? OFFSET ?');
     expect(
       pool.query.mock.calls.every(
-        ([sql]) => sql.includes("ba.status='active'") && sql.includes("a.status <> 'rejected'") && sql.includes("b.status <> 'moved'"),
+        ([sql]) => sql.includes("ba.status='active'") && sql.includes("a.status <> 'rejected'") && sql.includes("b.status='verified'"),
       ),
     ).toBe(true);
   });

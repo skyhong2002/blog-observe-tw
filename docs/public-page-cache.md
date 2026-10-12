@@ -1,185 +1,27 @@
-# Public page cache (ISR)
+# 公開內容的撤銷與快取
 
-Public pages are prerendered and regenerated in the background every
-**120 seconds** (`PUBLIC_REVALIDATE_SECONDS`, `web/src/lib/public-paths.ts`).
-Next.js answers them from its ISR cache with
-`Cache-Control: s-maxage=120, stale-while-revalidate=180`, which the gateway
-passes through. The 180 s is `expireTime: 300` in `web/next.config.ts` minus
-the 120 s revalidate; without it Next 16 defaults `expireTime` to one year
-(`stale-while-revalidate=31535880`). Nothing is forced: the cache headers come from real ISR
-entries in `.next/prerender-manifest.json`.
+2026-10-13 安全修正：暫停所有含文章／部落格資料頁的 ISR。舊版 ISR 120 秒加 SWR 180 秒及 API／SEO 快取不能滿足撤銷時限，不能再拿舊設計作為正式快取契約。
 
-## Edge (Cloudflare) and what the HTML may contain
+| 層 | 目前保存時間 | 失效方式 |
+| --- | --- | --- |
+| 公開 HTML：首頁、文章、來源、話題、作者、標籤、關係、流量 | 0 | Next force-dynamic，每次請求重讀 |
+| Next gateway fetch / React | 0 | fetch no-store；React memoize 只限同一次 render |
+| 瀏覽器資料 loader／搜尋建議 | 0 | 不存 Map/localStorage，fetch no-store；分頁再讀 |
+| gateway API／SEO 結果 | 0 | 只合併同時進行的請求，不保留已完成結果 |
+| 關係資料投影 | 0（公開讀） | 每次讀 SQL；worker 的診斷 snapshot 不供公開回應 |
+| sitemap | 0 | 重新查公開證據；HTTP no-store |
+| edge／Cloudflare 可變內容 | 0 | private,no-store；剝除上游 CDN override，既有 CF 物件另驗證到期 |
 
-The deployed Cloudflare rule caches only the blog host's `GET` without a
-query string, without `Cookie` and without `Authorization`, and not RSC
-requests; for those it honours the origin's cache headers. No other edge rule
-is needed for this change. That works because:
+不使用 on-demand revalidate 或 Cloudflare tag purge。這是撤銷正確性優先的暫時策略；恢復 ISR 前必須有經驗證的主動撤銷機制，不能僅把每層 TTL 各設成 60 秒。
 
-- Prerendered HTML is the same for every visitor. The layout reads no cookies
-  or headers; the account menu asks `/auth/me` in the browser. The home page
-  has no personal content.
-- The query never changes the HTML, so a URL with a query (which the edge does
-  not cache anyway) gets the same document as without.
-- Private responses (`/auth/*`, `/me/*`, `/api/me/*`, `/api/admin/*`) are
-  `private, no-store` from the gateway with a complete `Vary`; they are never
-  read by `public-api.ts` and never part of an ISR page.
-- `/my/` is a generic static shell (no visitor data, no session); the
-  follows, feed and OPML are read in the browser from private, no-store
-  gateway responses. Session data is never rendered into ISR output.
+公開內容一律要求站點 verified、文章仍存在、發布時間不在未來。隱藏其中一站不能讓同話題另一站消失。真實不存在與隱藏回 404，累積話題所有證據撤銷回 410。
 
-## Freshness
+靜態 JS/CSS 與 favicon 不含文章正文、標題或文章清單，維持靜態資產快取；favicon 原始檔不因隱藏站點而刪除。API 的 favicon manifest 仍是網站圖示資產目錄，不代表站點目前可公開。
 
-Freshness is layered, so 120 s is the usual refresh interval, not a hard
-real-time guarantee:
+已下載、複製或離線保存的內容無法由伺服器追回。已開啟畫面不持續輪詢，回到頁籤、bfcache 還原與上一頁／下一頁會重新讀取。驗收時間指資料撤銷 commit 後的新 HTTP／SSR 請求；不能把它冒稱為所有已開啟離線畫面同時被清空。
 
-1. Gateway responses carry their own short caches (for example
-   `/api/overview` and `/api/catalog` `max-age=30`, topics/relations/search
-   `60` or in-process projections of up to 5 minutes).
-2. Next's fetch cache keeps each public read for 120 s; during a page
-   regeneration a stale entry is fetched again in the foreground.
-3. The ISR page is regenerated in the background on the first request after
-   120 s; that request and any others during regeneration get the previous
-   page (`stale-while-revalidate`).
-4. The edge honours the origin headers: fresh for 120 s, then it may serve
-   the stale copy for up to 180 s more while it revalidates.
-   Edge and ISR staleness windows stack on top of the data-layer TTLs above,
-   so a change can take several minutes to reach readers.
-5. In the browser, query answers are remembered for 120 s (below).
+## 隔離驗收
 
-A failed regeneration keeps the previous page, so during gateway trouble a
-page can be older than 120 s; that is preferred over an empty one.
+`tests/integration/content-visibility.mjs` 強制使用 18169 的隨機 disposable DB。兩站共用話題、另一個僅第一站有文的話題；暖快取兩次 → 隱藏 → 恢復並重新暖快取 → 刪除。16 個端點核對標題、文章 ID、另一站保留、404/410/no-store。SSR 另以正式 Next build 連同一隔離 DB 驗證首頁、文章、來源、目錄、話題。
 
-## Which pages
-
-| Route | Rendering | Prerendered content | Read in the browser |
-| --- | --- | --- | --- |
-| `/` | ISR 120 s | overview, 30-day topics | — |
-| `/ranking/` | ISR 120 s | overview tags | — |
-| `/traffic/` | ISR 120 s | all listed blogs' traffic | table state `sort, month, q, state, view, page, compare` (no refetch) |
-| `/blogs/` | ISR 120 s | catalog page 1, default sort | `q, category, status, sort, dir, page, limit` → `/api/catalog` |
-| `/authors/` | ISR 120 s | authors page 1 | `author, page, limit` → `/api/catalog/authors` |
-| `/articles/` | ISR 120 s | latest posts | `q, page, blog` → `/api/search` |
-| `/tags/` | ISR 120 s | tag list | `tag` → `/api/tags/:slug` |
-| `/topics/` | ISR 120 s | 30-day ranking | `days=7\|90` → `/api/topics` |
-| `/relations/` | ISR 120 s | 90-day map | `days=7\|30` → `/api/relations` |
-| `/blogs/[slug]/` | ISR 120 s, on demand | profile, sidebar, relations, topics, inference | in-page `q` filter (no fetch) |
-| `/topics/[id]/` | ISR 120 s, on demand | 30-day topic | `days=7\|90` → `/api/topics/:id` |
-| `/about/`, `/my/` | static shell (ISR 120 s via the footer's catalog total) | no visitor data | `/my/` reads the reader's follows with credentials, uncached |
-| `/login/` | dynamic | — | reads `?error=` on the server; cheap, auth flow |
-| `/admin/`, `/admin/discovery/` | dynamic (`force-dynamic`) | — | admin console reads its own APIs, uncached |
-| `/healthz` | dynamic | — | — |
-
-Dynamic routes return `[]` from `generateStaticParams` with
-`dynamicParams = true`: nothing is fetched or rendered for them at build, and
-each slug/id is rendered on its first request and then cached like the others.
-Only slug-shaped blog segments and the gateway's topic id shapes are looked up;
-anything else is a 404 without a gateway call, which keeps junk URLs from
-filling the cache with lookups.
-
-## Server reads: `public-api.ts`
-
-`web/src/lib/public-api.ts` (`import 'server-only'`) is the only way server
-components read the gateway:
-
-- GET only, fixed init (`accept: application/json`, `redirect: 'error'`,
-  10 s timeout, `next.revalidate = 120`); there is no init/header parameter,
-  so no Cookie or Authorization can reach a shared response.
-- Only paths `isPublicApiPath` allows: `/api/overview`, `/api/catalog`,
-  `/api/catalog/authors`, `/api/search`, `/api/topics[/:id]`,
-  `/api/relations`, `/api/traffic`, `/api/tags/:slug`, `/api/blogs/:slug` and
-  its `relations|topics|inference|content`, each with a fixed set of query
-  keys. `/api/me`, `/api/admin`, `/auth`, `/me`, reader paths, encoded
-  slashes and dot segments are refused before any request.
-- 2xx → JSON, which must pass the payload contract for that path
-  (`public-contracts.ts`, below). 404 → `publicJsonOrNull` returns `null`
-  (only a real HTTP 404: a missing blog becomes the page's 404; a blog without
-  inference/content shows its existing note). 502/503/504 → one retry after
-  2 s. Anything else, network failure, unreadable JSON or a 200 of the wrong
-  shape → `PublicGatewayError` is thrown. Bodies that are not read (404,
-  retry, error) are cancelled so they do not hold the connection.
-- Throwing is deliberate: a background regeneration that throws keeps serving
-  the last good page, and a first render that throws is an uncached error.
-  Gateway trouble is never cached as an empty list or a 404. Validation runs
-  inside the shared read, before any component could catch it.
-- `BlogContentSources` only asks for slugs the content route accepts
-  (`^[a-z0-9][a-z0-9-]{0,199}$`; it answers 400 to others) and shows its
-  "no data" note for the rest.
-
-The rules live in `public-read.ts` (pure, tested with a fake fetch). The old
-no-store `gateway()` moved to `server-gateway.ts` (`server-only`) for private
-server reads; nothing public uses it. `api.ts` now holds only types and
-formatting, so client components can import it without bundling the internal
-origin.
-
-The footer's collection total is best-effort: it uses the public catalog read
-but swallows failures, since it is on every page including private ones.
-
-## Payload contracts: `public-contracts.ts`
-
-One check per public path kind, shared by the server read and the browser
-loader, written from the gateway routes in `app/src` (overview, catalog,
-authors, search, topics, topic detail, relations, traffic, tag, blog and the
-blog's relations/topics/inference/content). They require the containers and
-keys the pages index into (`blog.slug/name`, `topic.id/label`, `items`,
-`coverage.nonBodyLinks`, `pagination`, …) with the right types, never that a
-list has rows. Valid empty answers — no posts, an empty topic list, no
-relations, no traffic, `profile: null`, `vocabulary.status: 'unavailable'`,
-content `disabled`/`pending` — stay normal pages; `{}`, `null`, arrays, text
-or a wrong-typed container are failures.
-
-## Browser reads: query pages
-
-Prerendered HTML never depends on the query, so a query cannot poison the
-cache and no proxy/rewrite is involved. Each query page renders:
-
-```tsx
-<Suspense fallback={<XView …baseline />}>
-  <XFromUrl baseline={baseline} />
-</Suspense>
-```
-
-- The fallback is the readable baseline, so the first HTML is never blank.
-  The view is a client component, so the baseline data is sent once.
-- `XFromUrl` reads `useSearchParams()`. Without a query it shows the
-  baseline; with one it calls `usePublicJson(path, parse)`
-  (`use-public-json.ts`, logic in `public-loader.ts`): same-origin,
-  `credentials: 'omit'`, whitelisted paths only, payload contract checked.
-  Until the answer for the current path arrives the view is `pending` (frame
-  and filters shown, rows hidden).
-- Each read has a 10 s timeout, separate from the abort used when the query
-  changes or the view unmounts: a timeout shows the view's error state, never
-  an endless pending. Each run captures its own parser, and an aborted or
-  superseded run neither settles nor writes the cache, so an older query
-  answering or parsing late never replaces a newer one.
-- Answers are remembered for 120 s, at most 24 paths (least recently used
-  out), so back/forward is instant while fresh; going back to a query whose
-  answer has expired reads it again. A page left open does not poll.
-- URLs, links, sorting, paging, 7/30/90 tabs, tag/author ids and full-text
-  search keep their old shape, so they stay shareable.
-- Query results need JavaScript: without it a query URL shows the baseline
-  (and the edge does not cache query URLs). An invalid `?author=` now shows
-  "找不到這位作者" instead of an HTTP 404.
-
-## Checking
-
-```sh
-BLOG_GATEWAY_INTERNAL_URL=http://127.0.0.1:18167 npm --prefix web run build
-# Route table: ○ / ● with "Revalidate 2m"; ƒ only for /login, /admin, /healthz.
-jq '.routes | keys' web/.next/prerender-manifest.json
-jq '.dynamicRoutes | keys' web/.next/prerender-manifest.json   # /blogs/[slug], /topics/[id]
-```
-
-Tests:
-
-- `web/test/public-cache.test.ts`: whitelist, read rules (status handling,
-  retry, body cancel, wrong-shaped 200s throw, valid empty answers pass),
-  route contract.
-- `web/test/public-contracts.test.ts`: every kind has a contract; valid empty
-  payloads pass; `{}` / `null` / wrong types fail.
-- `web/test/public-loader.test.ts`: TTL and LRU eviction, timeout, 404 vs
-  error, aborted and superseded reads never settle or cache (injected clock,
-  timers and fetch).
-- `web/test/public-query.test.ts`: URL query logic, including a comparison
-  with the gateway's own `catalogFilters`.
-- Fixtures shaped after the gateway routes: `web/test/public-payloads.ts`.
+CF 驗收必須是正常無 Cookie／query／Authorization 的 GET /，等既有 HIT／Age 消失，連續兩次確認 no-store 與 BYPASS／DYNAMIC。加 query、RSC 或 Cookie 的 bypass 不能當作舊 CF 物件已撤銷的證據；Cloudflare 沒有掛接隔離資料库，不能宣稱直接對 CF 做了 fixture 隱藏測試。

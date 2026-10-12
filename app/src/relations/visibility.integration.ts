@@ -88,7 +88,7 @@ export async function runRelationVisibilityIntegration(pool: Pool) {
     await registerRelationRoutes(app, pool);
     const baseline = (await app.inject('/api/relations?days=90')).json();
     check(edge(baseline, a, b)?.count === 2 && edge(baseline, a, b)?.share === 2 / 3 && edge(baseline, a, b)?.mutual);
-    // Pause a real SQL snapshot build after its aggregation but before CAS; a hide must win.
+    // Pause live SQL after its aggregation; the revision fence must recheck a concurrent hide.
     let release!: () => void, arrived!: () => void;
     const blocked = new Promise<void>((r) => (release = r)),
       reached = new Promise<void>((r) => (arrived = r));
@@ -115,10 +115,8 @@ export async function runRelationVisibilityIntegration(pool: Pool) {
     await override(postIds[0], bUrl + 'one', 'body', true);
     release();
     check(edge(await racing, a, b)?.count === 1);
-    const [[currentSnapshot]] = await pool.query<RowDataPacket[]>('SELECT payload FROM relation_snapshots WHERE days=90');
-    check(
-      edge(typeof currentSnapshot.payload === 'string' ? JSON.parse(currentSnapshot.payload) : currentSnapshot.payload, a, b)?.count === 1,
-    );
+    const [[currentSnapshot]] = await pool.query<RowDataPacket[]>('SELECT COUNT(*) count FROM relation_snapshots WHERE days=90');
+    check(Number(currentSnapshot.count) === 0); // Public reads no longer write/cache worker DTOs.
 
     const hidden = (await app.inject('/api/relations?days=90')).json();
     check(edge(hidden, a, b)?.count === 1 && edge(hidden, a, b)?.share === 0.5 && edge(hidden, a, c)?.share === 0.5);
@@ -126,7 +124,7 @@ export async function runRelationVisibilityIntegration(pool: Pool) {
     const incomingProfile = (await app.inject(`/api/blogs/visibility-b-${suffix}/relations`)).json();
     check(incomingProfile.incoming.find((e: { sourceBlogId: number; share: number }) => e.sourceBlogId === a)?.share === 0.5);
     const [[snapshot]] = await pool.query<RowDataPacket[]>('SELECT COUNT(*) count FROM relation_snapshots');
-    check(Number(snapshot.count) > 0);
+    check(Number(snapshot.count) === 0);
     const profile = (await app.inject(`/api/blogs/visibility-a-${suffix}/relations`)).json();
     check(profile.outgoing.find((e: { targetBlogId: number; share: number }) => e.targetBlogId === b)?.share === 0.5);
     check(!profile.evidence.some((e: { postId: number; targetUrl: string }) => e.postId === postIds[0] && e.targetUrl === bUrl + 'one'));
@@ -200,7 +198,7 @@ export async function runRelationVisibilityIntegration(pool: Pool) {
       const responses = await completion;
       check(builders === 4 && responses.every((r) => r.statusCode === 200));
       const repeated = await limitedApp.inject(`/api/blogs/visibility-a-${suffix}/relations?days=7`);
-      check(repeated.statusCode === 200 && builders === 4);
+      check(repeated.statusCode === 200 && builders === 5);
     } finally {
       unblock();
       await limitedApp.close();

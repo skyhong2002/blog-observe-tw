@@ -4,9 +4,9 @@ import { overview } from '@/lib/public-api';
 import { NO_SEARCH } from '@/lib/search';
 import { staticPageMetadata } from '@/lib/seo';
 
-// ISR (PUBLIC_REVALIDATE_SECONDS): the prerendered page lists the latest posts;
+// Rendered per request (no-store reads, public-read.ts): the server page lists the latest posts;
 // ?q=&page=&blog= full-text search runs in the browser through the public /api/search.
-export const revalidate = 120;
+export const dynamic = 'force-dynamic';
 export const metadata = staticPageMetadata('/articles/');
 
 export default async function ArticlesPage() {

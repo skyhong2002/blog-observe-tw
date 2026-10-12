@@ -10,13 +10,10 @@ import { plainText } from '@/lib/api';
 import { getBlog, getPublicPage } from '@/lib/public-api';
 import { breadcrumbSchema, pageMetadata, serializeJsonLd, shortText } from '@/lib/seo';
 
-// ISR (PUBLIC_REVALIDATE_SECONDS), generated on first request and never at build
-// (no list of every blog is fetched). The in-page ?q= post filter runs in the browser.
-export const revalidate = 120;
-export const dynamicParams = true;
-export function generateStaticParams() {
-  return [];
-}
+// Rendered on every request, never cached or built: the blog's posts are the gateway's answer to this
+// request (no-store reads, public-read.ts), so a post it has since hidden never lives on in a stored page.
+// The in-page ?q= post filter runs in the browser.
+export const dynamic = 'force-dynamic';
 
 type Props = { params: Promise<{ slug: string }> };
 /**

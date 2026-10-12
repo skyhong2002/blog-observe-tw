@@ -11,10 +11,10 @@
 - 基底網址 `https://blog.observe.tw`。公開查詢使用 `GET`（也接受 `HEAD`），回傳 UTF-8 JSON。
 - API 狀態頁：`/api/status`。瀏覽器以 HTML 顯示；以 `Accept: application/json` 取得 JSON，只顯示 API 狀態與端點用途。狀態包含 `ok` 或 `degraded`，以有界可用性檢查確認公開查詢的資料依賴可連線，最多快取 5 秒；不是每個端點逐筆測試。JSON 欄位為 `status`、`version`、`endpoints`（每項 `path`、`summary`）與 `updatedAt`；這是狀態回應產生時間，不是文章資料更新時間。此回應為 `no-store`，不提供內部主機或爬蟲維運資訊。
 - 公開查詢不需要金鑰。每個 IP 每分鐘最多 60 次，超過回 `429`；回應帶 `x-ratelimit-limit`、`x-ratelimit-remaining`、`x-ratelimit-reset`。登入後可在 `/my/` 建立個人 API 金鑰（每人最多 3 把），以 `x-api-key: blog_…` 傳送，每把每分鐘 1000 次；伺服器只存 SHA-256 摘要，完整金鑰只顯示一次。無效或撤銷的金鑰回 `401`。為防止隨機金鑰探測，首次出現或未快取的金鑰須先通過每 IP 每分鐘 60 次的匿名／驗證桶；若該桶已用完會先回 `429`，請等窗口重設後重試。已快取且有效的金鑰不受此 IP 桶限制，每把每分鐘 1000 次額度不變。金鑰不能用來登入、管理或讀取私人資料，`Authorization` 不是本 API 的金鑰認證方式。
-- 允許跨網域：`Access-Control-Allow-Origin: *`，不接受跨域 cookie 認證。瀏覽器可讀取限流標頭與 `Retry-After`；遇 `429` 請依 `Retry-After` 秒數退避。共享快取上的限流標頭可能是產生回應時的快照，不能當作即時餘額；來源站仍對實際到站請求計額。
+- 允許跨網域：`Access-Control-Allow-Origin: *`，不接受跨域 cookie 認證。瀏覽器可讀取限流標頭與 `Retry-After`；遇 `429` 請依 `Retry-After` 秒數退避。限流標頭表示產生回應時的額度；來源站對實際到站請求計額。
 - 時間一律使用 UTC ISO 8601（例如 `2026-10-12T00:00:00.000Z`）；「一天」指台北時間（UTC+8）的日曆日，`hours` 則是連續經過的小時數。未知日期回 `null`，不以抓取日期冒充發文日期。
 - 部落格 `slug` 與話題 `id` 是穩定 API 識別碼，不因網頁網址改名而變動。已建立可讀網頁網址時，項目另附選用的 `canonicalPath`，文章附 `blogCanonicalPath`；以基底網址加上此相對路徑即可分享。欄位暫缺時仍可使用原識別碼網址，網頁會 301 到正式網址；不要拿可讀 slug 取代 API 參數。
-- 匿名成功回應帶 `cache-control: public, max-age=0, s-maxage=120, stale-while-revalidate=180`。文章依各站 RSS／抓取排程分批更新，關係快照約每 5 分鐘，話題查詢快取約 2 分鐘；低頻部落格不因久未發文而失效。請至少間隔 120 秒輪詢，關係以 5 分鐘以上為宜。更新與歷史回補有延遲，不保證每輪都有新資料。
+- 匿名成功回應帶 `cache-control: no-store`。文章依各站 RSS／抓取排程分批更新，查詢不保留跨請求結果快取，讓隱藏或刪除內容可即時反映；低頻部落格不因久未發文而失效。請至少間隔 120 秒輪詢，關係以 5 分鐘以上為宜。更新與歷史回補有延遲，不保證每輪都有新資料。
 - 帶 `x-api-key` 或 `Authorization` 的請求與錯誤回應為 `private, no-store` 或 `no-store`，不得進共享快取。快取標頭不代表 CDN 已快取該端點；目前 Cloudflare 的專用 HTML 規則只涵蓋首頁。
 - 錯誤格式為 `{"error":"..."}`：`400` 參數／游標錯誤、`401` 無效金鑰、`404` 找不到、`410` 話題證據已全部撤銷、`405` 不支援的方法、`429` 太頻繁、`503` 暫時無法提供服務。未知參數、重複參數與不合法的時間窗口會回 `400`。
 - 路徑參數請 URL 編碼（例如話題 `rss:1` 寫成 `rss%3A1`），路徑結尾不要加 `/`。文章與目錄使用 `limit`、`cursor`／`nextCursor`；游標是不透明字串，請原樣傳回並保持原查詢條件。`nextCursor: null` 表示這個結果已到尾頁。
@@ -144,7 +144,7 @@ curl --fail-with-body -sS 'https://blog.observe.tw/api/v1/articles'
 
 錯誤：`400` invalid_query／invalid_cursor；`401` invalid_api_key；`404` not_found；`405` method_not_allowed；`429` rate_limit_exceeded（請依 Retry-After 退避）；`503` unavailable。
 
-快取：`public, max-age=0, s-maxage=120, stale-while-revalidate=180`（僅匿名成功回應）。
+快取：`no-store`（僅匿名成功回應）。
 
 <a id="api-v1-blogs-slug-articles"></a>
 
@@ -193,7 +193,7 @@ curl --fail-with-body -sS 'https://blog.observe.tw/api/v1/blogs/skyhong-tw/artic
 
 錯誤：`400` invalid_query／invalid_cursor；`401` invalid_api_key；`404` not_found；`405` method_not_allowed；`429` rate_limit_exceeded（請依 Retry-After 退避）；`503` unavailable。
 
-快取：`public, max-age=0, s-maxage=120, stale-while-revalidate=180`（僅匿名成功回應）。
+快取：`no-store`（僅匿名成功回應）。
 
 ## 部落格目錄
 
@@ -239,7 +239,7 @@ curl --fail-with-body -sS 'https://blog.observe.tw/api/v1/blogs'
 
 錯誤：`400` invalid_query／invalid_cursor；`401` invalid_api_key；`404` not_found；`405` method_not_allowed；`429` rate_limit_exceeded（請依 Retry-After 退避）；`503` unavailable。
 
-快取：`public, max-age=0, s-maxage=120, stale-while-revalidate=180`（僅匿名成功回應）。
+快取：`no-store`（僅匿名成功回應）。
 
 <a id="api-v1-blogs-slug"></a>
 
@@ -281,7 +281,7 @@ curl --fail-with-body -sS 'https://blog.observe.tw/api/v1/blogs/skyhong-tw'
 
 錯誤：`400` invalid_query／invalid_cursor；`401` invalid_api_key；`404` not_found；`405` method_not_allowed；`429` rate_limit_exceeded（請依 Retry-After 退避）；`503` unavailable。
 
-快取：`public, max-age=0, s-maxage=120, stale-while-revalidate=180`（僅匿名成功回應）。
+快取：`no-store`（僅匿名成功回應）。
 
 ## 部落格提及關係
 
@@ -354,7 +354,7 @@ curl --fail-with-body -sS 'https://blog.observe.tw/api/v1/relations'
 
 錯誤：`400` invalid_query／invalid_cursor；`401` invalid_api_key；`404` not_found；`405` method_not_allowed；`429` rate_limit_exceeded（請依 Retry-After 退避）；`503` unavailable。
 
-快取：`public, max-age=0, s-maxage=120, stale-while-revalidate=180`（僅匿名成功回應）。
+快取：`no-store`（僅匿名成功回應）。
 
 <a id="api-v1-blogs-slug-relations"></a>
 
@@ -458,7 +458,7 @@ curl --fail-with-body -sS 'https://blog.observe.tw/api/v1/blogs/skyhong-tw/relat
 
 錯誤：`400` invalid_query／invalid_cursor；`401` invalid_api_key；`404` not_found；`405` method_not_allowed；`429` rate_limit_exceeded（請依 Retry-After 退避）；`503` unavailable。
 
-快取：`public, max-age=0, s-maxage=120, stale-while-revalidate=180`（僅匿名成功回應）。
+快取：`no-store`（僅匿名成功回應）。
 
 ## 話題與關鍵字
 
@@ -553,7 +553,7 @@ curl --fail-with-body -sS 'https://blog.observe.tw/api/v1/topics'
 
 錯誤：`400` invalid_query／invalid_cursor；`401` invalid_api_key；`404` not_found；`405` method_not_allowed；`429` rate_limit_exceeded（請依 Retry-After 退避）；`503` unavailable。
 
-快取：`public, max-age=0, s-maxage=120, stale-while-revalidate=180`（僅匿名成功回應）。
+快取：`no-store`（僅匿名成功回應）。
 
 <a id="api-v1-topics-id"></a>
 
@@ -676,7 +676,7 @@ curl --fail-with-body -sS 'https://blog.observe.tw/api/v1/topics/rss%3A1'
 
 錯誤：`400` invalid_query／invalid_cursor；`401` invalid_api_key；`404` not_found；`405` method_not_allowed；`410` gone（累積證據已全部撤銷）；`429` rate_limit_exceeded（請依 Retry-After 退避）；`503` unavailable。
 
-快取：`public, max-age=0, s-maxage=120, stale-while-revalidate=180`（僅匿名成功回應）。
+快取：`no-store`（僅匿名成功回應）。
 
 ## API 本身
 
@@ -703,4 +703,4 @@ curl --fail-with-body -sS 'https://blog.observe.tw/api/v1/openapi.json'
 
 錯誤：`400` invalid_query／invalid_cursor；`401` invalid_api_key；`404` not_found；`405` method_not_allowed；`429` rate_limit_exceeded（請依 Retry-After 退避）；`503` unavailable。
 
-快取：`public, max-age=0, s-maxage=120, stale-while-revalidate=180`（僅匿名成功回應）。
+快取：`no-store`（僅匿名成功回應）。

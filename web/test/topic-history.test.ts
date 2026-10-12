@@ -153,8 +153,6 @@ test('history paging: topic detail pages, cursors included, are never kept in th
     assert.equal(init.cache, 'no-store');
     assert.equal(init.credentials, 'omit');
   }
-  assert.equal(loader.size(), 0);
-  for (const path of [first, second, third]) assert.equal(loader.fresh(path), undefined, path);
 });
 
 test('topic detail in the browser: an article the gateway has since hidden is not served from an earlier answer', async () => {
@@ -171,10 +169,11 @@ test('topic detail in the browser: an article the gateway has since hidden is no
   assert.equal((settled[0] as { data: TopicDetail }).data.articles.length, 1);
   assert.equal(answers.length, 0, 'the second view asked the gateway again');
   assert.deepEqual((settled[1] as { data: TopicDetail }).data.articles, []);
-  // The ranking list is not topic detail and keeps the client TTL.
-  const lists = createPublicLoader({ fetch: async () => json(200, EMPTY.topics) });
-  await lists.load('/api/topics?days=7', (raw) => raw, new AbortController().signal);
-  assert.ok(lists.fresh('/api/topics?days=7'));
+  // The ranking list is read again on every view as well: no public kind keeps a client TTL.
+  const listAnswers = [EMPTY.topics, EMPTY.topics];
+  const lists = createPublicLoader({ fetch: async () => json(200, listAnswers.shift()) });
+  for (let i = 0; i < 2; i++) await lists.load('/api/topics?days=7', (raw) => raw, new AbortController().signal);
+  assert.equal(listAnswers.length, 0);
 });
 
 test('410: the server read is "not found" (the page 404s, never 500); the browser shows it as gone', async () => {
@@ -185,7 +184,6 @@ test('410: the server read is "not found" (the page 404s, never 500); the browse
   });
   const loader = createPublicLoader({ fetch: async () => json(410, { error: 'topic revoked' }) });
   assert.deepEqual(await loader.load(topicApiPath(STABLE, '7'), (raw) => raw, new AbortController().signal), { status: 'gone' });
-  assert.equal(loader.size(), 0);
 });
 
 test('topic page: metadata names no fixed period; the page is per-request, indexable and free of searchParams', () => {

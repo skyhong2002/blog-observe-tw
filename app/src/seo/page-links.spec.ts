@@ -167,7 +167,7 @@ describe('bounded API canonical links', () => {
     expect(await enrichPageLinks(pool, '/api/v1/topics', payload)).toBe(payload);
     expect(calls).toHaveLength(0);
   });
-  it('uses bounded batch queries and single-flight positive/negative caching', async () => {
+  it('uses bounded single-flight batches and rechecks visibility after completion', async () => {
     let release!: () => void;
     const wait = new Promise<void>((resolve) => {
       release = resolve;
@@ -184,7 +184,7 @@ describe('bounded API canonical links', () => {
     await Promise.all(tasks);
     expect(calls).toHaveLength(3);
     await enrichPageLinks(pool, '/api/blogs', payload);
-    expect(calls).toHaveLength(3);
+    expect(calls).toHaveLength(6);
     expect(payload.blogs[1]).not.toHaveProperty('canonicalPath');
   });
   it('caps unique references and skips oversized/deep payloads without a database lookup', async () => {

@@ -30,6 +30,12 @@ export function safePath(path: string): boolean {
   }
 }
 
+/** Content-bearing responses must not outlive visibility changes in another cache layer. */
+export function immutableAssetPath(raw: string): boolean {
+  const path = raw.split('?')[0];
+  return path.startsWith('/_next/static/') || /^\/favicons\/[a-zA-Z0-9._-]+\.(?:png|webp|svg|ico)$/.test(path);
+}
+
 export function createEdge({
   state,
   assets,
@@ -40,6 +46,8 @@ export function createEdge({
   request?: typeof httpRequest;
 }) {
   const server = createServer(async (req, res) => {
+    const mutable = !immutableAssetPath(req.url ?? '');
+    if (mutable) res.setHeader('cache-control', 'private, no-store');
     if (!safePath(req.url ?? '')) {
       res.writeHead(400, { 'cache-control': 'no-store' });
       res.end('Invalid path');
@@ -76,6 +84,10 @@ export function createEdge({
           clearTimeout(headersDeadline);
           response.setTimeout(60_000, () => response.destroy(Error('body_timeout')));
           const headers = endToEndHeaders(response.headers);
+          if (mutable) {
+            headers['cache-control'] = 'private, no-store';
+            for (const key of ['cdn-cache-control', 'cloudflare-cdn-cache-control', 'surrogate-control', 'expires']) delete headers[key];
+          }
           delete headers['x-blog-edge-generation'];
           delete headers['x-blog-release'];
           res.writeHead(response.statusCode ?? 502, headers);

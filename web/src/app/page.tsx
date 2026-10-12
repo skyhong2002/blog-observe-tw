@@ -13,9 +13,9 @@ import type { Topics } from '@/lib/topics';
 import styles from './_home/home.module.css';
 import MastheadCloud from './_home/MastheadCloud';
 import NewsImage from './_home/NewsImage';
-// ISR (PUBLIC_REVALIDATE_SECONDS). A failed gateway read throws, so a
-// regeneration keeps the last good page instead of caching an empty one.
-export const revalidate = 120;
+// Rendered per request with no-store reads (public-read.ts): no stored page can
+// keep showing an article the gateway has since hidden. A failed read throws.
+export const dynamic = 'force-dynamic';
 export const metadata = staticPageMetadata('/');
 export default async function HomePage() {
   const [data, topics] = await Promise.all([overview(), publicJson<Topics>(topicsApiPath('30'))]);

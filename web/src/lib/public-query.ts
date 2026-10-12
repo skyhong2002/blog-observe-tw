@@ -1,6 +1,7 @@
 /**
  * URL query handling for the public list pages. The pages themselves are
- * prerendered without a query (ISR); these helpers read the browser's query,
+ * rendered on the server without a query (force-dynamic, no-store reads);
+ * these helpers read the browser's query,
  * decide whether it differs from that baseline, and build the same-origin
  * public API path that answers it. Pure: node --test imports this file.
  */

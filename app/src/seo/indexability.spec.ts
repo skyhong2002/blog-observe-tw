@@ -14,7 +14,7 @@ describe('shared topic page indexability', () => {
     ]) {
       expect(topicIndexability(counts, 'current', active)).toMatchObject({ indexable: true, indexabilityReason: null, ...counts });
     }
-    expect(INDEXABILITY_CACHE_MS).toBe(300_000);
+    expect(INDEXABILITY_CACHE_MS).toBe(0);
   });
   it('only reports explicit noise and preserves inactive or missing-current page policy', () => {
     const counts = { posts: 0, blogs: 0 };
@@ -50,7 +50,7 @@ describe('shared topic page indexability', () => {
     expect(pool.getConnection).toHaveBeenCalledTimes(1);
     expect(query).toHaveBeenCalledTimes(3);
     await getPageIndexability(pool, 'blog', '1');
-    expect(query).toHaveBeenCalledTimes(3);
+    expect(query).toHaveBeenCalledTimes(6);
     expect(await getPageIndexability(pool, 'blog', '2')).toMatchObject({ indexable: true, indexabilityReason: null, posts: 0 });
   });
   it('keeps a one-post, one-blog topic in the deployed sitemap set', async () => {

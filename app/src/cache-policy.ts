@@ -25,14 +25,17 @@ export function privateCachePath(rawUrl: string): boolean {
 /** Enforced after every handler/proxy response, including denied/error responses. */
 export function installPrivateCachePolicy(app: FastifyInstance) {
   const protect: onSendHookHandler = async (request, reply, payload) => {
-    if (
+    const privateResponse =
       request.headers['x-api-key'] !== undefined ||
       request.headers.authorization !== undefined ||
+      request.headers.cookie !== undefined ||
       privateCachePath(request.raw.url || request.url) ||
       reply.hasHeader('set-cookie') ||
-      !['GET', 'HEAD'].includes(request.method)
-    ) {
-      reply.header('cache-control', 'private, no-store');
+      !['GET', 'HEAD'].includes(request.method);
+    const path = (request.raw.url || request.url).split('?')[0];
+    const liveData = /^\/api(?:\/|$)|^\/sitemaps?[^?]*\.xml$/i.test(path);
+    if (privateResponse || liveData) {
+      reply.header('cache-control', privateResponse ? 'private, no-store' : 'no-store');
       // An upstream-specific CDN override must not weaken the private boundary.
       reply.removeHeader('cdn-cache-control');
       reply.removeHeader('cloudflare-cdn-cache-control');

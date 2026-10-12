@@ -61,6 +61,22 @@ afterEach(async () => {
   await Promise.all(directories.splice(0).map((path) => rm(path, { recursive: true, force: true })));
 });
 
+describe('visibility cache boundary', () => {
+  it('does not let gateway/CDN cache headers retain mutable HTML, API or XML', async () => {
+    const gateway = await listen(createServer((_req, res) => {
+      res.writeHead(200, { 'cache-control': 'public, s-maxage=300', 'cdn-cache-control': 'public, max-age=999', expires: 'Wed, 21 Oct 2037 07:28:00 GMT' });
+      res.end('visible content');
+    }));
+    const port = await listen(createEdge({ state: { get: async () => blue }, assets: await temp(), request: redirectTransport({ 18174: gateway }) }));
+    for (const path of ['/', '/blogs/example/', '/api/v1/articles', '/sitemaps/topics.xml']) {
+      const response = await get(port, path);
+      expect(response.headers['cache-control']).toBe('private, no-store');
+      expect(response.headers['cdn-cache-control']).toBeUndefined();
+      expect(response.headers.expires).toBeUndefined();
+    }
+  });
+});
+
 describe('fixed deployment state and inherited socket', () => {
   it('rejects arbitrary targets and malformed state; retains last good target on later damage', async () => {
     let raw = JSON.stringify(blue);

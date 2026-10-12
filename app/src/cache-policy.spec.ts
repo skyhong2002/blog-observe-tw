@@ -81,6 +81,47 @@ describe('private route cache boundaries', () => {
       await app.close();
     }
   });
+  it('never shares API or sitemap results even when route hooks set CDN overrides', async () => {
+    const app = Fastify();
+    installPrivateCachePolicy(app);
+    for (const path of [
+      '/api/catalog',
+      '/api/overview',
+      '/api/topics',
+      '/api/v1/blogs',
+      '/api/pages/blogs/a',
+      '/sitemap.xml',
+      '/sitemaps/topics.xml',
+    ]) {
+      app.get(
+        path,
+        {
+          onSend: async (_request, reply, payload) => {
+            reply.header('cache-control', 'public, s-maxage=300').header('cloudflare-cdn-cache-control', 'max-age=900');
+            return payload;
+          },
+        },
+        async () => ({ ok: true }),
+      );
+    }
+    try {
+      for (const url of [
+        '/api/catalog',
+        '/api/overview',
+        '/api/topics',
+        '/api/v1/blogs',
+        '/api/pages/blogs/a',
+        '/sitemap.xml',
+        '/sitemaps/topics.xml',
+      ]) {
+        const response = await app.inject(url);
+        expect(response.headers['cache-control'], url).toBe('no-store');
+        expect(response.headers['cloudflare-cdn-cache-control'], url).toBeUndefined();
+      }
+    } finally {
+      await app.close();
+    }
+  });
   it('forces Set-Cookie responses private even on public paths', async () => {
     const request = async () => ({
       statusCode: 200,
@@ -153,7 +194,7 @@ describe('private route cache boundaries', () => {
     };
     const pool = {
       query: async (sql: string) =>
-        sql.includes('FROM posts p JOIN user_follows')
+        sql.includes('FROM posts p JOIN blogs b ON b.id=p.blog_id JOIN user_follows')
           ? [[{ title: 'PRIVATE_READER_POST', url: 'https://fixture.example/post', summary: '私有閱讀摘要' }]]
           : sql.includes('FROM user_follows f JOIN blogs')
             ? [[{ slug: 'fixture', name: 'PRIVATE_READER_FOLLOW', url: 'https://fixture.example/' }]]
@@ -205,7 +246,7 @@ describe('private route cache boundaries', () => {
         expect(r.headers['cache-control']).toBe('private, no-store');
       }
       expect((await app.inject('/auth/me')).headers['cache-control']).toBe('private, no-store');
-      expect((await app.inject('/api/topics?days=1')).headers['cache-control']).toBeUndefined();
+      expect((await app.inject('/api/topics?days=1')).headers['cache-control']).toBe('no-store');
     } finally {
       await app.close();
     }

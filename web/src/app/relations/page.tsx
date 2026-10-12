@@ -5,9 +5,9 @@ import { RELATIONS_PERIOD, relationsApiPath } from '@/lib/public-query';
 import type { Relations } from '@/lib/relations';
 import { staticPageMetadata } from '@/lib/seo';
 
-// ISR (PUBLIC_REVALIDATE_SECONDS): the prerendered page is the 90-day map;
+// Rendered per request (no-store reads, public-read.ts): the server page is the 90-day map;
 // ?days=7|30 are read in the browser from the same public /api/relations.
-export const revalidate = 120;
+export const dynamic = 'force-dynamic';
 export const metadata = staticPageMetadata('/relations/');
 
 export default async function Page() {

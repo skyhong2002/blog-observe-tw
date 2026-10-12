@@ -21,7 +21,7 @@ export async function runPageLinksIntegration(pool: Pool) {
     tagId = 0;
   const app = Fastify();
   try {
-    const [blog] = await pool.execute<ResultSetHeader>("INSERT INTO blogs(slug,name,status,discovered_at) VALUES (?,?,'seed',?)", [
+    const [blog] = await pool.execute<ResultSetHeader>("INSERT INTO blogs(slug,name,status,discovered_at) VALUES (?,?,'verified',?)", [
       slug,
       'Link fixture',
       now,
@@ -88,7 +88,7 @@ export async function runPageLinksIntegration(pool: Pool) {
     assert.equal(privateResult.headers['cache-control'], 'private, no-store');
     assert.equal(privateResult.json().follows[0].canonicalPath, path);
     return {
-      seedPagePreserved: true,
+      verifiedPagePreserved: true,
       stableSlugAndIcon: true,
       rawAliasAndRssCanonical: true,
       privateCacheUnchanged: true,

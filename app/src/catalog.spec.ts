@@ -39,7 +39,7 @@ describe('complete blog catalog', () => {
     expect(pool.query.mock.calls[4][0]).toContain('ORDER BY b.name ASC,b.id ASC LIMIT ? OFFSET ?');
     expect(pool.query.mock.calls[0][0]).toContain('COUNT(DISTINCT a.id)');
     expect(pool.query.mock.calls.slice(0, 3).every(([sql]) => !sql.includes('LIMIT'))).toBe(true);
-    expect(pool.query.mock.calls.every(([sql]) => sql.includes("b.status <> 'moved'"))).toBe(true);
+    expect(pool.query.mock.calls.every(([sql]) => sql.includes("b.status='verified'"))).toBe(true);
   });
 
   it('uses identical parameterized filters for count and rows, with literal wildcard search and global facets', async () => {

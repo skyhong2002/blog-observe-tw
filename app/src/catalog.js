@@ -32,7 +32,7 @@ export function catalogFilters(query = {}) {
 }
 export async function loadCatalog(pool, query = {}) {
   const filters = catalogFilters(query);
-  const where = ["b.status <> 'moved'"];
+  const where = ["b.status='verified'"];
   const parameters = [];
   if (filters.q) {
     // Explicit escape character makes percent, underscore and '=' literal search text.
@@ -53,15 +53,15 @@ export async function loadCatalog(pool, query = {}) {
   const [totalsResult, categoriesResult, statusesResult, countResult] = await Promise.all([
     pool.query(`SELECT COUNT(*) AS blogs,COALESCE(SUM(b.url IS NOT NULL AND b.url<>''),0) AS withUrls,
       MAX(b.last_crawl_success_at) AS updatedAt,
-      (SELECT COUNT(*) FROM posts p JOIN blogs pb ON pb.id=p.blog_id WHERE pb.status <> 'moved') AS posts,
+      (SELECT COUNT(*) FROM posts p JOIN blogs pb ON pb.id=p.blog_id WHERE pb.status='verified') AS posts,
       (SELECT COUNT(DISTINCT a.id) FROM authors a JOIN blog_authors ba ON ba.author_id=a.id
-        JOIN blogs ab ON ab.id=ba.blog_id WHERE a.status <> 'rejected' AND ba.status='active' AND ab.status <> 'moved') AS authors
-      FROM blogs b WHERE b.status <> 'moved'`),
+        JOIN blogs ab ON ab.id=ba.blog_id WHERE a.status <> 'rejected' AND ba.status='active' AND ab.status='verified') AS authors
+      FROM blogs b WHERE b.status='verified'`),
     pool.query(
-      `SELECT ${categoryLabel} AS value,COUNT(*) AS count FROM blogs b WHERE b.status <> 'moved' GROUP BY ${categoryLabel} ORDER BY value`,
+      `SELECT ${categoryLabel} AS value,COUNT(*) AS count FROM blogs b WHERE b.status='verified' GROUP BY ${categoryLabel} ORDER BY value`,
     ),
     pool.query(
-      `SELECT ${statusLabel} AS value,COUNT(*) AS count FROM blogs b WHERE b.status <> 'moved' GROUP BY ${statusLabel} ORDER BY value`,
+      `SELECT ${statusLabel} AS value,COUNT(*) AS count FROM blogs b WHERE b.status='verified' GROUP BY ${statusLabel} ORDER BY value`,
     ),
     pool.query(`SELECT COUNT(*) AS total FROM blogs b WHERE ${condition}`, parameters),
   ]);

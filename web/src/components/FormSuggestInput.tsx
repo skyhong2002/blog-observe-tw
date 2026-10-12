@@ -18,7 +18,8 @@ export type SuggestItem = { value: string; label?: string; hint?: string; media?
 export type SuggestSource = { kind: 'tags'; go?: boolean };
 type TagRow = { slug: string; label: string };
 async function suggestionsFor(source: SuggestSource, typed: string, signal: AbortSignal): Promise<SuggestItem[]> {
-  const response = await fetch('/api/overview', { signal });
+  // No-store like every public read (public-loader.ts): the overview lists articles the gateway may hide.
+  const response = await fetch('/api/overview', { cache: 'no-store', credentials: 'omit', signal });
   if (!response.ok) return [];
   const data: { tags?: TagRow[]; blogs?: Array<{ slug: string; name: string; iconUrl?: unknown; canonicalPath?: unknown }> } =
     await response.json();

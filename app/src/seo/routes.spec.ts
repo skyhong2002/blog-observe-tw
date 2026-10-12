@@ -46,7 +46,7 @@ describe('public crawler discovery routes', () => {
       const result = await app.inject('/sitemap.xml');
       expect(result.statusCode).toBe(200);
       expect(result.headers['content-type']).toContain('application/xml');
-      expect(result.headers['cache-control']).toContain('s-maxage=300');
+      expect(result.headers['cache-control']).toBe('no-store');
       expect(result.body).toContain('<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">');
       expect(result.body).toContain(`${SEO_ORIGIN}/sitemaps/blogs-2.xml`);
       expect(result.body).not.toContain('blogs-3');
@@ -62,7 +62,7 @@ describe('public crawler discovery routes', () => {
       const head = await app.inject({ method: 'HEAD', url: '/sitemap.xml' });
       expect(head.statusCode).toBe(200);
       expect(head.body).toBe('');
-      expect(query.mock.calls.length).toBe(count);
+      expect(query.mock.calls.length).toBeGreaterThan(count);
     } finally {
       await app.close();
     }

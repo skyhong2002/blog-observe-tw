@@ -31,7 +31,7 @@ describe('read-only public page resolver API', () => {
       expect(response.statusCode).toBe(200);
       expect(resolve).toHaveBeenCalledWith(pool, 'topic', '人工智慧');
       expect(response.json().page.indexable).toBe(true);
-      expect(response.headers['cache-control']).toContain('s-maxage=300');
+      expect(response.headers['cache-control']).toBe('no-store');
       await app.inject('/api/pages/topics/%252F');
       expect(resolve).toHaveBeenLastCalledWith(pool, 'topic', '%2F');
     } finally {

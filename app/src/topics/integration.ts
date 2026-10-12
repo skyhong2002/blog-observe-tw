@@ -223,7 +223,7 @@ export async function runTopicsQualityIntegration(pool: Pool) {
     const firstQueries = queries;
     assert.ok(firstQueries <= 8, `cold singleflight queried ${firstQueries} times`);
     await app.inject('/api/topics?days=7');
-    assert.equal(queries, firstQueries);
+    assert.ok(queries > firstQueries, 'later requests must recheck visibility');
     const result = concurrent[0].json();
     const topic = result.items.find((x: { id: string }) => x.id === `rss:${tagId}`);
     assert.equal(topic, undefined, 'feed categories must not create a parallel ranking dictionary');
@@ -232,7 +232,7 @@ export async function runTopicsQualityIntegration(pool: Pool) {
     assert.equal(nativeDetail.json().topic.excludedReason, 'not-in-tag-vocabulary');
     assert.deepEqual(nativeDetail.json().blogs, []);
     assert.equal(result.vocabulary.invalidTagCount, 3);
-    assert.equal(result.cacheSeconds, 120);
+    assert.equal(result.cacheSeconds, 0);
     const profile = await app.inject(`/api/blogs/topic-quality-${successId}-0/topics?days=7`);
     assert.equal(profile.statusCode, 200, profile.body);
     assert.equal(
@@ -256,7 +256,7 @@ export async function runTopicsQualityIntegration(pool: Pool) {
       globalBackoffMs: 3600000,
       coldSqlQueries: firstQueries,
       concurrentRequests: 12,
-      ttlSeconds: 120,
+      ttlSeconds: 0,
       nativeProvenancePreserved: true,
       scopeFiltered: true,
     };

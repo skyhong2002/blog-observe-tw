@@ -274,10 +274,11 @@ test('metadata: canonical, OG and JSON-LD use canonicalPath; every registered pa
     // Unknown keys and gateway 404s are real 404s.
     assert.match(text, /if \(!page\) notFound\(\);/, file);
   }
-  // Blog detail stays ISR; topic detail renders per request so the gateway's article visibility is never stale.
-  assert.match(source('app/blogs/[slug]/page.tsx'), /export const revalidate = 120;/);
-  assert.match(source('app/topics/[id]/page.tsx'), /export const dynamic = 'force-dynamic';/);
-  assert.doesNotMatch(source('app/topics/[id]/page.tsx'), /export const revalidate/);
+  // Both detail pages render per request so the gateway's article visibility is never stale.
+  for (const page of ['app/blogs/[slug]/page.tsx', 'app/topics/[id]/page.tsx']) {
+    assert.match(source(page), /export const dynamic = 'force-dynamic';/, page);
+    assert.doesNotMatch(source(page), /export const revalidate|generateStaticParams/, page);
+  }
   assert.match(source('app/topics/[id]/page.tsx'), /topicApiPath\(page\.stableId, TOPIC_DETAIL_PERIOD\)/);
   // The page carries recent and accumulated articles: its description names no fixed period.
   assert.match(source('app/topics/[id]/page.tsx'), /topicPageDescription\(label\)/);

@@ -53,7 +53,16 @@ export async function buildApp(config, { logger = false, store = null } = {}) {
     if (publicApiPath(request.url)) {
       const status = error.statusCode >= 400 && error.statusCode < 500 ? error.statusCode : 503;
       return reply.code(status).send({
-        error: status === 400 ? 'invalid_query' : status === 404 ? 'not_found' : status === 405 ? 'method_not_allowed' : status === 410 ? 'gone' : 'unavailable',
+        error:
+          status === 400
+            ? 'invalid_query'
+            : status === 404
+              ? 'not_found'
+              : status === 405
+                ? 'method_not_allowed'
+                : status === 410
+                  ? 'gone'
+                  : 'unavailable',
       });
     }
     return reply.send(error);
@@ -106,7 +115,7 @@ export async function buildApp(config, { logger = false, store = null } = {}) {
   }));
 
   app.get('/api/catalog/authors', async (request, reply) => {
-    reply.header('cache-control', 'public, max-age=30');
+    reply.header('cache-control', 'no-store');
     try {
       return await loadAuthorCatalog(pool, request.query);
     } catch (error) {
@@ -117,7 +126,7 @@ export async function buildApp(config, { logger = false, store = null } = {}) {
   });
 
   app.get('/api/catalog', async (request, reply) => {
-    reply.header('cache-control', 'public, max-age=30');
+    reply.header('cache-control', 'no-store');
     try {
       return await loadCatalog(pool, request.query);
     } catch {
@@ -126,7 +135,7 @@ export async function buildApp(config, { logger = false, store = null } = {}) {
   });
 
   app.get('/api/overview', async (_request, reply) => {
-    reply.header('cache-control', 'public, max-age=30');
+    reply.header('cache-control', 'no-store');
     return loadOverview(pool);
   });
 
@@ -138,12 +147,12 @@ export async function buildApp(config, { logger = false, store = null } = {}) {
     const [posts] = await pool.query(
       `SELECT p.id,p.guid,p.title,p.url,p.summary,p.author,p.published_at AS publishedAt,p.image_url AS imageUrl,
       b.slug AS blogSlug,b.name AS blogName FROM posts p JOIN post_tags pt ON pt.post_id=p.id JOIN blogs b ON b.id=p.blog_id
-      WHERE pt.tag_id=? AND pt.status='active' AND b.status <> 'moved' AND (p.published_at IS NULL OR p.published_at<=UTC_TIMESTAMP()) ORDER BY p.published_at DESC,p.id DESC LIMIT 200`,
+      WHERE pt.tag_id=? AND pt.status='active' AND b.status='verified' AND (p.published_at IS NULL OR p.published_at<=UTC_TIMESTAMP()) ORDER BY p.published_at DESC,p.id DESC LIMIT 200`,
       [tags[0].id],
     );
     const [blogs] = await pool.query(
       `SELECT DISTINCT b.id,b.slug,b.name,b.url,b.category,b.status_label AS statusLabel
-      FROM blogs b WHERE b.status <> 'moved' AND (EXISTS (SELECT 1 FROM blog_tags bt WHERE bt.blog_id=b.id AND bt.tag_id=? AND bt.status='active') OR EXISTS (SELECT 1 FROM posts p JOIN post_tags pt ON pt.post_id=p.id WHERE p.blog_id=b.id AND pt.tag_id=? AND pt.status='active')) ORDER BY b.name LIMIT 200`,
+      FROM blogs b WHERE b.status='verified' AND (EXISTS (SELECT 1 FROM blog_tags bt WHERE bt.blog_id=b.id AND bt.tag_id=? AND bt.status='active') OR EXISTS (SELECT 1 FROM posts p JOIN post_tags pt ON pt.post_id=p.id WHERE p.blog_id=b.id AND pt.tag_id=? AND pt.status='active')) ORDER BY b.name LIMIT 200`,
       [tags[0].id, tags[0].id],
     );
     return { tag: tags[0], posts: posts.map(publicPost), blogs };
@@ -152,7 +161,7 @@ export async function buildApp(config, { logger = false, store = null } = {}) {
   app.get('/api/blogs', async (request) => {
     const limit = Math.min(200, Math.max(1, Number(request.query?.limit || 200)));
     const [rows] = await pool.query(
-      'SELECT id,slug,name,url,canonical_host AS canonicalHost,category,status,status_label AS statusLabel,description,last_crawled_at AS lastCrawledAt,last_crawl_success_at AS lastCrawlSuccessAt,last_published_at AS lastPublishedAt,expected_interval_hours AS expectedIntervalHours,stale_policy AS stalePolicy FROM blogs ORDER BY name LIMIT ?',
+      "SELECT id,slug,name,url,canonical_host AS canonicalHost,category,status,status_label AS statusLabel,description,last_crawled_at AS lastCrawledAt,last_crawl_success_at AS lastCrawlSuccessAt,last_published_at AS lastPublishedAt,expected_interval_hours AS expectedIntervalHours,stale_policy AS stalePolicy FROM blogs WHERE status='verified' ORDER BY name LIMIT ?",
       [limit],
     );
     const icons = await iconManifest();
@@ -160,7 +169,7 @@ export async function buildApp(config, { logger = false, store = null } = {}) {
   });
   app.get('/api/blogs/:slug', async (request, reply) => {
     const [blogs] = await pool.query(
-      'SELECT id,slug,name,url,canonical_host AS canonicalHost,category,status,status_label AS statusLabel,description,source_name AS sourceName,source_row AS sourceRow,last_crawled_at AS lastCrawledAt,last_crawl_success_at AS lastCrawlSuccessAt,last_published_at AS lastPublishedAt,expected_interval_hours AS expectedIntervalHours,stale_policy AS stalePolicy,history_imported_at AS historyImportedAt FROM blogs WHERE slug=? LIMIT 1',
+      "SELECT id,slug,name,url,canonical_host AS canonicalHost,category,status,status_label AS statusLabel,description,source_name AS sourceName,source_row AS sourceRow,last_crawled_at AS lastCrawledAt,last_crawl_success_at AS lastCrawlSuccessAt,last_published_at AS lastPublishedAt,expected_interval_hours AS expectedIntervalHours,stale_policy AS stalePolicy,history_imported_at AS historyImportedAt FROM blogs WHERE slug=? AND status='verified' LIMIT 1",
       [request.params.slug],
     );
     if (!blogs.length) return reply.code(404).send({ error: 'blog not found' });
@@ -201,7 +210,7 @@ export async function buildApp(config, { logger = false, store = null } = {}) {
     const user = await requireUser(request, reply);
     if (!user) return;
     const [follows] = await pool.query(
-      'SELECT b.slug,b.name,b.url,b.category FROM user_follows f JOIN blogs b ON b.id=f.blog_id WHERE f.user_id=? ORDER BY b.name',
+      "SELECT b.slug,b.name,b.url,b.category FROM user_follows f JOIN blogs b ON b.id=f.blog_id WHERE f.user_id=? AND b.status='verified' ORDER BY b.name",
       [user.id],
     );
     const icons = await iconManifest();
@@ -214,7 +223,10 @@ export async function buildApp(config, { logger = false, store = null } = {}) {
       if (!sameOrigin(request, config.publicOrigin)) return reply.code(403).send({ error: 'same-origin requests only' });
       const user = await requireUser(request, reply);
       if (!user) return;
-      const [blogs] = await pool.query('SELECT id FROM blogs WHERE slug=? LIMIT 1', [request.params.slug]);
+      const [blogs] = await pool.query(
+        `SELECT id FROM blogs WHERE slug=? ${request.method === 'POST' ? "AND status='verified'" : ''} LIMIT 1`,
+        [request.params.slug],
+      );
       if (!blogs.length) return reply.code(404).send({ error: 'blog not found' });
       if (request.method === 'POST')
         await pool.execute('INSERT IGNORE INTO user_follows (user_id,blog_id,created_at) VALUES (?,?,?)', [
@@ -230,7 +242,7 @@ export async function buildApp(config, { logger = false, store = null } = {}) {
     const user = await requireUser(request, reply);
     if (!user) return;
     const [items] = await pool.query(
-      'SELECT p.guid,p.title,p.url,p.summary,p.published_at AS publishedAt FROM posts p JOIN user_follows f ON f.blog_id=p.blog_id WHERE f.user_id=? AND (p.published_at IS NULL OR p.published_at<=UTC_TIMESTAMP()) ORDER BY COALESCE(p.published_at,p.updated_at,p.created_at) DESC LIMIT 100',
+      "SELECT p.guid,p.title,p.url,p.summary,p.published_at AS publishedAt FROM posts p JOIN blogs b ON b.id=p.blog_id JOIN user_follows f ON f.blog_id=p.blog_id WHERE f.user_id=? AND b.status='verified' AND (p.published_at IS NULL OR p.published_at<=UTC_TIMESTAMP()) ORDER BY COALESCE(p.published_at,p.updated_at,p.created_at) DESC LIMIT 100",
       [user.id],
     );
     return reply
@@ -241,7 +253,7 @@ export async function buildApp(config, { logger = false, store = null } = {}) {
     const user = await requireUser(request, reply);
     if (!user) return;
     const [follows] = await pool.query(
-      "SELECT b.name,b.url,(SELECT fs.url FROM feed_sources fs WHERE fs.blog_id=b.id AND fs.last_success_at IS NOT NULL AND fs.type IN ('rss','atom') ORDER BY fs.last_success_at DESC,fs.id LIMIT 1) AS feedUrl FROM user_follows f JOIN blogs b ON b.id=f.blog_id WHERE f.user_id=? ORDER BY b.name",
+      "SELECT b.name,b.url,(SELECT fs.url FROM feed_sources fs WHERE fs.blog_id=b.id AND fs.last_success_at IS NOT NULL AND fs.type IN ('rss','atom') ORDER BY fs.last_success_at DESC,fs.id LIMIT 1) AS feedUrl FROM user_follows f JOIN blogs b ON b.id=f.blog_id WHERE f.user_id=? AND b.status='verified' ORDER BY b.name",
       [user.id],
     );
     const outlines = follows

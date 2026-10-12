@@ -10,7 +10,7 @@ export const PUBLIC_PATHS = [
   '/api/v1/topics/:id',
   '/api/v1/openapi.json',
 ] as const;
-export const API_CACHE = 'public, max-age=0, s-maxage=120, stale-while-revalidate=180';
+export const API_CACHE = 'no-store';
 export const API_LIMITS = { anonymous: 60, key: 1000, activeKeys: 3, defaultLimit: 50, maxLimit: 200 } as const;
 export const API_ERRORS = [
   'invalid_query',

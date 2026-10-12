@@ -4,9 +4,9 @@ import MediaTabs from '@/components/MediaTabs';
 import SimilarwebTraffic from '@/components/SimilarwebTraffic';
 import { staticPageMetadata } from '@/lib/seo';
 
-// ISR (PUBLIC_REVALIDATE_SECONDS): one prerendered table of every listed blog;
+// Rendered per request (no-store reads, public-read.ts): one table of every listed blog;
 // the comparison's URL state is applied in the browser (TrafficComparisonFromUrl).
-export const revalidate = 120;
+export const dynamic = 'force-dynamic';
 export const metadata = staticPageMetadata('/traffic/');
 export default function TrafficPage() {
   return (

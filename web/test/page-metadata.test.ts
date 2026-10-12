@@ -71,13 +71,12 @@ test('private page metadata is noindex without a canonical', () => {
   assert.equal(meta.alternates, undefined);
 });
 
-test('server pages and the layout never read cookies, headers or searchParams; ISR pages keep 120 s', () => {
+test('server pages and the layout never read cookies, headers or searchParams; none is ISR', () => {
   for (const file of [...pages(), join(APP, 'layout.tsx')]) {
     const text = source(file);
     if (text.startsWith("'use client'")) continue;
     assert.ok(!/\bcookies\(|\bheaders\(|searchParams/.test(text), relative(APP, file));
-    const revalidate = /export const revalidate = (\d+)/.exec(text);
-    if (revalidate) assert.equal(revalidate[1], '120', relative(APP, file));
+    assert.ok(!/export const revalidate/.test(text), relative(APP, file));
   }
 });
 

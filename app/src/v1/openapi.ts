@@ -26,10 +26,10 @@ export const API_INTRO = {
     `基底網址 \`${ORIGIN}\`。公開查詢使用 \`GET\`（也接受 \`HEAD\`），回傳 UTF-8 JSON。`,
     'API 狀態頁：`/api/status`。瀏覽器以 HTML 顯示；以 `Accept: application/json` 取得 JSON，只顯示 API 狀態與端點用途。狀態包含 `ok` 或 `degraded`，以有界可用性檢查確認公開查詢的資料依賴可連線，最多快取 5 秒；不是每個端點逐筆測試。JSON 欄位為 `status`、`version`、`endpoints`（每項 `path`、`summary`）與 `updatedAt`；這是狀態回應產生時間，不是文章資料更新時間。此回應為 `no-store`，不提供內部主機或爬蟲維運資訊。',
     '公開查詢不需要金鑰。每個 IP 每分鐘最多 60 次，超過回 `429`；回應帶 `x-ratelimit-limit`、`x-ratelimit-remaining`、`x-ratelimit-reset`。登入後可在 `/my/` 建立個人 API 金鑰（每人最多 3 把），以 `x-api-key: blog_…` 傳送，每把每分鐘 1000 次；伺服器只存 SHA-256 摘要，完整金鑰只顯示一次。無效或撤銷的金鑰回 `401`。為防止隨機金鑰探測，首次出現或未快取的金鑰須先通過每 IP 每分鐘 60 次的匿名／驗證桶；若該桶已用完會先回 `429`，請等窗口重設後重試。已快取且有效的金鑰不受此 IP 桶限制，每把每分鐘 1000 次額度不變。金鑰不能用來登入、管理或讀取私人資料，`Authorization` 不是本 API 的金鑰認證方式。',
-    '允許跨網域：`Access-Control-Allow-Origin: *`，不接受跨域 cookie 認證。瀏覽器可讀取限流標頭與 `Retry-After`；遇 `429` 請依 `Retry-After` 秒數退避。共享快取上的限流標頭可能是產生回應時的快照，不能當作即時餘額；來源站仍對實際到站請求計額。',
+    '允許跨網域：`Access-Control-Allow-Origin: *`，不接受跨域 cookie 認證。瀏覽器可讀取限流標頭與 `Retry-After`；遇 `429` 請依 `Retry-After` 秒數退避。限流標頭表示產生回應時的額度；來源站對實際到站請求計額。',
     '時間一律使用 UTC ISO 8601（例如 `2026-10-12T00:00:00.000Z`）；「一天」指台北時間（UTC+8）的日曆日，`hours` 則是連續經過的小時數。未知日期回 `null`，不以抓取日期冒充發文日期。',
     '部落格 `slug` 與話題 `id` 是穩定 API 識別碼，不因網頁網址改名而變動。已建立可讀網頁網址時，項目另附選用的 `canonicalPath`，文章附 `blogCanonicalPath`；以基底網址加上此相對路徑即可分享。欄位暫缺時仍可使用原識別碼網址，網頁會 301 到正式網址；不要拿可讀 slug 取代 API 參數。',
-    `匿名成功回應帶 \`cache-control: ${API_CACHE}\`。文章依各站 RSS／抓取排程分批更新，關係快照約每 5 分鐘，話題查詢快取約 2 分鐘；低頻部落格不因久未發文而失效。請至少間隔 120 秒輪詢，關係以 5 分鐘以上為宜。更新與歷史回補有延遲，不保證每輪都有新資料。`,
+    `匿名成功回應帶 \`cache-control: ${API_CACHE}\`。文章依各站 RSS／抓取排程分批更新，查詢不保留跨請求結果快取，讓隱藏或刪除內容可即時反映；低頻部落格不因久未發文而失效。請至少間隔 120 秒輪詢，關係以 5 分鐘以上為宜。更新與歷史回補有延遲，不保證每輪都有新資料。`,
     '帶 `x-api-key` 或 `Authorization` 的請求與錯誤回應為 `private, no-store` 或 `no-store`，不得進共享快取。快取標頭不代表 CDN 已快取該端點；目前 Cloudflare 的專用 HTML 規則只涵蓋首頁。',
     '錯誤格式為 `{"error":"..."}`：`400` 參數／游標錯誤、`401` 無效金鑰、`404` 找不到、`410` 話題證據已全部撤銷、`405` 不支援的方法、`429` 太頻繁、`503` 暫時無法提供服務。未知參數、重複參數與不合法的時間窗口會回 `400`。',
     '路徑參數請 URL 編碼（例如話題 `rss:1` 寫成 `rss%3A1`），路徑結尾不要加 `/`。文章與目錄使用 `limit`、`cursor`／`nextCursor`；游標是不透明字串，請原樣傳回並保持原查詢條件。`nextCursor: null` 表示這個結果已到尾頁。',
@@ -272,15 +272,28 @@ const schemas: Record<string, Schema> = {
     truncated: bool(),
   }),
   TopicHistory: obj({
-    articles: arr(obj({
-      id: int(), title: str(), url: str('原文連結；不提供全文'), publishedAt: nullable(time()),
-      blogSlug: str(), blogName: str(), blogCanonicalPath: str('可讀部落格路徑'),
-      evidenceState: str('confirmed 為已確認；pending 為過去觀測、待重新確認', { enum: ['confirmed', 'pending'] }),
-      observedAt: time('本站最後觀測到提及的時間'),
-    }, '', ['blogCanonicalPath'])),
+    articles: arr(
+      obj(
+        {
+          id: int(),
+          title: str(),
+          url: str('原文連結；不提供全文'),
+          publishedAt: nullable(time()),
+          blogSlug: str(),
+          blogName: str(),
+          blogCanonicalPath: str('可讀部落格路徑'),
+          evidenceState: str('confirmed 為已確認；pending 為過去觀測、待重新確認', { enum: ['confirmed', 'pending'] }),
+          observedAt: time('本站最後觀測到提及的時間'),
+        },
+        '',
+        ['blogCanonicalPath'],
+      ),
+    ),
     nextCursor: nullable(str('歷史清單下一頁游標；傳入 historyCursor，綁定話題不可跨用')),
-    confirmed: int('累積已確認的公開文章數'), pending: int('累積待重新確認的公開文章數'),
-    lastObservedAt: nullable(time()), total: int('累積不同公開文章數'),
+    confirmed: int('累積已確認的公開文章數'),
+    pending: int('累積待重新確認的公開文章數'),
+    lastObservedAt: nullable(time()),
+    total: int('累積不同公開文章數'),
   }),
   TopicDetail: obj({
     hours: int(),
@@ -458,7 +471,8 @@ export const ENDPOINTS: Endpoint[] = [
       q('historyCursor', 'history.nextCursor；累積歷史文章續頁，保持同一話題 ID', str('', { maxLength: 256 })),
     ],
     response: ref('TopicDetail'),
-    description: '近期最多 100 個部落格與 100 篇文章；請檢查 truncated。history 是累積曾有比對證據的公開文章，獨立於 hours 與每日來源窗口；近期為空時仍可讀歷史。pending 僅表示過去觀測、待重新確認，不代表現在仍命中。全部證據明確撤銷回 410；不存在或暫不可公開回 404。',
+    description:
+      '近期最多 100 個部落格與 100 篇文章；請檢查 truncated。history 是累積曾有比對證據的公開文章，獨立於 hours 與每日來源窗口；近期為空時仍可讀歷史。pending 僅表示過去觀測、待重新確認，不代表現在仍命中。全部證據明確撤銷回 410；不存在或暫不可公開回 404。',
   },
   { path: '/api/v1/openapi.json', summary: '機器可讀 OpenAPI 規格', tag: 'meta', response: ref('OpenApi') },
 ].map((endpoint) => ({
@@ -491,9 +505,9 @@ export const operationId = (path: string) =>
     .join('');
 export function buildOpenApi() {
   const headers = {
-    'cache-control': { description: '匿名成功回應可共享快取；帶金鑰／Authorization 或錯誤不得共享', schema: str() },
+    'cache-control': { description: '公開內容查詢 no-store；帶金鑰／Authorization 為 private, no-store', schema: str() },
     'x-ratelimit-limit': { description: '目前額度上限', schema: int() },
-    'x-ratelimit-remaining': { description: '產生回應當時剩餘額度；共享快取可能為舊快照', schema: int() },
+    'x-ratelimit-remaining': { description: '產生回應當時剩餘額度', schema: int() },
     'x-ratelimit-reset': { description: '目前窗口重設的秒數', schema: int() },
     'Access-Control-Allow-Origin': { schema: str('', { const: '*' }) },
   };

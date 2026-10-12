@@ -1,12 +1,13 @@
 import type { FastifyInstance } from 'fastify';
 import type { Pool, RowDataPacket } from 'mysql2/promise';
+import { TopicResponseCache } from '../topics/cache.ts';
 import { historyReadsEnabled } from '../topics/history-contracts.ts';
 import { digest, normalizeTerm } from '../topics/policy.ts';
 import { publicationExclusionReason } from '../topics/publication-noise.ts';
 import { SOURCE } from '../topics/snapshot-client.ts';
 import { getPublicPages, isPublicRouteKey, type PublicPageKind } from './page-routes.ts';
 
-export const PAGE_LINK_LIMITS = { references: 1000, nodes: 20000, depth: 24, cacheEntries: 10000, cacheMs: 300000, flights: 2000 } as const;
+export const PAGE_LINK_LIMITS = { references: 1000, nodes: 20000, depth: 24, cacheEntries: 10000, cacheMs: 0, flights: 2000 } as const;
 type Ref = { kind: 'blog-slug' | 'blog-id' | 'topic'; value: string };
 type Node = Record<string, unknown>;
 const keyOf = (ref: Ref) => `${ref.kind}:${ref.value}`;
@@ -52,7 +53,7 @@ async function loadLinks(pool: Pool, refs: Ref[]): Promise<Map<string, string>> 
   if (blogSlugs.length) {
     const slugs = blogSlugs.map((r) => r.value);
     const [rows] = await pool.query<RowDataPacket[]>(
-      "SELECT id,slug FROM blogs WHERE slug IN (?) AND BINARY slug IN (?) AND status<>'moved'",
+      "SELECT id,slug FROM blogs WHERE slug IN (?) AND BINARY slug IN (?) AND status='verified'",
       [slugs, slugs],
     );
     for (const row of rows) entities.set(keyOf({ kind: 'blog-slug', value: row.slug }), String(row.id));
@@ -140,43 +141,20 @@ async function loadLinks(pool: Pool, refs: Ref[]): Promise<Map<string, string>> 
   return result;
 }
 
-type Cache = { entries: Map<string, { until: number; value: string | null }>; flights: Map<string, Promise<void>> };
-const caches = new WeakMap<Pool, Cache>();
+/** Canonical URLs are stable, but public eligibility is not. Never retain a
+ * hidden publication's successful route resolution across completed requests. */
+const flights = new WeakMap<Pool, TopicResponseCache>();
 async function cachedLinks(pool: Pool, refs: Ref[]): Promise<Map<string, string>> {
-  if (historyReadsEnabled()) return loadLinks(pool, refs);
-  let cache = caches.get(pool);
+  let cache = flights.get(pool);
   if (!cache) {
-    cache = { entries: new Map(), flights: new Map() };
-    caches.set(pool, cache);
+    cache = new TopicResponseCache();
+    flights.set(pool, cache);
   }
-  const now = Date.now();
-  const missing = refs.filter((ref) => (cache.entries.get(keyOf(ref))?.until ?? 0) <= now && !cache.flights.has(keyOf(ref)));
-  if (missing.length && cache.flights.size + missing.length <= PAGE_LINK_LIMITS.flights) {
-    const state = cache;
-    const flight = loadLinks(pool, missing)
-      .then((result) => {
-        for (const ref of missing) {
-          const key = keyOf(ref);
-          state.entries.delete(key);
-          while (state.entries.size >= PAGE_LINK_LIMITS.cacheEntries) state.entries.delete(state.entries.keys().next().value!);
-          state.entries.set(key, { until: Date.now() + PAGE_LINK_LIMITS.cacheMs, value: result.get(key) ?? null });
-        }
-      })
-      .catch(() => {
-        /* Optional enrichment: never replace a valid response or expose DB errors. */
-      })
-      .finally(() => {
-        for (const ref of missing) if (state.flights.get(keyOf(ref)) === flight) state.flights.delete(keyOf(ref));
-      });
-    for (const ref of missing) state.flights.set(keyOf(ref), flight);
+  try {
+    return await cache.get(refs.map(keyOf).sort().join('|'), () => loadLinks(pool, refs));
+  } catch {
+    return new Map();
   }
-  await Promise.all(new Set(refs.map((ref) => cache.flights.get(keyOf(ref))).filter((p): p is Promise<void> => !!p)));
-  const result = new Map<string, string>();
-  for (const ref of refs) {
-    const hit = cache.entries.get(keyOf(ref));
-    if (hit && hit.until > Date.now() && hit.value) result.set(keyOf(ref), hit.value);
-  }
-  return result;
 }
 
 /** Copy-on-write preserves cached DTOs and every existing ID, slug and icon. */
@@ -299,7 +277,7 @@ export function registerPageLinks(app: FastifyInstance, pool: Pool) {
     if (!['GET', 'HEAD'].includes(request.method) || reply.statusCode !== 200) return payload;
     const path = request.url.split('?')[0];
     // Do not alter Cache-Control/Vary or authentication. /api/me/follows remains
-    // private and no-store; only immutable public paths enter the lookup cache.
+    // private and no-store; route eligibility is rechecked on every completed request.
     try {
       return await enrichPageLinks(pool, path, payload);
     } catch {

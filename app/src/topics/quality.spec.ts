@@ -36,7 +36,7 @@ describe('isolated malformed labels', () => {
   });
 });
 describe('bounded API singleflight cache', () => {
-  it('coalesces simultaneous loads and expires after configured bounded TTL', async () => {
+  it('coalesces simultaneous loads but rechecks every later completed request', async () => {
     let now = 0;
     const cache = new TopicResponseCache(1, 3, () => now);
     const load = vi.fn(async () => ({ n: 1 }));
@@ -45,10 +45,11 @@ describe('bounded API singleflight cache', () => {
     expect(results[0]).toEqual({ n: 1 });
     now = 59999;
     await cache.get('same', load);
-    expect(load).toHaveBeenCalledTimes(1);
+    expect(load).toHaveBeenCalledTimes(2);
     now = 60001;
     await cache.get('same', load);
-    expect(load).toHaveBeenCalledTimes(2);
+    expect(load).toHaveBeenCalledTimes(3);
+    expect(cache.ttlMs).toBe(0);
   });
   it('bounds cached keys and does not cache failed SQL', async () => {
     const cache = new TopicResponseCache(120000, 2);

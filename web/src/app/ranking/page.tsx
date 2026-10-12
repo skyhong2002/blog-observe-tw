@@ -6,8 +6,8 @@ import { taipei } from '@/lib/api';
 import { overview } from '@/lib/public-api';
 import { staticPageMetadata } from '@/lib/seo';
 import { table } from '@/lib/table-styles';
-// ISR (PUBLIC_REVALIDATE_SECONDS).
-export const revalidate = 120;
+// Rendered per request (no-store reads, public-read.ts).
+export const dynamic = 'force-dynamic';
 export const metadata = staticPageMetadata('/ranking/');
 export default async function RankingPage() {
   const data = await overview();

@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from 'next';
+import PublicRefresh from '@/components/PublicRefresh';
 import SiteAnalytics from '@/components/SiteAnalytics';
 import SiteFooter from '@/components/SiteFooter';
 import SiteHeader from '@/components/SiteHeader';
@@ -40,6 +41,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
       <body className="min-h-full bg-zinc-50 text-zinc-900 antialiased dark:bg-zinc-950 dark:text-zinc-100">
         <ThemeSync />
+        <PublicRefresh />
         <a
           href="#blog-main"
           className="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-50 focus:rounded-md focus:bg-white focus:px-4 focus:py-2 focus:text-zinc-900 focus:shadow"

@@ -9,7 +9,7 @@ import { SOURCE } from '../topics/snapshot-client.ts';
 import { getPublicPages, type PublicPage, type PublicPageKind } from './page-routes.ts';
 
 export const INDEXABILITY_WINDOW_DAYS = 90;
-export const INDEXABILITY_CACHE_MS = 300_000;
+export const INDEXABILITY_CACHE_MS = 0;
 export type PageIndexability = {
   indexable: boolean;
   indexabilityReason: string | null;
@@ -63,7 +63,7 @@ class PageIndexabilityStore {
         const [blogs] = await c.query<RowDataPacket[]>(
           `SELECT b.id entity_id,b.url,b.slug,b.status,SUM(CASE WHEN p.published_at>=? AND p.published_at<=? THEN 1 ELSE 0 END) posts,
           COALESCE(MAX(${validPostDate}),CASE WHEN b.discovered_at<=UTC_TIMESTAMP() THEN b.discovered_at END) lastmod
-          FROM blogs b LEFT JOIN posts p ON p.blog_id=b.id WHERE b.status<>'moved' GROUP BY b.id`,
+          FROM blogs b LEFT JOIN posts p ON p.blog_id=b.id WHERE b.status='verified' GROUP BY b.id`,
           [since, now],
         );
         await c.commit();

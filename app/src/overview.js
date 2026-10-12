@@ -40,30 +40,30 @@ async function loadProjection(pool) {
   const [postRows, tagRows, authorRows, blogRows, totalRows, recentRows] = await Promise.all([
     pool.query(`SELECT p.id,p.guid,p.title,p.url,p.summary,p.author,p.published_at AS publishedAt,p.image_url AS imageUrl,
       b.slug AS blogSlug,b.name AS blogName FROM posts p JOIN blogs b ON b.id=p.blog_id
-      WHERE b.status <> 'moved' AND (p.published_at IS NULL OR p.published_at<=UTC_TIMESTAMP()) ORDER BY p.published_at DESC,p.id DESC LIMIT 200`),
+      WHERE b.status='verified' AND (p.published_at IS NULL OR p.published_at<=UTC_TIMESTAMP()) ORDER BY p.published_at DESC,p.id DESC LIMIT 200`),
     pool.query(`SELECT t.slug,t.label,COUNT(DISTINCT p.id) AS postCount,COUNT(DISTINCT p.blog_id) AS blogCount
       FROM tags t JOIN post_tags pt ON pt.tag_id=t.id JOIN posts p ON p.id=pt.post_id JOIN blogs b ON b.id=p.blog_id
-      WHERE b.status <> 'moved' AND t.visibility='public' AND t.status='active' AND pt.status='active'
+      WHERE b.status='verified' AND t.visibility='public' AND t.status='active' AND pt.status='active'
       GROUP BY t.id,t.slug,t.label ORDER BY blogCount DESC,postCount DESC,t.slug LIMIT 100`),
     pool.query(`SELECT a.id,a.display_name AS displayName,b.slug AS blogSlug,b.name AS blogName,
       COUNT(DISTINCT p.id) AS postCount FROM authors a
       JOIN blog_authors ba ON ba.author_id=a.id JOIN blogs b ON b.id=ba.blog_id
       LEFT JOIN post_authors pa ON pa.author_id=a.id AND pa.status='active'
       LEFT JOIN posts p ON p.id=pa.post_id AND p.blog_id=b.id
-      WHERE a.status <> 'rejected' AND ba.status='active' AND b.status <> 'moved'
+      WHERE a.status <> 'rejected' AND ba.status='active' AND b.status='verified'
       GROUP BY a.id,a.display_name,b.slug,b.name ORDER BY a.display_name,b.slug LIMIT 200`),
-    pool.query(`SELECT ${blogFields} FROM blogs b ${latestJoin} WHERE b.status <> 'moved' ORDER BY postCount DESC,b.name LIMIT 200`),
-    pool.query(`SELECT (SELECT COUNT(*) FROM blogs WHERE status <> 'moved') AS blogs,
-      (SELECT COUNT(*) FROM posts p JOIN blogs b ON b.id=p.blog_id WHERE b.status <> 'moved') AS posts,
-      (SELECT MAX(last_crawl_success_at) FROM blogs) AS updatedAt`),
-    pool.query(`SELECT ${blogFields} FROM blogs b ${latestJoin} WHERE b.status <> 'moved' AND latest.published_at IS NOT NULL
+    pool.query(`SELECT ${blogFields} FROM blogs b ${latestJoin} WHERE b.status='verified' ORDER BY postCount DESC,b.name LIMIT 200`),
+    pool.query(`SELECT (SELECT COUNT(*) FROM blogs WHERE status='verified') AS blogs,
+      (SELECT COUNT(*) FROM posts p JOIN blogs b ON b.id=p.blog_id WHERE b.status='verified') AS posts,
+      (SELECT MAX(last_crawl_success_at) FROM blogs WHERE status='verified') AS updatedAt`),
+    pool.query(`SELECT ${blogFields} FROM blogs b ${latestJoin} WHERE b.status='verified' AND latest.published_at IS NOT NULL
       ORDER BY latest.published_at DESC,latest.id DESC,b.id LIMIT 20`),
   ]);
   const icons = await iconManifest();
   const row = totalRows[0][0];
   return {
     generatedAt: new Date().toISOString(),
-    cacheSeconds: 60,
+    cacheSeconds: 0,
     posts: postRows[0].map(publicPost),
     tags: tagRows[0],
     authors: authorRows[0],

@@ -40,15 +40,16 @@ export type RelationDTO = {
 };
 // Stable source-post / exact target / location identity survives crawler ordinal changes.
 // This only filters public presentation; original observations/discovery evidence are never mutated.
-const PUBLIC_RELATION = `EXISTS (SELECT 1 FROM relation_observations public_o WHERE public_o.post_id=l.source_post_id AND public_o.last_success_at IS NOT NULL AND public_o.status<>'reparse-pending') AND NOT EXISTS (SELECT 1 FROM admin_relation_overrides hidden_link
+const PUBLIC_RELATION = `EXISTS (SELECT 1 FROM posts visible_post JOIN blogs visible_blog ON visible_blog.id=visible_post.blog_id
+  WHERE visible_post.id=l.source_post_id AND visible_blog.status='verified') AND EXISTS (SELECT 1 FROM relation_observations public_o WHERE public_o.post_id=l.source_post_id AND public_o.last_success_at IS NOT NULL AND public_o.status<>'reparse-pending') AND NOT EXISTS (SELECT 1 FROM admin_relation_overrides hidden_link
   WHERE hidden_link.source_post_id=l.source_post_id AND hidden_link.target_url_hash=SHA2(l.target_url,256)
   AND BINARY hidden_link.target_url=BINARY l.target_url AND hidden_link.location=l.location AND hidden_link.hidden=TRUE)`;
-type RelationCache = { revision: number; entries: Map<string, { expires: number; dto: unknown }>; flights: Map<string, Promise<unknown>> };
+type RelationCache = { revision: number; flights: Map<string, Promise<unknown>> };
 const relationCaches = new WeakMap<Pool, RelationCache>();
 function cacheFor(pool: Pool): RelationCache {
   let cache = relationCaches.get(pool);
   if (!cache) {
-    cache = { revision: 0, entries: new Map(), flights: new Map() };
+    cache = { revision: 0, flights: new Map() };
     relationCaches.set(pool, cache);
   }
   return cache;
@@ -57,7 +58,6 @@ function cacheFor(pool: Pool): RelationCache {
 export async function invalidateRelationCache(pool: Pool) {
   const cache = cacheFor(pool);
   cache.revision++;
-  cache.entries.clear();
   cache.flights.clear();
   const c = await pool.getConnection();
   try {
@@ -72,10 +72,8 @@ export async function invalidateRelationCache(pool: Pool) {
     c.release();
   }
 }
-async function cachedProjection<T>(pool: Pool, key: string, ttl: number, build: () => Promise<T>): Promise<T> {
+async function cachedProjection<T>(pool: Pool, key: string, _ttl: number, build: () => Promise<T>): Promise<T> {
   const cache = cacheFor(pool);
-  const hit = cache.entries.get(key);
-  if (hit && hit.expires > Date.now()) return hit.dto as T;
   const pending = cache.flights.get(key);
   if (pending) return pending as Promise<T>;
   if (cache.flights.size >= 4) throw Object.assign(Error('relation_projection_busy'), { statusCode: 503 });
@@ -84,8 +82,6 @@ async function cachedProjection<T>(pool: Pool, key: string, ttl: number, build: 
       const revision = cache.revision;
       const dto = await build();
       if (cache.revision !== revision) continue;
-      if (cache.entries.size >= 256) cache.entries.delete(cache.entries.keys().next().value as string);
-      cache.entries.set(key, { expires: Date.now() + ttl, dto });
       return dto;
     }
     throw Error('relation_projection_changed');
@@ -113,12 +109,15 @@ async function buildSnapshot(pool: Pool, days: number, now: Date, attempt = 0): 
   return dto;
 }
 export async function readRelationSnapshot(pool: Pool, days: number, now = new Date()): Promise<RelationDTO> {
-  const [[row]] = await pool.query<RowDataPacket[]>(
-    `SELECT s.payload FROM relation_snapshots s JOIN relation_projection_state p ON p.id=1 AND p.revision=s.revision WHERE s.days=? AND s.generated_at>=?`,
-    [days, new Date(now.getTime() - 600000)],
-  );
-  if (row) return typeof row.payload === 'string' ? JSON.parse(row.payload) : row.payload;
-  return buildSnapshot(pool, days, now);
+  // Worker snapshots cannot prove visibility after a deletion/hide. Read live
+  // SQL, retaining the revision fence for admin edits committed mid-query.
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const [[before]] = await pool.query<RowDataPacket[]>('SELECT revision FROM relation_projection_state WHERE id=1');
+    const result = await loadRelations(pool, days, now);
+    const [[after]] = await pool.query<RowDataPacket[]>('SELECT revision FROM relation_projection_state WHERE id=1');
+    if (Number(before?.revision ?? 0) === Number(after?.revision ?? 0)) return result;
+  }
+  throw Error('relation_projection_changed');
 }
 /** Schedule every five minutes independently of crawler enablement; three bounded window DTOs. */
 export async function runRelationSnapshotBatch(pool: Pool, options: BatchOptions = {}): Promise<BatchResult> {
@@ -277,7 +276,9 @@ export async function loadRelations(pool: Pool, days = 90, now = new Date()): Pr
     nodeIds.add(pair.sourceBlogId);
     nodeIds.add(pair.targetBlogId);
   }
-  const [nodes] = nodeIds.size ? await pool.query<RowDataPacket[]>('SELECT id,slug,name FROM blogs WHERE id IN (?)', [[...nodeIds]]) : [[]];
+  const [nodes] = nodeIds.size
+    ? await pool.query<RowDataPacket[]>("SELECT id,slug,name FROM blogs WHERE id IN (?) AND status='verified'", [[...nodeIds]])
+    : [[]];
   const icons = await iconManifest();
   const coverage = await loadRelationCoverage(pool);
   return {
@@ -311,7 +312,7 @@ export async function registerRelationRoutes(app: FastifyInstance, pool: Pool) {
     const days = relationDays((request.query as { days?: unknown }).days);
     if (days === null) return reply.code(400).send({ error: 'invalid_days' });
     const { slug } = request.params as { slug: string };
-    const [[blog]] = await pool.query<RowDataPacket[]>("SELECT id,slug,name FROM blogs WHERE slug=? AND status<>'moved'", [slug]);
+    const [[blog]] = await pool.query<RowDataPacket[]>("SELECT id,slug,name FROM blogs WHERE slug=? AND status='verified'", [slug]);
     if (!blog) return reply.code(404).send({ error: 'blog_not_found' });
     return projectionResponse(reply, () => readBlogRelations(pool, { id: Number(blog.id) }, days));
   });
@@ -342,7 +343,7 @@ export function readBlogRelations(pool: Pool, blog: { id: number }, days: number
       })),
     );
     const ids = [...new Set([Number(blog.id), ...edges.flatMap((e) => [e.sourceBlogId, e.targetBlogId])])];
-    const [nodes] = await pool.query<RowDataPacket[]>('SELECT id,slug,name FROM blogs WHERE id IN (?)', [ids]);
+    const [nodes] = await pool.query<RowDataPacket[]>("SELECT id,slug,name FROM blogs WHERE id IN (?) AND status='verified'", [ids]);
     const [evidence] = await pool.query<RowDataPacket[]>(
       `SELECT p.id postId,p.title postTitle,p.url postUrl,l.target_url targetUrl,l.anchor_text anchor,p.published_at publishedAt,
       l.source_blog_id sourceBlogId,l.target_blog_id targetBlogId,l.location

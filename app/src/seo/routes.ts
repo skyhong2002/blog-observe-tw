@@ -8,7 +8,7 @@ import { getIndexablePages } from './indexability.ts';
 export const SEO_ORIGIN = 'https://blog.observe.tw';
 export const SITEMAP_PAGE_SIZE = 10_000;
 const MAX_XML_BYTES = 50 * 1024 * 1024;
-const CACHE = 'public, max-age=300, s-maxage=300, stale-while-revalidate=600';
+const CACHE = 'no-store';
 const staticPages = ['/', '/blogs/', '/topics/', '/api/', '/about/'] as const;
 export const xmlEscape = (value: string) =>
   value.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&apos;' })[c]!);
@@ -134,7 +134,12 @@ export function registerSeoRoutes(app: FastifyInstance, pool: Pool) {
             import.meta.url,
           ),
         )) ?? (await fileDate(new URL('./routes.ts', import.meta.url)));
-      return sitemapXml(rows.map((row) => ({ loc: SEO_ORIGIN + row.canonicalPath, lastmod: kind === 'topics' && historyReadsEnabled() ? iso(row.lastmod) : iso(row.lastmod) ?? iso(fallback) })));
+      return sitemapXml(
+        rows.map((row) => ({
+          loc: SEO_ORIGIN + row.canonicalPath,
+          lastmod: kind === 'topics' && historyReadsEnabled() ? iso(row.lastmod) : (iso(row.lastmod) ?? iso(fallback)),
+        })),
+      );
     });
     return reply.type('application/xml; charset=utf-8').header('cache-control', CACHE).send(xml);
   });

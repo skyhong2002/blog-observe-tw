@@ -1,7 +1,7 @@
 import { catalogFilters } from './catalog.js';
 
 const publicRelations = `FROM authors a JOIN blog_authors ba ON ba.author_id=a.id JOIN blogs b ON b.id=ba.blog_id
-  WHERE a.status <> 'rejected' AND ba.status='active' AND b.status <> 'moved'`;
+  WHERE a.status <> 'rejected' AND ba.status='active' AND b.status='verified'`;
 export function authorCatalogFilters(query = {}) {
   const { page, limit } = catalogFilters(query);
   if (query.author === undefined) return { author: null, page, limit };

@@ -1,13 +1,11 @@
 /**
- * The public, cookie-free gateway reads that public pages may share through
- * ISR (server) or same-origin fetches (browser). Pure: no origin, no fetch,
+ * The public, cookie-free gateway reads that public pages make on the server
+ * (public-api.ts) or as same-origin fetches in the browser (public-loader.ts),
+ * every one of them no-store (public-read.ts). Pure: no origin, no fetch,
  * safe in client bundles and node --test. Anything not listed here — /api/me,
  * /api/admin, /auth, /me, reader data, other methods — is private and must go
  * through the no-store gateway instead (see server-gateway.ts).
  */
-
-/** Seconds a public page (and its gateway reads) may be served before regenerating. Pages repeat it as a literal. */
-export const PUBLIC_REVALIDATE_SECONDS = 120;
 
 /** Longest query value accepted; the gateway clamps its own inputs further. */
 const VALUE_MAX = 300;

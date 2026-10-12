@@ -5,9 +5,9 @@ import { TOPICS_PERIOD, topicsApiPath } from '@/lib/public-query';
 import { staticPageMetadata } from '@/lib/seo';
 import type { Topics } from '@/lib/topics';
 
-// ISR (PUBLIC_REVALIDATE_SECONDS): the prerendered page is the 30-day ranking;
+// Rendered per request (no-store reads, public-read.ts): the server page is the 30-day ranking;
 // ?days=7|90 are read in the browser from the same public /api/topics.
-export const revalidate = 120;
+export const dynamic = 'force-dynamic';
 export const metadata = staticPageMetadata('/topics/');
 
 export default async function Page() {

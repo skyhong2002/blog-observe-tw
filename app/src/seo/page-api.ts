@@ -20,12 +20,7 @@ export function registerPageApi(app: FastifyInstance, pool: Pool) {
       const page = await resolvePublicPage(pool, kind, request.params.key);
       if (!page) return reply.code(404).header('cache-control', 'no-store').send({ error: 'not_found' });
       const metadata = await getPageIndexability(pool, kind, page.entityId);
-      return reply
-        .header(
-          'cache-control',
-          kind === 'topic' && historyReadsEnabled() ? 'no-store' : 'public, max-age=300, s-maxage=300, stale-while-revalidate=600',
-        )
-        .send({ page: { ...page, ...metadata } });
+      return reply.header('cache-control', 'no-store').send({ page: { ...page, ...metadata } });
     });
   }
 }

@@ -19,7 +19,7 @@ export function registerAiRoutes(app: FastifyInstance, pool: Pool) {
     const overrideValue = override ? validatedOverride(override.result_json) : null;
     const value = overrideValue || (row ? decode(row.result_json) : null);
     const [topics] = await pool.query<RowDataPacket[]>(
-      "SELECT p.id,p.title,COALESCE(o.result_json,a.result_json) result_json,CASE WHEN o.id IS NOT NULL THEN 'manual' ELSE a.coverage END coverage,COALESCE(o.updated_at,a.updated_at) updated_at,o.id override_id FROM posts p LEFT JOIN ai_results a ON a.id=(SELECT r.id FROM ai_results r WHERE r.entity_type='post' AND r.entity_id=p.id AND r.task='topics' AND r.status='ok' ORDER BY r.updated_at DESC,r.id DESC LIMIT 1) LEFT JOIN ai_overrides o ON o.entity_type='post' AND o.entity_id=p.id AND o.task='topics' WHERE p.blog_id=? AND (a.id IS NOT NULL OR o.id IS NOT NULL) ORDER BY p.published_at DESC,p.id DESC LIMIT 10",
+      "SELECT p.id,p.title,COALESCE(o.result_json,a.result_json) result_json,CASE WHEN o.id IS NOT NULL THEN 'manual' ELSE a.coverage END coverage,COALESCE(o.updated_at,a.updated_at) updated_at,o.id override_id FROM posts p LEFT JOIN ai_results a ON a.id=(SELECT r.id FROM ai_results r WHERE r.entity_type='post' AND r.entity_id=p.id AND r.task='topics' AND r.status='ok' ORDER BY r.updated_at DESC,r.id DESC LIMIT 1) LEFT JOIN ai_overrides o ON o.entity_type='post' AND o.entity_id=p.id AND o.task='topics' WHERE p.blog_id=? AND (p.published_at IS NULL OR p.published_at<=UTC_TIMESTAMP()) AND (a.id IS NOT NULL OR o.id IS NOT NULL) ORDER BY p.published_at DESC,p.id DESC LIMIT 10",
       [blog.id],
     );
     return {

@@ -25,7 +25,7 @@ describe('public v1 route privacy and input bounds', () => {
     const res = await app.inject({ method: 'HEAD', url: '/api/v1/articles' });
     expect(res.statusCode).toBe(200);
     expect(res.body).toBe('');
-    expect(res.headers['cache-control']).toContain('s-maxage=120');
+    expect(res.headers['cache-control']).toBe('no-store');
   });
   it('rejects malformed/repeated filters before issuing SQL', async () => {
     const { app, query } = setup();
@@ -111,7 +111,7 @@ describe('public v1 route privacy and input bounds', () => {
     }
     for (const call of query.mock.calls) expect(call[0]).toContain("b.status='verified'");
   });
-  it('single-flights equivalent public reads and shares GET/HEAD cached window', async () => {
+  it('single-flights concurrent public reads but refreshes subsequent HEAD', async () => {
     const { app, query } = setup(
       vi.fn(async () => {
         await new Promise((resolve) => setTimeout(resolve, 5));
@@ -128,7 +128,7 @@ describe('public v1 route privacy and input bounds', () => {
     const head = await app.inject({ method: 'HEAD', url: '/api/v1/articles' });
     expect(head.statusCode).toBe(200);
     expect(head.body).toBe('');
-    expect(query).toHaveBeenCalledTimes(1);
+    expect(query).toHaveBeenCalledTimes(2);
   });
   it('normalizes unexpected SQL errors without disclosing database text', async () => {
     const { app } = setup(vi.fn().mockRejectedValue(new Error('SQL password SELECT secret')));

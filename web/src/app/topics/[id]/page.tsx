@@ -10,8 +10,8 @@ import { type TopicDetail, topicPageDescription } from '@/lib/topics';
 import type { PublicLoad } from '@/lib/use-public-json';
 
 // Rendered on every request, never cached or built: which of a topic's articles may be shown is decided
-// by the gateway per request (an article hidden on one site must not live on in a stored page), so unlike
-// the other public pages this one is not ISR, and its page-registry and topic reads are no-store (public-read.ts).
+// by the gateway per request (an article hidden on one site must not live on in a stored page), so like
+// every public page this one is not ISR, and its page-registry and topic reads are no-store (public-read.ts).
 // The page is the 30-day view; ?days=7|90 and further history pages are read in the browser from /api/topics/:id.
 // When the period has no articles, the payload's `history` (articles the topic matched before) is shown instead.
 export const dynamic = 'force-dynamic';
