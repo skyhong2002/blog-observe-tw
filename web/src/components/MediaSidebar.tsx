@@ -1,17 +1,20 @@
 'use client';
 import { type ReactNode, useEffect, useId, useState } from 'react';
+
+/** Sidebar sections a link or the URL hash can point at; on phones the collapsed sidebar opens for them. */
+const anchors = ['#authors', '#source', '#content-source', '#traffic'];
 export default function MediaSidebar({ children, label = '媒體資料與媒體關係' }: { children: ReactNode; label?: string }) {
   const [open, setOpen] = useState(false);
   const id = useId();
   useEffect(() => {
     const reveal = () => {
-      if (!['#authors', '#source'].includes(location.hash)) return;
+      if (!anchors.includes(location.hash)) return;
       setOpen(true);
       requestAnimationFrame(() => document.querySelector(location.hash)?.scrollIntoView({ block: 'start' }));
     };
     const onClick = (event: MouseEvent) => {
       const link = (event.target as Element).closest('a');
-      if (link && ['#authors', '#source'].includes(link.getAttribute('href') ?? '')) setOpen(true);
+      if (link && anchors.includes(link.getAttribute('href') ?? '')) setOpen(true);
     };
     reveal();
     window.addEventListener('hashchange', reveal);

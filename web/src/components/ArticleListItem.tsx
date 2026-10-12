@@ -6,7 +6,17 @@ import { type Post, plainText, taipei } from '@/lib/api';
 
 /** Markup copied from tag.observe.tw ArticleListItem, commit afe0a65.
  * Blog data keeps source links and tags; news-only discovery/attribution is omitted. */
-export default function ArticleListItem({ post }: { post: Post }) {
+export default function ArticleListItem({
+  post,
+  snippet,
+  matchSource,
+}: {
+  post: Post;
+  /** Search hit context from /api/search, already plain text and ≤240 characters. */
+  snippet?: string | null;
+  /** Where the search matched; shown as a small label beside the snippet. */
+  matchSource?: 'body' | 'metadata' | null;
+}) {
   const article = {
     ...post,
     url: post.url ?? null,
@@ -40,7 +50,17 @@ export default function ArticleListItem({ post }: { post: Post }) {
               title
             )}
           </h3>
-          {article.description && (
+          {(snippet || matchSource) && (
+            <p className="mt-1 line-clamp-3 text-xs leading-5 text-zinc-600 dark:text-zinc-400">
+              {matchSource && (
+                <span className="mr-1.5 rounded bg-brand-50 px-1 text-[10px] text-brand-800 dark:bg-brand-950 dark:text-brand-300">
+                  {matchSource === 'body' ? '內文相符' : '標題或摘要相符'}
+                </span>
+              )}
+              {snippet}
+            </p>
+          )}
+          {!snippet && article.description && (
             <p className="mt-1 hidden text-xs leading-5 text-zinc-500 group-data-[summaries=true]/list:line-clamp-2 dark:text-zinc-400">
               {article.description}
             </p>

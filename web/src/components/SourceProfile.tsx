@@ -1,6 +1,7 @@
 // Profile grid and sidebar copied from tag.observe.tw /media/[media]/ (afe0a65).
 
 import Link from 'next/link';
+import type { ReactNode } from 'react';
 import BlogIcon from '@/components/BlogIcon';
 import { type Blog, taipei } from '@/lib/api';
 import ArticleListItem from './ArticleListItem';
@@ -8,7 +9,7 @@ import FollowButton from './follow-button';
 import MediaSidebar from './MediaSidebar';
 import MediaWordCloud from './MediaWordCloud';
 import SectionTabs from './SectionTabs';
-export default function SourceProfile({ blog, query = '' }: { blog: Blog; query?: string }) {
+export default function SourceProfile({ blog, query = '', sidebar }: { blog: Blog; query?: string; sidebar?: ReactNode }) {
   const allPosts = blog.posts ?? [];
   const posts = query
     ? allPosts.filter((post) => `${post.title} ${post.summary ?? ''}`.toLocaleLowerCase().includes(query.toLocaleLowerCase()))
@@ -57,7 +58,7 @@ export default function SourceProfile({ blog, query = '' }: { blog: Blog; query?
         ]}
       />
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-[minmax(0,1fr)_19rem] lg:gap-6">
-        <MediaSidebar label="部落格資料、作者與標籤">
+        <MediaSidebar label="部落格資料、內文來源、流量與作者">
           <section id="source" className="rounded-lg border border-zinc-200 p-3 text-xs dark:border-zinc-800">
             <h2 className="mb-3 flex items-baseline justify-between gap-2 text-sm font-semibold">部落格資料</h2>
             <dl className="grid grid-cols-[5rem_minmax(0,1fr)] gap-y-2.5 leading-5">
@@ -86,6 +87,7 @@ export default function SourceProfile({ blog, query = '' }: { blog: Blog; query?
               沒有近期文章不代表網站失效，抓取成功與發文時間分開記錄。
             </p>
           </section>
+          {sidebar}
           <section id="authors" className="rounded-lg border border-zinc-200 p-3 text-xs dark:border-zinc-800">
             <h2 className="mb-3 text-sm font-semibold">相關作者</h2>
             {blog.authors?.length ? (
@@ -142,7 +144,18 @@ export default function SourceProfile({ blog, query = '' }: { blog: Blog; query?
             </button>
           </form>
           <p className="text-xs text-zinc-500 dark:text-zinc-400">
-            本頁 {posts.length} 篇 · 搜尋最新收錄的 {allPosts.length} 篇文章
+            本頁 {posts.length} 篇 · 搜尋最新收錄的 {allPosts.length} 篇文章的標題與摘要
+            {query && (
+              <>
+                {' · '}
+                <Link
+                  href={`/articles/?${new URLSearchParams({ q: query, blog: blog.slug })}`}
+                  className="text-brand-700 hover:underline dark:text-brand-400"
+                >
+                  搜尋這個部落格的內文 →
+                </Link>
+              </>
+            )}
           </p>
           {posts.length ? (
             <ul className="divide-y divide-zinc-200 dark:divide-zinc-800">

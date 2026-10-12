@@ -13,6 +13,10 @@ export default function AboutPage() {
         <p className="text-sm leading-7 text-zinc-600 dark:text-zinc-400">
           來源包括種子名單、RSS、Atom、網站地圖與公開部落卷。候選站保留發現頁面與來源證據，經核對後才加入目錄；短文與圖片文也能被收錄。
         </p>
+        <p className="text-sm leading-7 text-zinc-600 dark:text-zinc-400">
+          文章內文依序從 RSS 全文、Atom 內容、平台 API 或文章頁 HTML
+          取得，只用於關鍵字、文章關係與站內搜尋；本站公開只顯示摘要、搜尋片段與原文連結。各部落格頁的「內文來源」會說明取得方式與狀態。
+        </p>
       </section>
       <section className="space-y-2">
         <h2 className="text-lg font-semibold">更新與排行</h2>

@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
+import BlogContentSources from '@/components/BlogContentSources';
 import BlogInference from '@/components/BlogInference';
 import BlogRelations from '@/components/BlogRelations';
 import BlogTopics from '@/components/BlogTopics';
@@ -17,11 +18,19 @@ export default async function BlogDetailPage({ params, searchParams }: Props) {
   if (!blog) notFound();
   return (
     <>
-      <SourceProfile blog={blog} query={String((await searchParams).q ?? '').slice(0, 100)} />
+      <SourceProfile
+        blog={blog}
+        query={String((await searchParams).q ?? '').slice(0, 100)}
+        sidebar={
+          <>
+            <BlogContentSources slug={blog.slug} />
+            <SimilarwebTraffic slug={blog.slug} compact />
+          </>
+        }
+      />
       <BlogRelations slug={blog.slug} />
       <BlogTopics slug={blog.slug} />
       <BlogInference slug={blog.slug} />
-      <SimilarwebTraffic slug={blog.slug} compact />
     </>
   );
 }
