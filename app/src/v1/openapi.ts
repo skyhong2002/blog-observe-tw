@@ -24,7 +24,7 @@ export const API_INTRO = {
   summary: '公開取用最新文章、部落格目錄、正文提及關係與話題排行；資料只涵蓋已收錄且驗證的部落格。',
   rules: [
     `基底網址 \`${ORIGIN}\`。公開查詢使用 \`GET\`（也接受 \`HEAD\`），回傳 UTF-8 JSON。`,
-    'API 狀態頁：`/api/status`。瀏覽器以 HTML 顯示；以 `Accept: application/json` 取得 JSON，只顯示 API 狀態與端點用途。JSON 欄位為 `status`、`version`、`endpoints`（每項 `path`、`summary`）與 `updatedAt`；這是狀態回應產生時間，不是文章資料更新時間。此回應為 `no-store`，不提供內部主機或爬蟲維運資訊。',
+    'API 狀態頁：`/api/status`。瀏覽器以 HTML 顯示；以 `Accept: application/json` 取得 JSON，只顯示 API 狀態與端點用途。狀態包含 `ok` 或 `degraded`，以有界可用性檢查確認公開查詢的資料依賴可連線，最多快取 5 秒；不是每個端點逐筆測試。JSON 欄位為 `status`、`version`、`endpoints`（每項 `path`、`summary`）與 `updatedAt`；這是狀態回應產生時間，不是文章資料更新時間。此回應為 `no-store`，不提供內部主機或爬蟲維運資訊。',
     '公開查詢不需要金鑰。每個 IP 每分鐘最多 60 次，超過回 `429`；回應帶 `x-ratelimit-limit`、`x-ratelimit-remaining`、`x-ratelimit-reset`。登入後可在 `/my/` 建立個人 API 金鑰（每人最多 3 把），以 `x-api-key: blog_…` 傳送，每把每分鐘 1000 次；伺服器只存 SHA-256 摘要，完整金鑰只顯示一次。無效或撤銷的金鑰回 `401`。為防止隨機金鑰探測，首次出現或未快取的金鑰須先通過每 IP 每分鐘 60 次的匿名／驗證桶；若該桶已用完會先回 `429`，請等窗口重設後重試。已快取且有效的金鑰不受此 IP 桶限制，每把每分鐘 1000 次額度不變。金鑰不能用來登入、管理或讀取私人資料，`Authorization` 不是本 API 的金鑰認證方式。',
     '允許跨網域：`Access-Control-Allow-Origin: *`，不接受跨域 cookie 認證。瀏覽器可讀取限流標頭與 `Retry-After`；遇 `429` 請依 `Retry-After` 秒數退避。共享快取上的限流標頭可能是產生回應時的快照，不能當作即時餘額；來源站仍對實際到站請求計額。',
     '時間一律使用 UTC ISO 8601（例如 `2026-10-12T00:00:00.000Z`）；「一天」指台北時間（UTC+8）的日曆日，`hours` 則是連續經過的小時數。未知日期回 `null`，不以抓取日期冒充發文日期。',

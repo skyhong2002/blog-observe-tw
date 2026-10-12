@@ -298,7 +298,7 @@ export async function buildApp(config, { logger = false, store = null } = {}) {
   });
 
   const proxyToUi = createUiProxy(config.uiOrigin);
-  registerApiStatus(app, proxyToUi);
+  registerApiStatus(app, proxyToUi, pool);
   app.get('/api', proxyToUi);
   app.get('/api/', proxyToUi);
   const handler = async (request, reply) => {

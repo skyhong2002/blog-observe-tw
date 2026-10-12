@@ -1,9 +1,37 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
+import type { Pool } from 'mysql2/promise';
 import { PUBLIC_PATHS } from '../public-api/contract.ts';
 import { buildOpenApi } from './openapi.ts';
 /** Only the public API contract is exposed; never internal hosts, queues or credentials. */
-export function registerApiStatus(app: FastifyInstance, proxy: (request: FastifyRequest, reply: FastifyReply) => unknown) {
+export function registerApiStatus(app: FastifyInstance, proxy: (request: FastifyRequest, reply: FastifyReply) => unknown, pool: Pool) {
   const spec = buildOpenApi();
+  let checkedAt = 0;
+  let healthy = false;
+  let flight: Promise<void> | null = null;
+  async function available() {
+    if (Date.now() - checkedAt < 5000) return healthy;
+    if (!flight)
+      flight = (async () => {
+        let timer: ReturnType<typeof setTimeout> | undefined;
+        try {
+          await Promise.race([
+            pool.query({ sql: 'SELECT 1', timeout: 1500 }),
+            new Promise((_, reject) => {
+              timer = setTimeout(() => reject(Error('status_timeout')), 2000);
+            }),
+          ]);
+          healthy = true;
+        } catch {
+          healthy = false;
+        } finally {
+          clearTimeout(timer);
+          checkedAt = Date.now();
+          flight = null;
+        }
+      })();
+    await flight;
+    return healthy;
+  }
   const endpoints = PUBLIC_PATHS.map((path) => {
     const openapiPath = path.replace(/:([a-z]+)/g, '{$1}');
     return {
@@ -18,7 +46,7 @@ export function registerApiStatus(app: FastifyInstance, proxy: (request: Fastify
         // UI proxy can replace response headers; enforce negotiation afterward.
         return proxy(request, reply);
       }
-      return { status: 'ok', version: 'v1', endpoints, updatedAt: new Date().toISOString() };
+      return { status: (await available()) ? 'ok' : 'degraded', version: 'v1', endpoints, updatedAt: new Date().toISOString() };
     });
   }
   app.addHook('onSend', async (request, reply, payload) => {

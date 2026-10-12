@@ -30,7 +30,7 @@ const COLUMNS: Array<{ label: string; links: FooterLink[] }> = [
   {
     label: '開發與聯絡',
     links: [
-      { href: '/healthz', label: '服務狀態' },
+      { href: '/api/', label: 'API 文件與狀態' },
       { href: 'https://github.com/skyhong2002/blog-observe-tw/issues/new', label: '聯絡與移除請求', external: true },
       { href: 'https://tag.observe.tw', label: '姊妹站 新文易數', external: true },
     ],

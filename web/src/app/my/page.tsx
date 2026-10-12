@@ -1,5 +1,19 @@
+import ApiKeyManager from '@/components/ApiKeyManager';
 import ReaderList from '@/components/ReaderList';
 import SectionTabs from '@/components/SectionTabs';
+import { exampleUrl, loadSpec, operations } from '@/lib/openapi-spec';
+
+// A public GET from the generated spec for the API key curl example; the page
+// itself stays a static shell and loads every private value in the browser.
+function keyExample(): string {
+  const example = operations(loadSpec())
+    .filter((e) => e.method === 'GET' && !e.path.endsWith('openapi.json'))
+    .map(exampleUrl)
+    .find((url) => url !== null);
+  if (!example) throw new Error('data/openapi.json has no public GET example for the API key section');
+  return example;
+}
+
 export default function MyPage() {
   return (
     <div className="space-y-5 pb-8">
@@ -16,6 +30,7 @@ export default function MyPage() {
         ]}
       />
       <ReaderList />
+      <ApiKeyManager example={keyExample()} />
     </div>
   );
 }

@@ -37,4 +37,24 @@ describe('deployed API contract registration', () => {
     expect((await app.inject('/api/')).headers['x-blog-outcome']).toBe('ui-down');
     await app.close();
   });
+  it('reports degraded status without leaking database failure details', async () => {
+    const app = await buildApp(
+      { port: 18160, uiOrigin: 'http://127.0.0.1:1', publicOrigin: 'https://blog.observe.tw', adminEmails: new Set() },
+      {
+        // @ts-expect-error JavaScript fixture injects only the pool interface used here.
+        store: {
+          pool: {
+            query: async () => {
+              throw Error('private connection detail');
+            },
+          },
+        },
+      },
+    );
+    const response = await app.inject({ url: '/api/status', headers: { accept: 'application/json' } });
+    expect(response.json().status).toBe('degraded');
+    expect(response.body).not.toContain('private connection');
+    expect(response.headers['cache-control']).toBe('no-store');
+    await app.close();
+  });
 });

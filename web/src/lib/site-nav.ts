@@ -23,6 +23,7 @@ export const NAV_GROUPS: Array<{ label: string; links: NavLink[] }> = [
     links: [
       { href: '/my/', label: '我的追蹤', short: '追蹤' },
       { href: '/me/feed.xml', label: '個人 RSS', short: 'RSS' },
+      { href: '/api/', label: 'API 文件', short: 'API' },
     ],
   },
 ];
