@@ -15,7 +15,7 @@ Created in [T3 Code](https://t3.codes).
 - 獨立 MariaDB `blog_observe` schema、Drizzle schema 與持久化 session；seed 匯入器保留原始列、來源 SHA-256、分類與未換算的流量原值。
 - 登入後可追蹤部落格，透過 `/me/feed.xml` 匯出個人 RSS，並以 `/me/opml` 匯出、`POST /api/me/opml` 匯入 OPML；未知 OPML 網址只進候選清單，不會自動公開收錄。
 - 專案骨架跟隨 tag.observe.tw 固定 commit `afe0a653fa8aae7e25a04a1d9fe87bf0400a2a39`：Fastify、Drizzle、BullMQ、Next 16、React 19、Tailwind 4、Biome、Vitest；`NOTICE` 保留移植來源與 MIT 聲明。
-- RSS/Atom/sitemap 抓取遵守 robots、識別 User-Agent、每站延遲和 ETag/Last-Modified；blogblog.club discovery 每週執行，Similarweb Similar Sites 預設關閉且有主機級 budget/lock。
+- RSS/Atom/sitemap 抓取遵守 robots、識別 User-Agent、每站延遲和 ETag/Last-Modified；blogblog.club discovery 每週執行，Similarweb 方案一（tag 唯一供應商入口）已核准但尚待正式 API／認證契約，本機旗標固定關閉；舊 direct provider、budget／lock 已移除。
 - 作者身份以部落格範圍分開保存，爬蟲標籤與社群／人工標籤有 provenance，不會覆蓋人工修訂；部落格另外保存最後抓取成功、最後發文、預期更新頻率與歷史匯入時間，低頻站不因沒有近期文章被判 stale。
 - 管理員可在 `/admin/discovery/` 查看候選來源、發現路徑與 RSS 偵測狀態並批次核准／拒絕；設定檔以 `BLOG_ADMIN_EMAILS`（逗號分隔）指定帳號，所有決定寫入 audit。
 
@@ -38,4 +38,4 @@ npm run blogs:merge -- old-slug new-slug --apply
 
 目前附件已匯入 136 列、135 個不重複名稱；原始 CSV 不在 repository，匯入摘要保存在 Steam Machine 的 `/home/deck/.local/share/blog-observe/seed-import-manifest.json`。
 
-完整的來源探索設計（`blogblog.club`、Similarweb Similar Sites、速率限制與和 tag 的協調方式）見 [`docs/discovery.md`](docs/discovery.md)。正式 Google 帳號登入仍需使用者本人在瀏覽器完成；Similarweb 跨服務共用鎖與 tag 端排程整合仍是後續工作。
+完整的來源探索設計（`blogblog.club`、Similarweb Similar Sites、速率限制與和 tag 的協調方式）見 [`docs/discovery.md`](docs/discovery.md)。正式 Google 帳號登入仍需使用者本人在瀏覽器完成；Similarweb 方案一已核准，接線仍等待 tag 的正式契約，詳見 [`docs/similarweb-coordination-proposal.md`](docs/similarweb-coordination-proposal.md)。目前舊 `BLOG_SIMILARWEB_*` 環境變數均忽略；placeholder 關閉時回 `disabled`、直接傳入 `enabled: true` 時回 `awaiting-contract`，兩者均零網路／檔案系統操作與零候選，不表示已接通。

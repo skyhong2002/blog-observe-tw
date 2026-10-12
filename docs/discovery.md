@@ -1,6 +1,6 @@
 # 部落格來源探索設計
 
-目前骨架已提供低頻、可關閉的 discovery worker：blogblog.club 每週抓取，Similarweb Similar Sites 預設關閉。候選資料和已收錄網站分開保存，並記錄發現網址、來源頁面、抓取時間與人工確認狀態；發現結果不會直接公開收錄。
+目前骨架已提供低頻、可關閉的 discovery worker：blogblog.club 每週抓取，Similarweb Similar Sites 本機旗標固定關閉，整合等待 tag 契約。候選資料和已收錄網站分開保存，並記錄發現網址、來源頁面、抓取時間與人工確認狀態；發現結果不會直接公開收錄。
 
 ## blogblog.club
 
@@ -15,7 +15,11 @@
 
 Similarweb 的 Similar Sites 結果只能當候選站和相似關係，不能當作權威分類。它和 tag.observe.tw 的流量抓取共用同一台機器與對外 IP，不能在 blog 服務另開一套無協調的爬蟲。
 
-目前程式預設不發出 Similarweb 請求；若要啟用，優先讀取 tag 已保存的資料。補抓使用主機層級 lock/budget（`BLOG_SIMILARWEB_LOCK_PATH`、`BLOG_SIMILARWEB_BUDGET_PATH` 可指到共用目錄），錯開每小時 `:35` 的流量工作，並將部落格每日預算限制在 10 次。因 tag 現行版本尚未讀取同一 lock，啟用前必須先提出 tag 端共用鎖或排入既有 traffic job 的方案；任何 403、429 或 401 都要停止並退避。這項協調不修改 tag.observe.tw 的程式或排程。
+方案一已獲使用者核准：由 tag 維護唯一的 Similarweb 供應商請求工作，blog 未來只提交探索需求並讀取 tag 結果。現在仍等待 tag 端提供正式 API、認證、資料格式、配額／退避與錯誤契約；尚未接通，也未猜測任何路由。
+
+blog 原先直接請求供應商的 endpoint、模擬瀏覽器 headers、目錄鎖與本機 budget 已移除。`loadConfig().similarWeb.enabled` 固定為 `false`；舊 `BLOG_SIMILARWEB_*` 環境變數全部忽略。`discoverSimilarSites()` 預設或傳入 `enabled: false` 只回 `disabled`；明確傳入 `enabled: true` 只回 `awaiting-contract`。兩種狀態都回傳空候選、零網路請求、零檔案系統操作，因此不消耗 tag 的共用 IP 配額。
+
+待契約明確後另行實作 tag client、安全驗證與整合測試，再接入候選保存；目前不接受注入的「成功」結果作為候選資料。未來候選需保存 `similarweb-similar-sites` 來源、探索網域、發現時間與相似關係 evidence，並經人工審核後才公開收錄。核准方案不代表現在已修改 tag 程式或排程。詳細依賴與回滾見 [跨服務協調提案](similarweb-coordination-proposal.md)。
 
 ## 資源隔離
 

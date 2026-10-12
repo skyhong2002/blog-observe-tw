@@ -25,12 +25,9 @@ export function loadConfig(env = process.env) {
     crawlUserAgent: env.BLOG_CRAWL_USER_AGENT || 'blog.observe.tw/0.3 (+https://blog.observe.tw/about; mailto:b@blog.observe.tw)',
     crawlDelayMs: Math.max(1000, Number(env.BLOG_CRAWL_DELAY_MS || 1200)),
     similarWeb: {
-      // Explicit opt-in: tag and blog share a public IP and Similarweb rate
-      // limits, so discovery must never silently start a second client.
-      enabled: env.BLOG_SIMILARWEB_ENABLED === '1' || env.BLOG_SIMILARWEB_ENABLED === 'true',
-      lockPath: env.BLOG_SIMILARWEB_LOCK_PATH || '/home/deck/.local/share/observe-similarweb-rate-limit.lock',
-      budgetPath: env.BLOG_SIMILARWEB_BUDGET_PATH || '/home/deck/.local/share/observe-similarweb-rate-budget.json',
-      maxPerDay: Math.max(1, Math.min(20, Number(env.BLOG_SIMILARWEB_MAX_PER_DAY || 10))),
+      // Only tag may contact the provider. Keep the local flag false until its
+      // API/authentication contract is implemented; ignore retired BLOG_SIMILARWEB_* settings.
+      enabled: false,
     },
     adminEmails: new Set(
       (env.BLOG_ADMIN_EMAILS || '')

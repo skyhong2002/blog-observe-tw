@@ -1,34 +1,77 @@
-import { mkdtemp } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
-import { describe, expect, it } from 'vitest';
+import * as filesystem from 'node:fs/promises';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { loadConfig } from '../config.js';
 import { discoverSimilarSites } from './similarweb.ts';
 
-describe('Similarweb coordination', () => {
-  it('does not call the network when disabled by default', async () => {
-    let calls = 0;
-    const result = await discoverSimilarSites('example.com', {
-      fetcher: async () => {
-        calls += 1;
-        return new Response('{}');
-      },
-    });
-    expect(result.status).toBe('disabled');
-    expect(calls).toBe(0);
+// Fail the assertions if a future implementation revives local lock/budget I/O.
+vi.mock('node:fs/promises', () => ({
+  mkdir: vi.fn(),
+  readFile: vi.fn(),
+  rm: vi.fn(),
+  stat: vi.fn(),
+  writeFile: vi.fn(),
+}));
+
+const network = vi.fn(() => {
+  throw new Error('Provider requests must remain disabled until the tag contract exists');
+});
+
+function expectNoIO() {
+  expect(network).not.toHaveBeenCalled();
+  for (const operation of Object.values(filesystem)) expect(operation).not.toHaveBeenCalled();
+}
+
+describe('Similarweb integration waits for the approved tag contract', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.stubGlobal('fetch', network);
+  });
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.unstubAllEnvs();
   });
 
-  it('uses a host lock and bounded daily budget when explicitly enabled', async () => {
-    const dir = await mkdtemp(join(tmpdir(), 'blog-similarweb-'));
-    let calls = 0;
-    const fetcher = async () => {
-      calls += 1;
-      return new Response(JSON.stringify({ similar_sites: [{ domain: 'other.example' }] }), {
-        headers: { 'content-type': 'application/json' },
-      });
+  it('returns no candidates or I/O by default and when explicitly disabled', async () => {
+    await expect(discoverSimilarSites('  WWW.Example.com  ')).resolves.toEqual({
+      enabled: false,
+      domain: 'example.com',
+      status: 'disabled',
+      candidates: [],
+    });
+    await expect(discoverSimilarSites('example.com', { enabled: false })).resolves.toMatchObject({
+      status: 'disabled',
+      candidates: [],
+    });
+    expectNoIO();
+  });
+
+  it('cannot fetch or produce candidates when enabled without a tag adapter', async () => {
+    await expect(discoverSimilarSites('example.com', { enabled: true })).resolves.toEqual({
+      enabled: true,
+      domain: 'example.com',
+      status: 'awaiting-contract',
+      candidates: [],
+    });
+    expectNoIO();
+  });
+
+  it('ignores all retired environment flags, endpoints and filesystem settings', async () => {
+    const legacy = {
+      BLOG_SIMILARWEB_ENABLED: 'true',
+      BLOG_SIMILARWEB_ENDPOINT: 'http://127.0.0.1:18160/healthz',
+      BLOG_SIMILARWEB_LOCK_PATH: '/tmp/retired-blog-similarweb-lock',
+      BLOG_SIMILARWEB_BUDGET_PATH: '/tmp/retired-blog-similarweb-budget.json',
+      BLOG_SIMILARWEB_MAX_PER_DAY: '9999',
     };
-    const options = { enabled: true, lockPath: join(dir, 'lock'), budgetPath: join(dir, 'budget.json'), maxPerDay: 1, fetcher };
-    await expect(discoverSimilarSites('example.com', options)).resolves.toMatchObject({ status: 'ok', candidates: ['other.example'] });
-    await expect(discoverSimilarSites('another.example', options)).resolves.toMatchObject({ status: 'budget' });
-    expect(calls).toBe(1);
+    for (const [name, value] of Object.entries(legacy)) vi.stubEnv(name, value);
+    const config = loadConfig({ BLOG_DB_URL: 'mysql://blog:unused@127.0.0.1/blog_observe', ...legacy });
+    expect(config.similarWeb).toEqual({ enabled: false });
+    await expect(discoverSimilarSites('example.com')).resolves.toMatchObject({ status: 'disabled', candidates: [] });
+    await expect(discoverSimilarSites('example.com', config.similarWeb)).resolves.toMatchObject({ status: 'disabled', candidates: [] });
+    await expect(discoverSimilarSites('example.com', { enabled: true })).resolves.toMatchObject({
+      status: 'awaiting-contract',
+      candidates: [],
+    });
+    expectNoIO();
   });
 });
