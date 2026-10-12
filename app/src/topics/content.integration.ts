@@ -20,6 +20,7 @@ export async function runContentTopicsIntegration(pool: Pool) {
   const token = randomUUID(),
     slug = `content-topics-${token}`,
     version = randomUUID(),
+    rollbackVersion = randomUUID(),
     now = new Date();
   const [[previous]] = await pool.query<RowDataPacket[]>('SELECT snapshot_id FROM topic_current WHERE source=?', [SOURCE]);
   let blogId: number | undefined, postId: number | undefined, userId: number | undefined, futurePostId: number | undefined;
@@ -69,7 +70,12 @@ export async function runContentTopicsIntegration(pool: Pool) {
     );
     await pool.execute("INSERT INTO topic_snapshots(id,manifest,status,generated_at,synced_at) VALUES (?,?,'published',?,?)", [
       version,
-      JSON.stringify({ coverage: 'observed-article-window' }),
+      JSON.stringify({
+        coverage: 'observed-article-window',
+        generatedAt: now.toISOString(),
+        total: 2,
+        window: { until: now.toISOString() },
+      }),
       now,
       now,
     ]);
@@ -86,11 +92,27 @@ export async function runContentTopicsIntegration(pool: Pool) {
         JSON.stringify({ label }),
       ]);
     await runTopicsBatch(pool, { limit: 200 });
-    let [hits] = await pool.query<RowDataPacket[]>('SELECT term_id,source FROM topic_matches_v2 WHERE post_id=?', [postId]);
+    let [hits] = await pool.query<RowDataPacket[]>('SELECT term_id,source FROM topic_matches_v3 WHERE post_id=? AND snapshot_id=?', [
+      postId,
+      version,
+    ]);
     assert.deepEqual(
       hits.map((r) => [r.term_id, r.source]),
       [[digest('私藏綠茶'), 'body']],
     );
+    // An immutable older generation must not make the current article appear
+    // dirty, nor may rematching the current generation erase rollback evidence.
+    await pool.execute(
+      `INSERT INTO topic_post_indexes_v3(snapshot_id,post_id,input_hash,post_hash,body_hash,matched_at,status,matcher_version,cleanup_version,body_kind,body_obtained_at,needs_refresh)
+      SELECT ?,post_id,input_hash,post_hash,body_hash,matched_at,status,matcher_version,cleanup_version,body_kind,body_obtained_at,needs_refresh FROM topic_post_indexes_v3 WHERE snapshot_id=? AND post_id=?`,
+      [rollbackVersion, version, postId],
+    );
+    await pool.execute(
+      'INSERT INTO topic_matches_v3(snapshot_id,post_id,term_id,source) SELECT ?,post_id,term_id,source FROM topic_matches_v3 WHERE snapshot_id=? AND post_id=?',
+      [rollbackVersion, version, postId],
+    );
+    const unchanged = await runTopicsBatch(pool, { limit: 200, since: new Date(now.getTime() - 2000) });
+    assert.equal(unchanged.processed, 0, 'old snapshot index must not cause current-generation rematching');
     const search = await loadSearch(pool, { q: '私藏綠茶', page: 1, limit: 20, blog: slug });
     assert.equal(search.items.length, 1);
     assert.ok(search.items[0].snippet.includes('私藏綠茶'));
@@ -173,14 +195,24 @@ export async function runContentTopicsIntegration(pool: Pool) {
     invalidateTopicCache(pool);
     assert.equal((await app.inject(path)).json().items.length, 0, 'changed stored body immediately invalidates previous match');
     await runTopicsBatch(pool, { limit: 200 });
-    [hits] = await pool.query<RowDataPacket[]>('SELECT term_id FROM topic_matches_v2 WHERE post_id=?', [postId]);
+    [hits] = await pool.query<RowDataPacket[]>('SELECT term_id FROM topic_matches_v3 WHERE post_id=? AND snapshot_id=?', [postId, version]);
     assert.equal(hits.length, 0);
     await pool.execute("UPDATE content_post_bodies SET status='partial',completeness='partial' WHERE post_id=?", [postId]);
     await runTopicsBatch(pool, { limit: 200 });
-    [hits] = await pool.query<RowDataPacket[]>('SELECT term_id FROM topic_matches_v2 WHERE post_id=?', [postId]);
+    [hits] = await pool.query<RowDataPacket[]>('SELECT term_id FROM topic_matches_v3 WHERE post_id=? AND snapshot_id=?', [postId, version]);
     assert.equal(hits[0]?.term_id, digest('舊版紅茶'));
+    const [rollbackHits] = await pool.query<RowDataPacket[]>(
+      'SELECT term_id,source FROM topic_matches_v3 WHERE snapshot_id=? AND post_id=?',
+      [rollbackVersion, postId],
+    );
+    assert.deepEqual(
+      rollbackHits.map((r) => [r.term_id, r.source]),
+      [[digest('私藏綠茶'), 'body']],
+      'current-generation replacement must preserve rollback rows',
+    );
     return {
       privateBodyMatched: true,
+      rollbackGenerationPreserved: true,
       fullSnapshotPreferred: true,
       changedHashInvalidated: true,
       legacyFallback: true,
@@ -202,19 +234,19 @@ export async function runContentTopicsIntegration(pool: Pool) {
     if (previous) await pool.execute('UPDATE topic_current SET snapshot_id=? WHERE source=?', [previous.snapshot_id, SOURCE]);
     else await pool.execute('DELETE FROM topic_current WHERE source=?', [SOURCE]);
     if (postId)
-      for (const table of ['topic_matches_v2', 'topic_post_indexes_v2', 'content_post_bodies', 'relation_observations'])
+      for (const table of ['topic_matches_v3', 'topic_post_indexes_v3', 'content_post_bodies', 'relation_observations'])
         await pool.execute(`DELETE FROM ${table} WHERE post_id=?`, [postId]);
     if (futurePostId) {
       const [[raw]] = await pool.query<RowDataPacket[]>('SELECT published_at FROM posts WHERE id=?', [futurePostId]);
       assert.equal(new Date(raw.published_at).getUTCFullYear(), 2115);
-      for (const table of ['topic_matches_v2', 'topic_post_indexes_v2'])
+      for (const table of ['topic_matches_v3', 'topic_post_indexes_v3'])
         await pool.execute(`DELETE FROM ${table} WHERE post_id=?`, [futurePostId]);
       await pool.execute('DELETE FROM posts WHERE id=?', [futurePostId]);
     }
     if (postId) await pool.execute('DELETE FROM posts WHERE id=?', [postId]);
     if (blogId) await pool.execute('DELETE FROM blogs WHERE id=?', [blogId]);
-    await pool.execute('DELETE FROM topic_term_aliases WHERE snapshot_id=?', [version]);
-    await pool.execute('DELETE FROM topic_canonical_terms WHERE snapshot_id=?', [version]);
+    await pool.execute('DELETE FROM topic_term_aliases_v3 WHERE snapshot_id=?', [version]);
+    await pool.execute('DELETE FROM topic_canonical_terms_v3 WHERE snapshot_id=?', [version]);
     await pool.execute('DELETE FROM topic_terms WHERE snapshot_id=?', [version]);
     await pool.execute('DELETE FROM topic_snapshots WHERE id=?', [version]);
   }

@@ -16,6 +16,7 @@ import { runPublicationDiscoveryBatch } from './relations/home.ts';
 import { runRelationSnapshotBatch } from './relations/routes.ts';
 import { runRelationBatch } from './relations/worker.ts';
 import { runTopicsBatch } from './topics/batch.ts';
+import { refreshTopicFrequencies } from './topics/frequency.ts';
 import { syncVocabulary } from './topics/sync.ts';
 
 const config = loadConfig();
@@ -58,7 +59,8 @@ for (const [name, every, enabled] of [
   ['blogs-publication-discovery', 30 * 60_000, relationsEnabled],
   ['blogs-ai', 60 * 60_000, aiEnabled],
   ['blogs-topics', 10 * 60_000, topicsEnabled],
-  ['blogs-vocabulary', 30 * 60_000, vocabularyEnabled],
+  ['blogs-topic-frequencies', 60 * 60_000, topicsEnabled],
+  ['blogs-vocabulary', 15 * 60_000, vocabularyEnabled],
   ['blogs-history', 5 * 60_000, historyEnabled],
   ['blogs-candidate-review', 30 * 60_000, candidateReviewEnabled],
   ['blogs-missing-icons', 15 * 60_000, missingIconsEnabled],
@@ -85,8 +87,13 @@ const worker = new Worker(
       return relationsEnabled ? runPublicationDiscoveryBatch(store.pool, batchOptions) : { skipped: 'disabled' };
     if (job.name === 'blogs-relations') return relationsEnabled ? runRelationBatch(store.pool, batchOptions) : { skipped: 'disabled' };
     if (job.name === 'blogs-ai') return aiEnabled ? runAiBatch(store.pool, { ...batchOptions, limit: 3 }) : { skipped: 'disabled' };
-    if (job.name === 'blogs-topics')
-      return topicsEnabled ? runTopicsBatch(store.pool, { ...batchOptions, limit: 200 }) : { skipped: 'disabled' };
+    if (job.name === 'blogs-topics') {
+      if (!topicsEnabled) return { skipped: 'disabled' };
+      const result = await runTopicsBatch(store.pool, { ...batchOptions, limit: 200 });
+      if (result.processed) await refreshTopicFrequencies(store.pool, { force: true });
+      return result;
+    }
+    if (job.name === 'blogs-topic-frequencies') return topicsEnabled ? refreshTopicFrequencies(store.pool) : { skipped: 'disabled' };
     if (job.name === 'blogs-vocabulary')
       return vocabularyEnabled
         ? syncVocabulary(store.pool, { ...batchOptions, enabled: true, mode: 'window', maxPages: 10 })

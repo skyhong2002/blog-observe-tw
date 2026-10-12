@@ -1,6 +1,9 @@
 // Adapted from youtube-board snapshot client; contract authored by tag.observe.tw.
 import { createHash } from 'node:crypto';
+import { isDeepStrictEqual } from 'node:util';
 import { TagApiTransport, type TagTransportOptions } from './transport.ts';
+export const MAX_SNAPSHOT_TERMS = 2_000_000;
+export const MAX_SNAPSHOT_BYTES = 2 * 1024 ** 3;
 export const SOURCE = 'https://tag.observe.tw' as const;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 const SHA = /^[0-9a-f]{64}$/;
@@ -9,6 +12,9 @@ export interface ExportTerm {
   id: string;
   label: string;
   articleCount: number;
+  recentArticleCount?: number;
+  noise?: boolean;
+  noEqual?: boolean;
   firstPublishedAt: string;
   lastPublishedAt: string;
   origin: 'article-tags-mixed';
@@ -68,13 +74,13 @@ export function validateManifest(raw: unknown): ExportManifest {
     raw.provenance.length > 2000 ||
     !Number.isSafeInteger(raw.changeCount) ||
     Number(raw.changeCount) < 0 ||
-    Number(raw.changeCount) > 500000 ||
+    Number(raw.changeCount) > MAX_SNAPSHOT_TERMS * 2 ||
     !Array.isArray(raw.changePages) ||
-    raw.changePages.length > 1000 ||
+    raw.changePages.length > Math.ceil((MAX_SNAPSHOT_TERMS * 2) / 500) ||
     raw.changePages.some((p) => typeof p !== 'string' || !SHA.test(p)) ||
     !Number.isSafeInteger(raw.total) ||
     Number(raw.total) < 0 ||
-    Number(raw.total) > 250000 ||
+    Number(raw.total) > MAX_SNAPSHOT_TERMS ||
     raw.pageSize !== 500 ||
     !Array.isArray(raw.pages) ||
     raw.pages.length !== Math.ceil(Number(raw.total) / 500) ||
@@ -86,9 +92,10 @@ export function validateManifest(raw: unknown): ExportManifest {
   return raw as unknown as ExportManifest;
 }
 export function validatePage(raw: unknown, manifest: ExportManifest, index: number): ExportPage {
-  if (!isObject(raw)) throw new Error('Invalid vocabulary page');
+  if (!isObject(raw) || !Number.isSafeInteger(index) || index < 0 || index >= manifest.pages.length)
+    throw new Error('Invalid vocabulary page');
   const pageManifest = validateManifest(raw.snapshot);
-  if (JSON.stringify(pageManifest) !== JSON.stringify(manifest)) throw new Error('Vocabulary snapshot changed while paging');
+  if (!isDeepStrictEqual(pageManifest, manifest)) throw new Error('Vocabulary snapshot changed while paging');
   const expectedCount = Math.min(500, manifest.total - index * 500);
   if (
     raw.cursor !== String(index) ||
@@ -109,6 +116,12 @@ export function validatePage(raw: unknown, manifest: ExportManifest, index: numb
       entry.id !== hash(entry.label) ||
       !Number.isSafeInteger(entry.articleCount) ||
       Number(entry.articleCount) < 1 ||
+      ('noise' in entry && typeof entry.noise !== 'boolean') ||
+      ('noEqual' in entry && typeof entry.noEqual !== 'boolean') ||
+      ('recentArticleCount' in entry &&
+        (!Number.isSafeInteger(entry.recentArticleCount) ||
+          Number(entry.recentArticleCount) < 0 ||
+          Number(entry.recentArticleCount) > Number(entry.articleCount))) ||
       entry.origin !== 'article-tags-mixed' ||
       entry.journalistAssigned !== null ||
       typeof entry.firstPublishedAt !== 'string' ||

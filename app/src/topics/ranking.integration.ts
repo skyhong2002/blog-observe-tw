@@ -35,11 +35,11 @@ export async function runTopicRankingIntegration(pool: Pool) {
     );
     for (const t of projected.terms)
       await pool.execute(
-        'INSERT INTO topic_canonical_terms(snapshot_id,id,normalized_label,label,exclusion_reason,occurrences,policy_version) VALUES (?,?,?,?,?,?,?)',
+        'INSERT INTO topic_canonical_terms_v3(snapshot_id,id,normalized_label,label,exclusion_reason,occurrences,policy_version) VALUES (?,?,?,?,?,?,?)',
         [snapshot, t.id, t.normalizedLabel, t.label, t.exclusionReason, t.occurrences, POLICY_VERSION],
       );
     for (const a of projected.aliases)
-      await pool.execute('INSERT INTO topic_term_aliases(snapshot_id,term_id,canonical_id) VALUES (?,?,?)', [
+      await pool.execute('INSERT INTO topic_term_aliases_v3(snapshot_id,term_id,canonical_id) VALUES (?,?,?)', [
         snapshot,
         a.termId,
         a.canonicalId,
@@ -71,22 +71,22 @@ export async function runTopicRankingIntegration(pool: Pool) {
           [post.insertId, blog.insertId, 'AI 模型', hash, now, now],
         );
         await pool.execute(
-          "INSERT INTO topic_post_indexes_v2(post_id,snapshot_id,input_hash,post_hash,body_hash,matched_at,status,matcher_version,cleanup_version,body_kind) VALUES (?,?,?,?,?,?,'ok',?,?,?)",
+          "INSERT INTO topic_post_indexes_v3(post_id,snapshot_id,input_hash,post_hash,body_hash,matched_at,status,matcher_version,cleanup_version,body_kind) VALUES (?,?,?,?,?,?,'ok',?,?,?)",
           [post.insertId, snapshot, digest('input'), postHash, hash, now, MATCHER_VERSION, CLEANUP_VERSION, 'text'],
         );
-        await pool.execute("INSERT INTO topic_matches_v2(post_id,term_id,snapshot_id,source) VALUES (?,?,?,'body')", [
+        await pool.execute("INSERT INTO topic_matches_v3(post_id,term_id,snapshot_id,source) VALUES (?,?,?,'body')", [
           post.insertId,
           digest('ai'),
           snapshot,
         ]);
         if (b === 0 && p < 2)
-          await pool.execute("INSERT INTO topic_matches_v2(post_id,term_id,snapshot_id,source) VALUES (?,?,?,'title')", [
+          await pool.execute("INSERT INTO topic_matches_v3(post_id,term_id,snapshot_id,source) VALUES (?,?,?,'title')", [
             post.insertId,
             digest('ai'),
             snapshot,
           ]);
         // Deliberately stale excluded evidence must still never enter the public ranking.
-        await pool.execute("INSERT INTO topic_matches_v2(post_id,term_id,snapshot_id,source) VALUES (?,?,?,'body')", [
+        await pool.execute("INSERT INTO topic_matches_v3(post_id,term_id,snapshot_id,source) VALUES (?,?,?,'body')", [
           post.insertId,
           digest('性'),
           snapshot,
@@ -104,6 +104,11 @@ export async function runTopicRankingIntegration(pool: Pool) {
       blogs: 2,
       titlePosts: 2,
       bodyOnlyPosts: 4,
+      recentShare: 1,
+      baselineShare: null,
+      lift: null,
+      matchingRule: 'title-and-body',
+      matchingReason: null,
     });
     const perBlog = await topicEvidenceDetail(pool, `tag:${digest('AI')}`, 30, true, now);
     assert.ok(perBlog);
@@ -130,7 +135,7 @@ export async function runTopicRankingIntegration(pool: Pool) {
     const unknown = await topicEvidenceDetail(pool, `rss:${tags[1]}`, 30, true, now);
     assert.equal(unknown?.topic.excludedReason, 'not-in-tag-vocabulary');
     assert.deepEqual(unknown?.blogs, []);
-    await pool.execute('UPDATE topic_post_indexes_v2 SET matcher_version=? WHERE post_id=?', ['obsolete', posts[0]]);
+    await pool.execute('UPDATE topic_post_indexes_v3 SET matcher_version=? WHERE post_id=?', ['obsolete', posts[0]]);
     const stale = await ranking(pool, 30, undefined, true, 100, now);
     assert.equal(stale.items[0].posts, 5, 'obsolete policy indexes cannot leak');
     await pool.execute('UPDATE posts SET content_hash=? WHERE id=?', [digest('changed'), posts[1]]);
@@ -148,7 +153,7 @@ export async function runTopicRankingIntegration(pool: Pool) {
   } finally {
     if (original) await pool.execute('UPDATE topic_current SET snapshot_id=? WHERE source=?', [original.snapshot_id, SOURCE]);
     else await pool.execute('DELETE FROM topic_current WHERE source=?', [SOURCE]);
-    for (const table of ['topic_matches_v2', 'topic_post_indexes_v2', 'topic_term_aliases', 'topic_canonical_terms'])
+    for (const table of ['topic_matches_v3', 'topic_post_indexes_v3', 'topic_term_aliases_v3', 'topic_canonical_terms_v3'])
       await pool.execute(`DELETE FROM ${table} WHERE snapshot_id=?`, [snapshot]);
     await pool.execute('DELETE FROM topic_snapshots WHERE id=?', [snapshot]);
     if (posts.length) {

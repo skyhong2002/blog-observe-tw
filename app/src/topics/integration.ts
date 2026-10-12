@@ -190,14 +190,14 @@ export async function runTopicsQualityIntegration(pool: Pool) {
     }
     if (tagId) await pool.execute('DELETE FROM tags WHERE id=?', [tagId]);
     for (const table of [
-      'topic_term_aliases',
-      'topic_canonical_terms',
+      'topic_term_aliases_v3',
+      'topic_canonical_terms_v3',
       'topic_terms',
       'topic_snapshots',
       'topic_window_articles',
       'topic_window_runs',
     ]) {
-      const key = ['topic_terms', 'topic_term_aliases', 'topic_canonical_terms'].includes(table)
+      const key = ['topic_terms', 'topic_term_aliases_v3', 'topic_canonical_terms_v3'].includes(table)
         ? 'snapshot_id'
         : table === 'topic_window_articles'
           ? 'run_id'

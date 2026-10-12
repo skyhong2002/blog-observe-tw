@@ -3398,6 +3398,128 @@
               "description": ""
             },
             "description": "排除原因與詞條數"
+          },
+          "frequencyBaseline": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "description": "",
+            "properties": {
+              "since": {
+                "type": "string",
+                "description": "",
+                "format": "date-time"
+              },
+              "until": {
+                "type": "string",
+                "description": "",
+                "format": "date-time"
+              },
+              "totalPosts": {
+                "type": "integer",
+                "description": ""
+              },
+              "coveredPosts": {
+                "type": "integer",
+                "description": ""
+              },
+              "thresholdRatio": {
+                "type": "number",
+                "description": ""
+              },
+              "version": {
+                "type": "string",
+                "description": ""
+              }
+            },
+            "required": [
+              "since",
+              "until",
+              "totalPosts",
+              "coveredPosts",
+              "thresholdRatio",
+              "version"
+            ]
+          },
+          "totalSourceTerms": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "description": "保留的上游原始詞數，包含未參與比對的詞"
+          },
+          "activeSet": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "description": "",
+            "properties": {
+              "status": {
+                "type": "string",
+                "description": ""
+              },
+              "version": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": ""
+              },
+              "asOf": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "",
+                "format": "date-time"
+              },
+              "eligibleTerms": {
+                "type": "integer",
+                "description": ""
+              },
+              "activeTerms": {
+                "type": "integer",
+                "description": ""
+              },
+              "termLimit": {
+                "type": "integer",
+                "description": ""
+              },
+              "codePointLimit": {
+                "type": "integer",
+                "description": ""
+              },
+              "memoryBudgetBytes": {
+                "type": "integer",
+                "description": ""
+              },
+              "estimatedBytes": {
+                "type": "integer",
+                "description": ""
+              },
+              "inactiveReasons": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "integer",
+                  "description": ""
+                },
+                "description": "low-frequency 或 memory-budget；原詞仍保留"
+              }
+            },
+            "required": [
+              "status",
+              "version",
+              "asOf",
+              "eligibleTerms",
+              "activeTerms",
+              "termLimit",
+              "codePointLimit",
+              "memoryBudgetBytes",
+              "estimatedBytes",
+              "inactiveReasons"
+            ]
           }
         },
         "required": [
@@ -3412,7 +3534,10 @@
           "tagNormalization",
           "upstreamSnapshotConsistent",
           "excludedTermCount",
-          "exclusionReasons"
+          "exclusionReasons",
+          "frequencyBaseline",
+          "totalSourceTerms",
+          "activeSet"
         ]
       },
       "MatchingPolicy": {
@@ -3453,6 +3578,14 @@
               ]
             },
             "description": ""
+          },
+          "recentBackfillHours": {
+            "type": "integer",
+            "description": ""
+          },
+          "frequency": {
+            "type": "object",
+            "additionalProperties": true
           }
         },
         "required": [
@@ -3461,7 +3594,9 @@
           "titleWeight",
           "bodyWeight",
           "sameBlogDecay",
-          "sources"
+          "sources",
+          "recentBackfillHours",
+          "frequency"
         ]
       },
       "Topic": {
@@ -3503,6 +3638,42 @@
           "bodyOnlyPosts": {
             "type": "integer",
             "description": ""
+          },
+          "recentShare": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "description": ""
+          },
+          "baselineShare": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "description": ""
+          },
+          "lift": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "description": "近期文章占比 ÷ 長期基準占比；無基準時為 null，不代表零"
+          },
+          "matchingRule": {
+            "type": "string",
+            "description": "",
+            "enum": [
+              "title-only",
+              "title-and-body"
+            ]
+          },
+          "matchingReason": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": ""
           }
         },
         "required": [
@@ -3513,7 +3684,12 @@
           "posts",
           "blogs",
           "titlePosts",
-          "bodyOnlyPosts"
+          "bodyOnlyPosts",
+          "recentShare",
+          "baselineShare",
+          "lift",
+          "matchingRule",
+          "matchingReason"
         ]
       },
       "Topics": {
@@ -3608,7 +3784,53 @@
                   "string",
                   "null"
                 ],
-                "description": "too-short、pure-number、pure-date、tag-noise、no-equal、upstream-noise、invalid-label 或 not-in-tag-vocabulary"
+                "description": "too-short、pure-number、pure-date、tag-noise、no-equal、upstream-noise、upstream-no-equal、invalid-label 或 not-in-tag-vocabulary"
+              },
+              "inactiveReason": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "low-frequency 或 memory-budget；與雜訊排除分開"
+              },
+              "matchingStatus": {
+                "type": "string",
+                "description": "",
+                "enum": [
+                  "active",
+                  "inactive",
+                  "excluded"
+                ]
+              },
+              "articleCount": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "description": ""
+              },
+              "lastPublishedAt": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "",
+                "format": "date-time"
+              },
+              "matchingRule": {
+                "type": "string",
+                "description": "",
+                "enum": [
+                  "title-only",
+                  "title-and-body"
+                ]
+              },
+              "matchingReason": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": ""
               }
             },
             "required": [
@@ -3616,7 +3838,13 @@
               "label",
               "source",
               "canonicalId",
-              "excludedReason"
+              "excludedReason",
+              "inactiveReason",
+              "matchingStatus",
+              "articleCount",
+              "lastPublishedAt",
+              "matchingRule",
+              "matchingReason"
             ]
           },
           "vocabulary": {

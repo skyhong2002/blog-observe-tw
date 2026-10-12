@@ -1,11 +1,94 @@
 import { taipei } from '@/lib/api';
-import { exclusionRows, type VocabularyStatus } from '@/lib/topics';
+import {
+  type ActiveSet,
+  exclusionRows,
+  type FrequencyBaseline,
+  formatBytes,
+  formatPercent,
+  inactiveRows,
+  recorded,
+  type VocabularyStatus,
+} from '@/lib/topics';
 
 const normalizationLabels: Record<string, string> = {
   'boundary-whitespace-v1': '去除標籤前後空白',
 };
-/** null/absent means the snapshot predates the field: say so instead of showing 0. */
-const recorded = (value: number | null | undefined) => (typeof value === 'number' && Number.isFinite(value) ? value : null);
+const count = (value: number | null | undefined, unit = '個') => {
+  const n = recorded(value);
+  return n === null ? '未記錄' : `${n.toLocaleString('zh-TW')} ${unit}`;
+};
+
+/** Shown only when the gateway sent an active set: no numbers are invented for older payloads. */
+function ActiveMatching({ set, total }: { set: ActiveSet; total: number | null }) {
+  const reasons = inactiveRows(set.inactiveReasons);
+  return (
+    <div className="rounded-lg border border-zinc-200 p-3 dark:border-zinc-800">
+      <p className="font-medium text-zinc-600 dark:text-zinc-400">來源詞庫完整保留；只用活躍比對集建立索引</p>
+      <p className="mt-1">
+        為控制比對所需記憶體，只有非雜訊、長度至少 2 字，且來源文章數至少 3 篇或最近 180 天內曾發文的詞，才符合活躍比對門檻；
+        符合門檻的詞在詞數與記憶體估算上限內建立索引。其餘的詞仍保留在詞庫中可查，只是本次暫不參與比對。
+      </p>
+      <dl className="mt-2 grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1">
+        {total !== null ? (
+          <>
+            <dt>來源詞庫</dt>
+            <dd className="min-w-0 break-words tabular-nums">{count(total)}</dd>
+          </>
+        ) : null}
+        <dt>活躍／符合門檻</dt>
+        <dd className="min-w-0 break-words tabular-nums">
+          {count(set.activeTerms)}／{count(set.eligibleTerms)}
+        </dd>
+        <dt>詞數上限</dt>
+        <dd className="min-w-0 break-words tabular-nums">{count(set.termLimit)}</dd>
+        <dt>記憶體估算／預算</dt>
+        <dd className="min-w-0 break-words tabular-nums">
+          {formatBytes(set.estimatedBytes)}／{formatBytes(set.memoryBudgetBytes)}
+        </dd>
+        <dt>時間基準</dt>
+        <dd className="min-w-0 break-words">{set.asOf ? taipei(set.asOf) : '未記錄'}</dd>
+      </dl>
+      <p className="mt-2">低頻或超出容量而暫停比對的詞不等於雜訊，與上方「不參與比對的詞」分開計算。</p>
+      {reasons.length ? (
+        <ul aria-label="暫未參與比對的原因" className="mt-1 flex flex-wrap gap-x-3 gap-y-1">
+          {reasons.map((r) => (
+            <li key={r.reason} className="tabular-nums">
+              {r.label} {r.count.toLocaleString('zh-TW')} 個
+            </li>
+          ))}
+        </ul>
+      ) : null}
+    </div>
+  );
+}
+
+/** The title-only rule for common terms; coverage is reported as measured, never as complete full text. */
+function FrequencyRule({ baseline }: { baseline: FrequencyBaseline }) {
+  const total = recorded(baseline.totalPosts);
+  const covered = recorded(baseline.coveredPosts);
+  return (
+    <div className="rounded-lg border border-zinc-200 p-3 dark:border-zinc-800">
+      <p className="font-medium text-zinc-600 dark:text-zinc-400">高頻詞只計標題命中</p>
+      <p className="mt-1">
+        以基準期間內已收錄且可公開的文章為分母、標題或正文命中的篇數為分子；占比超過 {formatPercent(baseline.thresholdRatio)}{' '}
+        的詞，排行與升溫倍率只計標題命中，正文命中仍留在頻率統計。這些詞沒有從來源詞庫刪除。
+      </p>
+      <dl className="mt-2 grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1">
+        <dt>基準期間</dt>
+        <dd className="min-w-0 break-words">
+          {taipei(baseline.since)} 至 {taipei(baseline.until)}
+        </dd>
+        <dt>已完成比對／基準文章</dt>
+        <dd className="min-w-0 break-words tabular-nums">
+          {count(covered, '篇')}／{count(total, '篇')}
+        </dd>
+      </dl>
+      {covered !== null && total !== null && covered < total ? (
+        <p className="mt-2">尚有文章未依目前版本完成比對，命中篇數為已觀測到的下限，不代表已涵蓋完整全文。</p>
+      ) : null}
+    </div>
+  );
+}
 
 function TagQuality({ data }: { data: VocabularyStatus }) {
   const invalid = recorded(data.invalidTagCount);
@@ -81,9 +164,19 @@ export default function VocabularyNotice({ data }: { data: VocabularyStatus }) {
             </p>
           ) : null}
           <TagQuality data={data} />
+          {data.activeSet ? <ActiveMatching set={data.activeSet} total={recorded(data.totalSourceTerms)} /> : null}
+          {data.frequencyBaseline ? <FrequencyRule baseline={data.frequencyBaseline} /> : null}
+          <details>
+            <summary className="cursor-pointer">詞庫更新與補比對</summary>
+            <p className="mt-1">
+              目前窗口以每 15 分鐘更新為目標，同步失敗或超出處理預算時可能延後。新詞會優先補比對近 48
+              小時的文章；較早的文章不代表已全面重新比對。
+              {data.coverage === 'observed-article-window' ? '完整快照與 changes 增量同步尚未啟用，詞庫仍是部分觀測窗口。' : ''}
+            </p>
+          </details>
         </>
       ) : (
-        <p>共同關鍵字尚未完成同步；目前只顯示本站已收錄的 RSS 標籤。</p>
+        <p>共同關鍵字尚未完成同步；話題排行會在同步完成後顯示，請稍後再查看。</p>
       )}
     </div>
   );

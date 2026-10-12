@@ -1,16 +1,23 @@
-import { createHash, randomUUID } from 'node:crypto';
-import { setTimeout as delay } from 'node:timers/promises';
+import { randomUUID } from 'node:crypto';
 import type { Pool, RowDataPacket } from 'mysql2/promise';
 import { reserveBudget } from '../jobs/budget.ts';
 import type { BatchOptions } from '../jobs/contracts.ts';
 import { withJobLease } from '../jobs/lease.ts';
-import { digest, normalizeTerm, TopicMatcher } from './matcher.ts';
+import { carryTopicIndexes } from './index-carry.ts';
+import { digest } from './matcher.ts';
+import { storedNormalizedLabel } from './policy.ts';
 import { writeTopicPolicy } from './policy-store.ts';
-import { type ExportManifest, HttpSnapshotSource, type SnapshotSource, SOURCE, validateManifest, validatePage } from './snapshot-client.ts';
+import { type ExportManifest, HttpSnapshotSource, type SnapshotSource, SOURCE } from './snapshot-client.ts';
+import { importSnapshot } from './snapshot-import.ts';
+import { canStartWindowSnapshot, cleanupTopicSnapshots } from './snapshot-retention.ts';
+import { cleanupWindowCache, LOOKBACK_MS, startWindowRun, WINDOW_REQUEST_LIMIT, WINDOW_START_LIMIT } from './window-incremental.ts';
+
+export { importSnapshot } from './snapshot-import.ts';
+
 import { TAG_NORMALIZATION } from './tag-normalization.ts';
 import { TagArticleSource, TagSourceSchemaError } from './tag-source.ts';
 import { TagRateLimitError } from './transport.ts';
-import { type ArticleSource, type SourceArticle, validateWindow, type Window } from './window-contract.ts';
+import type { ArticleSource, SourceArticle, Window } from './window-contract.ts';
 
 const json = <T>(raw: unknown): T => (typeof raw === 'string' ? JSON.parse(raw) : raw) as T;
 export type SyncOptions = BatchOptions & {
@@ -27,6 +34,10 @@ export interface LocalManifest {
   coverage: 'observed-article-window';
   window: Window;
   generatedAt: string;
+  sourceWindow?: Window;
+  syncStrategy?: string;
+  lookbackSeconds?: number;
+  parentVersion?: string | null;
   total: number;
   sha256: string;
   upstreamSnapshotConsistent: false;
@@ -43,12 +54,12 @@ async function publish(
   now: Date,
   assertLease: () => Promise<void>,
 ) {
-  new TopicMatcher(terms); // Reject oversized matching state before publication.
   await assertLease();
   const c = await pool.getConnection();
   try {
     await c.beginTransaction();
     const [[existing]] = await c.query<RowDataPacket[]>('SELECT manifest,status FROM topic_snapshots WHERE id=? FOR UPDATE', [manifest.id]);
+    if (existing?.status === 'retiring') throw Error('topic_snapshot_retiring');
     if (existing && JSON.stringify(json(existing.manifest)) !== JSON.stringify(manifest))
       throw Error('snapshot id reused with changed contents');
     await c.execute('INSERT IGNORE INTO topic_snapshots(id,manifest,status,generated_at) VALUES (?,?,?,?)', [
@@ -62,14 +73,14 @@ async function publish(
       if (batch.length)
         await c.query(
           'INSERT INTO topic_terms(snapshot_id,id,label,normalized_label,payload) VALUES ? ON DUPLICATE KEY UPDATE id=VALUES(id)',
-          [batch.map((t) => [manifest.id, t.id, t.label, normalizeTerm(t.label), JSON.stringify(t.payload)])],
+          [batch.map((t) => [manifest.id, t.id, t.label, storedNormalizedLabel(t.label), JSON.stringify(t.payload)])],
         );
     }
     await writeTopicPolicy(c, manifest.id, terms);
     const [[count]] = await c.query<RowDataPacket[]>('SELECT COUNT(*) n FROM topic_terms WHERE snapshot_id=?', [manifest.id]);
     if (Number(count.n) !== manifest.total) throw Error('staged term count mismatch');
     const [[current]] = await c.query<RowDataPacket[]>(
-      'SELECT s.manifest,s.generated_at FROM topic_current c JOIN topic_snapshots s ON s.id=c.snapshot_id WHERE c.source=? FOR UPDATE',
+      'SELECT s.id,s.manifest,s.generated_at FROM topic_current c JOIN topic_snapshots s ON s.id=c.snapshot_id WHERE c.source=? FOR UPDATE',
       [SOURCE],
     );
     const previous = current ? json<LocalManifest | ExportManifest>(current.manifest) : null;
@@ -78,12 +89,15 @@ async function publish(
       (manifest.coverage === 'all-current-indexed-article-tags' && previous.coverage !== 'all-current-indexed-article-tags') ||
       (manifest.coverage === previous.coverage && Date.parse(manifest.generatedAt) > Date.parse(previous.generatedAt));
     await c.execute("UPDATE topic_snapshots SET status='published',synced_at=? WHERE id=?", [now, manifest.id]);
-    if (newer)
+    if (newer) {
+      if (current?.id) await carryTopicIndexes(c, current.id, manifest.id);
       await c.execute(
         'INSERT INTO topic_current(source,snapshot_id) VALUES (?,?) ON DUPLICATE KEY UPDATE snapshot_id=VALUES(snapshot_id)',
         [SOURCE, manifest.id],
       );
+    }
     await c.execute("UPDATE topic_window_runs SET status='published',updated_at=? WHERE id=?", [now, manifest.id]);
+    await assertLease();
     await c.commit();
     return { status: 'published', version: manifest.id, total: terms.length, becameCurrent: newer, coverage: manifest.coverage };
   } catch (error) {
@@ -92,45 +106,6 @@ async function publish(
   } finally {
     c.release();
   }
-}
-export async function importSnapshot(
-  pool: Pool,
-  source: SnapshotSource,
-  now: Date,
-  assertLease: () => Promise<void>,
-  maxPages = 500,
-  control: { signal?: AbortSignal; deadline?: number } = {},
-) {
-  const assertRunning = () => {
-    control.signal?.throwIfAborted();
-    if (Date.now() >= (control.deadline ?? Infinity)) throw Error('snapshot deadline; current retained');
-  };
-  assertRunning();
-  const manifest = validateManifest(await source.current());
-  if (manifest.pages.length > maxPages) throw Error('snapshot page cap; current retained');
-  const hash = createHash('sha256');
-  const terms: { id: string; label: string; payload: unknown }[] = [];
-  let previous: Buffer | null = null;
-  let bytes = 0;
-  for (let i = 0; i < manifest.pages.length; i++) {
-    assertRunning();
-    await assertLease();
-    if (i) await delay(500, undefined, { signal: control.signal });
-    const page = validatePage(await source.page(manifest, i), manifest, i);
-    for (const t of page.entries) {
-      const label = Buffer.from(t.label);
-      if (previous && Buffer.compare(previous, label) >= 0) throw Error('snapshot order or duplicate');
-      previous = label;
-      const encoded = JSON.stringify(t) + '\n';
-      bytes += Buffer.byteLength(encoded);
-      if (bytes > 64_000_000) throw Error('snapshot total byte cap');
-      hash.update(encoded);
-      terms.push({ id: t.id, label: t.label, payload: t });
-    }
-  }
-  if (terms.length !== manifest.total || hash.digest('hex') !== manifest.sha256) throw Error('snapshot full checksum mismatch');
-  assertRunning();
-  return publish(pool, manifest, terms, now, assertLease);
 }
 export async function syncVocabulary(pool: Pool, options: SyncOptions = {}) {
   if (!(options.enabled ?? process.env.BLOG_TOPICS_SYNC_ENABLED === 'true')) return { status: 'disabled' };
@@ -141,22 +116,30 @@ export async function syncVocabulary(pool: Pool, options: SyncOptions = {}) {
     (await withJobLease(pool, 'topics', async (assertLease) => {
       const timeout = Math.max(1, Math.min(600_000, options.maxDurationMs ?? 120_000));
       const signal = AbortSignal.any([AbortSignal.timeout(timeout), ...(options.signal ? [options.signal] : [])]);
+      const snapshotCleanup = await cleanupTopicSnapshots(pool, assertLease);
       const beforeRequest = async () => {
         await assertLease();
-        if (!(await reserveBudget(pool, [{ scope: 'topics:upstream-requests', amount: 1, limit: 100 }], options.now?.() ?? new Date())))
+        if (
+          !(await reserveBudget(
+            pool,
+            [{ scope: 'topics:upstream-requests', amount: 1, limit: WINDOW_REQUEST_LIMIT }],
+            options.now?.() ?? new Date(),
+          ))
+        )
           throw Error('topic_upstream_budget');
       };
       if (options.mode === 'snapshot') {
-        if (!(await reserveBudget(pool, [{ scope: 'topics:full-sync', amount: 1, limit: 1 }], now))) return { status: 'budget' };
         return importSnapshot(
           pool,
           options.snapshotSource ?? new HttpSnapshotSource(fetch, signal, { deadline: started + timeout, beforeRequest }),
           now,
           assertLease,
-          500,
+          maxPages,
           {
             signal,
             deadline: started + timeout,
+            beforeStart: () => reserveBudget(pool, [{ scope: 'topics:full-sync', amount: 1, limit: 1 }], now),
+            beforeRequest: options.snapshotSource ? beforeRequest : undefined,
           },
         );
       }
@@ -171,6 +154,13 @@ export async function syncVocabulary(pool: Pool, options: SyncOptions = {}) {
       );
       let id: string;
       let window: Window;
+      let coverageSince: string;
+      let parentVersion: string | null;
+      let syncStrategy: string;
+      const cleanupAllowed = !options.window && !options.source;
+      const cleanupBefore = cleanupAllowed
+        ? await cleanupWindowCache(pool, assertLease).catch(() => ({ deleted: 0, backlog: true, error: 'cache-cleanup-deferred' }))
+        : { deleted: 0, backlog: false };
       let cursor: string | null;
       let pages: number;
       let status: string;
@@ -179,25 +169,26 @@ export async function syncVocabulary(pool: Pool, options: SyncOptions = {}) {
       if (active) {
         id = active.id;
         window = { since: active.since_at, until: active.until_at };
+        coverageSince = active.coverage_since ?? active.since_at;
+        parentVersion = active.parent_run_id ?? null;
+        syncStrategy = active.sync_strategy ?? 'full-window';
         cursor = active.cursor;
         pages = active.pages;
         status = active.status;
       } else {
-        if (!(await reserveBudget(pool, [{ scope: 'topics:window-start', amount: 1, limit: 1 }], now))) return { status: 'budget' };
-        window = options.window ?? { since: new Date(now.getTime() - 86400_000).toISOString(), until: now.toISOString() };
-        validateWindow(window);
-        window = { since: new Date(window.since).toISOString(), until: new Date(window.until).toISOString() };
+        const capacity = await canStartWindowSnapshot(pool);
+        if (capacity.blocked) return { status: 'retention-blocked', ...capacity, snapshotCleanup };
+        if (!(await reserveBudget(pool, [{ scope: 'topics:window-start', amount: 1, limit: WINDOW_START_LIMIT }], now)))
+          return { status: 'budget' };
         id = randomUUID();
+        const plan = await startWindowRun(pool, id, now, assertLease, options.window, Boolean(options.source));
+        window = plan.window;
+        coverageSince = plan.coverageSince;
+        parentVersion = plan.parentVersion;
+        syncStrategy = plan.strategy;
         cursor = null;
         pages = 0;
         status = 'scanning';
-        await pool.execute('INSERT INTO topic_window_runs(id,since_at,until_at,created_at,updated_at) VALUES (?,?,?,?,?)', [
-          id,
-          window.since,
-          window.until,
-          now,
-          now,
-        ]);
       }
       try {
         const source =
@@ -222,10 +213,25 @@ export async function syncVocabulary(pool: Pool, options: SyncOptions = {}) {
           !options.signal?.aborted
         ) {
           if (pages >= 1000) throw Error('vocabulary 1000-page cap');
-          if (!(await reserveBudget(pool, [{ scope: 'topics:window-pages', amount: 1, limit: 100 }], options.now?.() ?? new Date()))) break;
+          if (
+            !(await reserveBudget(
+              pool,
+              [{ scope: 'topics:window-pages', amount: 1, limit: WINDOW_REQUEST_LIMIT }],
+              options.now?.() ?? new Date(),
+            ))
+          ) {
+            const nextAttemptAt = new Date((options.now?.() ?? now).getTime() + 15 * 60_000);
+            await pool.execute('UPDATE topic_window_runs SET next_attempt_at=?,updated_at=? WHERE id=?', [
+              nextAttemptAt,
+              options.now?.() ?? now,
+              id,
+            ]);
+            break;
+          }
           await assertLease();
           if (options.source) await beforeRequest();
           const page = await source.page(window, cursor);
+          const articles = page.articles.map((a) => ({ ...a, publishedAt: new Date(a.publishedAt).toISOString() }));
           await assertLease();
           const c = await pool.getConnection();
           try {
@@ -236,13 +242,21 @@ export async function syncVocabulary(pool: Pool, options: SyncOptions = {}) {
               'SELECT COUNT(*) n,COALESCE(SUM(OCTET_LENGTH(payload)),0) bytes FROM topic_window_articles WHERE run_id=?',
               [id],
             );
-            if (Number(count.bytes) + page.articles.reduce((sum, a) => sum + Buffer.byteLength(JSON.stringify(a)), 0) > 32_000_000)
+            const [oldRows] = articles.length
+              ? await c.query<RowDataPacket[]>(
+                  'SELECT article_id,OCTET_LENGTH(payload) bytes FROM topic_window_articles WHERE run_id=? AND article_id IN (?)',
+                  [id, articles.map((a) => a.id)],
+                )
+              : [[]];
+            const bytes = articles.reduce((sum, a) => sum + Buffer.byteLength(JSON.stringify(a)), 0);
+            if (Number(count.bytes) - oldRows.reduce((sum, row) => sum + Number(row.bytes), 0) + bytes > 32_000_000)
               throw Error('vocabulary staged byte cap');
-            if (Number(count.n) + page.articles.length > 50_000) throw Error('vocabulary 50000-article cap');
-            if (page.articles.length)
-              await c.query('INSERT INTO topic_window_articles(run_id,article_id,payload) VALUES ?', [
-                page.articles.map((a) => [id, a.id, JSON.stringify(a)]),
-              ]);
+            if (Number(count.n) - oldRows.length + articles.length > 50_000) throw Error('vocabulary 50000-article cap');
+            if (articles.length)
+              await c.query(
+                'INSERT INTO topic_window_articles(run_id,article_id,payload,published_at) VALUES ? ON DUPLICATE KEY UPDATE payload=VALUES(payload),published_at=VALUES(published_at)',
+                [articles.map((a) => [id, a.id, JSON.stringify(a), new Date(a.publishedAt)])],
+              );
             status = page.nextCursor ? 'scanning' : 'ready';
             await c.execute('UPDATE topic_window_runs SET `cursor`=?,pages=pages+1,status=?,updated_at=?,next_attempt_at=NULL WHERE id=?', [
               page.nextCursor,
@@ -271,7 +285,7 @@ export async function syncVocabulary(pool: Pool, options: SyncOptions = {}) {
             transport: source instanceof TagArticleSource ? source.diagnostics : null,
           };
         const [rows] = await pool.query<RowDataPacket[]>('SELECT payload FROM topic_window_articles WHERE run_id=?', [id]);
-        const counts = new Map<string, number>();
+        const counts = new Map<string, { articleCount: number; firstPublishedAt: string; lastPublishedAt: string }>();
         let bytes = 0;
         let invalidTagCount = 0;
         let normalizedTagCount = 0;
@@ -282,15 +296,21 @@ export async function syncVocabulary(pool: Pool, options: SyncOptions = {}) {
           bytes += Buffer.byteLength(JSON.stringify(a));
           if (bytes > 32_000_000) throw Error('vocabulary staged byte cap');
           for (const label of new Set(a.tags)) {
-            counts.set(label, (counts.get(label) ?? 0) + 1);
+            const existing = counts.get(label);
+            const publishedAt = new Date(a.publishedAt).toISOString();
+            counts.set(label, {
+              articleCount: (existing?.articleCount ?? 0) + 1,
+              firstPublishedAt: existing && existing.firstPublishedAt < publishedAt ? existing.firstPublishedAt : publishedAt,
+              lastPublishedAt: existing && existing.lastPublishedAt > publishedAt ? existing.lastPublishedAt : publishedAt,
+            });
             if (counts.size > 50_000) throw Error('vocabulary 50000-term cap');
           }
         }
         const terms = [...counts]
-          .map(([label, articleCount]) => ({
+          .map(([label, stats]) => ({
             id: digest(label),
             label,
-            payload: { label, articleCount, origin: 'article-tags-mixed', journalistAssigned: null },
+            payload: { label, ...stats, origin: 'article-tags-mixed', journalistAssigned: null },
           }))
           .sort((a, b) => Buffer.compare(Buffer.from(a.label), Buffer.from(b.label)));
         const manifest: LocalManifest = {
@@ -300,20 +320,38 @@ export async function syncVocabulary(pool: Pool, options: SyncOptions = {}) {
           invalidTagCount,
           normalizedTagCount,
           tagNormalization: TAG_NORMALIZATION,
-          window,
+          window: { since: coverageSince, until: window.until },
+          sourceWindow: window,
+          syncStrategy,
+          lookbackSeconds: syncStrategy === 'incremental-overlap' ? LOOKBACK_MS / 1000 : 0,
+          parentVersion,
           generatedAt: window.until,
           total: terms.length,
           sha256: digest(terms.map((t) => JSON.stringify(t.payload) + '\n').join('')),
           upstreamSnapshotConsistent: false,
           attribution: '新文易數 tag.observe.tw',
         };
+        const publication = await publish(pool, manifest, terms, now, assertLease);
+        const cleanupAfter = cleanupAllowed
+          ? await cleanupWindowCache(pool, assertLease).catch(() => ({ deleted: 0, backlog: true, error: 'cache-cleanup-deferred' }))
+          : { deleted: 0, backlog: false };
         return {
-          ...(await publish(pool, manifest, terms, now, assertLease)),
+          ...publication,
+          snapshotCleanup,
+          cacheCleanup: { deleted: cleanupBefore.deleted + cleanupAfter.deleted, backlog: cleanupAfter.backlog },
           transport: source instanceof TagArticleSource ? source.diagnostics : null,
         };
       } catch (error) {
         if (error instanceof TagRateLimitError) return { status: 'deferred', version: id, nextAttemptAt: error.retryAt };
         const message = error instanceof Error ? error.message : '';
+        if (message === 'topic_snapshot_retiring') {
+          await assertLease();
+          await pool.execute("UPDATE topic_window_runs SET status='failed-retired',next_attempt_at=NULL,updated_at=? WHERE id=?", [
+            now,
+            id,
+          ]);
+          return { status: 'retired', version: id };
+        }
         if (
           error instanceof TagSourceSchemaError ||
           /^Tag source (?:invalid JSON|empty response)$/.test(message) ||
@@ -328,7 +366,11 @@ export async function syncVocabulary(pool: Pool, options: SyncOptions = {}) {
           ]);
           return { status: 'failed-schema', version: id, nextAttemptAt };
         }
-        if (message === 'topic_upstream_budget') return { status: 'budget', version: id };
+        if (message === 'topic_upstream_budget') {
+          const nextAttemptAt = new Date(now.getTime() + 15 * 60_000);
+          await pool.execute('UPDATE topic_window_runs SET next_attempt_at=?,updated_at=? WHERE id=?', [nextAttemptAt, now, id]);
+          return { status: 'budget', version: id, nextAttemptAt };
+        }
         const reason = message.includes('page cap')
           ? 'cap-pages'
           : message.includes('article cap')
@@ -340,7 +382,12 @@ export async function syncVocabulary(pool: Pool, options: SyncOptions = {}) {
                 : message.includes('trie cap')
                   ? 'cap-trie'
                   : null;
-        if (!reason) throw error;
+        if (!reason) {
+          if (options.source) throw error;
+          const nextAttemptAt = new Date(now.getTime() + 15 * 60_000);
+          await pool.execute('UPDATE topic_window_runs SET next_attempt_at=?,updated_at=? WHERE id=?', [nextAttemptAt, now, id]);
+          return { status: 'deferred', version: id, nextAttemptAt };
+        }
         await assertLease();
         await pool.execute('UPDATE topic_window_runs SET status=?,updated_at=? WHERE id=?', [reason, options.now?.() ?? new Date(), id]);
         return { status: 'capped', reason, version: id, pages, window };

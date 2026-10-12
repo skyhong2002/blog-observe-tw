@@ -241,7 +241,10 @@ describe('tag transport isolation and wire budget', () => {
     };
     const pool = {
       getConnection: async () => c,
-      query: async () => [[{ id: 'cooling', next_attempt_at: until }]],
+      query: async (sql: string) => {
+        if (sql.includes('FROM topic_snapshots')) return [sql.includes('COUNT(*)') ? [{ n: 0 }] : []];
+        return [[{ id: 'cooling', next_attempt_at: until }]];
+      },
       execute,
     } as unknown as Pool;
     expect(await syncVocabulary(pool, { enabled: true, now: () => now })).toEqual({

@@ -75,7 +75,7 @@ describe('crowdsourced vocabulary matching policy', () => {
     expect(new TopicMatcher(terms).match('AI 模型').ids).toEqual([]);
   });
   it('pins independently persisted policy and matcher versions', () => {
-    expect(POLICY_VERSION).toMatch(/^topic-policy-v2:[a-f0-9]{64}$/u);
-    expect(MATCHER_VERSION).toMatch(/^topic-matcher-v2:[a-f0-9]{64}$/u);
+    expect(POLICY_VERSION).toMatch(/^topic-policy-v3:[a-f0-9]{64}$/u);
+    expect(MATCHER_VERSION).toMatch(/^topic-matcher-v3:[a-f0-9]{64}$/u);
   });
 });

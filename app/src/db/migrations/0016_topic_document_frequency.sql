@@ -1,0 +1,20 @@
+CREATE TABLE `topic_frequency_runs` (
+	`snapshot_id` char(36) NOT NULL,
+	`baseline_from` datetime NOT NULL,
+	`baseline_until` datetime NOT NULL,
+	`total_posts` int NOT NULL,
+	`covered_posts` int NOT NULL,
+	`threshold_ratio` double NOT NULL,
+	`policy_version` varchar(128) NOT NULL,
+	`updated_at` datetime NOT NULL,
+	CONSTRAINT `topic_frequency_runs_snapshot_id` PRIMARY KEY(`snapshot_id`)
+) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+--> statement-breakpoint
+CREATE TABLE `topic_term_frequencies` (
+	`snapshot_id` char(36) NOT NULL,
+	`term_id` char(64) NOT NULL,
+	`matched_posts` int NOT NULL,
+	`title_posts` int NOT NULL,
+	`high_frequency` int NOT NULL,
+	CONSTRAINT `topic_term_frequencies_snapshot_id_term_id_pk` PRIMARY KEY(`snapshot_id`,`term_id`)
+) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
