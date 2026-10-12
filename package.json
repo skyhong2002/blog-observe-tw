@@ -36,6 +36,7 @@
     "test:visibility": "node tools/test-visibility-barrier.mjs",
     "content:once": "node --env-file-if-exists=.env tools/content-once.ts",
     "test:web": "node --test web/test/*.test.ts",
+    "test:topic-ui": "npx vitest run --config vitest.topic-ui.config.ts",
     "docs:api": "node tools/gen-api-docs.ts",
     "docs:api:check": "node tools/gen-api-docs.ts --check",
     "api:check": "node tools/check-openapi.ts"
