@@ -6,6 +6,7 @@ import { TooltipComponent } from 'echarts/components';
 import * as echarts from 'echarts/core';
 import { CanvasRenderer } from 'echarts/renderers';
 import { useEffect, useRef } from 'react';
+import { brandMark } from '@/lib/brand';
 import type { RelationEdge, RelationNode } from '@/lib/relations';
 
 echarts.use([GraphChart, TooltipComponent, CanvasRenderer]);
@@ -42,7 +43,7 @@ export default function BlogRelationGraph({ nodes, edges }: { nodes: RelationNod
             emphasis: { focus: 'adjacency' },
             data: nodes
               .filter((n) => edges.some((e) => e.sourceBlogId === n.id || e.targetBlogId === n.id))
-              .map((n) => ({ id: String(n.id), name: n.name, symbolSize: 22, itemStyle: { color: '#d9480f' } })),
+              .map((n) => ({ id: String(n.id), name: n.name, symbolSize: 22, itemStyle: { color: brandMark(dark) } })),
             links: edges.map((e) => ({
               source: String(e.sourceBlogId),
               target: String(e.targetBlogId),

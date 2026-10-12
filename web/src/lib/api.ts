@@ -15,7 +15,10 @@ export type Blog = {
   lastPublishedAt?: string | null;
   expectedIntervalHours?: number;
   postCount?: number;
+  /** /api/overview: the blog's newest collected post; `null` means none. Absent on older gateways. */
+  latestPost?: LatestPost | null;
 };
+export type LatestPost = { id: number; title: string; url: string | null; publishedAt: string | null };
 export type Author = {
   id: number;
   displayName: string;
@@ -55,6 +58,8 @@ export type Overview = {
   tags: Array<Tag & { postCount: number; blogCount: number }>;
   authors: Author[];
   blogs: Blog[];
+  /** Up to 20 blogs ordered by their newest post, each with `latestPost`. Absent on older gateways. */
+  recentBlogs?: Blog[];
   totals: { blogs: number; posts: number };
   updatedAt: string | null;
 };

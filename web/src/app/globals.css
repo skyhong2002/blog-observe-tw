@@ -12,18 +12,22 @@
 }
 
 @theme inline {
-  /* Brand accent: the logo's vermilion. Kept off blue/green, which mean camps on this site. */
-  --color-brand-50: var(--color-orange-50);
-  --color-brand-100: var(--color-orange-100);
-  --color-brand-200: var(--color-orange-200);
-  --color-brand-300: var(--color-orange-300);
-  --color-brand-400: var(--color-orange-400);
-  --color-brand-500: var(--color-orange-500);
-  --color-brand-600: var(--color-orange-600);
-  --color-brand-700: var(--color-orange-700);
-  --color-brand-800: var(--color-orange-800);
-  --color-brand-900: var(--color-orange-900);
-  --color-brand-950: var(--color-orange-950);
+  /* Brand accent: green, the logo's middle mark. Fixed sRGB hex so contrast is
+     exact and charts/SVG can share it (lib/brand.ts mirrors these; test/brand.test.ts
+     checks both). Text pairs: brand-700 on white/zinc-50/brand-50 (light),
+     brand-400 on zinc-950/zinc-900 (dark); white text only on brand-700 or darker.
+     Semantic colours (emerald success, amber warning, red error) stay as they are. */
+  --color-brand-50: #f0fdf4;
+  --color-brand-100: #dcfce7;
+  --color-brand-200: #bbf7d0;
+  --color-brand-300: #86efac;
+  --color-brand-400: #4ade80;
+  --color-brand-500: #22c55e;
+  --color-brand-600: #16a34a;
+  --color-brand-700: #15803d;
+  --color-brand-800: #166534;
+  --color-brand-900: #14532d;
+  --color-brand-950: #052e16;
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --font-sans: "PingFang TC", "Noto Sans TC", "Noto Sans CJK TC", "Microsoft JhengHei", system-ui, sans-serif;

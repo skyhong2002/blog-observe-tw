@@ -47,9 +47,10 @@
 .hero { border: 1px solid var(--line); border-radius: 12px; overflow: hidden; background: var(--panel); }
 .heroImage { display: block; }
 .heroImage { position: relative; aspect-ratio: 16 / 9; }
-.picture { position: absolute; inset: 0; display: block; overflow: hidden; background: var(--chip); }
-.pictureFallback { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: var(--muted); background: var(--chip); }
-.pictureFallback svg { width: min(44%, 160px); height: auto; opacity: .7; }
+/* Article images are optional (NewsImage): the box exists only while a valid
+   image is loading or loaded, and only the loading state is tinted. */
+.picture { position: absolute; inset: 0; display: block; overflow: hidden; }
+[data-image-state="loading"] > .picture { background: var(--chip); }
 .photo { object-fit: cover; }
 .heroContent { padding: 18px; }
 .heroBadge { display: inline-block; font-size: 12px; color: var(--accent); border-radius: 999px; padding: 3px 10px; background: var(--tint); margin-bottom: 12px; }
@@ -303,6 +304,23 @@
 
 /* The event link is the final row of the same card as the stories. */
 .storyList > .more { margin-top: 0; border: 0; border-top: 1px solid var(--soft-line); border-radius: 0; }
+
+/* 最新更新的部落格: one bordered list like .ranking; each row is the blog
+   (favicon, name, newest publish time) over its newest post title, which links
+   to the original article. The 探索更多文章 link is the list's footer row. */
+.recentBlogs { border: 1px solid var(--line); border-radius: 12px; overflow: hidden; background: var(--panel); }
+.recentBlogs ol { list-style: none; padding: 0; margin: 0; }
+.recentBlogs li { display: flex; flex-direction: column; gap: 3px; padding: 10px 12px; }
+.recentBlogs li + li { border-top: 1px solid var(--soft-line); }
+.recentBlogName { display: flex; align-items: center; gap: 8px; min-width: 0; font-size: 12px; line-height: 20px; }
+.recentBlogName > a { display: inline-flex; align-items: center; gap: 6px; min-width: 0; font-weight: 500; color: var(--accent); }
+.recentBlogName > a > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.recentBlogName > a:hover > span { text-decoration: underline; text-underline-offset: 3px; }
+.recentBlogName > time { margin-left: auto; flex-shrink: 0; font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.recentPost { font-size: 14px; line-height: 1.6; font-weight: 500; color: var(--ink); overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+a.recentPost:hover { color: var(--accent); }
+.recentMissing { font-size: 12px; line-height: 1.6; color: var(--muted); }
+.recentBlogs > .more { margin-top: 0; padding: 12px; border: 0; border-top: 1px solid var(--soft-line); border-radius: 0; }
 
 /* Masthead cloud: the masthead in the middle of the 正在發酵 cloud. One of three
  * canvases shows per breakpoint (MastheadCloud's CANVASES; the numbers arrive

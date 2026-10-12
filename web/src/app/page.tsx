@@ -3,6 +3,8 @@
 import Link from 'next/link';
 import BlogIcon from '@/components/BlogIcon';
 import { gateway, overview, plainText, taipei } from '@/lib/api';
+import { recentBlogRows } from '@/lib/home';
+import { externalHref } from '@/lib/images';
 import type { Topics } from '@/lib/topics';
 import styles from './_home/home.module.css';
 import MastheadCloud from './_home/MastheadCloud';
@@ -11,6 +13,8 @@ export const dynamic = 'force-dynamic';
 export default async function HomePage() {
   const [data, topics] = await Promise.all([overview(), gateway<Topics>('/api/topics?days=30')]);
   const [lead, ...rest] = data.posts;
+  const recentBlogs = recentBlogRows(data, 10);
+  const postHref = (post: { url?: string | null; blogSlug?: string }) => externalHref(post.url) ?? `/blogs/${post.blogSlug}/`;
   const updated = data.updatedAt ? `${taipei(data.updatedAt)} 更新` : '等待資料更新';
   return (
     <div className={styles.home}>
@@ -68,18 +72,11 @@ export default async function HomePage() {
           {lead ? (
             <>
               <article className={styles.hero}>
-                <a
-                  href={lead.url ?? `/blogs/${lead.blogSlug}/`}
-                  className={styles.heroImage}
-                  tabIndex={-1}
-                  aria-label={`閱讀：${lead.title}`}
-                >
-                  <NewsImage src={lead.imageUrl ?? null} priority />
-                </a>
+                <NewsImage src={lead.imageUrl} href={postHref(lead)} title={lead.title} variant="hero" />
                 <div className={styles.heroContent}>
                   <span className={styles.heroBadge}>最近發文</span>
                   <h3>
-                    <a href={lead.url ?? `/blogs/${lead.blogSlug}/`} className={styles.heroLink} rel="noopener noreferrer">
+                    <a href={postHref(lead)} className={styles.heroLink} rel="noopener noreferrer">
                       {lead.title}
                     </a>
                   </h3>
@@ -93,7 +90,7 @@ export default async function HomePage() {
                   <p className="line-clamp-5 text-sm leading-7 text-zinc-600 dark:text-zinc-400">{plainText(lead.summary)}</p>
                   <div className={styles.heroFoot}>
                     <span>{lead.author}</span>
-                    <a href={lead.url ?? `/blogs/${lead.blogSlug}/`} rel="noopener noreferrer">
+                    <a href={postHref(lead)} rel="noopener noreferrer">
                       到原站閱讀 →
                     </a>
                   </div>
@@ -111,7 +108,7 @@ export default async function HomePage() {
                         <span className={styles.storyIndex}>{String(i + 2).padStart(2, '0')}</span> {post.blogName}
                       </p>
                       <h3>
-                        <a href={post.url ?? `/blogs/${post.blogSlug}/`} rel="noopener noreferrer">
+                        <a href={postHref(post)} rel="noopener noreferrer">
                           {post.title}
                         </a>
                       </h3>
@@ -123,20 +120,13 @@ export default async function HomePage() {
                         <span>· {taipei(post.publishedAt)}</span>
                       </p>
                     </div>
-                    <a
-                      href={post.url ?? `/blogs/${post.blogSlug}/`}
-                      className={styles.thumbnail}
-                      tabIndex={-1}
-                      aria-label={`閱讀：${post.title}`}
-                    >
-                      <NewsImage src={post.imageUrl ?? null} />
-                    </a>
+                    <NewsImage src={post.imageUrl} href={postHref(post)} title={post.title} variant="thumbnail" />
                   </article>
                 ))}
+                <Link href="/articles/" className={styles.more}>
+                  探索更多文章 <span aria-hidden="true">→</span>
+                </Link>
               </div>
-              <Link href="/articles/" className={styles.more}>
-                探索更多文章 →
-              </Link>
             </>
           ) : (
             <div className={styles.empty}>
@@ -163,30 +153,48 @@ export default async function HomePage() {
             </Link>
           </div>
           <div className={`${styles.sectionHeading} ${styles.sectionHeadingLater}`}>
-            <h2>最近更新的部落格</h2>
+            <h2>最新更新的部落格</h2>
+            <Link href="/blogs/?sort=latest&dir=desc">依最新排序 →</Link>
           </div>
-          <div className={styles.headlineList}>
-            {data.blogs
-              .filter((blog) => blog.lastPublishedAt)
-              .sort((a, b) => Date.parse(b.lastPublishedAt ?? '') - Date.parse(a.lastPublishedAt ?? ''))
-              .slice(0, 4)
-              .map((blog) => (
-                <article className={styles.headlineCard} key={blog.slug}>
-                  <h3>
-                    <Link href={`/blogs/${blog.slug}/`} className="inline-flex items-center gap-1.5">
-                      <BlogIcon media={blog.slug} title={blog.name} />
-                      {blog.name}
-                    </Link>
-                  </h3>
-                  <div className={styles.headlineSource}>
-                    <p className={styles.headlineByline}>
-                      {blog.category ?? '未分類'} · {taipei(blog.lastPublishedAt)}
-                    </p>
-                    <p className={styles.comparedTitle}>{blog.description || '前往原站，閱讀作者的完整文章。'}</p>
-                  </div>
-                </article>
-              ))}
-          </div>
+          {recentBlogs.length ? (
+            <div className={styles.recentBlogs}>
+              <ol>
+                {recentBlogs.map(({ blog, latest, missing, publishedAt }) => {
+                  const href = externalHref(latest?.url);
+                  const title = latest?.title.trim() || '未提供標題';
+                  return (
+                    <li key={blog.slug}>
+                      <p className={styles.recentBlogName}>
+                        <Link href={`/blogs/${encodeURIComponent(blog.slug)}/`} title={blog.name}>
+                          <BlogIcon media={blog.slug} title={blog.name} />
+                          <span>{blog.name}</span>
+                        </Link>
+                        {publishedAt && <time dateTime={publishedAt}>{taipei(publishedAt)}</time>}
+                      </p>
+                      {latest ? (
+                        href ? (
+                          <a href={href} rel="noopener noreferrer" className={styles.recentPost} title={title}>
+                            {title}
+                          </a>
+                        ) : (
+                          <p className={styles.recentPost} title={title}>
+                            {title}
+                          </p>
+                        )
+                      ) : (
+                        <p className={styles.recentMissing}>{missing === 'none' ? '尚未收錄文章' : '最新文章標題暫缺'}</p>
+                      )}
+                    </li>
+                  );
+                })}
+              </ol>
+              <Link href="/articles/" className={styles.more}>
+                探索更多文章 <span aria-hidden="true">→</span>
+              </Link>
+            </div>
+          ) : (
+            <p className={styles.notice}>部落格更新資料整理中。</p>
+          )}
         </aside>
       </div>
       <div className={styles.band}>

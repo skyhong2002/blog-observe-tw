@@ -5,6 +5,7 @@ import { GridComponent, TooltipComponent } from 'echarts/components';
 import * as echarts from 'echarts/core';
 import { CanvasRenderer } from 'echarts/renderers';
 import { useEffect, useRef } from 'react';
+import { brandMark } from '@/lib/brand';
 
 echarts.use([BarChart, GridComponent, TooltipComponent, CanvasRenderer]);
 export default function TagCountChart({ rows }: { rows: Array<{ label: string; blogCount: number }> }) {
@@ -30,7 +31,9 @@ export default function TagCountChart({ rows }: { rows: Array<{ label: string; b
           data: rows.map((r) => r.label),
           axisLabel: { color: dark ? '#d4d4d8' : '#3f3f46', width: 90, overflow: 'truncate' },
         },
-        series: [{ name: '參與部落格', type: 'bar', data: rows.map((r) => r.blogCount), itemStyle: { color: '#d9480f' }, barMaxWidth: 22 }],
+        series: [
+          { name: '參與部落格', type: 'bar', data: rows.map((r) => r.blogCount), itemStyle: { color: brandMark(dark) }, barMaxWidth: 22 },
+        ],
       });
     };
     render();

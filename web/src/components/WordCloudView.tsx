@@ -51,7 +51,8 @@ const tones: Record<CloudTone, string> = {
   stone: 'fill-stone-600 dark:fill-stone-400',
 };
 const badges = {
-  brand: 'bg-brand-700 text-white dark:bg-brand-600',
+  // White text needs brand-700 or darker for 4.5:1 in both themes (green-600 is only ~3.3:1).
+  brand: 'bg-brand-700 text-white',
   soft: 'bg-brand-100 text-brand-800 dark:bg-brand-950 dark:text-brand-300',
   muted: 'bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300',
 };

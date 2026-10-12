@@ -35,7 +35,7 @@ export default async function BlogsPage({ searchParams }: { searchParams: Promis
       <Link
         href={sortLink(col)}
         scroll={false}
-        className={`inline-flex items-center gap-0.5 whitespace-nowrap hover:text-brand-700 ${sort === col ? 'text-zinc-900 dark:text-zinc-100' : ''}`}
+        className={`inline-flex items-center gap-0.5 whitespace-nowrap hover:text-brand-700 dark:hover:text-brand-400 ${sort === col ? 'text-zinc-900 dark:text-zinc-100' : ''}`}
       >
         {label}
         <span aria-hidden="true" className={sort === col ? '' : 'text-zinc-400 dark:text-zinc-600'}>
@@ -134,10 +134,11 @@ export default async function BlogsPage({ searchParams }: { searchParams: Promis
             {rows.map((blog) => (
               <tr key={blog.slug} className={table.row}>
                 <td className={table.lead}>
-                  <div className={table.leadBox}>
+                  {/* One line per row: name keeps its width, the URL takes what is left and is the first to truncate. */}
+                  <div className={`${table.leadBox} flex items-baseline gap-2`}>
                     <Link
                       href={`/blogs/${blog.slug}/`}
-                      className="flex min-w-0 max-w-full items-center gap-1.5 font-medium text-brand-700 hover:underline dark:text-brand-400"
+                      className="flex min-w-0 items-center gap-1.5 self-center font-medium text-brand-700 hover:underline dark:text-brand-400"
                     >
                       <BlogIcon media={blog.slug} title={blog.name} />
                       <span className={`${table.leadText} sm:max-w-60`} title={blog.name}>
@@ -145,9 +146,12 @@ export default async function BlogsPage({ searchParams }: { searchParams: Promis
                       </span>
                     </Link>
                     {blog.url && (
-                      <p className={`${table.leadExtra} ${table.leadText} mt-1 text-xs text-zinc-500 sm:max-w-60`} title={blog.url}>
-                        {blog.url}
-                      </p>
+                      <span
+                        className={`${table.leadExtra} ${table.leadText} shrink-[999] text-xs text-zinc-500 sm:max-w-40 dark:text-zinc-400`}
+                        title={blog.url}
+                      >
+                        {blog.url.replace(/^https?:\/\//, '').replace(/\/$/, '')}
+                      </span>
                     )}
                   </div>
                 </td>

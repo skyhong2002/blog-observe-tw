@@ -1,20 +1,10 @@
 import Image, { type ImageProps } from 'next/image';
+import { articleImage } from '@/lib/images';
+
 // Blog images are displayed directly in the browser, never fetched by the Next image proxy.
+// Invalid sources render nothing; callers own the wrapper and drop it too (lib/images.ts).
 export default function SafeImage({ src, alt = '', ...props }: Omit<ImageProps, 'src'> & { src: string | null | undefined }) {
-  if (!src) return null;
-  try {
-    const url = new URL(src);
-    if (
-      url.protocol !== 'https:' ||
-      url.username ||
-      url.password ||
-      url.port ||
-      !url.hostname.includes('.') ||
-      /^[\d.]+$/.test(url.hostname)
-    )
-      return null;
-  } catch {
-    return null;
-  }
-  return <Image src={src} alt={alt} {...props} unoptimized referrerPolicy="no-referrer" />;
+  const image = articleImage(src);
+  if (!image) return null;
+  return <Image src={image} alt={alt} {...props} unoptimized referrerPolicy="no-referrer" />;
 }
