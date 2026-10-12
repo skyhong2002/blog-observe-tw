@@ -27,4 +27,42 @@ describe('candidate writer entry guards', () => {
     await expect(recordCandidateCheck(pool, { ...checked(), reason: 'x'.repeat(130 * 1024) }, true)).rejects.toThrow('limit');
     expect(pool.getConnection).not.toHaveBeenCalled();
   });
+  it('invalid depth and missing personal proof become audited declines, never endless throws', async () => {
+    for (const evidence of [{ discoveryDepth: 9 }, { discoveryDepth: 1 }]) {
+      const c = {
+        query: vi.fn(async (sql: string) =>
+          sql.includes('GET_LOCK')
+            ? [[{ held: 1 }]]
+            : sql.includes('RELEASE_LOCK')
+              ? [[{ released: 1 }]]
+              : sql.includes('FROM discovery_candidates')
+                ? [
+                    [
+                      {
+                        id: 1,
+                        url: 'https://writer.test/',
+                        name: 'Writer',
+                        status: 'candidate',
+                        source_type: 'blogroll',
+                        source_evidence: evidence,
+                      },
+                    ],
+                  ]
+                : [[]],
+        ),
+        execute: vi.fn(async (_sql: string) => [{ affectedRows: 1 }]),
+        beginTransaction: vi.fn(),
+        commit: vi.fn(),
+        rollback: vi.fn(),
+        release: vi.fn(),
+        destroy: vi.fn(),
+      };
+      const pool = { getConnection: vi.fn(async () => c) } as unknown as Pool;
+      const result = await recordCandidateCheck(pool, { ...checked(), eligible: true }, true);
+      expect(result.status).toBe('candidate');
+      expect(['discovery_depth_invalid', 'personal_publication_unverified']).toContain(result.reason);
+      expect(c.commit).toHaveBeenCalledOnce();
+      expect(c.execute.mock.calls.some(([sql]) => sql.includes('discovery_candidate_audits'))).toBe(true);
+    }
+  });
 });

@@ -13,3 +13,9 @@ components. See docs/frontend-parity.md for the porting inventory and difference
 Copyright (c) 2026 Sky Hong
 
 Favicon caching and rendering ported from tools/fetch-favicons.ts, app/src/v1/icons.ts and web/src/components/MediaIcon.tsx at tag.observe.tw afe0a653fa8aae7e25a04a1d9fe87bf0400a2a39. Copyright (c) 2026 Sky Hong.
+
+Public article-window vocabulary contract and snapshot validation adapted from
+skyhong2002/youtube-board platform/jobs/src (local reviewed implementation,
+2026-10-12); provider contract from tag's tag-vocabulary-export worktree. These
+adaptations retain the MIT license and upstream copyright:
+Copyright (c) 2026 Sky Hong

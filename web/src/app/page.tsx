@@ -2,13 +2,14 @@
 
 import Link from 'next/link';
 import BlogIcon from '@/components/BlogIcon';
-import { overview, plainText, taipei } from '@/lib/api';
+import { gateway, overview, plainText, taipei } from '@/lib/api';
+import type { Topics } from '@/lib/topics';
 import styles from './_home/home.module.css';
 import MastheadCloud from './_home/MastheadCloud';
 import NewsImage from './_home/NewsImage';
 export const dynamic = 'force-dynamic';
 export default async function HomePage() {
-  const data = await overview();
+  const [data, topics] = await Promise.all([overview(), gateway<Topics>('/api/topics?days=30')]);
   const [lead, ...rest] = data.posts;
   const updated = data.updatedAt ? `${taipei(data.updatedAt)} 更新` : '等待資料更新';
   return (
@@ -17,19 +18,19 @@ export default async function HomePage() {
       <div className={styles.columns}>
         <aside className={styles.left} aria-label="標籤排行與作者">
           <div className={styles.sectionHeading}>
-            <h2>收錄標籤排行</h2>
-            <Link href="/ranking/">完整排行 →</Link>
+            <h2>最近共同話題</h2>
+            <Link href="/topics/">完整排行 →</Link>
           </div>
-          {data.tags.length ? (
+          {topics?.items.length ? (
             <ol className={styles.ranking}>
-              {data.tags.slice(0, 8).map((tag, i) => (
-                <li key={tag.slug}>
-                  <Link href={`/tags/?tag=${encodeURIComponent(tag.slug)}`}>
+              {topics.items.slice(0, 8).map((tag, i) => (
+                <li key={tag.id}>
+                  <Link href={`/topics/${encodeURIComponent(tag.id)}/?days=30`}>
                     <span className={styles.rank}>{String(i + 1).padStart(2, '0')}</span>
                     <span className={styles.rankBody}>
                       <strong>{tag.label}</strong>
                       <small>
-                        {tag.blogCount} 個部落格 · {tag.postCount} 篇
+                        {tag.blogs} 個部落格 · {tag.posts} 篇 · {tag.source === 'rss-category' ? 'RSS' : '共同詞彙'}
                       </small>
                     </span>
                   </Link>
@@ -37,9 +38,9 @@ export default async function HomePage() {
               ))}
             </ol>
           ) : (
-            <p className={styles.notice}>目前沒有可列出的標籤。</p>
+            <p className={styles.notice}>{topics ? '最近 30 天尚無足夠的共同話題。' : '話題資料暫時無法讀取。'}</p>
           )}
-          <p className={styles.muted}>依參與部落格數，再依收錄文章數排列；不是品質評分或升溫趨勢。</p>
+          <p className={styles.muted}>近 30 天；同站貢獻逐次遞減，至少兩站參與。RSS 標籤與共同詞彙分開列出。</p>
           <div className={`${styles.sectionHeading} ${styles.sectionHeadingLater}`}>
             <h2>作者動態</h2>
             <Link href="/authors/">全部作者 →</Link>
@@ -198,8 +199,8 @@ export default async function HomePage() {
         </section>
         <section className={styles.panel}>
           <div className={styles.sectionHeading}>
-            <h2>收錄與透明度</h2>
-            <Link href="/about/">收錄方式 →</Link>
+            <h2>沿著連結，認識新部落格</h2>
+            <Link href="/relations/">關係圖 →</Link>
           </div>
           <p className={styles.notice}>低頻寫作也是持續寫作。我們分開記錄最後發文與抓取成功時間，不會因為久未更新就判定網站失效。</p>
         </section>

@@ -1,6 +1,7 @@
 import { Queue, Worker } from 'bullmq';
 import { Redis } from 'ioredis';
 import pino from 'pino';
+import { runAiBatch } from './ai/batch.ts';
 import { loadConfig } from './config.js';
 import { runCandidateReviewBatch } from './crawl/candidate-review.ts';
 import { discoverBlogblog, discoverSimilar } from './crawl/discovery.ts';
@@ -10,6 +11,10 @@ import { runHistoryBatch } from './crawl/history.ts';
 import { createHistoryStore, selectHistoryBlogs } from './crawl/history-store.ts';
 import { createTagSimilarSitesClient } from './crawl/similarweb-client.ts';
 import { createDb } from './db/client.ts';
+import { runPublicationDiscoveryBatch } from './relations/home.ts';
+import { runRelationBatch } from './relations/worker.ts';
+import { runTopicsBatch } from './topics/batch.ts';
+import { syncVocabulary } from './topics/sync.ts';
 
 const config = loadConfig();
 const log = pino({ level: config.logLevel });
@@ -37,8 +42,18 @@ await queue.upsertJobScheduler(
 );
 const historyEnabled = process.env.BLOG_HISTORY_ENABLED !== 'false';
 const candidateReviewEnabled = process.env.BLOG_CANDIDATE_REVIEW_ENABLED !== 'false';
+const relationsEnabled = process.env.BLOG_RELATIONS_ENABLED === 'true';
+const aiEnabled = process.env.BLOG_AI_ENABLED === 'true';
+const topicsEnabled = process.env.BLOG_TOPICS_ENABLED === 'true';
+const vocabularyEnabled = process.env.BLOG_VOCABULARY_ENABLED === 'true';
+const shutdown = new AbortController();
 const missingIconsEnabled = process.env.BLOG_MISSING_FAVICONS_ENABLED !== 'false';
 for (const [name, every, enabled] of [
+  ['blogs-relations', 5 * 60_000, relationsEnabled],
+  ['blogs-publication-discovery', 30 * 60_000, relationsEnabled],
+  ['blogs-ai', 60 * 60_000, aiEnabled],
+  ['blogs-topics', 10 * 60_000, topicsEnabled],
+  ['blogs-vocabulary', 30 * 60_000, vocabularyEnabled],
   ['blogs-history', 5 * 60_000, historyEnabled],
   ['blogs-candidate-review', 30 * 60_000, candidateReviewEnabled],
   ['blogs-missing-icons', 15 * 60_000, missingIconsEnabled],
@@ -52,6 +67,23 @@ let closing = false;
 const worker = new Worker(
   config.queueName,
   async (job) => {
+    const batchOptions = {
+      signal: shutdown.signal,
+      limit: 5,
+      maxDurationMs: 120000,
+      userAgent: config.crawlUserAgent,
+      delayMs: config.crawlDelayMs,
+    };
+    if (job.name === 'blogs-publication-discovery')
+      return relationsEnabled ? runPublicationDiscoveryBatch(store.pool, batchOptions) : { skipped: 'disabled' };
+    if (job.name === 'blogs-relations') return relationsEnabled ? runRelationBatch(store.pool, batchOptions) : { skipped: 'disabled' };
+    if (job.name === 'blogs-ai') return aiEnabled ? runAiBatch(store.pool, { ...batchOptions, limit: 3 }) : { skipped: 'disabled' };
+    if (job.name === 'blogs-topics')
+      return topicsEnabled ? runTopicsBatch(store.pool, { ...batchOptions, limit: 200 }) : { skipped: 'disabled' };
+    if (job.name === 'blogs-vocabulary')
+      return vocabularyEnabled
+        ? syncVocabulary(store.pool, { ...batchOptions, enabled: true, mode: 'window', maxPages: 10 })
+        : { skipped: 'disabled' };
     if (job.name === 'blogs-history') {
       if (!historyEnabled) return { skipped: 'disabled' };
       const blogs = await selectHistoryBlogs(store.pool, 5);
@@ -136,6 +168,7 @@ worker.on('failed', (job, error) => log.error({ job: job?.name, error: error.mes
 async function close() {
   if (closing) return;
   closing = true;
+  shutdown.abort();
   await worker.close();
   await queue.close();
   await connection.quit();

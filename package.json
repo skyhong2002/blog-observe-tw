@@ -27,7 +27,11 @@
     "favicons:fetch": "node --env-file-if-exists=.env tools/fetch-favicons.ts",
     "seed:resolve": "node --env-file-if-exists=.env tools/resolve-seed-urls.ts",
     "history:batch": "node --env-file-if-exists=.env tools/crawl-history.ts",
-    "candidates:review": "node --env-file-if-exists=.env tools/review-candidates.ts"
+    "candidates:review": "node --env-file-if-exists=.env tools/review-candidates.ts",
+    "relations:once": "node --env-file-if-exists=.env tools/relations-once.ts",
+    "ai:once": "node --env-file-if-exists=.env tools/ai-once.ts",
+    "topics:once": "node --env-file-if-exists=.env tools/topics-once.ts",
+    "vocabulary:sync": "node --env-file-if-exists=.env tools/topics-once.ts --sync"
   },
   "dependencies": {
     "@fastify/rate-limit": "^11.2.0",

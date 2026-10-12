@@ -36,6 +36,34 @@
       "when": 1791784811777,
       "tag": "0004_history_import",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "5",
+      "when": 1791791182294,
+      "tag": "0005_blog_relationships",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "5",
+      "when": 1791791335462,
+      "tag": "0006_ai_fencing_topic_caps",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "5",
+      "when": 1791792174452,
+      "tag": "0007_publication_discovery_ai_errors",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "5",
+      "when": 1791792295799,
+      "tag": "0008_tag_sync_retry_after",
+      "breakpoints": true
     }
   ]
 }

@@ -7,7 +7,12 @@ import { loadConfig } from '../app/src/config.js';
 const config = loadConfig();
 const connection = new Redis(config.redisUrl, { maxRetriesPerRequest: null });
 const queue = new Queue(config.queueName, { connection, prefix: config.queuePrefix });
-const names = new Set(['blogs-history', 'blogs-candidate-review', 'blogs-missing-icons']);
+const relationshipJobs = ['blogs-relations', 'blogs-publication-discovery', 'blogs-ai', 'blogs-topics', 'blogs-vocabulary'];
+const names = new Set(
+  process.argv.includes('--relationships-only')
+    ? relationshipJobs
+    : ['blogs-history', 'blogs-candidate-review', 'blogs-missing-icons', ...relationshipJobs],
+);
 try {
   if ((await queue.getActiveCount()) > 0) throw new Error('Stop blog-observe-worker and wait for active jobs before rollback cleanup.');
   for (const name of names) await queue.removeJobScheduler(name);

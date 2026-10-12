@@ -1,8 +1,48 @@
+import { createHash } from 'node:crypto';
 import type { Pool, PoolConnection, RowDataPacket } from 'mysql2/promise';
+import { fetch as undiciFetch } from 'undici';
+import { infer } from '../ai/service.ts';
+import { reserveBudget } from '../jobs/budget.ts';
 import { recordCandidateCheck } from './candidate-promotion.ts';
 import { CANDIDATE_POLICY, type DiscoveryCandidate, validateCandidate } from './candidate-validation.ts';
-import type { FeedCrawlerOptions } from './feed.ts';
+import type { FeedCrawlerOptions, FeedFetcher } from './feed.ts';
 
+/** Counts robots and each redirect immediately before the existing pinned dispatcher performs I/O. */
+export function budgetedCandidateFetcher(
+  pool: Pool,
+  options: FeedCrawlerOptions & { signal?: AbortSignal; now?: () => Date },
+  assert: () => Promise<void>,
+  deadline: number,
+  onStop: () => void,
+): FeedFetcher {
+  const fetcher = options.fetcher ?? (undiciFetch as FeedFetcher);
+  return async (input, init) => {
+    if (options.signal?.aborted || Date.now() >= deadline) {
+      onStop();
+      throw Error('candidate_batch_stopped');
+    }
+    await assert();
+    const url = new URL(typeof input === 'string' ? input : input instanceof URL ? input.href : input.url);
+    const host = createHash('sha256').update(url.hostname.toLowerCase()).digest('hex');
+    const allowed = await reserveBudget(
+      pool,
+      [
+        { scope: 'candidates:http', amount: 1, limit: 300 },
+        { scope: `candidates:host:${host}`, amount: 1, limit: 20 },
+      ],
+      options.now?.() ?? new Date(),
+    );
+    if (!allowed) {
+      onStop();
+      throw Error('candidate_http_budget');
+    }
+    if (options.signal?.aborted || Date.now() >= deadline) {
+      onStop();
+      throw Error('candidate_batch_stopped');
+    }
+    return fetcher(input, init);
+  };
+}
 const LOCK = 'blog_observe:candidate-review';
 async function assertLease(c: PoolConnection) {
   const [[r]] = await c.query<RowDataPacket[]>('SELECT IS_USED_LOCK(?)=CONNECTION_ID() held', [LOCK]);
@@ -34,7 +74,7 @@ async function applyWithRetry(pool: Pool, check: Parameters<typeof recordCandida
 /** Review a bounded, resumable batch. Keep declined/operator-reviewed candidates out of automatic work. */
 export async function runCandidateReviewBatch(
   pool: Pool,
-  options: FeedCrawlerOptions & { apply?: boolean; limit?: number; maxDurationMs?: number } = {},
+  options: FeedCrawlerOptions & { apply?: boolean; limit?: number; maxDurationMs?: number; signal?: AbortSignal; now?: () => Date } = {},
 ) {
   if ((pool as unknown as { pool?: { config?: { connectionLimit?: number } } }).pool?.config?.connectionLimit === 1)
     throw Error('candidate review requires poolSize >= 2');
@@ -47,17 +87,65 @@ export async function runCandidateReviewBatch(
     const limit = Math.max(1, Math.min(2000, Math.trunc(options.limit || 25)));
     const deadline = Date.now() + Math.max(1000, Math.min(3600000, options.maxDurationMs || 600000));
     const [rows] = await connection.query<RowDataPacket[]>(
-      `SELECT id,url,name,status,source_type FROM discovery_candidates d WHERE status='candidate'
+      `SELECT id,url,name,status,source_type,source_evidence FROM discovery_candidates d WHERE status='candidate'
    AND NOT EXISTS (SELECT 1 FROM discovery_candidate_audits a WHERE a.candidate_id=d.id AND (a.source_type IN ('manual','human-review','admin') OR a.source_actor_id IS NOT NULL))
-   AND (COALESCE(JSON_UNQUOTE(JSON_EXTRACT(source_evidence,'$.automaticReview.policy')),'')<>? OR COALESCE(JSON_UNQUOTE(JSON_EXTRACT(source_evidence,'$.automaticReview.checkedAt')),'') < ?)
+   AND (COALESCE(JSON_UNQUOTE(JSON_EXTRACT(source_evidence,'$.automaticReview.policy')),'')<>? OR COALESCE(JSON_UNQUOTE(JSON_EXTRACT(source_evidence,'$.automaticReview.checkedAt')),'') < ? OR EXISTS(SELECT 1 FROM ai_results ai WHERE ai.entity_type='candidate' AND ai.entity_id=d.id AND ai.task='classification' AND ai.status<>'ok' AND ai.attempts<3 AND ai.next_attempt_at<=UTC_TIMESTAMP()))
    ORDER BY COALESCE(JSON_UNQUOTE(JSON_EXTRACT(source_evidence,'$.automaticReview.checkedAt')),''),id LIMIT ?`,
       [CANDIDATE_POLICY, new Date(Date.now() - 7 * 86400000).toISOString(), limit],
     );
     const results = [];
+    let stopped = false;
+    const boundedOptions =
+      options.apply === true
+        ? {
+            ...options,
+            fetcher: budgetedCandidateFetcher(
+              pool,
+              options,
+              () => assertLease(connection),
+              deadline,
+              () => {
+                stopped = true;
+              },
+            ),
+          }
+        : options;
     for (const row of rows) {
-      if (Date.now() >= deadline) break;
+      if (Date.now() >= deadline || options.signal?.aborted) break;
       await assertLease(connection);
-      const checked = await validateCandidate(row as DiscoveryCandidate, options);
+      const checked = await validateCandidate(row as DiscoveryCandidate, boundedOptions);
+      if (stopped) {
+        results.push({ id: row.id, status: 'deferred', reason: 'candidate_http_budget_or_deadline' });
+        break;
+      }
+      if (
+        options.apply === true &&
+        process.env.BLOG_AI_ENABLED === 'true' &&
+        checked.feed &&
+        checked.personalEvidence?.method === 'unresolved' &&
+        checked.personalEvidence.reason === 'personal_identity_uncertain'
+      ) {
+        const inference = await infer(pool, 'classification', 'candidate', checked.id, checked.personalEvidence.input, 'homepage', {
+          signal: options.signal,
+          now: options.now,
+        });
+        if (
+          inference.status === 'ok' &&
+          inference.result?.classification === 'personal' &&
+          inference.result.confidence >= 0.95 &&
+          inference.result.quotedEvidence.length
+        ) {
+          checked.personalEvidence = {
+            ...checked.personalEvidence,
+            method: 'ai',
+            personal: true,
+            reason: 'ai_personal_high_confidence',
+            cacheKey: inference.cacheKey,
+          };
+          checked.eligible = true;
+          checked.reason = 'verified_personal_homepage_and_rss';
+        }
+      }
       // Writer uses the second pool connection; never hold a SQL transaction while fetching.
       await assertLease(connection);
       try {

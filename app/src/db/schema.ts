@@ -475,3 +475,8 @@ export const historyTasks = mysqlTable(
     index('history_tasks_response').on(table.blogId, table.responseHash),
   ],
 );
+
+export * from '../ai/schema.ts';
+export * from '../jobs/schema.ts';
+export * from '../relations/schema.ts';
+export * from '../topics/schema.ts';

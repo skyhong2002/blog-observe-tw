@@ -1,5 +1,8 @@
 import { createHash } from 'node:crypto';
 import type { Pool, PoolConnection, ResultSetHeader, RowDataPacket } from 'mysql2/promise';
+import { inputKey, normalizeInput } from '../ai/contracts.ts';
+import { deterministicPersonalProof } from '../ai/personal.ts';
+import { reserveBudgetOnConnection } from '../jobs/budget.ts';
 import {
   CANDIDATE_POLICY,
   type CandidateCheck,
@@ -79,26 +82,105 @@ export async function recordCandidateCheck(pool: Pool, check: CandidateCheck, ap
     let slug: string | null = null;
     let created = false;
     const v = check.verification;
-    if (apply && check.eligible) {
+    const sourceEvidence = decode(candidate.source_evidence);
+    const depth = Number(sourceEvidence.discoveryDepth ?? 1);
+    const decline = (why: string) => {
+      check = { ...check, eligible: false };
+      reason = why;
+    };
+    if (check.eligible && (!Number.isInteger(depth) || depth < 1 || depth > 3)) decline('discovery_depth_invalid');
+    const parentEvidence = decode(sourceEvidence.minDepthEvidence || sourceEvidence.linkDiscovery || sourceEvidence);
+    if (check.eligible && (candidate.source_type === 'article-link' || parentEvidence.sourceBlogId !== undefined)) {
+      const parentId = Number(parentEvidence.sourceBlogId),
+        postId = Number(parentEvidence.sourcePostId);
+      if (!Number.isSafeInteger(parentId) || parentId < 1) decline('discovery_parent_missing');
+      else if (parentEvidence.location === 'blogroll' && parentEvidence.sourcePostId == null) {
+        const [parents] = await c.query<RowDataPacket[]>(
+          "SELECT COALESCE(r.depth,0) depth,b.url,u.url alias_url FROM blogs b LEFT JOIN relation_publications r ON r.blog_id=b.id LEFT JOIN blog_urls u ON u.blog_id=b.id WHERE b.id=? AND b.status='verified'",
+          [parentId],
+        );
+        const page = parentEvidence.sourcePageUrl;
+        if (!parents.length || Number(parents[0].depth) + 1 !== depth) decline('discovery_depth_mismatch');
+        else if (
+          typeof page !== 'string' ||
+          !parents.some((parent) =>
+            [parent.url, parent.alias_url].some((home) => typeof home === 'string' && publicationContains(page, home)),
+          )
+        )
+          decline('discovery_parent_page_mismatch');
+      } else if (!Number.isSafeInteger(postId) || postId < 1) decline('discovery_parent_post_missing');
+      else {
+        const [[parent]] = await c.query<RowDataPacket[]>(
+          "SELECT COALESCE(r.depth,0) depth FROM blogs b JOIN posts p ON p.blog_id=b.id AND p.id=? LEFT JOIN relation_publications r ON r.blog_id=b.id WHERE b.id=? AND b.status='verified'",
+          [postId, parentId],
+        );
+        if (!parent || Number(parent.depth) + 1 !== depth) decline('discovery_depth_mismatch');
+      }
+    }
+    const effectiveName =
+      check.enrichedName && ['article-link', 'blogroll'].includes(candidate.source_type) ? check.enrichedName : candidate.name;
+    if (check.eligible) {
+      const personal = check.personalEvidence;
+      let personalValid = personal ? deterministicPersonalProof(personal) : false;
+      if (personal?.method === 'ai' && personal.cacheKey) {
+        const [[cached]] = await c.query<RowDataPacket[]>(
+          "SELECT result_json,input_hash FROM ai_results WHERE cache_key=? AND entity_type='candidate' AND entity_id=? AND task='classification' AND status='ok' AND policy='personal-blog-v1'",
+          [personal.cacheKey, check.id],
+        );
+        const value = decode(cached?.result_json);
+        personalValid =
+          cached?.input_hash === inputKey('classification', normalizeInput(personal.input)).inputHash &&
+          value.classification === 'personal' &&
+          Number(value.confidence) >= 0.95 &&
+          Array.isArray(value.quotedEvidence) &&
+          value.quotedEvidence.length > 0 &&
+          value.quotedEvidence.every((q) => typeof q === 'string' && q.length >= 8 && personal.input.includes(q));
+      }
+      if (!personalValid) decline('personal_publication_unverified');
+    }
+    // biome-ignore lint/suspicious/noConfusingLabels: all declines must reach the shared append-only audit below.
+    admission: if (apply && check.eligible) {
       if (
-        candidatePreflight(candidate as Parameters<typeof candidatePreflight>[0]) ||
+        candidatePreflight({ ...candidate, name: effectiveName } as Parameters<typeof candidatePreflight>[0]) ||
         !v?.validated ||
         !v.finalUrl ||
         v.inputUrl !== check.inputUrl ||
         v.id !== check.id ||
-        candidatePreflight({ ...candidate, url: v.finalUrl } as Parameters<typeof candidatePreflight>[0]) ||
+        candidatePreflight({ ...candidate, name: effectiveName, url: v.finalUrl } as Parameters<typeof candidatePreflight>[0]) ||
         !v.evidence.identityMatches.length ||
         !check.feed ||
-        !candidateIdentityConfirmed(candidate.name, v, check.feed.title) ||
-        !['rss', 'atom'].includes(check.feed.type) ||
+        !candidateIdentityConfirmed(effectiveName, v, check.feed.title) ||
+        !['rss', 'atom', 'sitemap'].includes(check.feed.type) ||
         !isAllowedCrawlUrl(check.feed.url) ||
         check.feed.url.length > 1024 ||
         check.feed.entries < 1 ||
         !check.feed.sample.length ||
         check.feed.sample.some((u) => !publicationContains(u, v.finalUrl!)) ||
         safeKey(check.feed.identityUrl) !== safeKey(v.finalUrl)
-      )
-        throw Error('verified publication and RSS evidence required');
+      ) {
+        decline('publication_rss_evidence_invalid');
+        break admission;
+      }
+      if (
+        check.feed.type === 'sitemap' &&
+        (!check.sitemapArticles?.length ||
+          !publicationContains(check.feed.url, v.finalUrl) ||
+          check.sitemapArticles.some(
+            (a) =>
+              !['BlogPosting', 'Article'].includes(a.schemaType) ||
+              !a.title?.trim() ||
+              !a.author?.trim() ||
+              !publicationContains(a.url, v.finalUrl!) ||
+              !publicationContains(a.canonicalUrl, v.finalUrl!) ||
+              safeKey(a.url) === safeKey(v.finalUrl!) ||
+              safeKey(a.url) !== safeKey(a.canonicalUrl) ||
+              !/^[0-9a-f]{64}$/.test(a.htmlSha256) ||
+              !check.feed!.sample.includes(a.url),
+          ))
+      ) {
+        decline('article_sitemap_evidence_invalid');
+        break admission;
+      }
       const keys = new Set([safeKey(candidate.url), safeKey(v.finalUrl)]);
       const [rejected] = await c.query<RowDataPacket[]>("SELECT url FROM discovery_candidates WHERE status='rejected' FOR UPDATE");
       const [known] = await c.query<RowDataPacket[]>(
@@ -120,16 +202,26 @@ export async function recordCandidateCheck(pool: Pool, check: CandidateCheck, ap
           blogId = owner?.id ?? null;
           slug = owner?.slug ?? null;
           if (!blogId) {
+            if (!(await reserveBudgetOnConnection(c, [{ scope: 'discovery:admissions', amount: 1, limit: 10 }], now))) {
+              decline('daily_admission_budget_exhausted');
+              break admission;
+            }
             slug = `discovered-${createHash('sha256').update(safeKey(v.finalUrl)).digest('hex').slice(0, 20)}`;
             const name = Array.from(v.siteName || check.feed.title || v.title || candidate.name)
               .slice(0, 255)
               .join('');
             const [insert] = await c.execute<ResultSetHeader>(
-              "INSERT INTO blogs (slug,name,url,canonical_host,status,status_label,discovered_at,stale_policy) VALUES (?,?,?,?,'verified','RSS 自動驗證',?,'low_frequency')",
+              "INSERT INTO blogs (slug,name,url,canonical_host,status,status_label,discovered_at,stale_policy) VALUES (?,?,?,?,'verified','個人部落格自動驗證',?,'low_frequency')",
               [slug, name, v.finalUrl, new URL(v.finalUrl).hostname, now],
             );
             blogId = insert.insertId;
             created = true;
+            await c.execute('INSERT IGNORE INTO relation_publications (blog_id,depth,source_candidate_id,admitted_at) VALUES (?,?,?,?)', [
+              blogId,
+              depth,
+              check.id,
+              now,
+            ]);
             await c.execute("INSERT INTO blog_urls (blog_id,url,kind,is_primary,discovered_at) VALUES (?,?,'primary',TRUE,?)", [
               blogId,
               v.finalUrl,

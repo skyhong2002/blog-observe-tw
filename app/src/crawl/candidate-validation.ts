@@ -1,10 +1,19 @@
 import { XMLParser, XMLValidator } from 'fast-xml-parser';
+import { type PersonalEvidence, personalHomepage } from '../ai/personal.ts';
+import { type SitemapArticleEvidence, verifyArticleSitemap } from '../ai/publication-sitemap.ts';
 import { type FeedCrawlerOptions, isAllowedCrawlUrl, parseFeed, politeFetch, readFeedBody } from './feed.ts';
 import { seedIdentityKey } from './seed-url-resolution.ts';
 import { isSeedPlatformRoot, type SeedUrlValidation, validateSeedUrl } from './seed-url-validation.ts';
 
-export const CANDIDATE_POLICY = 'rss-publication-v1';
-export type DiscoveryCandidate = { id: number; url: string; name: string | null; status: string; source_type: string };
+export const CANDIDATE_POLICY = 'personal-rss-publication-v2';
+export type DiscoveryCandidate = {
+  id: number;
+  url: string;
+  name: string | null;
+  status: string;
+  source_type: string;
+  source_evidence?: unknown;
+};
 export type CandidateCheck = {
   policy: string;
   id: number;
@@ -13,7 +22,10 @@ export type CandidateCheck = {
   eligible: boolean;
   reason: string;
   verification?: SeedUrlValidation;
-  feed?: { url: string; type: 'rss' | 'atom'; title: string; identityUrl: string; entries: number; sample: string[] };
+  enrichedName?: string;
+  sitemapArticles?: SitemapArticleEvidence[];
+  personalEvidence?: PersonalEvidence;
+  feed?: { url: string; type: 'rss' | 'atom' | 'sitemap'; title: string; identityUrl: string; entries: number; sample: string[] };
 };
 const platforms = new Set([
   'medium.com',
@@ -115,10 +127,34 @@ export async function validateCandidate(candidate: DiscoveryCandidate, options: 
     eligible: false,
     reason: candidatePreflight(candidate) || 'unverified',
   };
-  if (result.reason !== 'unverified') return result;
+  const mayEnrich = ['article-link', 'blogroll'].includes(candidate.source_type);
+  if (result.reason !== 'unverified' && !(mayEnrich && result.reason === 'missing_identity_name')) return result;
+  try {
+    const home = await politeFetch(candidate.url, {}, options);
+    if (!home.ok) {
+      result.reason = `homepage_http_${home.status}`;
+      await home.body?.cancel();
+      return result;
+    }
+    const observed = personalHomepage(await readFeedBody(home));
+    result.personalEvidence = observed.evidence;
+    if (mayEnrich && !observed.siteName) {
+      result.reason = 'missing_identity_name';
+      return result;
+    }
+    if (mayEnrich && observed.siteName) {
+      result.enrichedName = observed.siteName;
+      candidate = { ...candidate, name: observed.siteName };
+    }
+  } catch (error) {
+    result.reason = /robots/i.test(error instanceof Error ? error.message : '')
+      ? 'robots_disallowed'
+      : 'homepage_personal_verification_failed';
+    return result;
+  }
   const verification = await validateSeedUrl(
     { id: candidate.id, name: candidate.name!, url: candidate.url },
-    { ...options, requireSyndication: true, maxSourceRequests: 8 },
+    { ...options, requireSyndication: false, maxSourceRequests: 8 },
   );
   result.verification = verification;
   if (!verification.validated || !verification.finalUrl) {
@@ -129,12 +165,40 @@ export async function validateCandidate(candidate: DiscoveryCandidate, options: 
     result.reason = 'redirect_not_publication_home';
     return result;
   }
-  const source = verification.feedSources.find((s) => s.type === 'rss' || s.type === 'atom');
+  const source =
+    verification.feedSources.find((s) => s.type === 'rss' || s.type === 'atom') ||
+    verification.feedSources.find((s) => s.type === 'sitemap');
   if (!source) {
-    result.reason = 'rss_or_atom_required';
+    result.reason = 'rss_or_article_sitemap_required';
     return result;
   }
   try {
+    if (source.type === 'sitemap') {
+      const title = verification.siteName || verification.title;
+      if (!candidateIdentityConfirmed(candidate.name, verification, title)) {
+        result.reason = 'sitemap_home_identity_mismatch';
+        return result;
+      }
+      const articles = await verifyArticleSitemap(source.url, verification.finalUrl, options);
+      if (!articles.length) {
+        result.reason = 'rss_or_article_sitemap_required';
+        return result;
+      }
+      result.sitemapArticles = articles;
+      result.feed = {
+        url: source.url,
+        type: 'sitemap',
+        title: title.slice(0, 255),
+        identityUrl: verification.finalUrl,
+        entries: articles.length,
+        sample: articles.map((a) => a.url),
+      };
+      result.eligible = result.personalEvidence?.personal === true;
+      result.reason = result.eligible
+        ? 'verified_personal_homepage_and_article_sitemap'
+        : result.personalEvidence?.reason || 'personal_identity_uncertain';
+      return result;
+    }
     const response = await politeFetch(source.url, {}, options);
     if (!response.ok) {
       result.reason = `feed_http_${response.status}`;
@@ -209,7 +273,8 @@ export async function validateCandidate(candidate: DiscoveryCandidate, options: 
       sample: entries.slice(0, 3).map((e) => e.url),
     };
     result.reason = 'verified_homepage_and_rss';
-    result.eligible = true;
+    result.eligible = result.personalEvidence?.personal === true;
+    if (!result.eligible) result.reason = result.personalEvidence?.reason || 'personal_identity_uncertain';
   } catch (error) {
     const m = error instanceof Error ? error.message : '';
     result.reason = /robots/i.test(m)

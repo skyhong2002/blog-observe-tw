@@ -1,12 +1,15 @@
 import rateLimit from '@fastify/rate-limit';
 import * as cheerio from 'cheerio';
 import Fastify, { LogController } from 'fastify';
+import { registerAiRoutes } from './ai/routes.ts';
 import { registerLogin } from './auth/google-login.ts';
 import { dbLoginStore } from './auth/store.ts';
 import { loadCatalog } from './catalog.js';
 import { loadAuthorCatalog } from './catalog-authors.js';
 import { createDb } from './db/client.ts';
 import { loadOverview } from './overview.js';
+import { registerRelationRoutes } from './relations/routes.ts';
+import { registerTopicRoutes } from './topics/routes.ts';
 import { createUiProxy } from './ui-proxy.js';
 import { iconManifest, registerFavicons } from './v1/favicon-routes.ts';
 import { iconUrl } from './v1/icons.ts';
@@ -39,6 +42,9 @@ export async function buildApp(config, { logger = false, store = null } = {}) {
   });
   registerFavicons(app);
   registerSimilarwebTraffic(app, pool);
+  registerRelationRoutes(app, pool);
+  registerAiRoutes(app, pool);
+  registerTopicRoutes(app, pool);
   for (const type of ['application/xml', 'text/xml', 'application/x-opml']) {
     app.addContentTypeParser(type, { parseAs: 'string', bodyLimit: 1024 * 1024 }, (_request, body, done) => done(null, body));
   }

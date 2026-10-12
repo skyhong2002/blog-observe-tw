@@ -55,3 +55,16 @@ npm run blogs:merge -- old-slug new-slug --apply
 [候選自動收錄](docs/automatic-candidate-review.md)每半小時驗證最多25筆，完整名稱、RSS首頁與文章歸屬皆須一致；網站／feed所有權、人工決定與稽核在同一交易保護。每十五分鐘另補最多10個新收錄站的缺圖，失敗冷卻七天；每月原圖示刷新保留。三種新工作都在 blog 自己的 BullMQ 單一 worker，以獨立旗標停止，姊妹站不改動。
 
 最新部署與本輪驗收：[2026-10-12 歷史遍歷、來源驗證與圖示補齊](docs/completion-2026-10-12.md)。
+
+## 部落格之間的引用與探索
+
+[關係、探索與話題設計](docs/blog-relationships.md)：文章正文的外連與 blogroll、側欄、留言分開保存；
+`/relations/` 看提及方向與互相引用，部落格頁可查看「提到誰／被誰提到」並回原文章核對。
+`/topics/` 採 7／30／90 天與同站遞減權重；本站 RSS 標籤和 tag 公開文章窗口的共同詞彙分開標示。
+詞庫保留來源、固定窗口、版本與同步時間，不宣稱尚未部署的完整匯出已可用。
+
+新工作以 `BLOG_RELATIONS_ENABLED`、`BLOG_AI_ENABLED`、`BLOG_TOPICS_ENABLED`、`BLOG_VOCABULARY_ENABLED`
+獨立啟用（程式預設關閉，正式部署審查後明確設定）。沿用 blog 原本的單一 worker／佇列。
+`relations:once`、`ai:once`、`topics:once`、`vocabulary:sync` 可手動執行同一個有預算的工作。
+AI 一律使用 `sky-quality` 別名，標示「AI 推定」；私密金鑰不入庫，人工覆寫優先於自動產生的簡介／主題。
+Similarweb 目前不提供引薦流量欄位，擴充需求見[欄位提案](docs/similarweb-referrals-proposal.md)，沒有修改 tag。

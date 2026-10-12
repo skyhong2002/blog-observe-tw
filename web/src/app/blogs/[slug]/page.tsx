@@ -1,5 +1,8 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
+import BlogInference from '@/components/BlogInference';
+import BlogRelations from '@/components/BlogRelations';
+import BlogTopics from '@/components/BlogTopics';
 import SimilarwebTraffic from '@/components/SimilarwebTraffic';
 import SourceProfile from '@/components/SourceProfile';
 import { getBlog } from '@/lib/api';
@@ -15,6 +18,9 @@ export default async function BlogDetailPage({ params, searchParams }: Props) {
   return (
     <>
       <SourceProfile blog={blog} query={String((await searchParams).q ?? '').slice(0, 100)} />
+      <BlogRelations slug={blog.slug} />
+      <BlogTopics slug={blog.slug} />
+      <BlogInference slug={blog.slug} />
       <SimilarwebTraffic slug={blog.slug} compact />
     </>
   );

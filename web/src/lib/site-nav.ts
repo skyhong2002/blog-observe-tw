@@ -8,7 +8,8 @@ export const NAV_GROUPS: Array<{ label: string; links: NavLink[] }> = [
       { href: '/tags/', label: '文章標籤', short: '標籤' },
     ],
   },
-  { label: '看趨勢', links: [{ href: '/ranking/', label: '大家正在寫什麼', short: '關鍵字' }] },
+  { label: '看關係', links: [{ href: '/relations/', label: '部落格關係圖', short: '關係圖' }] },
+  { label: '看話題', links: [{ href: '/topics/', label: '大家正在寫什麼', short: '話題' }] },
   {
     label: '看部落格',
     links: [

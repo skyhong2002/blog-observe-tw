@@ -4,7 +4,8 @@ import { candidatePreflight, type DiscoveryCandidate, publicationContains, valid
 const home = 'https://quill.test/',
   feed = home + 'feed/';
 const candidate: DiscoveryCandidate = { id: 1, url: home, name: 'Quill Writer', status: 'candidate', source_type: 'blogblog-club' };
-const homepage = '<title>Quill Writer</title><link rel="alternate" type="application/rss+xml" href="/feed/">';
+const homepage =
+  '<meta name="description" content="Personal blog. About me: I am Quill Writer."><title>Quill Writer</title><link rel="alternate" type="application/rss+xml" href="/feed/">';
 const rss = (identity = home, title = 'Quill Writer', post = home + 'old-post') =>
   `<rss version="2.0"><channel><title>${title}</title><link>${identity}</link><item><title>Short old post</title><link>${post}</link><guid>abc</guid><pubDate>Mon, 01 Jan 2001 00:00:00 GMT</pubDate><description>Hi</description></item></channel></rss>`;
 function options(xml: string, html = homepage) {
@@ -44,10 +45,10 @@ describe('automatic discovery verification', () => {
     expect(result.eligible).toBe(true);
     expect(result.feed).toMatchObject({ entries: 1, identityUrl: home, type: 'rss' });
   });
-  it('does not auto-approve sitemap-only publications', async () => {
+  it('does not auto-approve sitemap XML without article and Person evidence', async () => {
     const result = await validateCandidate(candidate, options('<urlset><url><loc>https://quill.test/post</loc></url></urlset>'));
     expect(result.eligible).toBe(false);
-    expect(result.reason).toBe('no_verified_feed_or_sitemap');
+    expect(result.reason).toBe('rss_or_article_sitemap_required');
   });
   it('does not accept a shared name fragment as full publication identity', async () => {
     const result = await validateCandidate(
@@ -60,7 +61,7 @@ describe('automatic discovery verification', () => {
   it('skips an advertised comments feed even when it appears before the main RSS', async () => {
     const opts = options(
       rss(),
-      '<title>Quill Writer</title><link rel="alternate" type="application/rss+xml" href="/comments/feed/"><link rel="alternate" type="application/rss+xml" href="/feed/">',
+      '<meta name="description" content="Personal blog. About me: I am Quill Writer."><title>Quill Writer</title><link rel="alternate" type="application/rss+xml" href="/comments/feed/"><link rel="alternate" type="application/rss+xml" href="/feed/">',
     );
     expect((await validateCandidate(candidate, opts)).eligible).toBe(true);
     expect(opts.fetcher.mock.calls.some(([url]) => String(url).includes('/comments/'))).toBe(false);
@@ -97,5 +98,23 @@ describe('automatic discovery verification', () => {
     const result = await validateCandidate({ ...candidate, url: 'https://blocked-candidate.test/' }, opts);
     expect(result.reason).toBe('robots_disallowed');
     expect(result.eligible).toBe(false);
+  });
+  it('retains identity-matching media and ambiguous RSS sites without personal admission', async () => {
+    for (const about of ['新聞媒體 編輯團隊', 'Quill Writer']) {
+      const check = await validateCandidate(
+        candidate,
+        options(rss(), `<title>Quill Writer</title><p>${about}</p><link rel="alternate" type="application/rss+xml" href="/feed/">`),
+      );
+      expect(check.feed?.entries).toBe(1);
+      expect(check.eligible).toBe(false);
+    }
+  });
+  it('enriches article anchor into independently verified homepage and RSS identity', async () => {
+    const check = await validateCandidate(
+      { ...candidate, source_type: 'article-link', name: 'An unrelated linked article' },
+      options(rss()),
+    );
+    expect(check.enrichedName).toBe('Quill Writer');
+    expect(check.eligible).toBe(true);
   });
 });

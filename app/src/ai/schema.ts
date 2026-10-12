@@ -1,0 +1,40 @@
+import { char, datetime, index, int, json, mysqlTable, uniqueIndex, varchar } from 'drizzle-orm/mysql-core';
+export const aiResults = mysqlTable(
+  'ai_results',
+  {
+    id: int('id').autoincrement().primaryKey(),
+    task: varchar('task', { length: 32 }).notNull(),
+    entityType: varchar('entity_type', { length: 16 }).notNull(),
+    entityId: int('entity_id').notNull(),
+    cacheKey: char('cache_key', { length: 64 }).notNull(),
+    inputHash: char('input_hash', { length: 64 }).notNull(),
+    coverage: varchar('coverage', { length: 32 }).notNull(),
+    status: varchar('status', { length: 16 }).notNull(),
+    resultJson: json('result_json'),
+    modelAlias: varchar('model_alias', { length: 64 }).notNull(),
+    actualModel: varchar('actual_model', { length: 180 }),
+    policy: varchar('policy', { length: 64 }).notNull(),
+    normalizationVersion: varchar('normalization_version', { length: 32 }).notNull(),
+    lastError: varchar('last_error', { length: 64 }),
+    claimToken: char('claim_token', { length: 32 }),
+    attempts: int('attempts').notNull().default(0),
+    nextAttemptAt: datetime('next_attempt_at'),
+    createdAt: datetime('created_at').notNull(),
+    updatedAt: datetime('updated_at').notNull(),
+  },
+  (t) => [uniqueIndex('ai_cache_key').on(t.cacheKey), index('ai_entity').on(t.entityType, t.entityId, t.task)],
+);
+export const aiOverrides = mysqlTable(
+  'ai_overrides',
+  {
+    id: int('id').autoincrement().primaryKey(),
+    entityType: varchar('entity_type', { length: 16 }).notNull(),
+    entityId: int('entity_id').notNull(),
+    task: varchar('task', { length: 32 }).notNull(),
+    resultJson: json('result_json').notNull(),
+    actor: varchar('actor', { length: 128 }).notNull(),
+    note: varchar('note', { length: 500 }).notNull(),
+    updatedAt: datetime('updated_at').notNull(),
+  },
+  (t) => [uniqueIndex('ai_override_entity').on(t.entityType, t.entityId, t.task)],
+);

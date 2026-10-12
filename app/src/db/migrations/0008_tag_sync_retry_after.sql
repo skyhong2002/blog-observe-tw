@@ -1,0 +1,1 @@
+ALTER TABLE `topic_window_runs` ADD `next_attempt_at` datetime;
