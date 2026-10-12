@@ -15,14 +15,11 @@ import {
   operations,
   SITE_ORIGIN,
 } from '@/lib/openapi-spec';
+import { pageMetadata } from '@/lib/seo';
 import { table } from '@/lib/table-styles';
 
 export const dynamic = 'force-static';
-export const metadata = {
-  title: 'API 文件',
-  description: '部落格觀察公開 API：端點、參數、回傳欄位與使用規則。',
-  alternates: { canonical: '/api/' },
-};
+export const metadata = pageMetadata('/api/', 'API 文件', '部落格觀察公開 API：端點、參數、回傳欄位與使用規則。');
 
 // `code` spans in the spec's prose become <code>.
 // Table cells pass `nowrap` so their row stays on one line.

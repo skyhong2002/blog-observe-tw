@@ -1,4 +1,11 @@
 import Link from 'next/link';
+import { pageMetadata } from '@/lib/seo';
+
+export const metadata = pageMetadata(
+  '/about/',
+  '資料來源與收錄方式',
+  '部落格觀察如何收錄公開部落格：來源、內文取得、更新與話題排行方式，以及隱私與訂閱說明。',
+);
 export default function AboutPage() {
   return (
     <article className="max-w-3xl space-y-6 pb-8">
