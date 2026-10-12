@@ -62,6 +62,7 @@ try {
     ['topic-frequency', '../app/src/topics/frequency.integration.ts', 'runTopicFrequencyIntegration'],
     ['topic-history', '../app/src/topics/history.integration.ts', 'runTopicHistoryIntegration'],
     ['content-visibility', '../tests/integration/content-visibility.mjs', 'runContentVisibilityIntegration'],
+    ['future-visibility', '../app/src/future-visibility.integration.ts', 'runFutureVisibilityIntegration'],
     ['topic-history-read', '../app/src/topics/history-read.integration.ts', 'runTopicHistoryReadIntegration'],
     ['index-carry', '../app/src/topics/index-carry.integration.ts', 'runIndexCarryIntegration'],
     ['window-incremental', '../app/src/topics/window-incremental.integration.ts', 'runWindowIncrementalIntegration'],

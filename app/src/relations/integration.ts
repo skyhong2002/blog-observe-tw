@@ -15,7 +15,7 @@ export async function runRelationIntegration(pool: Pool) {
     ?.port;
   if (configuredPort !== 18169) throw Error('relation integration requires the isolated test database on port 18169');
   const suffix = Date.now().toString(36);
-  const now = new Date('2040-10-12T00:00:00Z');
+  const now = new Date('2020-10-12T00:00:00Z');
   const blogIds: number[] = [];
   const postIds: number[] = [];
   const unknown = `https://unknown-${suffix}.example/`;
@@ -97,7 +97,7 @@ export async function runRelationIntegration(pool: Pool) {
       )) === 0,
     );
     const [[budget]] = await pool.query<RowDataPacket[]>(
-      "SELECT used FROM work_budgets WHERE day='2040-10-12' AND scope='relations:candidates'",
+      "SELECT used FROM work_budgets WHERE day='2020-10-12' AND scope='relations:candidates'",
     );
     check(Number(budget.used) >= 1);
     const profileCoverage = await loadRelationCoverage(pool, a);
@@ -191,7 +191,7 @@ export async function runRelationIntegration(pool: Pool) {
     const homeCoverage = await loadRelationCoverage(pool, a);
     check(homeCoverage.nonBodyLinks.blogroll === 2);
     const [[afterHomeBudget]] = await pool.query<RowDataPacket[]>(
-      "SELECT used FROM work_budgets WHERE day='2040-10-12' AND scope='relations:candidates'",
+      "SELECT used FROM work_budgets WHERE day='2020-10-12' AND scope='relations:candidates'",
     );
     check(Number(afterHomeBudget.used) === Number(budget.used) + 1);
     const homeUrl = new URL(sourceUrl).origin + '/';

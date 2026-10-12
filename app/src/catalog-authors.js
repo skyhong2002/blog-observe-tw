@@ -29,7 +29,7 @@ export async function loadAuthorCatalog(pool, query = {}) {
   const [authors] = await pool.query(
     `SELECT a.id,a.display_name AS displayName,b.slug AS blogSlug,b.name AS blogName,
       (SELECT COUNT(DISTINCT p.id) FROM post_authors pa JOIN posts p ON p.id=pa.post_id
-        WHERE pa.author_id=a.id AND pa.status='active' AND p.blog_id=b.id) AS postCount
+        WHERE pa.author_id=a.id AND pa.status='active' AND p.blog_id=b.id AND (p.published_at IS NULL OR p.published_at<=UTC_TIMESTAMP())) AS postCount
       ${condition} ORDER BY a.display_name,b.name,a.id,b.id LIMIT ? OFFSET ?`,
     [...parameters, filters.limit, (page - 1) * filters.limit],
   );

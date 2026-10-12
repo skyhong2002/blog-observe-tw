@@ -11,9 +11,9 @@ export function registerContentRoutes(app: FastifyInstance, pool: Pool) {
       const [totals] = await pool.query<RowDataPacket[]>(`SELECT
         (SELECT COUNT(*) FROM blogs WHERE status='verified') blogs,
         (SELECT COUNT(*) FROM content_blog_rules r JOIN blogs b ON b.id=r.blog_id WHERE b.status='verified') configuredBlogs,
-        (SELECT COUNT(*) FROM posts p JOIN blogs b ON b.id=p.blog_id WHERE b.status='verified') posts`);
+        (SELECT COUNT(*) FROM posts p JOIN blogs b ON b.id=p.blog_id WHERE b.status='verified' AND (p.published_at IS NULL OR p.published_at<=UTC_TIMESTAMP())) posts`);
       const [states] = await pool.query<RowDataPacket[]>(`SELECT c.status,c.source_kind source,COUNT(*) count
-        FROM content_post_bodies c JOIN posts p ON p.id=c.post_id JOIN blogs b ON b.id=p.blog_id WHERE b.status='verified' GROUP BY c.status,c.source_kind`);
+        FROM content_post_bodies c JOIN posts p ON p.id=c.post_id JOIN blogs b ON b.id=p.blog_id WHERE b.status='verified' AND (p.published_at IS NULL OR p.published_at<=UTC_TIMESTAMP()) GROUP BY c.status,c.source_kind`);
       const [rules] = await pool.query<RowDataPacket[]>(`SELECT r.last_status status,COUNT(*) count
         FROM content_blog_rules r JOIN blogs b ON b.id=r.blog_id WHERE b.status='verified' GROUP BY r.last_status`);
       return { totals: totals[0], states, rules, publicContent: 'summary-only', observedAt: new Date().toISOString() };
@@ -32,7 +32,7 @@ export function registerContentRoutes(app: FastifyInstance, pool: Pool) {
       if (!rows[0]) return null;
       const [sources] = await pool.query<RowDataPacket[]>(
         `SELECT c.status,c.source_kind source,c.completeness,COUNT(*) count
-        FROM content_post_bodies c JOIN posts p ON p.id=c.post_id JOIN blogs b ON b.id=p.blog_id WHERE b.id=? AND b.status='verified' GROUP BY c.status,c.source_kind,c.completeness`,
+        FROM content_post_bodies c JOIN posts p ON p.id=c.post_id JOIN blogs b ON b.id=p.blog_id WHERE b.id=? AND b.status='verified' AND (p.published_at IS NULL OR p.published_at<=UTC_TIMESTAMP()) GROUP BY c.status,c.source_kind,c.completeness`,
         [rows[0].id],
       );
       const { id: _privateId, ...blog } = rows[0];

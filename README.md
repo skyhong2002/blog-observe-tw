@@ -44,7 +44,7 @@ npm run blogs:merge -- old-slug new-slug --apply
 
 ## 開發與發版
 
-以 GitHub `main` 為唯一整合與發版來源；主要工作目錄 `/home/deck/.t3/projects/blog-observe-tw` 的 main 已同步，`feat/tag-frontend-parity` 已完整納入。新工作先 fetch，再從遠端 main 開始；正式服務固定使用 commit SHA 的獨立 release，不從功能分支或 checkout 的舊 `.next` 發版。詳見 [分支、部署與回滾流程](docs/deployment.md)。
+以 GitHub `main` 為唯一整合與發版來源；主要工作目錄 `/home/deck/.t3/projects/blog-observe-tw` 的 main 已同步，`feat/tag-frontend-parity` 已完整納入。新工作先 fetch，再從遠端 main 開始；正式服務固定使用 commit SHA 的獨立 release，不從功能分支或 checkout 的舊 `.next` 發版。詳見 [藍綠部署與安全回滾流程](docs/blue-green-deployment.md)。
 
 依使用者要求，自行搜尋並驗證 131 個缺網址 seed；唯一官方身份及有效 RSS／Atom／sitemap 通過後直接補入既有 seed，真正無法驗證者保留 unresolved 與證據。詳見 [種子網址驗證流程](docs/seed-url-matching-proposal.md)。
 
@@ -77,6 +77,6 @@ Similarweb 目前不提供引薦流量欄位，擴充需求見[欄位提案](doc
 
 公開查詢提供已驗證部落格目錄、文章短摘要、提及關係與話題；不公開抓取全文或私人追蹤。匿名每 IP 每分鐘 60 次；登入 `/my/` 可建立最多三把 `x-api-key` 金鑰，每把每分鐘 1000 次，資料庫只存 SHA-256。金鑰只授權公開查詢，不取代登入 session。管理金鑰需 session、同源 Origin 與 CSRF。
 
-v1 由單一 gateway process 提供，撤銷立即清除同 process 的 key cache；若未來改多 gateway，必須先加入跨 process 失效通知與共用限流。匿名成功回應提供 `s-maxage=120, stale-while-revalidate=180`；Cookie／API key／Authorization 與錯誤回應不共用快取。現有 Cloudflare 專用 HTML 規則只涵蓋首頁；若另增加 API 規則，必須明確排除上述三種標頭，尊重來源 `private/no-store`，不得把憑證請求的回應強制快取。
+v1 由單一 gateway process 提供，撤銷立即清除同 process 的 key cache；若未來改多 gateway，必須先加入跨 process 失效通知與共用限流。目前公開資料回應與 HTML 均為 `no-store`，Cloudflare 首頁與 API 兩條快取規則停用。origin／Next／Cloudflare 三層撤銷驗證完成前，不恢復共享快取，也不使用短 TTL 退路；詳見 [公開內容撤銷規則](docs/public-page-cache.md)。
 
 正式 web 建置請使用根目錄 `npm run web:build`；此入口先清除該 checkout 的 `web/.next`，完成後比對 standalone 的 build ID 與 API 文件 HTML，避免重複建置留下舊 release 的靜態產物。請勿在正在提供服務的 release 目錄執行建置。

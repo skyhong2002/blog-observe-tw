@@ -41,7 +41,7 @@ export type RelationDTO = {
 // Stable source-post / exact target / location identity survives crawler ordinal changes.
 // This only filters public presentation; original observations/discovery evidence are never mutated.
 const PUBLIC_RELATION = `EXISTS (SELECT 1 FROM posts visible_post JOIN blogs visible_blog ON visible_blog.id=visible_post.blog_id
-  WHERE visible_post.id=l.source_post_id AND visible_blog.status='verified') AND EXISTS (SELECT 1 FROM relation_observations public_o WHERE public_o.post_id=l.source_post_id AND public_o.last_success_at IS NOT NULL AND public_o.status<>'reparse-pending') AND NOT EXISTS (SELECT 1 FROM admin_relation_overrides hidden_link
+  WHERE visible_post.id=l.source_post_id AND visible_post.blog_id=l.source_blog_id AND visible_blog.status='verified') AND EXISTS (SELECT 1 FROM relation_observations public_o WHERE public_o.post_id=l.source_post_id AND public_o.last_success_at IS NOT NULL AND public_o.status<>'reparse-pending') AND NOT EXISTS (SELECT 1 FROM admin_relation_overrides hidden_link
   WHERE hidden_link.source_post_id=l.source_post_id AND hidden_link.target_url_hash=SHA2(l.target_url,256)
   AND BINARY hidden_link.target_url=BINARY l.target_url AND hidden_link.location=l.location AND hidden_link.hidden=TRUE)`;
 type RelationCache = { revision: number; flights: Map<string, Promise<unknown>> };
@@ -182,12 +182,12 @@ export async function loadRelationCoverage(
     COALESCE(SUM(o.status='ok'),0) observedPosts,COALESCE(SUM(o.status='failed'),0) failedPosts,
     COALESCE(SUM(o.status='no-body'),0) noBodyPosts,COALESCE(SUM(p.published_at IS NULL),0) unknownDatePosts,
     COALESCE(SUM(o.truncated=1),0) truncatedPosts,MAX(o.last_success_at) sampledAt
-    FROM posts p JOIN blogs b ON b.id=p.blog_id LEFT JOIN relation_observations o ON o.post_id=p.id WHERE b.status='verified' ${blogId === undefined ? '' : 'AND p.blog_id=?'}`,
+    FROM posts p JOIN blogs b ON b.id=p.blog_id LEFT JOIN relation_observations o ON o.post_id=p.id WHERE b.status='verified' AND (p.published_at IS NULL OR p.published_at<=UTC_TIMESTAMP()) ${blogId === undefined ? '' : 'AND p.blog_id=?'}`,
     blogId === undefined ? [] : [blogId],
   );
   const [locationRows] = await pool.query<RowDataPacket[]>(
     `SELECT l.location,COUNT(*) count,COALESCE(SUM(l.target_blog_id IS NULL),0) unresolved
-    FROM relation_links l JOIN blogs b ON b.id=l.source_blog_id WHERE ${PUBLIC_RELATION} AND b.status='verified' ${blogId === undefined ? '' : 'AND l.source_blog_id=?'} GROUP BY l.location`,
+    FROM relation_links l JOIN posts p ON p.id=l.source_post_id AND p.blog_id=l.source_blog_id JOIN blogs b ON b.id=p.blog_id WHERE ${PUBLIC_RELATION} AND b.status='verified' AND (p.published_at IS NULL OR p.published_at<=UTC_TIMESTAMP()) ${blogId === undefined ? '' : 'AND l.source_blog_id=?'} GROUP BY l.location`,
     blogId === undefined ? [] : [blogId],
   );
   const [[homeLinks]] = await pool.query<RowDataPacket[]>(

@@ -2,8 +2,10 @@
 import assert from 'node:assert/strict';
 import { randomBytes, randomUUID } from 'node:crypto';
 import { request } from 'node:http';
-import { setTimeout as delay } from 'node:timers/promises';
 import { pathToFileURL } from 'node:url';
+import { drizzle } from 'drizzle-orm/mysql2';
+import * as schema from '../../app/src/db/schema.ts';
+import { hashToken } from '../../app/src/auth/google-login.ts';
 import { buildApp } from '../../app/src/app.js';
 import { loadConfig } from '../../app/src/config.js';
 import { digest, MATCHER_VERSION } from '../../app/src/topics/policy.ts';
@@ -18,16 +20,16 @@ export async function seedContentVisibility(pool) {
     marker,
     blogs: [],
     posts: [],
-    titles: [`${marker} private-article`, `${marker} unaffected-article`],
-    slugs: [`${marker}-source-a`, `${marker}-source-b`],
-    blogKeys: [`${marker}-blog-a`, `${marker}-blog-b`],
+    titles: [`${marker} private-article`, `${marker} unaffected-article`, `${marker} unaffected-target`],
+    slugs: [`${marker}-source-a`, `${marker}-source-b`, `${marker}-source-c`],
+    blogKeys: [`${marker}-blog-a`, `${marker}-blog-b`, `${marker}-blog-c`],
     topicKeys: [`${marker}-shared`, `${marker}-a-only`],
     topicIds: [digest(`${marker}-shared`), digest(`${marker}-a-only`)],
     tagId: 0,
     tagSlug: `${marker}-native`,
   };
   try {
-    for (let i = 0; i < 2; i++) {
+    for (let i = 0; i < 3; i++) {
       const [blog] = await pool.execute(
         "INSERT INTO blogs(slug,name,url,status,discovered_at,last_published_at) VALUES(?,?,?,'verified',?,?)",
         [fixture.slugs[i], fixture.slugs[i], `https://${fixture.slugs[i]}.example/`, now, published],
@@ -65,6 +67,17 @@ export async function seedContentVisibility(pool) {
     fixture.tagId = tag.insertId;
     for (const postId of fixture.posts)
       await pool.execute('INSERT INTO post_tags(post_id,tag_id,first_seen_at,last_seen_at,created_at,updated_at) VALUES(?,?,?,?,?,?)', [postId, fixture.tagId, now, now, now, now]);
+    // A→B disappears with A; B→C proves an unrelated public edge remains.
+    for (const i of [0, 1]) {
+      await pool.execute(
+        "INSERT INTO relation_observations(post_id,blog_id,status,parser_version,observed_at,last_success_at,next_attempt_at,published_at) VALUES(?,?,'ok','visibility-fixture',?,?,?,?)",
+        [fixture.posts[i], fixture.blogs[i], now, now, now, published],
+      );
+      await pool.execute(
+        "INSERT INTO relation_links(source_post_id,source_blog_id,ordinal,target_url,target_blog_id,target_post_id,anchor_text,context,location,observed_at,resolution_checked_at) VALUES(?,?,0,?,?,?,?,'fixture','body',?,?)",
+        [fixture.posts[i], fixture.blogs[i], `https://${fixture.slugs[i + 1]}.example/post`, fixture.blogs[i + 1], fixture.posts[i + 1], fixture.slugs[i + 1], now, now],
+      );
+    }
     return fixture;
   } catch (error) {
     await cleanupContentVisibility(pool, fixture);
@@ -74,7 +87,8 @@ export async function seedContentVisibility(pool) {
 
 export async function mutateContentVisibility(pool, fixture, action) {
   assertEphemeralDatabase(pool);
-  if (action === 'hide') await pool.execute("UPDATE blogs SET status='seed' WHERE id=?", [fixture.blogs[0]]);
+  if (['hide', 'seed', 'rejected', 'moved'].includes(action))
+    await pool.execute('UPDATE blogs SET status=? WHERE id=?', [action === 'hide' ? 'seed' : action, fixture.blogs[0]]);
   else if (action === 'restore') await pool.execute("UPDATE blogs SET status='verified' WHERE id=?", [fixture.blogs[0]]);
   else if (action === 'delete') await pool.execute('DELETE FROM posts WHERE id=?', [fixture.posts[0]]);
   else throw Error('invalid_fixture_action');
@@ -93,18 +107,22 @@ export async function cleanupContentVisibility(pool, fixture) {
   }
   await pool.query('DELETE FROM topic_article_evidence WHERE canonical_id IN (?)', [fixture.topicIds]);
   await pool.query('DELETE FROM topic_pages WHERE canonical_id IN (?)', [fixture.topicIds]);
-  if (fixture.posts.length) await pool.query('DELETE FROM posts WHERE id IN (?)', [fixture.posts]);
+  if (fixture.posts.length) {
+    await pool.query('DELETE FROM relation_links WHERE source_post_id IN (?)', [fixture.posts]);
+    await pool.query('DELETE FROM relation_observations WHERE post_id IN (?)', [fixture.posts]);
+    await pool.query('DELETE FROM posts WHERE id IN (?)', [fixture.posts]);
+  }
   if (fixture.blogs.length) await pool.query('DELETE FROM blogs WHERE id IN (?)', [fixture.blogs]);
 }
 
 /** Safe for root's final Next/gateway pair: only local HTTP accepted; no production host option. */
-export function visibilityHttpGet(origin, path) {
+export function visibilityHttpGet(origin, path, headers = {}) {
   const base = new URL(origin);
   assert.equal(base.protocol, 'http:');
   assert.equal(base.hostname, '127.0.0.1');
   assert.ok(path.startsWith('/') && !path.startsWith('//'));
   return new Promise((resolve, reject) => {
-    const req = request(new URL(path, base), { method: 'GET', timeout: 10000 }, (res) => {
+    const req = request(new URL(path, base), { method: 'GET', timeout: 10000, headers }, (res) => {
       const chunks = [];
       let bytes = 0;
       res.on('data', (chunk) => {
@@ -136,10 +154,15 @@ function containsArticleId(body, postId) {
 
 function probes(f) {
   const topic = encodeURIComponent(`tag:${f.topicIds[0]}`);
-  const post = (name, path, unaffected = true) => ({ name, path, postId: f.posts[0], before: f.titles[0], absent: f.titles[0], unaffected: unaffected ? f.titles[1] : null, on: ['hide', 'delete'] });
-  const blog = (name, path, unaffected = true) => ({ name, path, before: f.slugs[0], absent: f.slugs[0], unaffected: unaffected ? f.slugs[1] : null, on: ['hide'] });
+  const post = (name, path, unaffected = true) => ({ name, path, postId: f.posts[0], before: f.titles[0], absent: f.titles[0], unaffected: unaffected ? f.titles[1] : null, on: ['seed', 'rejected', 'moved', 'delete'] });
+  const blog = (name, path, unaffected = true) => ({ name, path, before: f.slugs[0], absent: f.slugs[0], unaffected: unaffected ? f.slugs[1] : null, on: ['seed', 'rejected', 'moved'] });
   return [
     post('legacy-overview', '/api/overview'),
+    { ...blog('legacy-relations', '/api/relations?days=90'), on: ['seed', 'rejected', 'moved', 'delete'] },
+    { ...blog('v1-relations', '/api/v1/relations?hours=2160'), on: ['seed', 'rejected', 'moved', 'delete'] },
+    blog('legacy-blog-relations', `/api/blogs/${f.slugs[0]}/relations?days=90`, false),
+    blog('v1-blog-relations', `/api/v1/blogs/${f.slugs[0]}/relations?hours=2160`, false),
+    { ...post('reader-rss', '/me/feed.xml'), postId: null, authenticated: true },
     blog('legacy-catalog', `/api/catalog?q=${f.marker}`),
     blog('legacy-blog-list', '/api/blogs?limit=200'),
     post('legacy-blog-detail', `/api/blogs/${f.slugs[0]}`, false),
@@ -151,71 +174,115 @@ function probes(f) {
     blog('v1-blog-detail', `/api/v1/blogs/${f.slugs[0]}`, false),
     post('v1-blog-articles', `/api/v1/blogs/${f.slugs[0]}/articles?hours=2160`, false),
     post('v1-topic-detail', `/api/v1/topics/${topic}?hours=2160`),
-    { name: 'blog-page-registry', path: `/api/pages/blogs/${f.blogKeys[0]}`, before: f.blogKeys[0], absent: f.blogKeys[0], on: ['hide'] },
-    { name: 'topic-page-registry', path: `/api/pages/topics/${f.topicKeys[1]}`, before: f.topicKeys[1], absent: f.topicKeys[1], on: ['hide', 'delete'] },
-    { name: 'blogs-sitemap', path: '/sitemaps/blogs.xml', before: f.blogKeys[0], absent: f.blogKeys[0], unaffected: f.blogKeys[1], on: ['hide'] },
-    { name: 'topics-sitemap', path: '/sitemaps/topics.xml', before: f.topicKeys[1], absent: f.topicKeys[1], unaffected: f.topicKeys[0], on: ['hide', 'delete'] },
+    { name: 'blog-page-registry', path: `/api/pages/blogs/${f.blogKeys[0]}`, before: f.blogKeys[0], absent: f.blogKeys[0], on: ['seed', 'rejected', 'moved'] },
+    { name: 'topic-page-registry', path: `/api/pages/topics/${f.topicKeys[1]}`, before: f.topicKeys[1], absent: f.topicKeys[1], on: ['seed', 'rejected', 'moved', 'delete'] },
+    { name: 'blogs-sitemap', path: '/sitemaps/blogs.xml', before: f.blogKeys[0], absent: f.blogKeys[0], unaffected: f.blogKeys[1], on: ['seed', 'rejected', 'moved'] },
+    { name: 'topics-sitemap', path: '/sitemaps/topics.xml', before: f.topicKeys[1], absent: f.topicKeys[1], unaffected: f.topicKeys[0], on: ['seed', 'rejected', 'moved', 'delete'] },
   ];
 }
 
 export async function runContentVisibilityIntegration(pool) {
   assertEphemeralDatabase(pool);
+  const [[statusColumn]] = await pool.query("SHOW COLUMNS FROM blogs LIKE 'status'");
+  assert.match(String(statusColumn.Type), /^varchar\(32\)$/i, 'fixture requires blogs.status varchar(32)');
   const oldFlag = process.env.BLOG_TOPIC_HISTORY_READ_ENABLED;
   process.env.BLOG_TOPIC_HISTORY_READ_ENABLED = 'true';
   const fixture = await seedContentVisibility(pool);
-  const config = loadConfig({ BLOG_DB_URL: process.env.BLOG_DB_URL, BLOG_UI_ORIGIN: 'http://127.0.0.1:9' });
+  // This session exists only inside the disposable database; never output its token or secret.
+  const session = randomBytes(32).toString('base64url');
+  const secret = randomBytes(48).toString('base64url');
+  const config = loadConfig({
+    BLOG_DB_URL: process.env.BLOG_DB_URL,
+    BLOG_UI_ORIGIN: 'http://127.0.0.1:9',
+    BLOG_GOOGLE_CLIENT_ID: 'isolated-visibility-fixture',
+    BLOG_GOOGLE_CLIENT_SECRET: 'isolated-unused-fixture',
+    BLOG_SESSION_SECRET: secret,
+  });
   let app;
+  let userId = 0;
   const measurements = [];
+  const unaffectedChecks = [];
   try {
-    app = await buildApp(config, { store: { pool } });
+    const now = new Date();
+    const [user] = await pool.execute('INSERT INTO users(google_sub,email,created_at,last_login_at) VALUES(?,?,?,?)',
+      [fixture.marker, `${fixture.marker}@example.invalid`, now, now]);
+    userId = user.insertId;
+    await pool.execute('INSERT INTO user_sessions(token_hash,user_id,created_at,expires_at) VALUES(?,?,?,?)',
+      [hashToken(session, secret), userId, now, new Date(now.getTime() + 3600_000)]);
+    for (const blogId of fixture.blogs)
+      await pool.execute('INSERT INTO user_follows(user_id,blog_id,created_at) VALUES(?,?,?)', [userId, blogId, now]);
+    app = await buildApp(config, { store: { pool, db: drizzle(pool, { schema, mode: 'default' }) } });
     const origin = await app.listen({ host: '127.0.0.1', port: 0 });
     const targets = probes(fixture);
-    for (let round = 0; round < 2; round++)
-      for (const p of targets) {
-        const r = await visibilityHttpGet(origin, p.path);
-        assert.equal(r.status, 200, `warm ${p.name}`);
-        assert.ok(r.body.includes(p.before), `warm missing ${p.name}`);
-        if (p.postId) assert.ok(containsArticleId(r.body, p.postId), `warm missing article ID ${p.name}`);
-        assert.match(r.cacheControl, /(?:^|,)\s*no-store(?:,|$)/, `warm ${p.name} must bypass cache`);
-        if (p.unaffected) assert.ok(r.body.includes(p.unaffected), `warm unaffected missing ${p.name}`);
-      }
-    for (const action of ['hide', 'delete']) {
-      const changedAt = await mutateContentVisibility(pool, fixture, action);
-      const pending = new Map(targets.filter((p) => p.on.includes(action)).map((p) => [p.name, p]));
-      while (pending.size && performance.now() - changedAt < 60_000) {
-        for (const [name, p] of pending) {
-          const response = await visibilityHttpGet(origin, p.path);
-          assert.ok([200, 404, 410].includes(response.status), `${action} ${name} unexpected HTTP ${response.status}`);
-          if (response.body.includes(p.absent) || containsArticleId(response.body, p.postId)) continue;
-          if (p.unaffected) {
-            assert.equal(response.status, 200, `${action} ${name} removed unaffected container`);
-            assert.ok(response.body.includes(p.unaffected), `${action} ${name} removed unaffected item`);
+    for (const [phaseIndex, action] of ['seed', 'rejected', 'moved', 'delete'].entries()) {
+      // Independent anonymous clients avoid the real 60/minute API quota across four test phases.
+      // The same client/URL warms and reads after each mutation; no authentication/cache-busting query on public probes.
+      const anonymousHeaders = { 'cf-connecting-ip': `192.0.2.${phaseIndex + 1}` };
+      const read = (p) => visibilityHttpGet(origin, p.path, { ...anonymousHeaders, ...(p.authenticated ? { cookie: `blog_session=${session}` } : {}) });
+      const rssAnonymous = await visibilityHttpGet(origin, '/me/feed.xml', anonymousHeaders);
+      assert.equal(rssAnonymous.status, 401, 'RSS is reader-private, not a public endpoint');
+      assert.match(rssAnonymous.cacheControl, /no-store/);
+      for (let round = 0; round < 2; round++) {
+        for (const p of targets) {
+          const r = await read(p);
+          assert.equal(r.status, 200, `warm ${action} ${p.name}`);
+          assert.ok(r.body.includes(p.before), `warm missing ${action} ${p.name}`);
+          if (p.postId) assert.ok(containsArticleId(r.body, p.postId), `warm missing article ID ${action} ${p.name}`);
+          assert.match(r.cacheControl, /(?:^|,)\s*no-store(?:,|$)/, `warm ${action} ${p.name} must bypass cache`);
+          if (p.unaffected) assert.ok(r.body.includes(p.unaffected), `warm unaffected missing ${action} ${p.name}`);
+          if (['legacy-relations', 'v1-relations'].includes(p.name)) {
+            const edges = JSON.parse(r.body).edges;
+            for (const i of [0, 1])
+              assert.ok(edges.some((e) => e.sourceBlogId === fixture.blogs[i] && e.targetBlogId === fixture.blogs[i + 1] && e.count > 0), `warm missing relation ${p.name}`);
           }
-          // No cache layer may add a freshness/stale allowance beyond the removal deadline.
-          assert.match(response.cacheControl, /(?:^|,)\s*no-store(?:,|$)/, `${action} ${name} must bypass shared/browser cache`);
-          measurements.push({ action, layer: name, elapsedMs: Math.ceil(performance.now() - changedAt), status: response.status, cacheControl: response.cacheControl });
-          pending.delete(name);
         }
-        if (pending.size) await delay(1000);
       }
-      assert.equal(pending.size, 0, `visibility deadline exceeded: ${[...pending.keys()].join(',')}`);
-      if (action === 'hide') {
-        await mutateContentVisibility(pool, fixture, 'restore');
-        const restored = await visibilityHttpGet(origin, `/api/topics/${encodeURIComponent(`tag:${fixture.topicIds[0]}`)}?days=90`);
-        assert.equal(restored.status, 200);
-        assert.ok(restored.body.includes(fixture.titles[0]), 'restored evidence must recover without a negative cache');
-        // Warm every deletion probe again after restoring A. A cached masked response must not make deletion falsely pass.
-        for (const p of targets.filter((p) => p.on.includes('delete'))) {
-          const rewarmed = await visibilityHttpGet(origin, p.path);
-          assert.equal(rewarmed.status, 200, `restored ${p.name}`);
-          assert.ok(rewarmed.body.includes(p.before), `restored ${p.name} did not recover`);
-          if (p.postId) assert.ok(containsArticleId(rewarmed.body, p.postId), `restored ${p.name} missing article ID`);
+      const changedAt = await mutateContentVisibility(pool, fixture, action);
+      // No polling, retries, grace period, or cache invalidation: the FIRST read after commit must be clean.
+      for (const p of targets.filter((p) => p.on.includes(action))) {
+        const response = await read(p);
+        assert.ok([200, 404, 410].includes(response.status), `${action} ${p.name} unexpected HTTP ${response.status}`);
+        assert.ok(!response.body.includes(p.absent), `${action} ${p.name} first read leaked removed text`);
+        assert.ok(!containsArticleId(response.body, p.postId), `${action} ${p.name} first read leaked removed article ID`);
+        if (p.unaffected) {
+          assert.equal(response.status, 200, `${action} ${p.name} removed unaffected container`);
+          assert.ok(response.body.includes(p.unaffected), `${action} ${p.name} removed unaffected item`);
         }
+        if (['legacy-relations', 'v1-relations'].includes(p.name)) {
+          const edges = JSON.parse(response.body).edges;
+          assert.ok(!edges.some((e) => e.sourceBlogId === fixture.blogs[0] || e.targetBlogId === fixture.blogs[0]), `${action} ${p.name} retained A relation IDs`);
+          assert.ok(edges.some((e) => e.sourceBlogId === fixture.blogs[1] && e.targetBlogId === fixture.blogs[2] && e.count > 0), `${action} ${p.name} removed B-C relation`);
+        }
+        assert.match(response.cacheControl, /(?:^|,)\s*no-store(?:,|$)/, `${action} ${p.name} must bypass shared/browser cache`);
+        measurements.push({ action, layer: p.name, reader: p.authenticated ? 'authenticated-reader' : 'anonymous', firstRead: true,
+          batchElapsedMs: Math.ceil(performance.now() - changedAt), status: response.status, cacheControl: response.cacheControl });
+      }
+      const intact = await visibilityHttpGet(origin, `/api/blogs/${fixture.slugs[1]}`, anonymousHeaders);
+      assert.equal(intact.status, 200);
+      assert.ok(intact.body.includes(fixture.titles[1]), `${action} unaffected B article missing`);
+      const ledger = await pool.query('SELECT state FROM topic_article_evidence WHERE post_id=?', [fixture.posts[0]]);
+      assert.ok(ledger[0].every((row) => row.state === 'confirmed'), 'visibility reads must not permanently revoke ledger evidence');
+      unaffectedChecks.push({ action, blogB: true, sharedTopic: true, unrelatedRelation: true, ledgerUnmodified: true });
+      if (action !== 'delete') {
+        await mutateContentVisibility(pool, fixture, 'restore');
+        const restored = await visibilityHttpGet(origin, `/api/topics/${encodeURIComponent(`tag:${fixture.topicIds[0]}`)}?days=90`, anonymousHeaders);
+        assert.equal(restored.status, 200);
+        assert.ok(restored.body.includes(fixture.titles[0]), 'restored evidence must recover on the next read');
       }
     }
-    return { isolatedPort: 18169, transport: 'real-loopback-http', warmedTwice: true, measurements, maxElapsedMs: Math.max(...measurements.map((m) => m.elapsedMs)), unmeasuredLayers: ['Next SSR/RSC preview requires final build', 'Cloudflare cannot front this private isolated fixture'] };
+    return { isolatedPort: 18169, blogStatusType: statusColumn.Type, transport: 'real-loopback-http', warmedTwicePerMutation: true,
+      requirement: 'first anonymous read after mutation commit; no retry or grace period', measurements, unaffectedChecks,
+      maxBatchElapsedMs: Math.max(...measurements.map((m) => m.batchElapsedMs)),
+      rss: { anonymous: '401/no-store', reader: 'separate authenticated fixture; not a public feed' },
+      moved: 'No explicit relocation target exists in this fixture; old data must disappear. Alias-to-public-target behavior belongs to redirect tests.',
+      unmeasuredLayers: ['Next HTML/RSC covered by root preview', 'Cloudflare cannot front this private isolated fixture'] };
   } finally {
     await app?.close();
+    if (userId) {
+      await pool.execute('DELETE FROM user_follows WHERE user_id=?', [userId]);
+      await pool.execute('DELETE FROM user_sessions WHERE user_id=?', [userId]);
+      await pool.execute('DELETE FROM users WHERE id=?', [userId]);
+    }
     await cleanupContentVisibility(pool, fixture);
     if (oldFlag === undefined) delete process.env.BLOG_TOPIC_HISTORY_READ_ENABLED;
     else process.env.BLOG_TOPIC_HISTORY_READ_ENABLED = oldFlag;
@@ -261,7 +328,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     phase = 'content-visibility';
     console.log(JSON.stringify({ passed: true, result: await runContentVisibilityIntegration(store.pool) }));
   } catch (error) {
-    const message = typeof error?.message === 'string' && /^(warm |warm missing |warm unaffected |hide |delete |visibility deadline|restored )/.test(error.message) ? error.message : undefined;
+    const message = typeof error?.message === 'string' && /^(warm |warm missing |warm unaffected |seed |rejected |moved |hide |delete |visibility deadline|restored )/.test(error.message) ? error.message : undefined;
     console.error(JSON.stringify({ passed: false, phase, code: /^[A-Z_0-9]{1,60}$/.test(error?.code || '') ? error.code : 'VISIBILITY_TEST_FAILED', message }));
     process.exitCode = 1;
   } finally {

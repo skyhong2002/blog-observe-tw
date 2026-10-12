@@ -137,8 +137,8 @@ export async function runContentTopicsIntegration(pool: Pool) {
       false,
     );
     assert.equal(overview.posts[0].id, postId);
-    assert.equal(overview.blogs.find((row: { slug: string }) => row.slug === slug)?.postCount, 2);
-    assert.ok(overview.totals.posts >= 2);
+    assert.equal(overview.blogs.find((row: { slug: string }) => row.slug === slug)?.postCount, 1);
+    assert.ok(overview.totals.posts >= 1);
     const recent = overview.recentBlogs.find((row: { slug: string }) => row.slug === slug);
     assert.equal(recent?.latestPost.id, postId);
     assert.ok(!JSON.stringify(overview).includes('PRIVATE_FULL_BODY_TAIL'));

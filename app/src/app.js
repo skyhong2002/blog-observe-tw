@@ -12,7 +12,7 @@ import { loadAuthorCatalog } from './catalog-authors.js';
 import { registerContentRoutes } from './content/routes.ts';
 import { createDb } from './db/client.ts';
 import { loadOverview } from './overview.js';
-import { clientIp } from './public-api/client-ip.ts';
+import { gatewayRateKey, gatewayRateMax } from './public-api/client-ip.ts';
 import { installPublicApiPolicy, publicApiPath } from './public-api/middleware.ts';
 import { queryValues } from './public-api/query.ts';
 import { publicPost, publicRss } from './public-post.ts';
@@ -76,9 +76,9 @@ export async function buildApp(config, { logger = false, store = null } = {}) {
   await app.register(rateLimit, {
     global: true,
     timeWindow: '1 minute',
-    max: 240,
+    max: gatewayRateMax,
     allowList: (request) => publicApiPath(request.url),
-    keyGenerator: clientIp,
+    keyGenerator: gatewayRateKey,
   });
   registerPublicApi(app, pool);
   app.get('/api/v1/openapi.json', { config: { rateLimit: false } }, async (request) => {
@@ -152,7 +152,7 @@ export async function buildApp(config, { logger = false, store = null } = {}) {
     );
     const [blogs] = await pool.query(
       `SELECT DISTINCT b.id,b.slug,b.name,b.url,b.category,b.status_label AS statusLabel
-      FROM blogs b WHERE b.status='verified' AND (EXISTS (SELECT 1 FROM blog_tags bt WHERE bt.blog_id=b.id AND bt.tag_id=? AND bt.status='active') OR EXISTS (SELECT 1 FROM posts p JOIN post_tags pt ON pt.post_id=p.id WHERE p.blog_id=b.id AND pt.tag_id=? AND pt.status='active')) ORDER BY b.name LIMIT 200`,
+      FROM blogs b WHERE b.status='verified' AND (EXISTS (SELECT 1 FROM blog_tags bt WHERE bt.blog_id=b.id AND bt.tag_id=? AND bt.status='active') OR EXISTS (SELECT 1 FROM posts p JOIN post_tags pt ON pt.post_id=p.id WHERE p.blog_id=b.id AND pt.tag_id=? AND pt.status='active' AND (p.published_at IS NULL OR p.published_at<=UTC_TIMESTAMP()))) ORDER BY b.name LIMIT 200`,
       [tags[0].id, tags[0].id],
     );
     return { tag: tags[0], posts: posts.map(publicPost), blogs };
@@ -184,7 +184,7 @@ export async function buildApp(config, { logger = false, store = null } = {}) {
     );
     const [tags] = await pool.query(
       `SELECT t.slug,t.label,t.kind,t.visibility,bt.role,
-       (SELECT COUNT(DISTINCT p.id) FROM post_tags pt JOIN posts p ON p.id=pt.post_id WHERE pt.tag_id=t.id AND pt.status='active' AND p.blog_id=bt.blog_id) AS postCount FROM blog_tags bt JOIN tags t ON t.id=bt.tag_id
+       (SELECT COUNT(DISTINCT p.id) FROM post_tags pt JOIN posts p ON p.id=pt.post_id WHERE pt.tag_id=t.id AND pt.status='active' AND p.blog_id=bt.blog_id AND (p.published_at IS NULL OR p.published_at<=UTC_TIMESTAMP())) AS postCount FROM blog_tags bt JOIN tags t ON t.id=bt.tag_id
        WHERE bt.blog_id=? AND bt.status='active' AND t.visibility='public' AND t.status='active' ORDER BY t.label`,
       [blogs[0].id],
     );

@@ -18,7 +18,7 @@ export function invalidateOverviewCache(pool) {
 
 const blogFields = `b.id,b.slug,b.name,b.url,b.category,b.description,b.status,b.status_label AS statusLabel,
   b.last_crawl_success_at AS lastCrawlSuccessAt,b.last_published_at AS lastPublishedAt,
-  b.expected_interval_hours AS expectedIntervalHours,(SELECT COUNT(*) FROM posts cp WHERE cp.blog_id=b.id) AS postCount,
+  b.expected_interval_hours AS expectedIntervalHours,(SELECT COUNT(*) FROM posts cp WHERE cp.blog_id=b.id AND (cp.published_at IS NULL OR cp.published_at<=UTC_TIMESTAMP())) AS postCount,
   latest.id latestPostId,latest.title latestPostTitle,latest.url latestPostUrl,latest.published_at latestPostPublishedAt`;
 const latestJoin = `LEFT JOIN posts latest ON latest.id=(SELECT lp.id FROM posts lp WHERE lp.blog_id=b.id
   AND (lp.published_at IS NULL OR lp.published_at<=UTC_TIMESTAMP()) ORDER BY lp.published_at DESC,lp.id DESC LIMIT 1)`;
@@ -43,18 +43,18 @@ async function loadProjection(pool) {
       WHERE b.status='verified' AND (p.published_at IS NULL OR p.published_at<=UTC_TIMESTAMP()) ORDER BY p.published_at DESC,p.id DESC LIMIT 200`),
     pool.query(`SELECT t.slug,t.label,COUNT(DISTINCT p.id) AS postCount,COUNT(DISTINCT p.blog_id) AS blogCount
       FROM tags t JOIN post_tags pt ON pt.tag_id=t.id JOIN posts p ON p.id=pt.post_id JOIN blogs b ON b.id=p.blog_id
-      WHERE b.status='verified' AND t.visibility='public' AND t.status='active' AND pt.status='active'
+      WHERE b.status='verified' AND t.visibility='public' AND t.status='active' AND pt.status='active' AND (p.published_at IS NULL OR p.published_at<=UTC_TIMESTAMP())
       GROUP BY t.id,t.slug,t.label ORDER BY blogCount DESC,postCount DESC,t.slug LIMIT 100`),
     pool.query(`SELECT a.id,a.display_name AS displayName,b.slug AS blogSlug,b.name AS blogName,
       COUNT(DISTINCT p.id) AS postCount FROM authors a
       JOIN blog_authors ba ON ba.author_id=a.id JOIN blogs b ON b.id=ba.blog_id
       LEFT JOIN post_authors pa ON pa.author_id=a.id AND pa.status='active'
-      LEFT JOIN posts p ON p.id=pa.post_id AND p.blog_id=b.id
+      LEFT JOIN posts p ON p.id=pa.post_id AND p.blog_id=b.id AND (p.published_at IS NULL OR p.published_at<=UTC_TIMESTAMP())
       WHERE a.status <> 'rejected' AND ba.status='active' AND b.status='verified'
       GROUP BY a.id,a.display_name,b.slug,b.name ORDER BY a.display_name,b.slug LIMIT 200`),
     pool.query(`SELECT ${blogFields} FROM blogs b ${latestJoin} WHERE b.status='verified' ORDER BY postCount DESC,b.name LIMIT 200`),
     pool.query(`SELECT (SELECT COUNT(*) FROM blogs WHERE status='verified') AS blogs,
-      (SELECT COUNT(*) FROM posts p JOIN blogs b ON b.id=p.blog_id WHERE b.status='verified') AS posts,
+      (SELECT COUNT(*) FROM posts p JOIN blogs b ON b.id=p.blog_id WHERE b.status='verified' AND (p.published_at IS NULL OR p.published_at<=UTC_TIMESTAMP())) AS posts,
       (SELECT MAX(last_crawl_success_at) FROM blogs WHERE status='verified') AS updatedAt`),
     pool.query(`SELECT ${blogFields} FROM blogs b ${latestJoin} WHERE b.status='verified' AND latest.published_at IS NOT NULL
       ORDER BY latest.published_at DESC,latest.id DESC,b.id LIMIT 20`),

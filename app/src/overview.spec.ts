@@ -44,7 +44,7 @@ describe('read-only frontend projection', () => {
     expect(sql.every((query) => query.trim().startsWith('SELECT'))).toBe(true);
     expect(sql[1]).toContain("t.visibility='public'");
     expect(sql[0]).toContain('(p.published_at IS NULL OR p.published_at<=UTC_TIMESTAMP())');
-    expect(sql[4]).not.toContain('published_at<=');
+    expect(sql[4]).toContain('(p.published_at IS NULL OR p.published_at<=UTC_TIMESTAMP())');
     expect(data.recentBlogs[0]).toMatchObject({ slug: 'low-frequency', postCount: 1, latestPost: { id: 7, title: '最新' } });
     expect(data.recentBlogs[0]).not.toHaveProperty('latestPostId');
     expect(sql[5]).toContain('ORDER BY latest.published_at DESC');

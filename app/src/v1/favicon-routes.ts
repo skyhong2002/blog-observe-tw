@@ -37,7 +37,8 @@ export async function iconManifest(): Promise<Record<string, IconRecord>> {
 
 export function registerFavicons(app: FastifyInstance) {
   app.get('/api/icons', async (_request, reply) => reply.header('cache-control', 'public, max-age=60').send(await iconManifest()));
-  app.get<{ Params: { file: string } }>('/favicons/:file', async (request, reply) => {
+  // Static PNG requests must not consume a page's dynamic/auth request bucket.
+  app.get<{ Params: { file: string } }>('/favicons/:file', { config: { rateLimit: false } }, async (request, reply) => {
     const file = request.params.file;
     if (!/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,159}\.png$/.test(file)) return reply.code(404).send();
     for (const root of runtimeRoot ? [runtimeRoot] : [repositoryRoot]) {

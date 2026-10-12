@@ -53,7 +53,7 @@ export async function loadCatalog(pool, query = {}) {
   const [totalsResult, categoriesResult, statusesResult, countResult] = await Promise.all([
     pool.query(`SELECT COUNT(*) AS blogs,COALESCE(SUM(b.url IS NOT NULL AND b.url<>''),0) AS withUrls,
       MAX(b.last_crawl_success_at) AS updatedAt,
-      (SELECT COUNT(*) FROM posts p JOIN blogs pb ON pb.id=p.blog_id WHERE pb.status='verified') AS posts,
+      (SELECT COUNT(*) FROM posts p JOIN blogs pb ON pb.id=p.blog_id WHERE pb.status='verified' AND (p.published_at IS NULL OR p.published_at<=UTC_TIMESTAMP())) AS posts,
       (SELECT COUNT(DISTINCT a.id) FROM authors a JOIN blog_authors ba ON ba.author_id=a.id
         JOIN blogs ab ON ab.id=ba.blog_id WHERE a.status <> 'rejected' AND ba.status='active' AND ab.status='verified') AS authors
       FROM blogs b WHERE b.status='verified'`),
@@ -72,7 +72,7 @@ export async function loadCatalog(pool, query = {}) {
     `SELECT b.id,b.slug,b.name,b.url,${categoryLabel} AS category,${statusLabel} AS statusLabel,
       b.last_crawl_success_at AS lastCrawlSuccessAt,b.last_published_at AS lastPublishedAt,
       b.expected_interval_hours AS expectedIntervalHours,
-      (SELECT COUNT(*) FROM posts p WHERE p.blog_id=b.id) AS postCount
+      (SELECT COUNT(*) FROM posts p WHERE p.blog_id=b.id AND (p.published_at IS NULL OR p.published_at<=UTC_TIMESTAMP())) AS postCount
       FROM blogs b WHERE ${condition} ORDER BY ${sortColumns[filters.sort]} ${filters.dir.toUpperCase()},b.id ASC LIMIT ? OFFSET ?`,
     [...parameters, filters.limit, (page - 1) * filters.limit],
   );
