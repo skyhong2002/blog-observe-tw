@@ -88,7 +88,7 @@ describe('public crawler discovery routes', () => {
       expect(sql).toContain("b.status='verified'");
       expect(sql).toContain('t.exclusion_reason IS NULL');
       expect(sql).toContain("i.status='ok'");
-      expect(sql).toContain('topic_matches_v2');
+      expect(sql).toContain('topic_matches_v3');
       expect(sql).toContain('i.matcher_version=');
       const head = await app.inject({ method: 'HEAD', url: '/sitemaps/topics.xml' });
       expect(head.statusCode).toBe(200);
