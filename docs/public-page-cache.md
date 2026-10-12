@@ -10,7 +10,7 @@
 | gateway API／SEO 結果 | 0 | 只合併同時進行的請求，不保留已完成結果 |
 | 關係資料投影 | 0（公開讀） | 每次讀 SQL；worker 的診斷 snapshot 不供公開回應 |
 | sitemap | 0 | 重新查公開證據；HTTP no-store |
-| edge／Cloudflare 可變內容 | 0 | private,no-store；剝除上游 CDN override，既有 CF 物件另驗證到期 |
+| edge／Cloudflare 可變內容 | 0 | private,no-store；剝除上游 CDN override，Cloudflare 協助者已停用首頁／API 規則並清除該主機 edge 物件 |
 
 不使用 on-demand revalidate 或 Cloudflare tag purge。這是撤銷正確性優先的暫時策略；恢復 ISR 前必須有經驗證的主動撤銷機制，不能僅把每層 TTL 各設成 60 秒。
 
@@ -24,4 +24,6 @@
 
 `tests/integration/content-visibility.mjs` 強制使用 18169 的隨機 disposable DB。兩站共用話題、另一個僅第一站有文的話題；暖快取兩次 → 隱藏 → 恢復並重新暖快取 → 刪除。16 個端點核對標題、文章 ID、另一站保留、404/410/no-store。SSR 另以正式 Next build 連同一隔離 DB 驗證首頁、文章、來源、目錄、話題。
 
-CF 驗收必須是正常無 Cookie／query／Authorization 的 GET /，等既有 HIT／Age 消失，連續兩次確認 no-store 與 BYPASS／DYNAMIC。加 query、RSC 或 Cookie 的 bypass 不能當作舊 CF 物件已撤銷的證據；Cloudflare 沒有掛接隔離資料库，不能宣稱直接對 CF 做了 fixture 隱藏測試。
+CF 驗收必須是正常無 Cookie／query／Authorization 的 GET /，確認既有 HIT／Age 已消失，連續兩次確認 no-store 與 BYPASS／DYNAMIC。加 query、RSC 或 Cookie 的 bypass 不能當作舊 CF 物件已撤銷的證據；Cloudflare 沒有掛接隔離資料库，不能宣稱直接對 CF 做了 fixture 隱藏測試。
+
+2026-10-13 最新要求：沒有任何「s-maxage ≤ 60 秒即可恢復」例外。origin、Next、Cloudflare 三層主動失效證據不齊前，一律維持 bypass + no-store。[部署與驗收紀錄](privacy-deployment-2026-10-13.md)。
