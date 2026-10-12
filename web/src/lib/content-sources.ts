@@ -13,10 +13,11 @@ export type ContentSource = {
 };
 export type BlogContent = {
   blog: {
+    /** Known platform code, `unrecognized`, or null; never the raw value. */
     platform: string | null;
     lastMethod: ContentSourceKind | null;
     status: ContentStatus | null;
-    /** Already reduced to one of two safe phrases, or null when nothing needs saying. */
+    /** Already reduced to a fixed reader phrase (see reasonText), or null when nothing needs saying. */
     reason: string | null;
     lastAttemptAt: string | null;
     lastSuccessAt: string | null;
@@ -57,40 +58,60 @@ const completenessText: Record<string, string> = {
   summary: '僅摘要',
   excerpt: '僅摘要',
 };
+/** Known platform codes in reader words; anything else reads as 尚未辨識, never the raw code. */
 const platformText: Record<string, string> = {
+  generic: '一般網頁',
   wordpress: 'WordPress',
   blogger: 'Blogger',
+  pixnet: '痞客邦',
   medium: 'Medium',
   substack: 'Substack',
-  ghost: 'Ghost',
-  hexo: 'Hexo',
-  hugo: 'Hugo',
-  jekyll: 'Jekyll',
-  pixnet: '痞客邦',
   vocus: '方格子',
   matters: 'Matters',
-  other: '其他',
+  hugo: 'Hugo',
+  jekyll: 'Jekyll',
+  ghost: 'Ghost',
+  hexo: 'Hexo',
 };
+const unrecognizedPlatform = '尚未辨識';
 const statuses = new Set(Object.keys(contentStatusText));
 const kinds = new Set(Object.keys(sourceText));
-/** Reason codes that mean the site or its terms limit fetching; everything else reads as not yet fetched. */
-const limitedReason = /block|forbid|denied|robots|paywall|login|auth|captcha|rate|limit|403|401|429|terms|optout|opt-out/i;
+/**
+ * Reason codes, checked in this order. `content-limit` comes first so the word "limit" can never read as a
+ * source restriction; only robots / HTTP 401 / 403 / paywall do.
+ */
+const reasonGroups: [RegExp, string][] = [
+  [/content[-_ ]?limit/i, '內容超過收錄長度上限'],
+  [/budget|deferred/i, '等待下次處理'],
+  [/publisher[-_ ]?excerpt/i, '來源只提供部分內容'],
+  [/robots|paywall|(?<!\d)40[13](?!\d)/i, '來源限制'],
+];
 
 const record = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value);
 const status = (value: unknown) => (typeof value === 'string' && statuses.has(value) ? (value as ContentStatus) : null);
 const kind = (value: unknown) => (typeof value === 'string' && kinds.has(value) ? (value as ContentSourceKind) : null);
 const time = (value: unknown) => (typeof value === 'string' && value.length <= 40 && Number.isFinite(Date.parse(value)) ? value : null);
 
-/** Never shows the raw code: `來源限制` for limits, `尚未取得` otherwise, nothing when the status is fine. */
+/** Never shows the raw code or error text: a fixed phrase per reason group, nothing when the status is fine. */
 export function reasonText(reason: unknown, current: ContentStatus | null): string | null {
   if (current === 'ok' || current === 'no-posts') return null;
+  const code = typeof reason === 'string' ? reason.slice(0, 200) : '';
+  for (const [pattern, text] of code ? reasonGroups : []) if (pattern.test(code)) return text;
   if (current === 'blocked') return '來源限制';
-  if (typeof reason !== 'string' || !reason) return current === 'missing' ? '尚未取得' : null;
-  return limitedReason.test(reason.slice(0, 200)) ? '來源限制' : '尚未取得';
+  if (current === 'partial') return '尚未完整取得';
+  return code || current === 'missing' ? '尚未取得' : null;
 }
 export const completenessLabel = (value: string | null) => (value ? (completenessText[value.toLowerCase()] ?? null) : null);
-export const platformLabel = (value: string | null) =>
-  value ? (platformText[value.toLowerCase()] ?? (/^[\w .-]{1,30}$/.test(value) ? value : null)) : null;
+/** Lower-cased known platform code, `unrecognized` for any other value, null when none was sent. */
+const platformCode = (value: unknown) => {
+  if (typeof value !== 'string' || !value.trim()) return null;
+  const code = value.trim().toLowerCase();
+  return Object.hasOwn(platformText, code) ? code : 'unrecognized';
+};
+export const platformLabel = (value: string | null) => {
+  const code = platformCode(value);
+  return code ? (platformText[code] ?? unrecognizedPlatform) : null;
+};
 
 export function normalizeContent(raw: unknown): BlogContent | null {
   if (!record(raw) || !record(raw.blog)) return null;
@@ -98,7 +119,7 @@ export function normalizeContent(raw: unknown): BlogContent | null {
   const current = status(blog.status);
   return {
     blog: {
-      platform: typeof blog.platform === 'string' ? blog.platform : null,
+      platform: platformCode(blog.platform),
       lastMethod: kind(blog.lastMethod),
       status: current,
       reason: reasonText(blog.reason, current),
