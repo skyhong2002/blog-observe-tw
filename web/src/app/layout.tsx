@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from 'next';
+import SiteAnalytics from '@/components/SiteAnalytics';
 import SiteFooter from '@/components/SiteFooter';
 import SiteHeader from '@/components/SiteHeader';
 import ThemeSync from '@/components/ThemeSync';
@@ -53,6 +54,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <SiteFooter />
         </div>
         <TouchTitleHint />
+        <SiteAnalytics />
       </body>
     </html>
   );

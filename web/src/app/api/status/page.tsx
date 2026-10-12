@@ -3,13 +3,10 @@
 // page never fetches its own URL (the gateway proxies HTML /api/status here).
 import ApiStatusView from '@/components/ApiStatusView';
 import ApiTabs from '@/components/ApiTabs';
+import { staticPageMetadata } from '@/lib/seo';
 
 export const dynamic = 'force-static';
-export const metadata = {
-  title: 'API 狀態',
-  description: '查看部落格觀察公開 API 的可用狀態與各端點用途。',
-  alternates: { canonical: '/api/status/' },
-};
+export const metadata = staticPageMetadata('/api/status/');
 
 export default function ApiStatusPage() {
   return (

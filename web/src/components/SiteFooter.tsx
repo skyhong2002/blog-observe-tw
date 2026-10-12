@@ -25,6 +25,8 @@ const COLUMNS: Array<{ label: string; links: FooterLink[] }> = [
       { href: '/blogs/', label: '收錄部落格' },
       { href: '/about/', label: '資料蒐集' },
       { href: METHOD_HREF, label: '資料來源與計算方式' },
+      // This browser's Google Analytics choice (noindex).
+      { href: '/observe/opt-out/', label: '不計入統計' },
     ],
   },
   {

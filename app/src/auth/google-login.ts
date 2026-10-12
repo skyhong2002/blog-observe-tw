@@ -30,6 +30,7 @@ export interface LoginStore {
 
 export const SESSION_COOKIE = 'blog_session';
 export const FLOW_COOKIE = 'blog_oauth';
+export const LOGIN_COMPLETED_COOKIE = 'blog_login_completed';
 export const SESSION_DAYS = 30;
 export const FLOW_SECONDS = 600;
 
@@ -139,6 +140,10 @@ export function registerLogin(app: FastifyInstance, store: LoginStore | null, co
   const secure = config?.origin.startsWith('https:') ? '; Secure' : '';
   const cookie = (name: string, value: string, maxAge: number) =>
     `${name}=${value}; Path=/; Max-Age=${maxAge}; HttpOnly; SameSite=Lax${secure}`;
+  // An untrusted, non-identifying analytics receipt only. Never read it for authentication.
+  // The browser consumes/deletes this flag after sending its successful-login event.
+  const completedCookie = (completed: boolean) =>
+    `${LOGIN_COMPLETED_COOKIE}=${completed ? '1' : ''}; Path=/; Max-Age=${completed ? 300 : 0}; SameSite=Lax; Secure`;
   const currentUser = async (request: FastifyRequest): Promise<SessionUser | null> => {
     const value = readCookie(request, SESSION_COOKIE);
     if (!store || !config || !value || value.length > 128) return null;
@@ -157,7 +162,8 @@ export function registerLogin(app: FastifyInstance, store: LoginStore | null, co
   if (!store || !config) return { currentUser };
   const exchange = options.exchange ?? googleExchange(config);
   const callback = `${config.origin}/auth/google/callback`;
-  const fail = (reply: FastifyReply, reason: string) => reply.redirect(`/login?error=${encodeURIComponent(reason)}`, 303);
+  const fail = (reply: FastifyReply, reason: string) =>
+    reply.header('set-cookie', completedCookie(false)).redirect(`/login?error=${encodeURIComponent(reason)}`, 303);
 
   app.get<{ Querystring: { next?: string } }>('/auth/google', async (request, reply) => {
     const state = token();
@@ -180,7 +186,7 @@ export function registerLogin(app: FastifyInstance, store: LoginStore | null, co
     }).toString();
     return reply
       .header('cache-control', 'no-store')
-      .header('set-cookie', cookie(FLOW_COOKIE, flow, FLOW_SECONDS))
+      .header('set-cookie', [cookie(FLOW_COOKIE, flow, FLOW_SECONDS), completedCookie(false)])
       .redirect(url.toString(), 302);
   });
 
@@ -213,7 +219,7 @@ export function registerLogin(app: FastifyInstance, store: LoginStore | null, co
       const session = token();
       await store.createSession(hashToken(session, config.sessionSecret), userId, new Date(at.getTime() + SESSION_DAYS * 86_400_000));
       return reply
-        .header('set-cookie', [cookie(FLOW_COOKIE, '', 0), cookie(SESSION_COOKIE, session, SESSION_DAYS * 86_400)])
+        .header('set-cookie', [cookie(FLOW_COOKIE, '', 0), cookie(SESSION_COOKIE, session, SESSION_DAYS * 86_400), completedCookie(true)])
         .redirect(safeNext(flow.next), 303);
     } catch (err) {
       request.log.error({ err: (err as Error).message }, 'blog session persistence failed');
@@ -226,7 +232,7 @@ export function registerLogin(app: FastifyInstance, store: LoginStore | null, co
     if (request.headers.origin !== config.origin) return reply.code(403).send({ error: 'same-origin requests only' });
     const value = readCookie(request, SESSION_COOKIE);
     if (value && value.length <= 128) await store.deleteSession(hashToken(value, config.sessionSecret));
-    return reply.header('set-cookie', cookie(SESSION_COOKIE, '', 0)).redirect('/', 303);
+    return reply.header('set-cookie', [cookie(SESSION_COOKIE, '', 0), completedCookie(false)]).redirect('/', 303);
   });
 
   return { currentUser };

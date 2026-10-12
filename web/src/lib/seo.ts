@@ -38,6 +38,35 @@ export function pageMetadata(path: string, title: string | null, description: st
   };
 }
 
+// Title and description of every static public page, unique per page. Query
+// views (?q=, ?tag=, ?author=, ?days=…) are client-side states of these pages
+// and share their self canonical.
+export const STATIC_PAGES = {
+  '/': [null, SITE_DESCRIPTION],
+  '/about/': ['資料來源與收錄方式', '部落格觀察如何收錄公開部落格：來源、內文取得、更新與話題排行方式，以及隱私與訂閱說明。'],
+  '/api/': ['API 文件', '部落格觀察公開 API：端點、參數、回傳欄位與使用規則。'],
+  '/api/status/': ['API 狀態', '查看部落格觀察公開 API 的可用狀態與各端點用途。'],
+  '/articles/': ['最新文章', '台灣部落格最新文章：依發文時間列出收錄部落格的公開文章，可全文搜尋，點選後回到原站閱讀。'],
+  '/authors/': ['文章作者', '台灣部落格的文章作者：依收錄文章數整理作者與所屬部落格，查看每位作者最近的文章。'],
+  '/blogs/': ['部落格目錄', '台灣部落格目錄：依分類、更新狀態與最新發文瀏覽收錄的部落格，連回作者自己的網站閱讀。'],
+  '/ranking/': ['標籤收錄排行', '部落格文章標籤收錄排行：依參與部落格數與收錄文章數排列，是收錄概況而非品質評分。'],
+  '/relations/': ['部落格關係圖', '從正文連結看台灣部落格之間的引用與交流，近 7、30、90 天的部落格關係圖。'],
+  '/tags/': ['文章標籤', '探索台灣部落格文章標籤：看每個標籤有哪些部落格參與、收錄多少文章與最近的文章。'],
+  '/topics/': ['大家正在寫什麼', '台灣部落格近期共同話題排行：依參與部落格數與文章數，看大家最近都在寫什麼。'],
+  '/traffic/': ['部落格流量與排名', '對照已核准部落格的網域流量估算、排名與資料時間；估算不代表文章品質。'],
+} as const satisfies Record<string, readonly [string | null, string]>;
+
+export function staticPageMetadata(path: keyof typeof STATIC_PAGES) {
+  const [title, description]: readonly [string | null, string] = STATIC_PAGES[path];
+  return pageMetadata(path, title, description);
+}
+
+/** Sign-in, reader, admin and settings pages: never indexed, no canonical. */
+export const privatePageMetadata = (title: string) => ({
+  title: { absolute: `${title} · ${SITE_NAME}` },
+  robots: { index: false, follow: false },
+});
+
 /** /blogs/<slug>/ with the slug percent-encoded once. */
 export const blogPath = (slug: string) => `/blogs/${encodeURIComponent(slug)}/`;
 /** /topics/<id>/, e.g. /topics/tag%3A<hash>/. */
@@ -48,7 +77,10 @@ export function serializeJsonLd(value: unknown): string {
   return JSON.stringify(value).replace(/</g, '\\u003c');
 }
 
-/** Home page: the site and its publisher. No SearchAction (no confirmed search URL template). */
+/** The header search form's GET target: /articles/ runs ?q= through the public /api/search. */
+export const SEARCH_URL_TEMPLATE = `${SITE_ORIGIN}/articles/?q={search_term_string}`;
+
+/** Home page: the site, its article search and its publisher. */
 export function siteSchema() {
   return {
     '@context': 'https://schema.org',
@@ -61,6 +93,11 @@ export function siteSchema() {
         description: SITE_DESCRIPTION,
         inLanguage: 'zh-Hant',
         publisher: { '@id': `${SITE_ORIGIN}/#organization` },
+        potentialAction: {
+          '@type': 'SearchAction',
+          target: { '@type': 'EntryPoint', urlTemplate: SEARCH_URL_TEMPLATE },
+          'query-input': 'required name=search_term_string',
+        },
       },
       {
         '@type': 'Organization',

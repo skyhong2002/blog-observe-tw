@@ -2,11 +2,12 @@
 import Link from 'next/link';
 import MediaTabs from '@/components/MediaTabs';
 import SimilarwebTraffic from '@/components/SimilarwebTraffic';
+import { staticPageMetadata } from '@/lib/seo';
 
 // ISR (PUBLIC_REVALIDATE_SECONDS): one prerendered table of every listed blog;
 // the comparison's URL state is applied in the browser (TrafficComparisonFromUrl).
 export const revalidate = 120;
-export const metadata = { title: '部落格流量與排名', description: '對照已核准部落格的網域流量估算、排名與資料時間；估算不代表文章品質。' };
+export const metadata = staticPageMetadata('/traffic/');
 export default function TrafficPage() {
   return (
     <div className="space-y-5 pb-8">

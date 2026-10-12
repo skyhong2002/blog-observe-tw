@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { ACTION_EVENT, type AnalyticsAction } from '@/lib/analytics-consent.mts';
 
 export default function FollowButton({ slug }: { slug: string }) {
   const [following, setFollowing] = useState(false);
@@ -32,8 +33,11 @@ export default function FollowButton({ slug }: { slug: string }) {
         method: following ? 'DELETE' : 'POST',
         credentials: 'same-origin',
       });
-      if (response.ok) setFollowing(!following);
-      else setMessage('追蹤設定未更新，請稍後再試。');
+      if (response.ok) {
+        // A completed follow only; no blog or reader identifiers.
+        if (!following) window.dispatchEvent(new CustomEvent<AnalyticsAction>(ACTION_EVENT, { detail: 'follow' }));
+        setFollowing(!following);
+      } else setMessage('追蹤設定未更新，請稍後再試。');
     } catch {
       setMessage('連線失敗，請稍後再試。');
     } finally {

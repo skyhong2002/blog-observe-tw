@@ -4,9 +4,11 @@ import TableScroller from '@/components/TableScroller';
 import TagCountChartLoader from '@/components/TagCountChartLoader';
 import { taipei } from '@/lib/api';
 import { overview } from '@/lib/public-api';
+import { staticPageMetadata } from '@/lib/seo';
 import { table } from '@/lib/table-styles';
 // ISR (PUBLIC_REVALIDATE_SECONDS).
 export const revalidate = 120;
+export const metadata = staticPageMetadata('/ranking/');
 export default async function RankingPage() {
   const data = await overview();
   return (

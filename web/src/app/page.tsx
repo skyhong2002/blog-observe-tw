@@ -7,7 +7,7 @@ import { recentBlogRows } from '@/lib/home';
 import { externalHref } from '@/lib/images';
 import { overview, publicJson } from '@/lib/public-api';
 import { topicsApiPath } from '@/lib/public-query';
-import { pageMetadata, SITE_DESCRIPTION, serializeJsonLd, siteSchema } from '@/lib/seo';
+import { serializeJsonLd, siteSchema, staticPageMetadata } from '@/lib/seo';
 import type { Topics } from '@/lib/topics';
 import styles from './_home/home.module.css';
 import MastheadCloud from './_home/MastheadCloud';
@@ -15,7 +15,7 @@ import NewsImage from './_home/NewsImage';
 // ISR (PUBLIC_REVALIDATE_SECONDS). A failed gateway read throws, so a
 // regeneration keeps the last good page instead of caching an empty one.
 export const revalidate = 120;
-export const metadata = pageMetadata('/', null, SITE_DESCRIPTION);
+export const metadata = staticPageMetadata('/');
 export default async function HomePage() {
   const [data, topics] = await Promise.all([overview(), publicJson<Topics>(topicsApiPath('30'))]);
   const [lead, ...rest] = data.posts;

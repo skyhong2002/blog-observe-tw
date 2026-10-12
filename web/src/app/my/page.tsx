@@ -2,6 +2,9 @@ import ApiKeyManager from '@/components/ApiKeyManager';
 import ReaderList from '@/components/ReaderList';
 import SectionTabs from '@/components/SectionTabs';
 import { exampleUrl, loadSpec, operations } from '@/lib/openapi-spec';
+import { privatePageMetadata } from '@/lib/seo';
+
+export const metadata = privatePageMetadata('我的閱讀');
 
 // A public GET from the generated spec for the API key curl example; the page
 // itself stays a static shell and loads every private value in the browser.

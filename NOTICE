@@ -32,3 +32,8 @@ at afe0a653fa8aae7e25a04a1d9fe87bf0400a2a39. Copyright (c) 2026 Sky Hong.
 Topic matching noise policy copies app/src/tag-noise.ts and app/data/no-equal-tags.json
 verbatim from tag.observe.tw afe0a653fa8aae7e25a04a1d9fe87bf0400a2a39.
 Copyright (c) 2026 Sky Hong
+
+Analytics consent/runtime and SEO metadata patterns selectively adapted from
+SiteAnalytics.tsx, analytics-consent.mts and seo.mts in the reviewed tag.observe.tw
+source (2026-10-12, checkout base d034b09f90819f11424891e9aecf7f510fb4c780).
+Copyright (c) 2026 Sky Hong

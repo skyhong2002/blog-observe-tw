@@ -23,6 +23,13 @@ test('canonicals are absolute, on blog.observe.tw, with one trailing slash and n
   assert.equal(meta.openGraph.images[0].url, 'https://blog.observe.tw/opengraph-image.png');
 });
 
+test('list pages do not lend each other a title or canonical', () => {
+  const a = pageMetadata('/authors/', '文章作者', 'x');
+  const b = pageMetadata('/articles/', '最新文章', 'y');
+  assert.notEqual(a.alternates.canonical, b.alternates.canonical);
+  assert.notDeepEqual(a.title, b.title);
+});
+
 test('the home page keeps the site title', () => {
   const meta = pageMetadata('/', null, 'home');
   assert.deepEqual(meta.title, { absolute: SITE_TITLE });
