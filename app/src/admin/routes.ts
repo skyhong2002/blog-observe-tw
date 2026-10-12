@@ -312,7 +312,7 @@ export function registerAdminRoutes(app: FastifyInstance, config: AdminOptions) 
         );
         return { ok: true };
       });
-      invalidateRelationCache(config.pool);
+      await invalidateRelationCache(config.pool);
       return result;
     });
   });

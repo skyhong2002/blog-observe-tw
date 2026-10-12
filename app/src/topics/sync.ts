@@ -6,7 +6,8 @@ import type { BatchOptions } from '../jobs/contracts.ts';
 import { withJobLease } from '../jobs/lease.ts';
 import { digest, normalizeTerm, TopicMatcher } from './matcher.ts';
 import { type ExportManifest, HttpSnapshotSource, type SnapshotSource, SOURCE, validateManifest, validatePage } from './snapshot-client.ts';
-import { TagArticleSource } from './tag-source.ts';
+import { TAG_NORMALIZATION } from './tag-normalization.ts';
+import { TagArticleSource, TagSourceSchemaError } from './tag-source.ts';
 import { TagRateLimitError } from './transport.ts';
 import { type ArticleSource, type SourceArticle, validateWindow, type Window } from './window-contract.ts';
 
@@ -28,6 +29,9 @@ export interface LocalManifest {
   total: number;
   sha256: string;
   upstreamSnapshotConsistent: false;
+  invalidTagCount: number;
+  normalizedTagCount: number;
+  tagNormalization: string;
   attribution: string;
 }
 /** Publish only after all staged data validates. Existing public pointer is unchanged on every failure. */
@@ -154,6 +158,12 @@ export async function syncVocabulary(pool: Pool, options: SyncOptions = {}) {
           },
         );
       }
+      const [[failedCooldown]] = await pool.query<RowDataPacket[]>(
+        "SELECT id,next_attempt_at FROM topic_window_runs WHERE status='failed-schema' AND next_attempt_at>? ORDER BY next_attempt_at DESC LIMIT 1",
+        [now],
+      );
+      if (failedCooldown?.next_attempt_at)
+        return { status: 'deferred', version: failedCooldown.id, nextAttemptAt: failedCooldown.next_attempt_at };
       const [[active]] = await pool.query<RowDataPacket[]>(
         "SELECT * FROM topic_window_runs WHERE status IN ('scanning','ready') ORDER BY created_at LIMIT 1",
       );
@@ -261,8 +271,12 @@ export async function syncVocabulary(pool: Pool, options: SyncOptions = {}) {
         const [rows] = await pool.query<RowDataPacket[]>('SELECT payload FROM topic_window_articles WHERE run_id=?', [id]);
         const counts = new Map<string, number>();
         let bytes = 0;
+        let invalidTagCount = 0;
+        let normalizedTagCount = 0;
         for (const row of rows) {
           const a = json<SourceArticle>(row.payload);
+          invalidTagCount += a.invalidTagCount ?? 0;
+          normalizedTagCount += a.normalizedTagCount ?? 0;
           bytes += Buffer.byteLength(JSON.stringify(a));
           if (bytes > 32_000_000) throw Error('vocabulary staged byte cap');
           for (const label of new Set(a.tags)) {
@@ -281,6 +295,9 @@ export async function syncVocabulary(pool: Pool, options: SyncOptions = {}) {
           id,
           source: SOURCE,
           coverage: 'observed-article-window',
+          invalidTagCount,
+          normalizedTagCount,
+          tagNormalization: TAG_NORMALIZATION,
           window,
           generatedAt: window.until,
           total: terms.length,
@@ -295,6 +312,20 @@ export async function syncVocabulary(pool: Pool, options: SyncOptions = {}) {
       } catch (error) {
         if (error instanceof TagRateLimitError) return { status: 'deferred', version: id, nextAttemptAt: error.retryAt };
         const message = error instanceof Error ? error.message : '';
+        if (
+          error instanceof TagSourceSchemaError ||
+          /^Tag source (?:invalid JSON|empty response)$/.test(message) ||
+          (error as { code?: string })?.code === 'ER_DUP_ENTRY'
+        ) {
+          await assertLease();
+          const nextAttemptAt = new Date((options.now?.() ?? new Date()).getTime() + 3600_000);
+          await pool.execute("UPDATE topic_window_runs SET status='failed-schema',next_attempt_at=?,updated_at=? WHERE id=?", [
+            nextAttemptAt,
+            options.now?.() ?? new Date(),
+            id,
+          ]);
+          return { status: 'failed-schema', version: id, nextAttemptAt };
+        }
         if (message === 'topic_upstream_budget') return { status: 'budget', version: id };
         const reason = message.includes('page cap')
           ? 'cap-pages'

@@ -1,5 +1,7 @@
-import type { FastifyInstance } from 'fastify';
+import type { FastifyInstance, FastifyReply } from 'fastify';
 import type { Pool, RowDataPacket } from 'mysql2/promise';
+import type { BatchOptions, BatchResult } from '../jobs/contracts.ts';
+import { withJobLease } from '../jobs/lease.ts';
 import { iconUrl } from '../v1/icons.ts';
 
 export type RelationEdge = {
@@ -37,18 +39,101 @@ export type RelationDTO = {
 };
 // Stable source-post / exact target / location identity survives crawler ordinal changes.
 // This only filters public presentation; original observations/discovery evidence are never mutated.
-const PUBLIC_RELATION = `NOT EXISTS (SELECT 1 FROM admin_relation_overrides hidden_link
+const PUBLIC_RELATION = `EXISTS (SELECT 1 FROM relation_observations public_o WHERE public_o.post_id=l.source_post_id AND public_o.last_success_at IS NOT NULL AND public_o.status<>'reparse-pending') AND NOT EXISTS (SELECT 1 FROM admin_relation_overrides hidden_link
   WHERE hidden_link.source_post_id=l.source_post_id AND hidden_link.target_url_hash=SHA2(l.target_url,256)
   AND BINARY hidden_link.target_url=BINARY l.target_url AND hidden_link.location=l.location AND hidden_link.hidden=TRUE)`;
-type RelationCache = { revision: number; entries: Map<number, { expires: number; dto: RelationDTO }> };
+type RelationCache = { revision: number; entries: Map<string, { expires: number; dto: unknown }>; flights: Map<string, Promise<unknown>> };
 const relationCaches = new WeakMap<Pool, RelationCache>();
-/** Admin mutation calls this after commit. Never cache an in-flight pre-mutation projection afterward. */
-export function invalidateRelationCache(pool: Pool) {
-  const cache = relationCaches.get(pool);
-  if (cache) {
-    cache.revision++;
-    cache.entries.clear();
+function cacheFor(pool: Pool): RelationCache {
+  let cache = relationCaches.get(pool);
+  if (!cache) {
+    cache = { revision: 0, entries: new Map(), flights: new Map() };
+    relationCaches.set(pool, cache);
   }
+  return cache;
+}
+/** Admin callers MUST await this after commit. Database CAS fences concurrent worker rebuilds. */
+export async function invalidateRelationCache(pool: Pool) {
+  const cache = cacheFor(pool);
+  cache.revision++;
+  cache.entries.clear();
+  cache.flights.clear();
+  const c = await pool.getConnection();
+  try {
+    await c.beginTransaction();
+    await c.query('INSERT INTO relation_projection_state (id,revision) VALUES (1,1) ON DUPLICATE KEY UPDATE revision=revision+1');
+    await c.query('DELETE FROM relation_snapshots');
+    await c.commit();
+  } catch (e) {
+    await c.rollback();
+    throw e;
+  } finally {
+    c.release();
+  }
+}
+async function cachedProjection<T>(pool: Pool, key: string, ttl: number, build: () => Promise<T>): Promise<T> {
+  const cache = cacheFor(pool);
+  const hit = cache.entries.get(key);
+  if (hit && hit.expires > Date.now()) return hit.dto as T;
+  const pending = cache.flights.get(key);
+  if (pending) return pending as Promise<T>;
+  if (cache.flights.size >= 4) throw Object.assign(Error('relation_projection_busy'), { statusCode: 503 });
+  const task = (async () => {
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const revision = cache.revision;
+      const dto = await build();
+      if (cache.revision !== revision) continue;
+      if (cache.entries.size >= 256) cache.entries.delete(cache.entries.keys().next().value as string);
+      cache.entries.set(key, { expires: Date.now() + ttl, dto });
+      return dto;
+    }
+    throw Error('relation_projection_changed');
+  })().finally(() => {
+    if (cache.flights.get(key) === task) cache.flights.delete(key);
+  });
+  cache.flights.set(key, task);
+  return task;
+}
+async function buildSnapshot(pool: Pool, days: number, now: Date, attempt = 0): Promise<RelationDTO> {
+  await pool.query('INSERT IGNORE INTO relation_projection_state (id,revision) VALUES (1,0)');
+  const [[state]] = await pool.query<RowDataPacket[]>('SELECT revision FROM relation_projection_state WHERE id=1');
+  const dto = await loadRelations(pool, days, now);
+  await pool.query(
+    `INSERT INTO relation_snapshots (days,revision,payload,generated_at)
+    SELECT ?,revision,?,? FROM relation_projection_state WHERE id=1 AND revision=?
+    ON DUPLICATE KEY UPDATE revision=VALUES(revision),payload=VALUES(payload),generated_at=VALUES(generated_at)`,
+    [days, JSON.stringify(dto), now, state.revision],
+  );
+  const [[after]] = await pool.query<RowDataPacket[]>('SELECT revision FROM relation_projection_state WHERE id=1');
+  if (Number(after.revision) !== Number(state.revision)) {
+    if (attempt >= 1) throw Error('relation_projection_changed');
+    return buildSnapshot(pool, days, now, attempt + 1);
+  }
+  return dto;
+}
+export async function readRelationSnapshot(pool: Pool, days: number, now = new Date()): Promise<RelationDTO> {
+  const [[row]] = await pool.query<RowDataPacket[]>(
+    `SELECT s.payload FROM relation_snapshots s JOIN relation_projection_state p ON p.id=1 AND p.revision=s.revision WHERE s.days=? AND s.generated_at>=?`,
+    [days, new Date(now.getTime() - 600000)],
+  );
+  if (row) return typeof row.payload === 'string' ? JSON.parse(row.payload) : row.payload;
+  return buildSnapshot(pool, days, now);
+}
+/** Schedule every five minutes independently of crawler enablement; three bounded window DTOs. */
+export async function runRelationSnapshotBatch(pool: Pool, options: BatchOptions = {}): Promise<BatchResult> {
+  return (
+    (await withJobLease(pool, 'relation-snapshots', async (assertLease) => {
+      let processed = 0;
+      const deadline = Date.now() + Math.min(options.maxDurationMs ?? 120000, 120000);
+      for (const days of [7, 30, 90]) {
+        if (options.signal?.aborted || Date.now() >= deadline) break;
+        await assertLease();
+        await buildSnapshot(pool, days, options.now?.() ?? new Date());
+        processed++;
+      }
+      return { processed, skipped: 0, truncated: processed < 3, reservedUnused: 0 };
+    })) ?? { processed: 0, skipped: 1, truncated: false, reservedUnused: 0 }
+  );
 }
 const iso = (value: unknown): string | null => {
   if (!value) return null;
@@ -204,21 +289,21 @@ export async function loadRelations(pool: Pool, days = 90, now = new Date()): Pr
   };
 }
 
+async function projectionResponse(reply: FastifyReply, build: () => Promise<unknown>) {
+  try {
+    return await build();
+  } catch (error) {
+    if (error instanceof Error && (error.message === 'relation_projection_busy' || error.message === 'relation_projection_changed'))
+      return reply.header('retry-after', '2').code(503).send({ error: 'relation_projection_busy' });
+    throw error;
+  }
+}
 export async function registerRelationRoutes(app: FastifyInstance, pool: Pool) {
-  const cache = relationCaches.get(pool) ?? { revision: 0, entries: new Map<number, { expires: number; dto: RelationDTO }>() };
-  relationCaches.set(pool, cache);
-  const read = async (days: number) => {
-    const cached = cache.entries.get(days);
-    const revision = cache.revision;
-    if (cached && cached.expires > Date.now()) return cached.dto;
-    const dto = await loadRelations(pool, days);
-    if (cache.revision === revision) cache.entries.set(days, { expires: Date.now() + 60000, dto });
-    return dto;
-  };
+  const read = (days: number) => cachedProjection(pool, `global:${days}`, 300000, () => readRelationSnapshot(pool, days));
   app.get('/api/relations', async (request, reply) => {
     const days = relationDays((request.query as { days?: unknown }).days);
     if (days === null) return reply.code(400).send({ error: 'invalid_days' });
-    return read(days);
+    return projectionResponse(reply, () => read(days));
   });
   app.get('/api/blogs/:slug/relations', async (request, reply) => {
     const days = relationDays((request.query as { days?: unknown }).days);
@@ -226,51 +311,57 @@ export async function registerRelationRoutes(app: FastifyInstance, pool: Pool) {
     const { slug } = request.params as { slug: string };
     const [[blog]] = await pool.query<RowDataPacket[]>("SELECT id,slug,name FROM blogs WHERE slug=? AND status<>'moved'", [slug]);
     if (!blog) return reply.code(404).send({ error: 'blog_not_found' });
-    const dto = await read(days);
-    // Profile edges are queried separately so the global 500-edge graph cap never hides a source's links.
-    const now = new Date();
-    const cutoff = new Date(now.getTime() - days * 86400000);
-    const [rows] = await pool.query<RowDataPacket[]>(
-      `SELECT e.* FROM (
+    return projectionResponse(reply, () =>
+      cachedProjection(pool, `profile:${blog.id}:${days}`, 60000, async () => {
+        // Profile edges are queried separately so the global 500-edge graph cap never hides a source's links.
+        const now = new Date();
+        const cutoff = new Date(now.getTime() - days * 86400000);
+        const [rows] = await pool.query<RowDataPacket[]>(
+          `SELECT e.* FROM (
       SELECT l.source_blog_id sourceBlogId,l.target_blog_id targetBlogId,COUNT(DISTINCT l.source_post_id) count,
         SUM(COUNT(DISTINCT l.source_post_id)) OVER (PARTITION BY l.source_blog_id) denominator,MIN(p.published_at) firstMentionAt,MAX(p.published_at) lastMentionAt
       FROM relation_links l JOIN posts p ON p.id=l.source_post_id JOIN blogs a ON a.id=l.source_blog_id JOIN blogs b ON b.id=l.target_blog_id
-      WHERE ${PUBLIC_RELATION} AND l.location='body' AND l.source_blog_id<>l.target_blog_id AND a.status='verified' AND b.status='verified' AND p.published_at>=? AND p.published_at<=?
+      WHERE ${PUBLIC_RELATION} AND l.source_blog_id IN (SELECT relevant.source_id FROM (SELECT ? source_id UNION SELECT source_blog_id FROM relation_links WHERE target_blog_id=?) relevant) AND l.location='body' AND l.source_blog_id<>l.target_blog_id AND a.status='verified' AND b.status='verified' AND p.published_at>=? AND p.published_at<=?
       GROUP BY l.source_blog_id,l.target_blog_id) e WHERE sourceBlogId=? OR targetBlogId=? ORDER BY count DESC,sourceBlogId,targetBlogId LIMIT 1001`,
-      [cutoff, now, blog.id, blog.id],
-    );
-    const edges = projectRelations(
-      rows.slice(0, 1000).map((r) => ({
-        sourceBlogId: Number(r.sourceBlogId),
-        targetBlogId: Number(r.targetBlogId),
-        count: Number(r.count),
-        denominator: Number(r.denominator),
-        firstMentionAt: r.firstMentionAt,
-        lastMentionAt: r.lastMentionAt,
-      })),
-    );
-    const ids = [...new Set([Number(blog.id), ...edges.flatMap((e) => [e.sourceBlogId, e.targetBlogId])])];
-    const [nodes] = await pool.query<RowDataPacket[]>('SELECT id,slug,name FROM blogs WHERE id IN (?)', [ids]);
-    const [evidence] = await pool.query<RowDataPacket[]>(
-      `SELECT p.id postId,p.title postTitle,p.url postUrl,l.target_url targetUrl,l.anchor_text anchor,p.published_at publishedAt,
+          [blog.id, blog.id, cutoff, now, blog.id, blog.id],
+        );
+        const edges = projectRelations(
+          rows.slice(0, 1000).map((r) => ({
+            sourceBlogId: Number(r.sourceBlogId),
+            targetBlogId: Number(r.targetBlogId),
+            count: Number(r.count),
+            denominator: Number(r.denominator),
+            firstMentionAt: r.firstMentionAt,
+            lastMentionAt: r.lastMentionAt,
+          })),
+        );
+        const ids = [...new Set([Number(blog.id), ...edges.flatMap((e) => [e.sourceBlogId, e.targetBlogId])])];
+        const [nodes] = await pool.query<RowDataPacket[]>('SELECT id,slug,name FROM blogs WHERE id IN (?)', [ids]);
+        const [evidence] = await pool.query<RowDataPacket[]>(
+          `SELECT p.id postId,p.title postTitle,p.url postUrl,l.target_url targetUrl,l.anchor_text anchor,p.published_at publishedAt,
       l.source_blog_id sourceBlogId,l.target_blog_id targetBlogId,l.location
       FROM relation_links l JOIN posts p ON p.id=l.source_post_id JOIN blogs a ON a.id=l.source_blog_id JOIN blogs b ON b.id=l.target_blog_id
       WHERE ${PUBLIC_RELATION} AND l.location='body' AND (l.source_blog_id=? OR l.target_blog_id=?) AND l.source_blog_id<>l.target_blog_id
       AND a.status='verified' AND b.status='verified' AND p.published_at>=? AND p.published_at<=?
       ORDER BY p.published_at DESC,l.source_post_id,l.ordinal LIMIT 20`,
-      [blog.id, blog.id, cutoff, now],
+          [blog.id, blog.id, cutoff, now],
+        );
+        const coverage = await loadRelationCoverage(pool, Number(blog.id));
+        return {
+          days,
+          generatedAt: now.toISOString(),
+          mostMentioned: [],
+          mutual: [],
+          coverage: { ...coverage, graphTruncated: rows.length > 1000, aggregationTruncated: false },
+          blogId: Number(blog.id),
+          nodes: nodes.map((r) => ({ id: Number(r.id), slug: r.slug, name: r.name, iconUrl: iconUrl(r.slug) })),
+          edges,
+          outgoing: edges.filter((e) => e.sourceBlogId === blog.id),
+          incoming: edges.filter((e) => e.targetBlogId === blog.id),
+          evidence: evidence.map((r) => ({ ...r, publishedAt: iso(r.publishedAt) })),
+          profileTruncated: rows.length > 1000,
+        };
+      }),
     );
-    const coverage = await loadRelationCoverage(pool, Number(blog.id));
-    return {
-      ...dto,
-      coverage: { ...coverage, graphTruncated: rows.length > 1000, aggregationTruncated: false },
-      blogId: Number(blog.id),
-      nodes: nodes.map((r) => ({ id: Number(r.id), slug: r.slug, name: r.name, iconUrl: iconUrl(r.slug) })),
-      edges,
-      outgoing: edges.filter((e) => e.sourceBlogId === blog.id),
-      incoming: edges.filter((e) => e.targetBlogId === blog.id),
-      evidence: evidence.map((r) => ({ ...r, publishedAt: iso(r.publishedAt) })),
-      profileTruncated: rows.length > 1000,
-    };
   });
 }

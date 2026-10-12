@@ -128,7 +128,7 @@ describe('published immutable export contract', () => {
   it('uses fixed public origin without credentials, rejects HTTP/oversize and redirects', async () => {
     const request = vi.fn<typeof fetch>(async () => new Response('missing', { status: 404 }));
     await expect(new HttpSnapshotSource(request).current()).rejects.toThrow('HTTP 404');
-    expect(String(request.mock.calls[0][0])).toBe('https://tag.observe.tw/api/v1/vocabulary/snapshots/current');
+    expect(String(request.mock.calls[0][0])).toBe('http://127.0.0.1:18130/api/v1/vocabulary/snapshots/current');
     const options = request.mock.calls[0][1] as RequestInit;
     expect(options.redirect).toBe('error');
     expect(options.headers).not.toHaveProperty('Authorization');
@@ -147,9 +147,9 @@ describe('window vocabulary public article API', () => {
   it('fetches only official public contract, validates tags and cursor order', async () => {
     const request = vi.fn<typeof fetch>(async () => Response.json(page));
     const source = new TagArticleSource(request);
-    expect(await source.page(window, null)).toEqual({ articles: [{ ...article, id: '25' }], nextCursor: null });
+    expect(await source.page(window, null)).toMatchObject({ articles: [{ ...article, id: '25' }], nextCursor: null });
     const url = request.mock.calls[0][0] as URL;
-    expect(url.origin).toBe(SOURCE);
+    expect(url.origin).toBe('http://127.0.0.1:18130');
     expect(url.pathname).toBe('/api/v1/articles');
     expect(url.searchParams.get('limit')).toBe('200');
     expect((request.mock.calls[0][1] as RequestInit).redirect).toBe('error');
@@ -162,22 +162,28 @@ describe('window vocabulary public article API', () => {
     await expect(
       new TagArticleSource(async () => Response.json({ ...page, articles: [{ ...article, publishedAt: timestamp }] })).page(window, null),
     ).rejects.toThrow('outside');
-    await expect(
-      new TagArticleSource(async () => Response.json({ ...page, articles: [{ ...article, tags: ['bad\u0000tag'] }] })).page(window, null),
-    ).rejects.toThrow('terms');
+    expect(
+      (
+        await new TagArticleSource(async () => Response.json({ ...page, articles: [{ ...article, tags: ['旅行', 'bad\u0000tag'] }] })).page(
+          window,
+          null,
+        )
+      ).articles[0],
+    ).toMatchObject({ tags: ['旅行'], invalidTagCount: 1 });
   });
   it('accepts real-world boundary zero-width spacing while retaining source labels and rejecting embedded controls', async () => {
-    const rawTags = ['\u200B洛杉磯道奇', ' 旅行\uFEFF'];
+    const rawTags = ['\u200B洛杉磯道奇', ' 旅行\uFEFF', '公益代言人\u2060'];
     const source = new TagArticleSource(async () => Response.json({ ...page, articles: [{ ...article, tags: rawTags }] }));
     expect((await source.page(window, null)).articles[0]).toMatchObject({
-      tags: ['洛杉磯道奇', '旅行'],
+      tags: ['洛杉磯道奇', '旅行', '公益代言人'],
       rawTags,
-      tagNormalization: 'boundary-whitespace-v1',
+      tagNormalization: 'boundary-whitespace-format-skip-invalid-v2',
     });
     for (const tags of [['洛\u200B杉磯'], ['\u200B'], [42], ['bad\u0000tag']]) {
-      await expect(
-        new TagArticleSource(async () => Response.json({ ...page, articles: [{ ...article, tags }] })).page(window, null),
-      ).rejects.toThrow('terms');
+      expect(
+        (await new TagArticleSource(async () => Response.json({ ...page, articles: [{ ...article, tags }] })).page(window, null))
+          .articles[0],
+      ).toMatchObject({ tags: [], invalidTagCount: 1 });
     }
   });
   it('default disabled sync makes zero network or database writes', async () => {

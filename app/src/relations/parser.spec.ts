@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { identityKey, normalizeLink, publicationHome, resolvePublication } from './identity.ts';
+import {
+  compilePublicationAliases,
+  identityKey,
+  normalizeLink,
+  publicationDecision,
+  publicationHome,
+  resolvePublication,
+} from './identity.ts';
 import { parseArticleLinks } from './parser.ts';
 import { projectRelations, relationDays, withinRelationWindow } from './routes.ts';
 import { relationFailureCode } from './worker.ts';
@@ -177,4 +184,86 @@ describe('body reference arithmetic and dates', () => {
     expect(relationFailureCode(Error('http_403'))).toBe('http-403');
     expect(relationFailureCode(Error('unsafe crawl URL: secret'))).toBe('unsafe-target');
   });
+});
+
+describe('quality regression: structural boundaries and eligible publications', () => {
+  it.each(['right-sidebar', 'ast-right-sidebar', 'ast-no-sidebar', 'has-sidebar'])(
+    'ignores layout token %s outside selected body',
+    (token) => {
+      const result = parse(
+        `<body class="${token}"><article class="tag-movie-comment"><div class="entry-content">正文<a href="https://bob.example/">Bob</a></div></article></body>`,
+      );
+      expect(result.bodyText).toContain('正文');
+      expect(result.links).toHaveLength(1);
+      expect(result.links[0].location).toBe('body');
+    },
+  );
+  it('does not allow share, related articles, taxonomy, or navigation into body evidence', () => {
+    const widgets = ['sharedaddy', 'jp-relatedposts', 'yarpp', 'addtoany', 'post-tags', 'tagcloud'];
+    const result = parse(
+      `<article><div class="entry-content">正文<a href="https://bob.example/">Bob</a>${widgets.map((c) => `<div class="${c}">排除<a href="https://${c}.example/">排除</a></div>`).join('')}<a rel="tag" href="https://tags.example/">排除</a></div></article>`,
+    );
+    expect(result.links).toHaveLength(1);
+    expect(result.bodyText).not.toContain('排除');
+  });
+  it.each([
+    ['matters.town', '/@alice/post', '/@alice'],
+    ['hackmd.io', '/@alice/note', '/@alice'],
+    ['note.com', '/alice/n/123', '/alice'],
+    ['substack.com', '/@alice/post', '/@alice'],
+  ])('keeps %s owner paths', (host, path, home) => {
+    expect(publicationHome(`https://${host}${path}`)).toBe(`https://${host}${home}`);
+    const a = [
+      { blogId: 1, url: `https://${host}${home}` },
+      { blogId: 2, url: `https://${host}${home.replace('alice', 'bob')}` },
+    ];
+    const result = parseArticleLinks(
+      `<article><a href="${path.replace('alice', 'bob')}">Bob</a><a href="${path}">Self</a></article>`,
+      `https://${host}${path}`,
+      1,
+      a,
+    );
+    expect(result.links).toHaveLength(1);
+    expect(result.links[0].targetBlogId).toBe(2);
+  });
+  it('keeps Gamer owner query identity but refuses owner-less articles', () => {
+    expect(publicationHome('https://home.gamer.com.tw/creationDetail.php?sn=12')).toBeNull();
+    expect(publicationHome('https://home.gamer.com.tw/homeindex.php?owner=alice')).toBe(
+      'https://home.gamer.com.tw/homeindex.php?owner=alice',
+    );
+    expect(
+      resolvePublication('https://home.gamer.com.tw/homeindex.php?owner=bob', [
+        { blogId: 1, url: 'https://home.gamer.com.tw/homeindex.php?owner=alice' },
+      ]),
+    ).toBeNull();
+  });
+  it.each(['bit.ly', 'lnkd.in', 'reurl.cc'])('rejects unresolved shortener %s before admission budget', (host) =>
+    expect(publicationDecision(`https://${host}/x`)).toEqual({ home: null, reason: 'shortener-unresolved' }),
+  );
+  it.each(['news.ltn.com.tw', 'ptt.cc', 'dcard.tw', 'github.com', 'linktr.ee', 'books.com.tw', 'open.spotify.com'])(
+    'rejects non-publication %s',
+    (host) => expect(publicationDecision(`https://${host}/x`).reason).toBe('non-publication-host'),
+  );
+  it('precompiled aliases match longest owner boundary and do not resolve ambiguous owner records', () => {
+    const resolver = compilePublicationAliases([
+      { blogId: 1, url: 'https://note.com/alice' },
+      { blogId: 2, url: 'https://note.com/alice' },
+    ]);
+    expect(resolvePublication('https://note.com/alice/n/123', resolver)).toBeNull();
+  });
+});
+
+it('retains explicit footer blogroll as non-body evidence while dropping footer navigation', () => {
+  const result = parse(
+    '<article>正文</article><footer><div class="blogroll"><a href="https://roll.example/">友站</a></div><a href="https://nav.example/">導覽</a></footer>',
+  );
+  expect(result.links).toHaveLength(1);
+  expect(result.links[0].location).toBe('blogroll');
+});
+
+it('does not rediscover its own root from a custom-domain path publication', () => {
+  const result = parseArticleLinks('<article><a href="/about">關於</a></article>', 'https://alice.example/blog/post', 1, [
+    { blogId: 1, url: 'https://alice.example/blog/' },
+  ]);
+  expect(result.links).toEqual([]);
 });

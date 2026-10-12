@@ -71,6 +71,13 @@
       "when": 1791793391751,
       "tag": "0009_admin_identity_roles",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "5",
+      "when": 1791794858697,
+      "tag": "0010_relation_projection_quality",
+      "breakpoints": true
     }
   ]
 }

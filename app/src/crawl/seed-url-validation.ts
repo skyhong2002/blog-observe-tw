@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import * as cheerio from 'cheerio';
 import { XMLParser, XMLValidator } from 'fast-xml-parser';
+import { publicationDecision } from '../relations/identity.ts';
 import { type FeedCrawlerOptions, type FeedLink, isAllowedCrawlUrl, politeFetch, rankedSitemapUrls, readFeedBody } from './feed.ts';
 
 export type SeedResearchEvidence = { alias: string; sourceUrl: string; excerpt: string };
@@ -126,6 +127,13 @@ const platformHosts = new Set([
   'xuite.net',
   'wixsite.com',
   'weebly.com',
+  'matters.town',
+  'matters.news',
+  'hackmd.io',
+  'note.com',
+  'note.mu',
+  'home.gamer.com.tw',
+  'blog.udn.com',
 ]);
 
 /** Shared platforms need an author subdomain or their known publication path. */
@@ -133,6 +141,10 @@ export function isSeedPlatformRoot(value: string): boolean {
   const url = new URL(value);
   const host = url.hostname.replace(/^www\./, '').toLowerCase();
   if (!platformHosts.has(host)) return false;
+  if (
+    ['substack.com', 'matters.town', 'matters.news', 'hackmd.io', 'note.com', 'note.mu', 'home.gamer.com.tw', 'blog.udn.com'].includes(host)
+  )
+    return !publicationDecision(value).home;
   if (host === 'medium.com')
     return !/^\/(?:@[\w.-]+|[\w-]+)(?:\/|$)/.test(url.pathname) || /^\/(?:about|membership|topics|tag|search)(?:\/|$)/.test(url.pathname);
   if (host === 'vocus.cc') return !/^\/(?:salon|user)\/[^/]+/.test(url.pathname);
@@ -280,6 +292,10 @@ function inPublication(value: string, home: string): boolean {
   const resolved = absolute(value, home);
   if (!resolved || !sameHost(resolved, home)) return false;
   const homepage = new URL(home);
+  if (homepage.hostname === 'home.gamer.com.tw')
+    return (
+      Boolean(homepage.searchParams.get('owner')) && new URL(resolved).searchParams.get('owner') === homepage.searchParams.get('owner')
+    );
   const path = homepage.pathname.replace(/\/$/, '');
   if (!platformHosts.has(homepage.hostname.replace(/^www\./, ''))) return true;
   const checkedPath = new URL(resolved).pathname.replace(/\/$/, '');

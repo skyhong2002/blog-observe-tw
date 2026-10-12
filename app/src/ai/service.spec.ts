@@ -71,3 +71,14 @@ describe('durable inference cache and retry', () => {
     expect(interleaveTasks([], ['p100', 'p101'], 3)).toEqual(['p100', 'p101']);
   });
 });
+
+it('rechecks ownership evidence in injected provider results and cached classification', async () => {
+  const input = JSON.stringify(['Site description:']);
+  const spoof = { ...answer, quotedEvidence: ['Site description:'] };
+  for (const cached of [false, true]) {
+    const db = database(cached ? { status: 'ok', result_json: spoof, actual_model: 'fixture' } : {});
+    const gateway = vi.fn(async () => ({ result: spoof, actualModel: 'fixture' }));
+    const inferred = await infer(db.pool, 'classification', 'candidate', 1, input, 'site-identity', { gateway });
+    expect(inferred.result?.classification).toBe('uncertain');
+  }
+});

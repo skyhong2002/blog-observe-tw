@@ -7,7 +7,14 @@ import { loadConfig } from '../app/src/config.js';
 const config = loadConfig();
 const connection = new Redis(config.redisUrl, { maxRetriesPerRequest: null });
 const queue = new Queue(config.queueName, { connection, prefix: config.queuePrefix });
-const relationshipJobs = ['blogs-relations', 'blogs-publication-discovery', 'blogs-ai', 'blogs-topics', 'blogs-vocabulary'];
+const relationshipJobs = [
+  'blogs-relation-snapshots',
+  'blogs-relations',
+  'blogs-publication-discovery',
+  'blogs-ai',
+  'blogs-topics',
+  'blogs-vocabulary',
+];
 const names = new Set(
   process.argv.includes('--relationships-only')
     ? relationshipJobs

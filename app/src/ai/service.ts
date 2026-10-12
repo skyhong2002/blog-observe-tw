@@ -9,6 +9,7 @@ import {
   MODEL_ALIAS,
   NORMALIZATION,
   normalizeInput,
+  validateInference,
   validateResult,
 } from './contracts.ts';
 import { callGateway, gatewayBody } from './gateway.ts';
@@ -58,7 +59,18 @@ export async function infer(
     [task, entityType, entityId, storageKey, inputHash, coverage, MODEL_ALIAS, AI_POLICY, NORMALIZATION, now, now],
   );
   const [[row]] = await pool.query<RowDataPacket[]>('SELECT * FROM ai_results WHERE cache_key=?', [storageKey]);
-  if (row.status === 'ok') return { status: 'ok', result: decode(row.result_json), cacheKey: storageKey, actualModel: row.actual_model };
+  if (row.status === 'ok') {
+    try {
+      return {
+        status: 'ok',
+        result: validateInference(task, decode(row.result_json), input),
+        cacheKey: storageKey,
+        actualModel: row.actual_model,
+      };
+    } catch {
+      return { status: 'failed', cacheKey: storageKey };
+    }
+  }
   if (row.attempts >= 3 || (row.next_attempt_at && new Date(row.next_attempt_at) > now) || options.signal?.aborted)
     return { status: 'deferred', cacheKey: storageKey };
   // CAS is a crash-safe short lease. An attempt lost after reservation still consumes budget.
@@ -92,6 +104,7 @@ export async function infer(
   if (started.affectedRows !== 1) return { status: 'deferred', cacheKey: storageKey };
   try {
     const value = await (options.gateway || callGateway)(task, input, { signal: options.signal });
+    value.result = validateInference(task, value.result, input);
     const [saved] = await pool.execute<ResultSetHeader>(
       "UPDATE ai_results SET status='ok',last_error=NULL,result_json=?,actual_model=?,next_attempt_at=NULL,updated_at=? WHERE id=? AND claim_token=?",
       [JSON.stringify(value.result), value.actualModel, (options.now || (() => new Date()))(), row.id, claimToken],

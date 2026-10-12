@@ -9,7 +9,10 @@ export interface SourceArticle {
   publishedAt: string;
   tags: string[];
   rawTags?: string[];
-  tagNormalization?: 'boundary-whitespace-v1';
+  tagNormalization?: string;
+  invalidTagCount?: number;
+  normalizedTagCount?: number;
+  invalidTagSamples?: import('./tag-normalization.ts').InvalidTagEvidence[];
 }
 export interface ArticlePage {
   articles: SourceArticle[];

@@ -1,8 +1,8 @@
 import { createHash } from 'node:crypto';
 import type { Pool, PoolConnection, ResultSetHeader, RowDataPacket } from 'mysql2/promise';
 import { type AdminActor, requireAdminTransaction, writeAudit } from '../admin/identity.ts';
-import { inputKey, normalizeInput } from '../ai/contracts.ts';
-import { deterministicPersonalProof } from '../ai/personal.ts';
+import { AI_POLICY, inputKey, normalizeInput } from '../ai/contracts.ts';
+import { aiPersonalProof, deterministicPersonalProof } from '../ai/personal.ts';
 import { reserveBudgetOnConnection } from '../jobs/budget.ts';
 import {
   CANDIDATE_POLICY,
@@ -135,17 +135,12 @@ export async function recordCandidateCheck(
       let personalValid = personal ? deterministicPersonalProof(personal) : false;
       if (personal?.method === 'ai' && personal.cacheKey) {
         const [[cached]] = await c.query<RowDataPacket[]>(
-          "SELECT result_json,input_hash FROM ai_results WHERE cache_key=? AND entity_type='candidate' AND entity_id=? AND task='classification' AND status='ok' AND policy='personal-blog-v1'",
-          [personal.cacheKey, check.id],
+          "SELECT result_json,input_hash FROM ai_results WHERE cache_key=? AND entity_type='candidate' AND entity_id=? AND task='classification' AND status='ok' AND policy=?",
+          [personal.cacheKey, check.id, AI_POLICY],
         );
         const value = decode(cached?.result_json);
         personalValid =
-          cached?.input_hash === inputKey('classification', normalizeInput(personal.input)).inputHash &&
-          value.classification === 'personal' &&
-          Number(value.confidence) >= 0.95 &&
-          Array.isArray(value.quotedEvidence) &&
-          value.quotedEvidence.length > 0 &&
-          value.quotedEvidence.every((q) => typeof q === 'string' && q.length >= 8 && personal.input.includes(q));
+          cached?.input_hash === inputKey('classification', normalizeInput(personal.input)).inputHash && aiPersonalProof(personal, value);
       }
       if (!personalValid) decline('personal_publication_unverified');
     }

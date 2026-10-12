@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
-export const AI_POLICY = 'personal-blog-v1';
+import { ownershipQuotes, ownershipSegments } from './ownership.ts';
+export const AI_POLICY = 'personal-blog-v2-ownership';
 export const NORMALIZATION = 'plain-nfkc-v1';
 export const MODEL_ALIAS = 'sky-quality';
 export type AiTask = 'classification' | 'profile' | 'topics';
@@ -72,4 +73,17 @@ export function validatedOverride(value: unknown): AiResult | null {
   } catch {
     return null;
   }
+}
+
+/** Classification evidence is confined to separate site-level excerpts, never labels or article/comment content. */
+export function validateInference(task: AiTask, value: unknown, input: string): AiResult {
+  if (task !== 'classification') return validateResult(value, input);
+  const segments = ownershipSegments(input);
+  if (!segments) throw Error('invalid_output');
+  const result = validateResult(value, segments.join('\n'));
+  if (result.quotedEvidence.some((q) => !segments.some((s) => s.includes(q)))) throw Error('ungrounded_output');
+  if (result.classification === 'personal' && !ownershipQuotes(input, result.quotedEvidence)) {
+    return { classification: 'uncertain', confidence: 0, quotedEvidence: [], bio: '', topics: [] };
+  }
+  return result;
 }

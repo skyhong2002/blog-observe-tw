@@ -33,6 +33,7 @@ export const relationLinks = mysqlTable(
     ordinal: int('ordinal').notNull(),
     targetUrl: varchar('target_url', { length: 1024 }).notNull(),
     targetBlogId: int('target_blog_id'),
+    targetReason: varchar('target_reason', { length: 64 }),
     targetPostId: int('target_post_id'),
     anchorText: varchar('anchor_text', { length: 255 }).notNull(),
     context: varchar('context', { length: 320 }).notNull(),
@@ -45,6 +46,7 @@ export const relationLinks = mysqlTable(
     index('relation_links_target').on(t.targetBlogId),
     index('relation_links_source').on(t.sourceBlogId, t.location),
     index('relation_links_unresolved').on(t.targetBlogId, t.sourcePostId),
+    index('relation_links_resolution_due').on(t.resolutionCheckedAt, t.sourcePostId),
   ],
 );
 
@@ -94,6 +96,7 @@ export const relationHomeLinks = mysqlTable(
     sourcePageUrl: varchar('source_page_url', { length: 1024 }).notNull(),
     targetUrl: varchar('target_url', { length: 1024 }).notNull(),
     targetBlogId: int('target_blog_id'),
+    targetReason: varchar('target_reason', { length: 64 }),
     anchorText: varchar('anchor_text', { length: 255 }).notNull(),
     bodySha256: char('body_sha256', { length: 64 }).notNull(),
     path: json('path').$type<string[]>().notNull(),
@@ -106,3 +109,15 @@ export const relationHomeLinks = mysqlTable(
     index('relation_home_links_resolution').on(t.resolutionCheckedAt),
   ],
 );
+
+/** Shared generation prevents an in-flight rebuild reviving an admin-hidden edge. */
+export const relationProjectionState = mysqlTable('relation_projection_state', {
+  id: int('id').primaryKey(),
+  revision: int('revision').notNull().default(0),
+});
+export const relationSnapshots = mysqlTable('relation_snapshots', {
+  days: int('days').primaryKey(),
+  revision: int('revision').notNull(),
+  payload: json('payload').notNull(),
+  generatedAt: datetime('generated_at').notNull(),
+});

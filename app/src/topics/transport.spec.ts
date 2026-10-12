@@ -29,7 +29,7 @@ describe('tag transport isolation and wire budget', () => {
     ])
       expect(() => tagApiOrigin(origin)).toThrow();
     const request = vi.fn<typeof fetch>(async () => Response.json({}));
-    const t = new TagApiTransport(request, { origin: LOCAL_TAG_ORIGIN });
+    const t = new TagApiTransport(request, { readServiceToken: async () => null, origin: LOCAL_TAG_ORIGIN });
     await expect(t.json('//evil.example/api/v1/articles?x', 100, 'tag')).rejects.toThrow();
     await expect(t.json('/internal/similarweb/requests', 100, 'tag')).rejects.toThrow();
     expect(request).not.toHaveBeenCalled();
@@ -41,7 +41,7 @@ describe('tag transport isolation and wire budget', () => {
     const time = clock();
     const request = vi.fn<typeof fetch>(async () => Response.json({ ok: true }));
     const budget = vi.fn(async () => {});
-    const t = new TagApiTransport(request, { origin, ...time, beforeRequest: budget });
+    const t = new TagApiTransport(request, { readServiceToken: async () => null, origin, ...time, beforeRequest: budget });
     await Promise.all([t.json(path, 100, 'tag'), t.json(path, 100, 'tag'), t.json(path, 100, 'tag')]);
     expect(time.sleeps).toEqual([minimum, minimum]);
     expect(budget).toHaveBeenCalledTimes(3);
@@ -60,7 +60,12 @@ describe('tag transport isolation and wire budget', () => {
     const request = vi.fn<typeof fetch>(async () =>
       ++attempts < 3 ? new Response('', { status: 429, headers: { 'Retry-After': '2' } }) : Response.json({ ok: true }),
     );
-    const t = new TagApiTransport(request, { origin: LOCAL_TAG_ORIGIN, ...time, beforeRequest: budget });
+    const t = new TagApiTransport(request, {
+      readServiceToken: async () => null,
+      origin: LOCAL_TAG_ORIGIN,
+      ...time,
+      beforeRequest: budget,
+    });
     expect(await t.json(path, 100, 'tag')).toEqual({ ok: true });
     expect(time.sleeps).toEqual([2000, 2000]);
     expect(budget).toHaveBeenCalledTimes(3);
@@ -71,7 +76,12 @@ describe('tag transport isolation and wire budget', () => {
     const time = clock();
     const request = vi.fn<typeof fetch>(async () => new Response('', { status: 429 }));
     const budget = vi.fn(async () => {});
-    const t = new TagApiTransport(request, { origin: PUBLIC_TAG_ORIGIN, ...time, beforeRequest: budget });
+    const t = new TagApiTransport(request, {
+      readServiceToken: async () => null,
+      origin: PUBLIC_TAG_ORIGIN,
+      ...time,
+      beforeRequest: budget,
+    });
     await expect(t.json(path, 100, 'tag')).rejects.toThrow('429');
     expect(request).toHaveBeenCalledTimes(3);
     expect(budget).toHaveBeenCalledTimes(3);
@@ -82,7 +92,13 @@ describe('tag transport isolation and wire budget', () => {
     const time = clock();
     const persisted = vi.fn(async (_date: Date) => {});
     const request = vi.fn<typeof fetch>(async () => new Response('', { status: 429, headers: { 'Retry-After': '120' } }));
-    const t = new TagApiTransport(request, { origin: LOCAL_TAG_ORIGIN, ...time, deadline: 20000, onRateLimit: persisted });
+    const t = new TagApiTransport(request, {
+      readServiceToken: async () => null,
+      origin: LOCAL_TAG_ORIGIN,
+      ...time,
+      deadline: 20000,
+      onRateLimit: persisted,
+    });
     await expect(t.json(path, 100, 'tag')).rejects.toMatchObject({ retryAt: new Date(120000) });
     expect(request).toHaveBeenCalledTimes(1);
     expect(persisted).toHaveBeenCalledWith(new Date(120000));
@@ -98,7 +114,12 @@ describe('tag transport isolation and wire budget', () => {
       return Response.json({});
     });
     const budget = vi.fn(async () => {});
-    const t = new TagApiTransport(request, { origin: LOCAL_TAG_ORIGIN, ...time, beforeRequest: budget });
+    const t = new TagApiTransport(request, {
+      readServiceToken: async () => null,
+      origin: LOCAL_TAG_ORIGIN,
+      ...time,
+      beforeRequest: budget,
+    });
     await t.json(path, 100, 'tag');
     await t.json(path, 100, 'tag');
     expect(request.mock.calls.map(([url]) => new URL(String(url)).origin)).toEqual([
@@ -112,12 +133,16 @@ describe('tag transport isolation and wire budget', () => {
   });
   it('does not fallback on HTTP failure or arbitrary fetch exception', async () => {
     const request = vi.fn<typeof fetch>(async () => new Response('', { status: 503 }));
-    await expect(new TagApiTransport(request, { origin: LOCAL_TAG_ORIGIN }).json(path, 100, 'tag')).rejects.toThrow('503');
+    await expect(
+      new TagApiTransport(request, { readServiceToken: async () => null, origin: LOCAL_TAG_ORIGIN }).json(path, 100, 'tag'),
+    ).rejects.toThrow('503');
     expect(request).toHaveBeenCalledTimes(1);
     const failure = vi.fn<typeof fetch>(async () => {
       throw Error('bad redirect');
     });
-    await expect(new TagApiTransport(failure, { origin: LOCAL_TAG_ORIGIN }).json(path, 100, 'tag')).rejects.toThrow('bad redirect');
+    await expect(
+      new TagApiTransport(failure, { readServiceToken: async () => null, origin: LOCAL_TAG_ORIGIN }).json(path, 100, 'tag'),
+    ).rejects.toThrow('Tag request failed');
     expect(failure).toHaveBeenCalledTimes(1);
   });
   it('does not send retry when its per-wire reservation fails', async () => {
@@ -125,6 +150,7 @@ describe('tag transport isolation and wire budget', () => {
     let reservations = 0;
     const request = vi.fn<typeof fetch>(async () => new Response('', { status: 429 }));
     const t = new TagApiTransport(request, {
+      readServiceToken: async () => null,
       origin: LOCAL_TAG_ORIGIN,
       ...time,
       beforeRequest: async () => {
@@ -142,9 +168,13 @@ describe('tag transport isolation and wire budget', () => {
       },
       cancel,
     });
-    await expect(new TagApiTransport(async () => new Response(big), { origin: LOCAL_TAG_ORIGIN }).json(path, 100, 'tag')).rejects.toThrow(
-      'byte cap',
-    );
+    await expect(
+      new TagApiTransport(async () => new Response(big), { readServiceToken: async () => null, origin: LOCAL_TAG_ORIGIN }).json(
+        path,
+        100,
+        'tag',
+      ),
+    ).rejects.toThrow('byte cap');
     expect(cancel).toHaveBeenCalledTimes(1);
     const controller = new AbortController();
     const cancelled = vi.fn();
@@ -161,7 +191,11 @@ describe('tag transport isolation and wire budget', () => {
       },
       { highWaterMark: 0 },
     );
-    const t = new TagApiTransport(async () => new Response(hanging), { origin: LOCAL_TAG_ORIGIN, signal: controller.signal });
+    const t = new TagApiTransport(async () => new Response(hanging), {
+      readServiceToken: async () => null,
+      origin: LOCAL_TAG_ORIGIN,
+      signal: controller.signal,
+    });
     const result = t.json(path, 100, 'tag');
     await ready;
     controller.abort();
@@ -185,7 +219,7 @@ describe('tag transport isolation and wire budget', () => {
     let count = 0;
     const time = clock();
     const request = vi.fn<typeof fetch>(async () => (++count === 1 ? new Response(stream) : Response.json({})));
-    const t = new TagApiTransport(request, { origin: LOCAL_TAG_ORIGIN, ...time });
+    const t = new TagApiTransport(request, { readServiceToken: async () => null, origin: LOCAL_TAG_ORIGIN, ...time });
     const first = t.json(path, 100, 'tag');
     const second = t.json(path, 100, 'tag');
     await ready;

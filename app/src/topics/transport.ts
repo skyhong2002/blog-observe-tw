@@ -1,9 +1,11 @@
 import { setTimeout as delay } from 'node:timers/promises';
+import { readTagServiceToken } from './service-token.ts';
 
 export const PUBLIC_TAG_ORIGIN = 'https://tag.observe.tw';
 export const LOCAL_TAG_ORIGIN = 'http://127.0.0.1:18130';
 export type TagTransportOptions = {
   origin?: string;
+  readServiceToken?: () => Promise<string | null>;
   signal?: AbortSignal;
   deadline?: number;
   delayMs?: number;
@@ -15,7 +17,7 @@ export type TagTransportOptions = {
   now?: () => number;
   sleep?: (ms: number, signal?: AbortSignal) => Promise<void>;
 };
-export function tagApiOrigin(value = process.env.BLOG_TAG_API_ORIGIN ?? PUBLIC_TAG_ORIGIN): string {
+export function tagApiOrigin(value = process.env.BLOG_TAG_API_ORIGIN ?? LOCAL_TAG_ORIGIN): string {
   if (value !== PUBLIC_TAG_ORIGIN && value !== LOCAL_TAG_ORIGIN) throw Error('Invalid BLOG_TAG_API_ORIGIN');
   return value;
 }
@@ -45,7 +47,7 @@ const allowedPath = (path: string) =>
     path,
   );
 
-/** Single in-flight response per client, including streamed body and backoff. Never forwards authentication or proxy headers. */
+/** Single in-flight response per client, including streamed body and backoff. Only the fixed public origin receives the dedicated read-only service token; proxy headers are never forwarded. */
 export class TagApiTransport {
   private readonly request: typeof fetch;
   private readonly options: TagTransportOptions;
@@ -54,6 +56,7 @@ export class TagApiTransport {
   private readonly origin: string;
   private activeOrigin: string;
   private tail: Promise<unknown> = Promise.resolve();
+  private serviceToken: Promise<string | null> | undefined;
   private lastRequest: number | null = null;
   readonly diagnostics = { transport: '', requests: 0, fallbacks: 0, retries: 0 };
   constructor(request: typeof fetch = fetch, options: TagTransportOptions = {}) {
@@ -93,6 +96,15 @@ export class TagApiTransport {
       this.assertRunning();
       const spacing = Math.max(this.activeOrigin === LOCAL_TAG_ORIGIN ? 500 : 1100, this.options.delayMs ?? 0);
       if (this.lastRequest !== null) await this.wait(Math.max(0, this.lastRequest + spacing - this.clock()));
+      const headers: Record<string, string> = {
+        Accept: 'application/json',
+        'User-Agent': 'BlogObserve/1.0 (+https://blog.observe.tw/about/; contact https://skyhong.tw/)',
+      };
+      if (this.activeOrigin === PUBLIC_TAG_ORIGIN) {
+        this.serviceToken ??= (this.options.readServiceToken ?? readTagServiceToken)().catch(() => null);
+        const token = await this.serviceToken;
+        if (token) headers['x-service-token'] = token;
+      }
       await this.options.beforeRequest?.();
       this.assertRunning();
       this.lastRequest = this.clock();
@@ -104,10 +116,7 @@ export class TagApiTransport {
         response = await this.request(new URL(path, this.activeOrigin), {
           redirect: 'error',
           signal,
-          headers: {
-            Accept: 'application/json',
-            'User-Agent': 'BlogObserve/1.0 (+https://blog.observe.tw/about/; contact https://skyhong.tw/)',
-          },
+          headers,
         });
       } catch (error) {
         this.assertRunning();
@@ -118,7 +127,7 @@ export class TagApiTransport {
           this.diagnostics.fallbacks++;
           continue;
         }
-        throw error;
+        throw Error('Tag request failed');
       }
       if (response.status === 429) {
         const pause = retryAfterMs(response.headers.get('retry-after'), retries, this.clock());

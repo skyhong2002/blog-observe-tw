@@ -1,8 +1,9 @@
 import { createHash } from 'node:crypto';
 import type { Pool, ResultSetHeader, RowDataPacket } from 'mysql2/promise';
 import { reserveBudget } from '../jobs/budget.ts';
-import { identityKey, type PublicationAlias, publicationHome, resolvePublication } from './identity.ts';
+import { identityKey, type PublicationAlias, publicationDecision, publicationHome, resolvePublication } from './identity.ts';
 import { PARSER_VERSION, type ParsedArticle, type ParsedLink } from './parser.ts';
+import { invalidateRelationCache } from './routes.ts';
 
 export type ArticleRow = {
   id: number;
@@ -14,6 +15,7 @@ export type ArticleRow = {
   etag?: string | null;
   last_modified?: string | null;
   status?: string;
+  parser_version?: string;
 };
 export async function loadAliases(pool: Pool): Promise<PublicationAlias[]> {
   const [rows] = await pool.query<RowDataPacket[]>(`SELECT b.id blogId,b.url FROM blogs b WHERE b.status='verified' AND b.url IS NOT NULL
@@ -64,7 +66,7 @@ export async function saveObservation(pool: Pool, post: ArticleRow, parsed: Pars
         targetPostId = target?.id ?? null;
       }
       await c.query(
-        `INSERT INTO relation_links (source_post_id,source_blog_id,ordinal,target_url,target_blog_id,target_post_id,anchor_text,context,location,observed_at,resolution_checked_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
+        `INSERT INTO relation_links (source_post_id,source_blog_id,ordinal,target_url,target_blog_id,target_post_id,anchor_text,context,location,observed_at,resolution_checked_at,target_reason) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
         [
           post.id,
           post.blog_id,
@@ -77,6 +79,7 @@ export async function saveObservation(pool: Pool, post: ArticleRow, parsed: Pars
           link.location,
           now,
           now,
+          link.targetBlogId ? 'known-publication' : publicationDecision(link.targetUrl).reason,
         ],
       );
     }
@@ -130,8 +133,8 @@ export async function discoverCandidateLinks(pool: Pool, source: DiscoverySource
       ...new Set(
         ['http:', 'https:'].flatMap((scheme) =>
           [host, `www.${host}`].flatMap((name) => [
-            `${scheme}//${name}${h.pathname}`,
-            `${scheme}//${name}${h.pathname.replace(/\/$/, '')}`,
+            `${scheme}//${name}${h.pathname}${h.search}`,
+            `${scheme}//${name}${h.pathname.replace(/\/$/, '')}${h.search}`,
           ]),
         ),
       ),
@@ -216,10 +219,48 @@ export async function reconcileTargets(pool: Pool, aliases: PublicationAlias[], 
       continue;
     }
     await pool.query(
-      `UPDATE relation_links SET target_blog_id=?,resolution_checked_at=?,target_post_id=(SELECT id FROM posts WHERE blog_id=? AND url=? ORDER BY id LIMIT 1) WHERE source_post_id=? AND ordinal=?`,
-      [blogId, now, blogId, row.target_url, row.source_post_id, row.ordinal],
+      `UPDATE relation_links SET target_blog_id=?,resolution_checked_at=?,target_reason=?,target_post_id=(SELECT id FROM posts WHERE blog_id=? AND url=? ORDER BY id LIMIT 1) WHERE source_post_id=? AND ordinal=?`,
+      [
+        blogId,
+        now,
+        blogId ? 'known-publication' : publicationDecision(row.target_url).reason,
+        blogId,
+        row.target_url,
+        row.source_post_id,
+        row.ordinal,
+      ],
     );
     if (blogId) resolved++;
   }
   return resolved;
+}
+
+/** Budget/deadline scheduling is not evidence of a failed website. */
+export async function deferObservation(pool: Pool, post: ArticleRow, now: Date, reason = 'budget-deferred') {
+  const next = new Date(now);
+  next.setUTCHours(24, 0, 0, 0);
+  await pool.query(
+    `INSERT INTO relation_observations(post_id,blog_id,status,parser_version,observed_at,next_attempt_at,published_at,error_code)
+ VALUES (?,?,'deferred',?,?,?,?,?) ON DUPLICATE KEY UPDATE status=IF(status='reparse-pending',status,IF(last_success_at IS NULL,'deferred',IF(body_text IS NULL,'no-body','ok'))),next_attempt_at=VALUES(next_attempt_at),error_code=VALUES(error_code)`,
+    [post.id, post.blog_id, PARSER_VERSION, now, next, post.published_at, reason],
+  );
+}
+/** Explicit repair operation. Never deletes observations/links; a successful v2 crawl replaces each generation. */
+export async function requeueLegacyObservations(pool: Pool, { apply = false, limit = 500 }: { apply?: boolean; limit?: number } = {}) {
+  const [rows] = await pool.query<RowDataPacket[]>(
+    `SELECT post_id FROM relation_observations WHERE parser_version<>? AND (status IN ('ok','no-body') OR error_code='budget-exhausted') ORDER BY post_id LIMIT ?`,
+    [PARSER_VERSION, Math.max(1, Math.min(2000, limit))],
+  );
+  if (apply && rows.length)
+    await pool.query(
+      "UPDATE relation_observations SET status='reparse-pending',etag=NULL,last_modified=NULL,next_attempt_at=UTC_TIMESTAMP(),error_code='parser-upgrade' WHERE post_id IN (?)",
+      [rows.map((r) => r.post_id)],
+    );
+  if (apply && rows.length) await invalidateRelationCache(pool);
+  return {
+    selected: rows.length,
+    applied: apply ? rows.length : 0,
+    postIds: rows.map((r) => Number(r.post_id)),
+    parserVersion: PARSER_VERSION,
+  };
 }

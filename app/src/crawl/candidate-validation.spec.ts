@@ -118,3 +118,27 @@ describe('automatic discovery verification', () => {
     expect(check.eligible).toBe(true);
   });
 });
+
+it('admits exact personal platform homes without collapsing owners or accepting articles', () => {
+  for (const url of [
+    'https://matters.town/@alice',
+    'https://hackmd.io/@bob',
+    'https://substack.com/@ann',
+    'https://note.com/lin',
+    'https://home.gamer.com.tw/homeindex.php?owner=annie',
+  ]) {
+    expect(candidatePreflight({ ...candidate, url })).toBeNull();
+  }
+  for (const url of [
+    'https://note.com/lin/n/abc',
+    'https://matters.town/@alice/post',
+    'https://home.gamer.com.tw/creation.php?owner=annie',
+    'https://home.gamer.com.tw/homeindex.php?owner=annie&x=1',
+  ]) {
+    expect(candidatePreflight({ ...candidate, url })).toBe('needs_publication_home');
+  }
+  expect(candidatePreflight({ ...candidate, url: 'https://reurl.cc/xyz' })).toBe('shortener-unresolved');
+  expect(
+    publicationContains('https://home.gamer.com.tw/creation.php?owner=bob', 'https://home.gamer.com.tw/homeindex.php?owner=alice'),
+  ).toBe(false);
+});

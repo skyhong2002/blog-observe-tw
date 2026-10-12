@@ -4,7 +4,7 @@ import { createHash } from 'node:crypto';
 import Fastify from 'fastify';
 import type { Pool, ResultSetHeader, RowDataPacket } from 'mysql2/promise';
 import { parseArticleLinks } from './parser.ts';
-import { invalidateRelationCache, loadRelationCoverage, loadRelations, registerRelationRoutes } from './routes.ts';
+import { invalidateRelationCache, loadRelationCoverage, loadRelations, readRelationSnapshot, registerRelationRoutes } from './routes.ts';
 import { loadAliases, saveObservation } from './store.ts';
 
 export async function runRelationVisibilityIntegration(pool: Pool) {
@@ -80,17 +80,53 @@ export async function runRelationVisibilityIntegration(pool: Pool) {
           new Date(),
         ],
       );
-      invalidateRelationCache(pool);
+      await invalidateRelationCache(pool);
     };
     const edge = (dto: Awaited<ReturnType<typeof loadRelations>>, source: number, target: number) =>
       dto.edges.find((e) => e.sourceBlogId === source && e.targetBlogId === target);
+    await invalidateRelationCache(pool);
     await registerRelationRoutes(app, pool);
     const baseline = (await app.inject('/api/relations?days=90')).json();
     check(edge(baseline, a, b)?.count === 2 && edge(baseline, a, b)?.share === 2 / 3 && edge(baseline, a, b)?.mutual);
+    // Pause a real SQL snapshot build after its aggregation but before CAS; a hide must win.
+    let release!: () => void, arrived!: () => void;
+    const blocked = new Promise<void>((r) => (release = r)),
+      reached = new Promise<void>((r) => (arrived = r));
+    let intercepted = false;
+    const racingPool = new Proxy(pool, {
+      get(target, key) {
+        if (key === 'query')
+          return async (...args: unknown[]) => {
+            const result = await Reflect.apply(target.query, target, args);
+            if (!intercepted && String(args[0]).startsWith('SELECT l.source_blog_id sourceBlogId')) {
+              intercepted = true;
+              arrived();
+              await blocked;
+            }
+            return result;
+          };
+        const value = Reflect.get(target, key);
+        return typeof value === 'function' ? value.bind(target) : value;
+      },
+    }) as Pool;
+    await pool.query('DELETE FROM relation_snapshots');
+    const racing = readRelationSnapshot(racingPool, 90);
+    await reached;
     await override(postIds[0], bUrl + 'one', 'body', true);
+    release();
+    check(edge(await racing, a, b)?.count === 1);
+    const [[currentSnapshot]] = await pool.query<RowDataPacket[]>('SELECT payload FROM relation_snapshots WHERE days=90');
+    check(
+      edge(typeof currentSnapshot.payload === 'string' ? JSON.parse(currentSnapshot.payload) : currentSnapshot.payload, a, b)?.count === 1,
+    );
+
     const hidden = (await app.inject('/api/relations?days=90')).json();
     check(edge(hidden, a, b)?.count === 1 && edge(hidden, a, b)?.share === 0.5 && edge(hidden, a, c)?.share === 0.5);
     check(hidden.mostMentioned.find((r: { blogId: number; mentions: number }) => r.blogId === b)?.mentions === 1);
+    const incomingProfile = (await app.inject(`/api/blogs/visibility-b-${suffix}/relations`)).json();
+    check(incomingProfile.incoming.find((e: { sourceBlogId: number; share: number }) => e.sourceBlogId === a)?.share === 0.5);
+    const [[snapshot]] = await pool.query<RowDataPacket[]>('SELECT COUNT(*) count FROM relation_snapshots');
+    check(Number(snapshot.count) > 0);
     const profile = (await app.inject(`/api/blogs/visibility-a-${suffix}/relations`)).json();
     check(profile.outgoing.find((e: { targetBlogId: number; share: number }) => e.targetBlogId === b)?.share === 0.5);
     check(!profile.evidence.some((e: { postId: number; targetUrl: string }) => e.postId === postIds[0] && e.targetUrl === bUrl + 'one'));
@@ -126,10 +162,53 @@ export async function runRelationVisibilityIntegration(pool: Pool) {
     // Exact URL case matters, even when the database's default collation is insensitive.
     await override(postIds[0], bUrl + 'ONE', 'body', true);
     check(edge(await loadRelations(pool, 90), a, b)?.count === 2);
+    // Same-key requests single-flight; distinct cold profiles are capped at four SQL builders.
+    let unblock!: () => void, allBlocked!: () => void;
+    let builders = 0;
+    const gate = new Promise<void>((r) => (unblock = r)),
+      four = new Promise<void>((r) => (allBlocked = r));
+    const limitedPool = new Proxy(pool, {
+      get(target, key) {
+        if (key === 'query')
+          return async (...args: unknown[]) => {
+            if (String(args[0]).startsWith('SELECT e.* FROM')) {
+              builders++;
+              if (builders === 4) allBlocked();
+              await gate;
+            }
+            return Reflect.apply(target.query, target, args);
+          };
+        const value = Reflect.get(target, key);
+        return typeof value === 'function' ? value.bind(target) : value;
+      },
+    }) as Pool;
+    const limitedApp = Fastify();
+    await registerRelationRoutes(limitedApp, limitedPool);
+    try {
+      const loads = [
+        ...Array.from({ length: 10 }, () => limitedApp.inject(`/api/blogs/visibility-a-${suffix}/relations?days=7`)),
+        limitedApp.inject(`/api/blogs/visibility-a-${suffix}/relations?days=30`),
+        limitedApp.inject(`/api/blogs/visibility-b-${suffix}/relations?days=7`),
+        limitedApp.inject(`/api/blogs/visibility-b-${suffix}/relations?days=30`),
+      ];
+      // LightMyRequest starts on .then, rather than when the thenable is created.
+      const completion = Promise.all(loads);
+      await four;
+      const overloaded = await limitedApp.inject(`/api/blogs/visibility-c-${suffix}/relations?days=7`);
+      check(overloaded.statusCode === 503 && overloaded.headers['retry-after'] === '2');
+      unblock();
+      const responses = await completion;
+      check(builders === 4 && responses.every((r) => r.statusCode === 200));
+      const repeated = await limitedApp.inject(`/api/blogs/visibility-a-${suffix}/relations?days=7`);
+      check(repeated.statusCode === 200 && builders === 4);
+    } finally {
+      unblock();
+      await limitedApp.close();
+    }
     return { assertions, cacheInvalidation: true, stableFingerprint: true, rawEvidencePreserved: true, ratiosConsistent: true };
   } finally {
     await app.close();
-    invalidateRelationCache(pool);
+    await invalidateRelationCache(pool);
     if (postIds.length) {
       await pool.query('DELETE FROM admin_relation_overrides WHERE source_post_id IN (?)', [postIds]);
       await pool.query('DELETE FROM relation_links WHERE source_post_id IN (?)', [postIds]);

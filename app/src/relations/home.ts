@@ -5,15 +5,17 @@ import { politeFetch } from '../crawl/feed.ts';
 import { reserveBudget } from '../jobs/budget.ts';
 import type { BatchOptions, BatchResult } from '../jobs/contracts.ts';
 import { withJobLease } from '../jobs/lease.ts';
-import { normalizeLink, type PublicationAlias, publicationHome, resolvePublication } from './identity.ts';
+import { identityKey, normalizeLink, type PublicationAlias, publicationDecision, publicationHome, resolvePublication } from './identity.ts';
 import type { ParsedLink } from './parser.ts';
+import { invalidateRelationCache } from './routes.ts';
 import { discoverCandidateLinks, loadAliases } from './store.ts';
-import { budgetedRelationFetcher, relationFailureCode } from './worker.ts';
+import { budgetedRelationFetcher, relationBudgetAvailable, relationFailureCode } from './worker.ts';
 
 const MARKER = /blogroll|部落卷|部落格卷|部落圈|友站|友情連結|友情链接|推薦部落格|推荐博客/i;
-const REGIONS = '[id*="blogroll" i],[class*="blogroll" i],[id*="linkcat" i]';
-const COMMENTS = '[id*="comment" i],[class*="comment" i]';
-const EXCLUDED = `${COMMENTS},nav,header,footer,form`;
+const REGIONS = '#blogroll,.blogroll,.blogroll-links,.linkcat,[id^="linkcat-"]';
+const COMMENTS =
+  '#comments,#respond,[id^="comment-"],.comment,.comments,.comment-list,.commentlist,.comment-body,.comment-content,[role="comment"]';
+const EXCLUDED = `${COMMENTS},nav,header,footer,form,.sharedaddy,.jp-relatedposts,.yarpp,.addtoany,.post-tags,.tagcloud`;
 const trim = (s: string, max: number) => Array.from(s.replace(/\s+/g, ' ').trim()).slice(0, max).join('');
 export type HomeDiscovery = { links: ParsedLink[]; childUrl: string | null; truncated: boolean; confirmed: boolean; bodySha256: string };
 
@@ -53,7 +55,7 @@ export function parsePublicationBlogroll(
     let primary = $('main,.entry-content,.post-content,[itemprop="articleBody"]');
     if (!primary.length) primary = $('article');
     primary.find('a[href]').each((_, el) => {
-      if (!$(el).closest(`${EXCLUDED},aside,[class*="sidebar" i],[id*="sidebar" i]`).length) selected.add(el);
+      if (!$(el).closest(`${EXCLUDED},aside,.sidebar,#sidebar,.widget-area,.site-sidebar,[role="complementary"]`).length) selected.add(el);
     });
   }
   const links: ParsedLink[] = [];
@@ -66,7 +68,8 @@ export function parsePublicationBlogroll(
     if (targetBlogId === blogId) continue;
     if (new URL(targetUrl).origin === new URL(pageUrl).origin && targetBlogId === null) {
       const home = publicationHome(targetUrl);
-      if (!home || resolvePublication(home, aliases) === blogId) continue;
+      const sourceHome = publicationHome(pageUrl);
+      if (!home || (sourceHome && identityKey(home) === identityKey(sourceHome)) || resolvePublication(home, aliases) === blogId) continue;
     }
     if (seen.has(targetUrl)) continue;
     seen.add(targetUrl);
@@ -117,8 +120,8 @@ export async function saveHomeSweep(
       for (const l of page.parsed.links)
         await c.query(
           `INSERT INTO relation_home_links
-        (blog_id,source_page_hash,ordinal,source_page_url,target_url,target_blog_id,anchor_text,body_sha256,path,observed_at,resolution_checked_at)
-        VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
+        (blog_id,source_page_hash,ordinal,source_page_url,target_url,target_blog_id,anchor_text,body_sha256,path,observed_at,resolution_checked_at,target_reason)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
           [
             blogId,
             hashes[i],
@@ -131,6 +134,7 @@ export async function saveHomeSweep(
             JSON.stringify([...page.path, l.targetUrl]),
             now,
             now,
+            l.targetBlogId ? 'known-publication' : publicationDecision(l.targetUrl).reason,
           ],
         );
     }
@@ -179,8 +183,8 @@ async function reconcileHomeTargets(pool: Pool, aliases: PublicationAlias[], now
       ]);
     else
       await pool.query(
-        'UPDATE relation_home_links SET target_blog_id=?,resolution_checked_at=? WHERE blog_id=? AND source_page_hash=? AND ordinal=?',
-        [target, now, r.blog_id, r.source_page_hash, r.ordinal],
+        'UPDATE relation_home_links SET target_blog_id=?,resolution_checked_at=?,target_reason=? WHERE blog_id=? AND source_page_hash=? AND ordinal=?',
+        [target, now, target ? 'known-publication' : publicationDecision(r.target_url).reason, r.blog_id, r.source_page_hash, r.ordinal],
       );
   }
 }
@@ -208,6 +212,11 @@ export async function runPublicationDiscoveryBatch(pool: Pool, options: BatchOpt
           break;
         }
         await assertLease();
+        if (!(await relationBudgetAvailable(pool, blog.url, now()))) {
+          await deferHomeScan(pool, blog.id, now());
+          result.skipped++;
+          continue;
+        }
         if (!(await reserveBudget(pool, [{ scope: 'relations:homes', amount: 1, limit: 10 }], now()))) {
           result.truncated = true;
           break;
@@ -293,11 +302,23 @@ export async function runPublicationDiscoveryBatch(pool: Pool, options: BatchOpt
         } catch (error) {
           await assertLease();
           const reason = fetcher.lastFailure || relationFailureCode(error);
-          await retainPartialHomeSweep(pool, blog.id, homeSucceeded, reason, now());
+          if (/budget|batch-stopped/.test(reason)) await deferHomeScan(pool, blog.id, now());
+          else await retainPartialHomeSweep(pool, blog.id, homeSucceeded, reason, now());
           result.skipped++;
         }
       }
+      if (result.processed) await invalidateRelationCache(pool);
       return result;
     })) ?? { ...empty, skipped: 1 }
+  );
+}
+
+async function deferHomeScan(pool: Pool, blogId: number, now: Date) {
+  const next = new Date(now);
+  next.setUTCHours(24, 0, 0, 0);
+  await pool.query(
+    `INSERT INTO relation_home_scans (blog_id,status,observed_at,next_attempt_at,error_code)
+    VALUES (?,'deferred',?,?,'budget-deferred') ON DUPLICATE KEY UPDATE next_attempt_at=VALUES(next_attempt_at),error_code=VALUES(error_code),status=IF(last_success_at IS NULL,'deferred',status)`,
+    [blogId, now, next],
   );
 }

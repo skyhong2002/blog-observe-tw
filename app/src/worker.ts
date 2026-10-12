@@ -12,6 +12,7 @@ import { createHistoryStore, selectHistoryBlogs } from './crawl/history-store.ts
 import { createTagSimilarSitesClient } from './crawl/similarweb-client.ts';
 import { createDb } from './db/client.ts';
 import { runPublicationDiscoveryBatch } from './relations/home.ts';
+import { runRelationSnapshotBatch } from './relations/routes.ts';
 import { runRelationBatch } from './relations/worker.ts';
 import { runTopicsBatch } from './topics/batch.ts';
 import { syncVocabulary } from './topics/sync.ts';
@@ -49,6 +50,7 @@ const vocabularyEnabled = process.env.BLOG_VOCABULARY_ENABLED === 'true';
 const shutdown = new AbortController();
 const missingIconsEnabled = process.env.BLOG_MISSING_FAVICONS_ENABLED !== 'false';
 for (const [name, every, enabled] of [
+  ['blogs-relation-snapshots', 5 * 60_000, process.env.BLOG_RELATION_SNAPSHOTS_ENABLED !== 'false'],
   ['blogs-relations', 5 * 60_000, relationsEnabled],
   ['blogs-publication-discovery', 30 * 60_000, relationsEnabled],
   ['blogs-ai', 60 * 60_000, aiEnabled],
@@ -74,6 +76,7 @@ const worker = new Worker(
       userAgent: config.crawlUserAgent,
       delayMs: config.crawlDelayMs,
     };
+    if (job.name === 'blogs-relation-snapshots') return runRelationSnapshotBatch(store.pool, batchOptions);
     if (job.name === 'blogs-publication-discovery')
       return relationsEnabled ? runPublicationDiscoveryBatch(store.pool, batchOptions) : { skipped: 'disabled' };
     if (job.name === 'blogs-relations') return relationsEnabled ? runRelationBatch(store.pool, batchOptions) : { skipped: 'disabled' };

@@ -1,11 +1,12 @@
 import { XMLParser, XMLValidator } from 'fast-xml-parser';
 import { type PersonalEvidence, personalHomepage } from '../ai/personal.ts';
 import { type SitemapArticleEvidence, verifyArticleSitemap } from '../ai/publication-sitemap.ts';
+import { identityKey, publicationDecision } from '../relations/identity.ts';
 import { type FeedCrawlerOptions, isAllowedCrawlUrl, parseFeed, politeFetch, readFeedBody } from './feed.ts';
 import { seedIdentityKey } from './seed-url-resolution.ts';
 import { isSeedPlatformRoot, type SeedUrlValidation, validateSeedUrl } from './seed-url-validation.ts';
 
-export const CANDIDATE_POLICY = 'personal-rss-publication-v2';
+export const CANDIDATE_POLICY = 'personal-rss-publication-v3-ownership';
 export type DiscoveryCandidate = {
   id: number;
   url: string;
@@ -68,14 +69,25 @@ export function candidatePreflight(candidate: DiscoveryCandidate): string | null
   const u = new URL(candidate.url);
   const host = u.hostname.replace(/^www\./, '');
   if (nonPublications.some((h) => host === h || host.endsWith(`.${h}`))) return 'not_a_blog_publication';
-  if (isSeedPlatformRoot(candidate.url) || (platforms.has(host) && u.pathname === '/')) return 'platform_root';
-  // Never turn a contributed article, category, product or arbitrary path into a new publication.
-  if (host === 'medium.com') {
-    if (!/^\/(?:@[\w.-]+|[\w-]+)\/?$/.test(u.pathname)) return 'needs_publication_home';
-  } else if (host === 'vocus.cc') {
-    if (!/^\/(?:salon|user)\/[^/]+\/?$/.test(u.pathname)) return 'needs_publication_home';
-  } else if (!/^\/(?:blog\/?|blogs\/?)?$/.test(u.pathname)) return 'needs_publication_home';
-  if (u.search) return 'needs_publication_home';
+  const decision = publicationDecision(candidate.url);
+  if (!decision.home)
+    return decision.reason === 'shortener-unresolved'
+      ? decision.reason
+      : decision.reason === 'platform-root'
+        ? 'platform_root'
+        : 'not_a_blog_publication';
+  // Platform owner homes are exact; article URLs and arbitrary query strings must not be admitted.
+  const home = new URL(decision.home);
+  const platformPath = home.pathname !== '/' || home.search;
+  if (!platformPath && (isSeedPlatformRoot(candidate.url) || (platforms.has(host) && u.pathname === '/'))) return 'platform_root';
+  if (platformPath) {
+    if (
+      identityKey(candidate.url) !== identityKey(decision.home) ||
+      u.pathname.replace(/\/$/, '') !== home.pathname.replace(/\/$/, '') ||
+      u.search !== home.search
+    )
+      return 'needs_publication_home';
+  } else if (!/^\/(?:blog\/?|blogs\/?)?$/.test(u.pathname) || u.search) return 'needs_publication_home';
   if (!candidate.name?.trim()) return 'missing_identity_name';
   return null;
 }
@@ -111,6 +123,8 @@ export function publicationContains(value: string, home: string): boolean {
     const v = new URL(value),
       h = new URL(home);
     if (v.hostname.replace(/^www\./, '') !== h.hostname.replace(/^www\./, '')) return false;
+    if (h.hostname === 'home.gamer.com.tw')
+      return Boolean(h.searchParams.get('owner')) && v.searchParams.get('owner') === h.searchParams.get('owner');
     const path = h.pathname.replace(/\/$/, '');
     return !path || v.pathname === path || v.pathname.startsWith(`${path}/`);
   } catch {
