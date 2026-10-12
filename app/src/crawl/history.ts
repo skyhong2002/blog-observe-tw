@@ -1,4 +1,4 @@
-import { type BlogToCrawl, canonicalArticleUrl, parseSitemapArticle, politeFetch, readFeedBody } from './feed.ts';
+import { type BlogToCrawl, canonicalArticleUrl, isNonSyndicationSource, parseSitemapArticle, politeFetch, readFeedBody } from './feed.ts';
 import {
   historyInPublication,
   historySourceInScope,
@@ -28,7 +28,67 @@ const empty = (warnings: string[] = []): HistoryPageResult => ({ tasks: [], entr
 function blocked(reason: string, retryMs = 6 * 60 * 60 * 1000) {
   return Object.assign(new Error(reason), { retryMs });
 }
+/** Persist only fixed categories/known SQL codes: never URLs, response bodies or DB error text. */
+export function historyFailureReason(error: unknown): string {
+  const err =
+    error && typeof error === 'object'
+      ? (error as { name?: string; message?: string; code?: string; cause?: { code?: string }; sqlState?: string })
+      : {};
+  const message = typeof err.message === 'string' ? err.message : '';
+  const code = typeof err.code === 'string' ? err.code : typeof err.cause?.code === 'string' ? err.cause.code : '';
+  if (code === 'HISTORY_LIMIT') return 'history_total_limit';
+  if (/^robots disallow(?:\s|$)/i.test(message) || message === 'history_robots_denied') return 'history_robots_denied';
+  if (/^history_http_[1-5][0-9]{2}$/.test(message)) return message;
+  const knownReasons = new Set([
+    'history_source_ownership_changed',
+    'history_blog_identity_changed',
+    'history_task_changed',
+    'history_task_missing',
+    'history_entry_missing',
+    'history_entry_identity_changed',
+    'history_redirect_outside_publication',
+    'history_pagination_metadata_invalid',
+    'history_entry_outside_publication',
+    'history_child_source_changed',
+  ]);
+  if (knownReasons.has(message)) return message;
+  if (
+    ['TimeoutError', 'AbortError'].includes(err.name || '') ||
+    ['ETIMEDOUT', 'UND_ERR_CONNECT_TIMEOUT', 'UND_ERR_HEADERS_TIMEOUT', 'UND_ERR_BODY_TIMEOUT'].includes(code)
+  )
+    return 'history_timeout';
+  if (/response exceeds|body.*limit/i.test(message) || code === 'ERR_BUFFER_TOO_LARGE') return 'history_body_limit';
+  if (message === 'invalid_xml_source') return 'history_invalid_xml';
+  if (err.name === 'SyntaxError' || message === 'invalid_wordpress_source') return 'history_invalid_json';
+  if (message === 'invalid gzip feed response') return 'history_invalid_gzip';
+  const sqlCodes = new Set([
+    'ER_DATA_TOO_LONG',
+    'ER_LOCK_DEADLOCK',
+    'ER_LOCK_WAIT_TIMEOUT',
+    'ER_DUP_ENTRY',
+    'ER_BAD_FIELD_ERROR',
+    'ER_NO_SUCH_TABLE',
+    'ER_PARSE_ERROR',
+    'ER_WARN_DATA_OUT_OF_RANGE',
+    'ER_TRUNCATED_WRONG_VALUE',
+    'ER_TRUNCATED_WRONG_VALUE_FOR_FIELD',
+    'ER_NO_REFERENCED_ROW_2',
+    'ER_CON_COUNT_ERROR',
+    'ER_SERVER_SHUTDOWN',
+  ]);
+  if (sqlCodes.has(code)) return `history_sql_${code.toLowerCase()}`;
+  if (code.startsWith('ER_') || typeof err.sqlState === 'string') return 'history_sql_error';
+  if (['ENOTFOUND', 'EAI_AGAIN'].includes(code)) return 'history_dns_error';
+  if (['ECONNREFUSED', 'ECONNRESET', 'EPIPE', 'UND_ERR_SOCKET', 'PROTOCOL_CONNECTION_LOST'].includes(code))
+    return 'history_connection_error';
+  if (/unsafe crawl (?:URL|address)|target does not match validated DNS/i.test(message)) return 'history_unsafe_target';
+  if (/too many redirects/i.test(message)) return 'history_redirect_limit';
+  return 'history_fetch_or_write_failed';
+}
+
 async function readTask(task: HistoryTask, blog: BlogToCrawl, options: HistoryOptions): Promise<HistoryPageResult> {
+  if (['feed', 'sitemap', 'wordpress'].includes(task.kind) && isNonSyndicationSource(task.url))
+    return { ...empty(['non-syndication-source']), fetched: false };
   if (task.kind === 'entry') {
     if (!task.payload?.entry) throw new Error('history_entry_missing');
     const entry = restoreEntry(task.payload.entry);
@@ -138,15 +198,8 @@ export async function runHistoryBatch(
       } catch (error) {
         const code = (error as { code?: string }).code;
         const limited = code === 'HISTORY_LIMIT';
-        const message = error instanceof Error ? error.message : '';
-        const reason = limited
-          ? 'history_total_limit'
-          : /robots/i.test(message)
-            ? 'history_robots_denied'
-            : /^history_[a-z_0-9]+$/.test(message)
-              ? message
-              : 'history_fetch_or_write_failed';
-        const policyBlock = /robots/i.test(message) || /^history_http_(401|403|429)$/.test(message);
+        const reason = historyFailureReason(error);
+        const policyBlock = reason === 'history_robots_denied' || /^history_http_(401|403|429)$/.test(reason);
         if (!limited && !policyBlock && (await store.failTask(blog, task, reason, now()))) {
           if (task.kind === 'article' || task.kind === 'entry') articles++;
           else pages++;

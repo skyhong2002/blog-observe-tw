@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { FeedEntry, FeedFetcher } from './feed.ts';
-import { runHistoryBatch } from './history.ts';
+import { historyFailureReason, runHistoryBatch } from './history.ts';
 import { historyTaskKey, storedEntry } from './history-parse.ts';
 import type { HistoryPageResult, HistoryRun, HistoryStore, HistoryTask, HistoryTaskInput } from './history-types.ts';
 
@@ -241,4 +241,35 @@ describe('history failed-task recovery', () => {
       ).status,
     ).toBe('exhausted');
   });
+});
+
+it('retires already-persisted oEmbed tasks without HTTP and proceeds to other work', async () => {
+  const embed = `${blog.url}wp-json/oembed/1.0/embed?url=post&format=xml`;
+  const m = memory([input(embed, 'feed'), { ...input(entry(8).url, 'entry'), payload: { entry: storedEntry(entry(8)) } }]);
+  const fetcher = vi.fn<FeedFetcher>();
+  expect((await runHistoryBatch(m.store, blog, options(fetcher))).status).toBe('exhausted');
+  expect(fetcher).not.toHaveBeenCalled();
+  expect(m.posts).toHaveLength(1);
+  expect([...m.tasks.values()][0].status).toBe('done');
+  expect(m.run.warnings).toContain('non-syndication-source');
+});
+
+it('classifies failures without persisting private URLs, SQL messages or arbitrary codes', () => {
+  const secret = 'private-token-value';
+  const cases: Array<[unknown, string]> = [
+    [Object.assign(new Error(secret), { name: 'TimeoutError' }), 'history_timeout'],
+    [Object.assign(new Error(secret), { cause: { code: 'UND_ERR_BODY_TIMEOUT' } }), 'history_timeout'],
+    [new Error(`crawl response exceeds 5242880 bytes ${secret}`), 'history_body_limit'],
+    [new Error('invalid_xml_source'), 'history_invalid_xml'],
+    [new SyntaxError(`Unexpected token ${secret}`), 'history_invalid_json'],
+    [Object.assign(new Error(`INSERT secret ${secret}`), { code: 'ER_DATA_TOO_LONG' }), 'history_sql_er_data_too_long'],
+    [Object.assign(new Error(secret), { code: `ER_${secret}`, sqlState: '45000' }), 'history_sql_error'],
+    [Object.assign(new Error(secret), { cause: { code: 'ECONNRESET' } }), 'history_connection_error'],
+    [new Error(`unsafe crawl address: ${secret}`), 'history_unsafe_target'],
+    [new Error(`history_${secret}`), 'history_fetch_or_write_failed'],
+  ];
+  for (const [error, expected] of cases) {
+    expect(historyFailureReason(error)).toBe(expected);
+    expect(historyFailureReason(error)).not.toContain(secret);
+  }
 });

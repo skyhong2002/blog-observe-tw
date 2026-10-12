@@ -135,3 +135,52 @@ it('records deleted-source terminal failure without rechecking removed ownership
   expect(calls.find(([sql]) => sql.startsWith('UPDATE history_runs'))?.[1][0]).toContain('failed-task:history_source_ownership_changed');
   await store.release();
 });
+
+it('initializes only real syndication sources from legacy feed_sources rows', async () => {
+  const lease = { query: vi.fn(async () => [[{ acquired: 1, held: 1, released: 1 }], []]), release: vi.fn(), destroy: vi.fn() };
+  const query = vi.fn(async (sql: string, _values?: unknown[]): Promise<[Array<Record<string, unknown>>, unknown[]]> => {
+    if (sql.startsWith('SELECT id,url,status')) return [[{ id: blog.id, url: blog.url, status: 'verified' }], []];
+    if (sql.startsWith('SELECT url,type FROM feed_sources'))
+      return [
+        [
+          { url: `${blog.url}wp-json/oembed/1.0/embed?format=xml`, type: 'rss' },
+          { url: `${blog.url}official.xml`, type: 'rss' },
+        ],
+        [],
+      ];
+    if (sql.startsWith('SELECT COUNT')) return [[{ total: 0 }], []];
+    if (sql.startsWith('SELECT * FROM history_runs') && !sql.includes('FOR UPDATE'))
+      return [
+        [
+          {
+            blog_id: blog.id,
+            status: 'partial',
+            warnings: '[]',
+            pages_fetched: 0,
+            articles_written: 0,
+            tasks_total: 2,
+            tasks_done: 0,
+            archive_seen: false,
+          },
+        ],
+        [],
+      ];
+    return [[], []];
+  });
+  const connection = {
+    query,
+    execute: vi.fn(async () => [{ affectedRows: 1 }, []]),
+    beginTransaction: vi.fn(),
+    commit: vi.fn(),
+    rollback: vi.fn(),
+    release: vi.fn(),
+  };
+  const pool = { getConnection: vi.fn().mockResolvedValueOnce(lease).mockResolvedValue(connection) } as unknown as Pool;
+  const store = createHistoryStore(pool);
+  await store.acquire();
+  await store.initialize(blog, caps, new Date());
+  const values = query.mock.calls.find(([sql]) => sql.startsWith('INSERT INTO history_tasks'))?.[1];
+  expect(values).toContain(`${blog.url}official.xml`);
+  expect(values?.some((value) => typeof value === 'string' && value.includes('/oembed/'))).toBe(false);
+  await store.release();
+});

@@ -398,6 +398,17 @@ export async function politeFetch(
   throw new Error(`too many redirects from ${value}`);
 }
 
+/** oEmbed XML describes an embed, never an RSS/Atom publication. */
+export function isNonSyndicationSource(value: string, mime = ''): boolean {
+  if (/oembed/i.test(mime)) return true;
+  try {
+    const url = new URL(value);
+    return /(?:^|\/)oembed(?:\/|$)/i.test(url.pathname) || /(?:^|\/)oembed(?:\/|$)/i.test(url.searchParams.get('rest_route') || '');
+  } catch {
+    return true;
+  }
+}
+
 function discoverLinks(html: string, baseUrl: string): FeedLink[] {
   const $ = cheerio.load(html);
   const links: FeedLink[] = [];
@@ -405,7 +416,7 @@ function discoverLinks(html: string, baseUrl: string): FeedLink[] {
     const href = $(element).attr('href');
     const type = ($(element).attr('type') || '').toLowerCase();
     const url = absolute(href, baseUrl);
-    if (url && (type.includes('rss') || type.includes('atom') || type.includes('xml'))) {
+    if (url && !isNonSyndicationSource(url, type) && (type.includes('rss') || type.includes('atom') || type.includes('xml'))) {
       links.push({ url, type: type.includes('atom') ? 'atom' : 'rss' });
     }
   });
@@ -780,7 +791,9 @@ export async function crawlBlog(
       [blog.id],
     );
     const known = Array.isArray(registered) ? (registered as FeedLink[]) : [];
-    const valid = known.filter((source) => ['rss', 'atom', 'sitemap'].includes(source.type) && isAllowedCrawlUrl(source.url));
+    const valid = known.filter(
+      (source) => ['rss', 'atom', 'sitemap'].includes(source.type) && isAllowedCrawlUrl(source.url) && !isNonSyndicationSource(source.url),
+    );
     const sitemaps = new Map(valid.filter((source) => source.type === 'sitemap').map((source) => [source.url, source]));
     // Older miscellaneous sources remain recorded, but cannot exhaust the page
     // budget before a newly verified article partition is visited.

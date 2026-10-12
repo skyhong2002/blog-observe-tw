@@ -3,9 +3,11 @@ import { gzipSync } from 'node:zlib';
 import { type Agent, fetch as undiciFetch } from 'undici';
 import { describe, expect, it, vi } from 'vitest';
 import {
+  discoverFeedUrls,
   type FeedFetcher,
   isAllowedCrawlUrl,
   isBlockedAddress,
+  isNonSyndicationSource,
   MAX_RESPONSE_BYTES,
   parseFeed,
   parseSitemap,
@@ -377,4 +379,15 @@ it('reserves distinct host slots before concurrent requests yield', async () => 
   expect(received).toHaveLength(3);
   expect(received[1] - received[0]).toBeGreaterThanOrEqual(200);
   expect(received[2] - received[1]).toBeGreaterThanOrEqual(200);
+});
+
+it('excludes XML/JSON oEmbed discovery while preserving legitimate application/xml feeds', async () => {
+  const base = 'https://oembed-discovery.test/';
+  const html =
+    '<link rel="alternate" type="application/json+oembed" href="/wp-json/oembed/1.0/embed?url=x"><link rel="alternate" type="text/xml+oembed" href="/embed.xml"><link rel="alternate" type="application/xml" href="/official-feed.xml"><link rel="alternate" type="application/xml" href="/?rest_route=%2Foembed%2F1.0%2Fembed">';
+  const fetcher: FeedFetcher = async (input) => (String(input).endsWith('/robots.txt') ? new Response('') : new Response(html));
+  const links = await discoverFeedUrls(base, { fetcher, resolveHost: async () => ['93.184.216.34'], delayMs: 250 });
+  expect(links).toContainEqual({ url: `${base}official-feed.xml`, type: 'rss' });
+  expect(links.some((link) => /embed|rest_route/.test(new URL(link.url).pathname + new URL(link.url).search))).toBe(false);
+  expect(isNonSyndicationSource(`${base}wp-json/oembed/1.0/embed?format=xml`)).toBe(true);
 });

@@ -172,3 +172,13 @@ it('rejects invalid WordPress pagination counts and omits homepage comments feed
   );
   expect(home.tasks.filter((item) => item.kind === 'feed').map((item) => item.url)).toEqual(['https://history.test/feed/']);
 });
+
+it('does not enqueue oEmbed alternatives as history feeds', () => {
+  const home = parseHistoryHome(
+    '<link rel="alternate" type="text/xml+oembed" href="/custom-embed.xml"><link rel="alternate" type="application/json+oembed" href="/wp-json/oembed/1.0/embed"><link rel="alternate" type="application/xml" href="/real.xml">',
+    task,
+    blog,
+    blog.url,
+  );
+  expect(home.tasks.filter((item) => item.kind === 'feed').map((item) => item.url)).toEqual(['https://history.test/real.xml']);
+});

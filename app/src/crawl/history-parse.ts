@@ -7,6 +7,7 @@ import {
   type FeedEntry,
   isAllowedCrawlUrl,
   isCommentsFeed,
+  isNonSyndicationSource,
   parseFeed,
   parseSitemap,
   rankedSitemapUrls,
@@ -227,12 +228,18 @@ export function parseHistoryHome(html: string, task: HistoryTask, blog: BlogToCr
   const tasks: HistoryTaskInput[] = [];
   const add = (raw: string, kind: HistoryTaskInput['kind'], optional = true) => {
     const url = absolute(raw, finalUrl);
-    if (url && !isCommentsFeed(url) && historyInPublication(url, blog.url) && !tasks.some((other) => other.url === url))
+    if (
+      url &&
+      !isCommentsFeed(url) &&
+      !isNonSyndicationSource(url) &&
+      historyInPublication(url, blog.url) &&
+      !tasks.some((other) => other.url === url)
+    )
       tasks.push(child(task, url, kind, { optional }));
   };
   $('link[rel~="alternate"]').each((_, element) => {
     const type = $(element).attr('type') || '';
-    if (/rss|atom|xml/i.test(type)) add($(element).attr('href') || '', 'feed');
+    if (/rss|atom|xml/i.test(type) && !/oembed/i.test(type)) add($(element).attr('href') || '', 'feed');
   });
   const platform = sharedHosts.has(new URL(blog.url).hostname.replace(/^www\./, ''));
   const prefix = platform ? `${new URL(blog.url).pathname.replace(/\/$/, '')}/` : '/';

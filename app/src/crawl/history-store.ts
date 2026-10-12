@@ -1,5 +1,5 @@
 import type { Pool, PoolConnection, RowDataPacket } from 'mysql2/promise';
-import { type BlogToCrawl, isAllowedCrawlUrl, writeFeedEntries } from './feed.ts';
+import { type BlogToCrawl, isAllowedCrawlUrl, isNonSyndicationSource, writeFeedEntries } from './feed.ts';
 import { historyInPublication, historySourceInScope, historyTaskKey } from './history-parse.ts';
 import type { HistoryRun, HistoryStore, HistoryTask, HistoryTaskInput } from './history-types.ts';
 
@@ -199,7 +199,7 @@ export function createHistoryStore(pool: Pool): HistoryStore {
         );
         const tasks: HistoryTaskInput[] = [{ url: blog.url, kind: 'home', sourceUrl: blog.url, sourceType: 'rss', depth: 0 }];
         for (const feed of feeds)
-          if (['rss', 'atom', 'sitemap'].includes(feed.type))
+          if (['rss', 'atom', 'sitemap'].includes(feed.type) && !isNonSyndicationSource(feed.url))
             tasks.push({
               url: feed.url,
               kind: feed.type === 'sitemap' ? 'sitemap' : 'feed',
