@@ -6,7 +6,7 @@ import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 const MiB = 1024 ** 2;
-export const LIMITS = Object.freeze({ images: 4, bytes: 50 * MiB, reserve: 111.5 * 1024 ** 3 + 512 * MiB, load: 12, delay: 5000 });
+export const LIMITS = Object.freeze({ images: 4, bytes: 50 * MiB, reserve: 112.5 * 1024 ** 3 + 512 * MiB, load: 12, delay: 5000 });
 const analyticsRoots = ['google-analytics.com', 'googletagmanager.com', 'doubleclick.net', 'googleadservices.com', 'googlesyndication.com'];
 export function requestDecision(raw, targetOrigin) {
   try {
@@ -133,7 +133,11 @@ export async function capture(config, deps) {
   return report;
 }
 async function main() {
-  const args = process.argv.slice(2), file = args.find(arg => !arg.startsWith('--'));
+  const args = process.argv.slice(2);
+  // Operator freeze: do not even load a plan/module or create an artifact directory.
+  // Remove only after the user explicitly lifts the capture stop; free space alone is not authorization.
+  if (args.includes('--capture')) throw Error('capture_paused_by_operator');
+  const file = args.find(arg => !arg.startsWith('--'));
   if (!file) throw Error('usage: node tools/ui-capture.mjs plan.json [--capture]');
   const config = JSON.parse(await readFile(file, 'utf8')), batch = plan(config);
   if (!args.includes('--capture')) { console.log(JSON.stringify({ mode: 'dry-plan', images: batch.pages.length, estimatedBytes: batch.estimatedBytes, requiredFreeBytes: LIMITS.reserve + batch.estimatedBytes, viewport: '1280/390 × 900', network: false, globalQuotaProviderRequired: true })); return; }
@@ -148,4 +152,4 @@ async function main() {
   const report = await capture(config, { now: () => new Date().toISOString(), gate: snapshotGate, ttfb: formalTTFB, acquireGlobalQuota: () => quota.acquire({ maxBrowsers: 2 }), launch: () => chromium.launch({ headless: true }), sleep: ms => new Promise(resolve => setTimeout(resolve, ms)), saveImage: (name, data) => writeFile(resolve(artifactDir, name), data, { flag: 'wx', mode: 0o600 }), saveReport: report => writeFile(resolve(artifactDir, 'capture-report.json'), JSON.stringify(report, null, 2), { flag: 'wx', mode: 0o600 }) });
   if (report.error) process.exitCode = 1;
 }
-if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) main().catch(() => { console.error('ui_capture_refused'); process.exitCode = 1; });
+if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) main().catch(error => { console.error(error.message === 'capture_paused_by_operator' ? 'capture_paused_by_operator' : 'ui_capture_refused'); process.exitCode = 1; });

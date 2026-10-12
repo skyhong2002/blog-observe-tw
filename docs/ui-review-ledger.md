@@ -234,3 +234,8 @@ GPT-6.1 Sol 再逐張讀取36張既有blog/tag圖，九個畫面狀態：authors
 六case均issues-found，四route由pending改為issues；互動、深色、未截到的內容仍待驗。所有圖片來自已存在檔案，未產生新capture。A的部分tag參考capture時間／HTTP狀態未保留則明列unknown，不能由畫面猜200。協調agent的模型與真正image reviewer分開記錄，不冒充指定模型。
 
 本輪合計 **76張實際圖片輸入（blog40／tag36）**，兩批GPT-6.1 Sol與一批Opus；覆蓋15個不同route的部分靜態狀態，並非15個整頁pass。權威盤點維持24項，最新 **pass0／fixed3／issues8／pending11／n/a-ui2**；fixed只表示先前指定修正已驗，不等於該route所有狀態通過。
+
+
+### 最新操作限制：全部新增 capture 停止
+
+使用者回報 `/home` 107.80GiB，已低於112.5GiB截圖停止線。本限制取代先前「門檻符合即可新capture」的操作條件：只允許既有圖的離線review與不產生建置產物的小型程式碼／文件修正。禁止新截圖、capture、建置、匯出與大型寫入，不刪檔、不碰tag-backup；空間回升不會自動解除。capture CLI已在讀計畫／載入Playwright／建立artifact目錄之前無條件拒絕`--capture`。純函式與mock用於離線驗證，不是實際瀏覽器執行權限。

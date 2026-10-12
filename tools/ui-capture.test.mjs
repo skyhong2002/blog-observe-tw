@@ -78,3 +78,14 @@ test('report omits request query, headers and credentials', async () => {
   const m = mocks(); const r = await capture({ ...config, pages: [{ path: '/topics/test/?q=private-value', width: 390 }] }, m.deps);
   assert.equal(r.pages[0].pathname, '/topics/test/'); assert.ok(!JSON.stringify(r).includes('private-value')); assert.ok(!JSON.stringify(r).includes('headers'));
 });
+
+
+test('operator pause refuses CLI capture before reading even a nonexistent plan', async () => {
+  const { spawnSync } = await import('node:child_process');
+  const { fileURLToPath } = await import('node:url');
+  const cli = fileURLToPath(new URL('./ui-capture.mjs', import.meta.url));
+  const result = spawnSync(process.execPath, [cli, '--capture', '/not-a-real-ui-capture-plan.json'], { encoding: 'utf8' });
+  assert.equal(result.status, 1);
+  assert.equal(result.stdout, '');
+  assert.equal(result.stderr.trim(), 'capture_paused_by_operator');
+});
