@@ -36,6 +36,7 @@ def main():
             {'role': 'user', 'content': packet},
         ],
         'max_tokens': max_tokens,
+        'reasoning_effort': os.environ.get('OPUS_REVIEW_REASONING_EFFORT', 'low'),
         'stream': False,
     }
     request = urllib.request.Request(

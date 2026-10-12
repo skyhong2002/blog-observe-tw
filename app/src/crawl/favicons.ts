@@ -1,5 +1,6 @@
 // Adapted from tag.observe.tw afe0a65 tools/fetch-favicons.ts.
 // Copyright (c) 2026 Sky Hong. MIT; see LICENSE and NOTICE.
+import { spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { copyFile, mkdir, readFile, rename, stat, unlink, writeFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
@@ -65,12 +66,15 @@ export function icoToImage(buf: Buffer): Buffer | { raw: Buffer; width: number; 
   if (!n || n > 256 || 6 + n * 16 > buf.length) return null;
   const entries = Array.from({ length: n }, (_, i) => {
     const o = 6 + i * 16;
-    return { w: buf[o] || 256, size: buf.readUInt32LE(o + 8), offset: buf.readUInt32LE(o + 12) };
+    return { w: buf[o] || 256, h: buf[o + 1] || 256, size: buf.readUInt32LE(o + 8), offset: buf.readUInt32LE(o + 12) };
   }).sort((a, b) => b.w - a.w);
   for (const e of entries) {
     if (e.offset < 6 + n * 16 || e.offset + e.size > buf.length || e.size < 8) continue;
     const data = buf.subarray(e.offset, e.offset + e.size);
-    if (data.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))) return data;
+    if (data.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))) {
+      if (data.length >= 24 && data.readUInt32BE(16) === e.w && data.readUInt32BE(20) === e.h) return data;
+      continue;
+    }
     if (data.length < 40) continue;
     const header = data.readUInt32LE(0);
     if (header < 40 || header > data.length) continue;
@@ -82,6 +86,8 @@ export function icoToImage(buf: Buffer): Buffer | { raw: Buffer; width: number; 
       width <= 0 ||
       height <= 0 ||
       !Number.isInteger(height) ||
+      width !== e.w ||
+      height !== e.h ||
       width * height > MAX_PIXELS ||
       width > 4096 ||
       height > 4096
@@ -168,7 +174,56 @@ function allowedImageFormat(body: Buffer): 'png' | 'jpeg' | 'gif' | 'webp' | 'ic
   return 'svg';
 }
 
+const DECODER_WALL_MS = 4000;
+const decoderScript = `const { decodeFavicon } = await import(process.argv[1]);
+const chunks = []; for await (const chunk of process.stdin) chunks.push(chunk);
+const result = await decodeFavicon(Buffer.concat(chunks));
+process.stdout.write(JSON.stringify(result ? { ...result, png: result.png.toString('base64') } : null));`;
+
+/** Native decoders are isolated: SIGKILL ends metadata/render work even if libvips does not observe its timeout. */
 export async function toPng(body: Buffer): Promise<Icon | null> {
+  if (body.length > MAX_RESPONSE_BYTES || !allowedImageFormat(body)) return null;
+  return new Promise((resolve) => {
+    const child = spawn(process.execPath, ['--max-old-space-size=128', '--input-type=module', '--eval', decoderScript, import.meta.url], {
+      stdio: ['pipe', 'pipe', 'ignore'],
+    });
+    let output = '';
+    let killed = false;
+    let settled = false;
+    const timer = setTimeout(() => {
+      killed = true;
+      child.kill('SIGKILL');
+    }, DECODER_WALL_MS);
+    const finish = (result: Icon | null) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      resolve(result);
+    };
+    child.once('error', () => finish(null));
+    child.stdout.on('data', (chunk: Buffer) => {
+      output += chunk.toString('utf8');
+      if (output.length > 256 * 1024) {
+        killed = true;
+        child.kill('SIGKILL');
+      }
+    });
+    child.once('close', (code) => {
+      if (killed || code !== 0) return finish(null);
+      try {
+        const data = JSON.parse(output) as (Omit<Icon, 'png'> & { png: string }) | null;
+        finish(data ? { ...data, png: Buffer.from(data.png, 'base64') } : null);
+      } catch {
+        finish(null);
+      }
+    });
+    child.stdin.on('error', () => {});
+    child.stdin.end(body);
+  });
+}
+
+/** Internal child-process entrypoint; callers must use toPng for its wall-clock boundary. */
+export async function decodeFavicon(body: Buffer): Promise<Icon | null> {
   try {
     if (body.length > MAX_RESPONSE_BYTES) return null;
     const format = allowedImageFormat(body);
@@ -193,11 +248,14 @@ export async function toPng(body: Buffer): Promise<Icon | null> {
       (meta.pages ?? 1) > 1
     )
       return null;
-    const stats = await input.stats();
     const png = await input
       .resize(SIZE, SIZE, { fit: 'contain', background: { r: 0, g: 0, b: 0, alpha: 0 } })
       .png()
       .toBuffer();
+    // Only inspect the bounded 192px result, never render the untrusted source twice.
+    const stats = await sharp(png, { limitInputPixels: SIZE * SIZE })
+      .timeout({ seconds: 3 })
+      .stats();
     return { png, sourceWidth: meta.width, sourceHeight: meta.height, transparent: !stats.isOpaque };
   } catch {
     return null;

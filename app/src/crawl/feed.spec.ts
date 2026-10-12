@@ -44,6 +44,7 @@ describe('crawl request safety', () => {
     expect(isAllowedCrawlUrl('https://example.test:8443/')).toBe(false);
     expect(isAllowedCrawlUrl('http://127.0.0.1/')).toBe(false);
     expect(isAllowedCrawlUrl('http://[::1]/')).toBe(false);
+    for (const url of ['http://[::ffff:7f00:1]/', 'http://2130706433/', 'http://0x7f.1/']) expect(isAllowedCrawlUrl(url)).toBe(false);
     expect(isBlockedAddress('169.254.169.254')).toBe(true);
     expect(isBlockedAddress('100.64.0.1')).toBe(true);
     expect(isBlockedAddress('::ffff:127.0.0.1')).toBe(true);
@@ -68,6 +69,21 @@ describe('crawl request safety', () => {
       expect(isBlockedAddress(address)).toBe(true);
     expect(isBlockedAddress('2606:4700:4700::1111')).toBe(false);
     expect(isBlockedAddress('2001:4860:4860::8888')).toBe(false);
+  });
+
+  it('removes stale compressed wire headers from the consumed body while preserving final URL and validators', async () => {
+    const fetcher: FeedFetcher = async (input) =>
+      String(input).endsWith('/robots.txt')
+        ? new Response('')
+        : new Response('already decompressed', {
+            headers: { 'content-encoding': 'gzip', 'content-length': '7', etag: 'compressed-v1', 'content-type': 'text/html' },
+          });
+    const result = await politeFetch('https://decompressed-headers.test/page', {}, { fetcher, resolveHost: async () => ['93.184.216.34'] });
+    expect(await result.text()).toBe('already decompressed');
+    expect(result.headers.has('content-encoding')).toBe(false);
+    expect(result.headers.has('content-length')).toBe(false);
+    expect(result.headers.get('etag')).toBe('compressed-v1');
+    expect(result.url).toBe('https://decompressed-headers.test/page');
   });
 
   it('rejects unresolved and private DNS answers before fetch', async () => {

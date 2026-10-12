@@ -212,8 +212,12 @@ async function limitedResponse(response: Response, requestedUrl: string): Promis
     throw new Error(`crawl response exceeds ${MAX_RESPONSE_BYTES} bytes`);
   }
   if (!response.body) {
-    if (!response.url) Object.defineProperty(response, 'url', { value: requestedUrl });
-    return response;
+    const headers = new Headers(response.headers);
+    headers.delete('content-encoding');
+    headers.delete('content-length');
+    const empty = new Response(null, { status: response.status, statusText: response.statusText, headers });
+    Object.defineProperty(empty, 'url', { value: response.url || requestedUrl });
+    return empty;
   }
   const reader = response.body.getReader();
   const chunks: Uint8Array[] = [];
@@ -233,10 +237,14 @@ async function limitedResponse(response: Response, requestedUrl: string): Promis
     reader.releaseLock();
   }
   const body = Buffer.concat(chunks.map((chunk) => Buffer.from(chunk)));
+  // undici fetch has already decompressed the body; compressed wire headers are no longer valid.
+  const headers = new Headers(response.headers);
+  headers.delete('content-encoding');
+  headers.delete('content-length');
   const buffered = new Response(body.length ? body : null, {
     status: response.status,
     statusText: response.statusText,
-    headers: response.headers,
+    headers,
   });
   // Consumers resolve relative feed/icon links against the final response URL.
   Object.defineProperty(buffered, 'url', { value: response.url || requestedUrl });

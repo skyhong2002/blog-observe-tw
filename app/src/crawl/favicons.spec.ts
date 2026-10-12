@@ -1,3 +1,5 @@
+import { spawn } from 'node:child_process';
+import { EventEmitter } from 'node:events';
 import { mkdtemp, readFile, rm, stat } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
@@ -16,6 +18,10 @@ import {
 } from './favicons.ts';
 import { politeFetch } from './feed.ts';
 
+vi.mock('node:child_process', async (original) => {
+  const actual = await original<typeof import('node:child_process')>();
+  return { ...actual, spawn: vi.fn(actual.spawn) };
+});
 vi.mock('./feed.ts', async (original) => ({ ...(await original<typeof import('./feed.ts')>()), politeFetch: vi.fn() }));
 const dirs: string[] = [];
 const target = { slug: 'writer', id: 1, title: 'Writer', kind: 'blog' as const, url: 'https://writer.example/blog/' };
@@ -66,8 +72,8 @@ describe('favicon conversion and discovery', () => {
     icon.writeUInt32LE(40, 14);
     icon.writeUInt32LE(22, 18);
     icon.writeUInt32LE(40, 22);
-    icon.writeInt32LE(100000, 26);
-    icon.writeInt32LE(200000, 30);
+    icon.writeInt32LE(65535, 26);
+    icon.writeInt32LE(65535 * 2, 30);
     icon.writeUInt16LE(32, 36);
     expect(icoToImage(icon)).toBeNull();
   });
@@ -85,6 +91,7 @@ describe('favicon conversion and discovery', () => {
     expect(output?.sourceHeight).toBe(48);
     expect(output?.png.readUInt32BE(16)).toBe(192);
     expect(output?.png.readUInt32BE(20)).toBe(192);
+    expect(output?.transparent).toBe(true);
     expect(await toPng(Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="100000" height="100000"/>'))).toBeNull();
   });
   it('isolates platform authors when reusing an origin and rejects external SVG resources', async () => {
@@ -168,6 +175,52 @@ describe('favicon conversion and discovery', () => {
         .then(() => true)
         .catch(() => false),
     ).toBe(false);
+  });
+  it('bounds real SVG filter rendering with the isolated decoder deadline', async () => {
+    const svg =
+      '<svg xmlns="http://www.w3.org/2000/svg" width="4000" height="4000"><defs><filter id="noise"><feTurbulence type="fractalNoise" baseFrequency="0.4" numOctaves="20"/><feGaussianBlur stdDeviation="120"/></filter></defs><rect width="4000" height="4000" filter="url(#noise)"/></svg>';
+    const started = performance.now();
+    const output = await toPng(Buffer.from(svg));
+    expect(performance.now() - started).toBeLessThan(5000);
+    if (output) expect(output.png.readUInt32BE(16)).toBe(192);
+  }, 6000);
+  it('kills the isolated decoder at the wall-clock deadline instead of leaving native work running', async () => {
+    const body = await png();
+    const child = Object.assign(new EventEmitter(), {
+      stdout: new EventEmitter(),
+      stdin: Object.assign(new EventEmitter(), { end: vi.fn() }),
+      kill: vi.fn((_signal: string) => {
+        child.emit('close', null, 'SIGKILL');
+        return true;
+      }),
+    });
+    vi.mocked(spawn).mockReturnValueOnce(child as unknown as ReturnType<typeof spawn>);
+    vi.useFakeTimers();
+    try {
+      const result = toPng(body);
+      await vi.advanceTimersByTimeAsync(4000);
+      expect(await result).toBeNull();
+      expect(child.kill).toHaveBeenCalledWith('SIGKILL');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+  it('rejects ICO directory/bitmap size disagreement and truncated bitmap pixels', () => {
+    const icon = Buffer.alloc(22 + 40 + 32 * 32 * 4);
+    icon.writeUInt16LE(1, 2);
+    icon.writeUInt16LE(1, 4);
+    icon[6] = 32;
+    icon[7] = 32;
+    icon.writeUInt32LE(icon.length - 22, 14);
+    icon.writeUInt32LE(22, 18);
+    icon.writeUInt32LE(40, 22);
+    icon.writeInt32LE(16, 26);
+    icon.writeInt32LE(64, 30);
+    icon.writeUInt16LE(32, 36);
+    expect(icoToImage(icon)).toBeNull();
+    icon.writeInt32LE(32, 26);
+    icon.writeUInt32LE(40, 14);
+    expect(icoToImage(icon.subarray(0, 62))).toBeNull();
   });
   it('does not guess a URL for an unverified seed', async () => {
     const directory = await root();
