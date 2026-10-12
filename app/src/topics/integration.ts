@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import Fastify from 'fastify';
 import type { Pool, ResultSetHeader, RowDataPacket } from 'mysql2/promise';
+import { installPrivateCachePolicy } from '../cache-policy.ts';
 import { publicationLabelSql } from './publication-noise.ts';
 import { invalidateTopicCache, registerTopicRoutes } from './routes.ts';
 import { SOURCE } from './snapshot-client.ts';
@@ -68,14 +69,25 @@ export async function runTopicsQualityIntegration(pool: Pool) {
       now,
     ]);
   const app = Fastify();
+  installPrivateCachePolicy(app);
   let queries = 0;
+  let gateEnabled = false,
+    builders = 0;
+  let releaseBuilders!: () => void, buildersArrived!: () => void;
+  const gate = new Promise<void>((resolve) => (releaseBuilders = resolve));
+  const eightBuilders = new Promise<void>((resolve) => (buildersArrived = resolve));
   const statements: string[] = [];
   const counted = new Proxy(pool, {
     get(target, key) {
       if (key === 'query')
-        return (...args: unknown[]) => {
+        return async (...args: unknown[]) => {
           queries++;
           statements.push(String(args[0]));
+          if (gateEnabled && String(args[0]).startsWith('WITH scoped_posts') && String(args[0]).includes('per_blog AS')) {
+            builders++;
+            if (builders === 8) buildersArrived();
+            await gate;
+          }
           return Reflect.apply(target.query, target, args);
         };
       const value = Reflect.get(target, key);
@@ -218,13 +230,41 @@ export async function runTopicsQualityIntegration(pool: Pool) {
       );
     }
     registerTopicRoutes(app, counted);
-    const concurrent = await Promise.all(Array.from({ length: 12 }, () => app.inject('/api/topics?days=7')));
-    for (const r of concurrent) assert.equal(r.statusCode, 200, r.body);
+    // Every request gets its own read, including identical keys. Hold all eight
+    // admitted builders until the other four have explicitly failed closed.
+    gateEnabled = true;
+    let rejectedCount = 0,
+      allRejected!: () => void;
+    const fourRejected = new Promise<void>((resolve) => (allRejected = resolve));
+    const pending = Promise.all(
+      Array.from({ length: 12 }, () =>
+        app.inject('/api/topics?days=7').then((response) => {
+          if (response.statusCode === 503 && ++rejectedCount === 4) allRejected();
+          return response;
+        }),
+      ),
+    );
+    await Promise.all([eightBuilders, fourRejected]);
+    releaseBuilders();
+    const concurrent = await pending;
+    gateEnabled = false;
+    assert.equal(builders, 8, 'identical keys must invoke eight independent SQL builders');
+    const successful = concurrent.filter((r) => r.statusCode === 200);
+    const rejected = concurrent.filter((r) => r.statusCode === 503);
+    assert.equal(successful.length, 8);
+    assert.equal(rejected.length, 4);
+    for (const response of concurrent) assert.match(String(response.headers['cache-control']), /no-store/);
+    for (const response of rejected) {
+      const body = response.json();
+      assert.equal(body.message, 'topic_cache_busy');
+      assert.equal(body.items, undefined, 'overload must not return a stale topic DTO');
+      assert.equal(body.vocabulary, undefined);
+    }
     const firstQueries = queries;
-    assert.ok(firstQueries <= 8, `cold singleflight queried ${firstQueries} times`);
-    await app.inject('/api/topics?days=7');
-    assert.ok(queries > firstQueries, 'later requests must recheck visibility');
-    const result = concurrent[0].json();
+    const later = await app.inject('/api/topics?days=7');
+    assert.equal(later.statusCode, 200, later.body);
+    assert.ok(queries > firstQueries, 'later requests must recheck visibility after capacity drains');
+    const result = successful[0].json();
     const topic = result.items.find((x: { id: string }) => x.id === `rss:${tagId}`);
     assert.equal(topic, undefined, 'feed categories must not create a parallel ranking dictionary');
     const nativeDetail = await app.inject(`/api/topics/rss:${tagId}?days=7`);
@@ -256,11 +296,14 @@ export async function runTopicsQualityIntegration(pool: Pool) {
       globalBackoffMs: 3600000,
       coldSqlQueries: firstQueries,
       concurrentRequests: 12,
+      independentBuilders: builders,
+      overloadedRequests: rejectedCount,
       ttlSeconds: 0,
       nativeProvenancePreserved: true,
       scopeFiltered: true,
     };
   } finally {
+    releaseBuilders();
     await app.close();
     if (original) await pool.execute('UPDATE topic_current SET snapshot_id=? WHERE source=?', [original, SOURCE]);
     else await pool.execute('DELETE FROM topic_current WHERE source=?', [SOURCE]);

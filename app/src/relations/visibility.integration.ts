@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import Fastify from 'fastify';
 import type { Pool, ResultSetHeader, RowDataPacket } from 'mysql2/promise';
+import { installPrivateCachePolicy } from '../cache-policy.ts';
 import { parseArticleLinks } from './parser.ts';
 import { invalidateRelationCache, loadRelationCoverage, loadRelations, readRelationSnapshot, registerRelationRoutes } from './routes.ts';
 import { loadAliases, saveObservation } from './store.ts';
@@ -16,7 +17,12 @@ export async function runRelationVisibilityIntegration(pool: Pool) {
   let userId = 0,
     assertions = 0;
   const check = (value: unknown) => {
-    assert.ok(value);
+    try {
+      assert.ok(value, `relation visibility assertion ${assertions + 1}`);
+    } catch (error) {
+      Error.captureStackTrace(error as Error, check);
+      throw error;
+    }
     assertions++;
   };
   const hash = (value: string) => createHash('sha256').update(value).digest('hex');
@@ -160,7 +166,7 @@ export async function runRelationVisibilityIntegration(pool: Pool) {
     // Exact URL case matters, even when the database's default collation is insensitive.
     await override(postIds[0], bUrl + 'ONE', 'body', true);
     check(edge(await loadRelations(pool, 90), a, b)?.count === 2);
-    // Same-key requests single-flight; distinct cold profiles are capped at four SQL builders.
+    // Identical keys must perform independent reads, with at most four SQL builders.
     let unblock!: () => void, allBlocked!: () => void;
     let builders = 0;
     const gate = new Promise<void>((r) => (unblock = r)),
@@ -181,6 +187,7 @@ export async function runRelationVisibilityIntegration(pool: Pool) {
       },
     }) as Pool;
     const limitedApp = Fastify();
+    installPrivateCachePolicy(limitedApp);
     await registerRelationRoutes(limitedApp, limitedPool);
     try {
       const loads = [
@@ -190,15 +197,37 @@ export async function runRelationVisibilityIntegration(pool: Pool) {
         limitedApp.inject(`/api/blogs/visibility-b-${suffix}/relations?days=30`),
       ];
       // LightMyRequest starts on .then, rather than when the thenable is created.
-      const completion = Promise.all(loads);
-      await four;
+      let rejectedCount = 0,
+        allRejected!: () => void;
+      const nineRejected = new Promise<void>((resolve) => (allRejected = resolve));
+      const completion = Promise.all(
+        loads.map((load) =>
+          load.then((response) => {
+            if (response.statusCode === 503 && ++rejectedCount === 9) allRejected();
+            return response;
+          }),
+        ),
+      );
+      await Promise.all([four, nineRejected]);
       const overloaded = await limitedApp.inject(`/api/blogs/visibility-c-${suffix}/relations?days=7`);
       check(overloaded.statusCode === 503 && overloaded.headers['retry-after'] === '2');
+      check(String(overloaded.headers['cache-control']).includes('no-store'));
+      assert.deepEqual(overloaded.json(), { error: 'relation_projection_busy' });
       unblock();
       const responses = await completion;
-      check(builders === 4 && responses.every((r) => r.statusCode === 200));
+      check(builders === 4);
+      check(responses.filter((r) => r.statusCode === 200).length === 4);
+      const rejected = responses.filter((r) => r.statusCode === 503);
+      check(rejected.length === 9);
+      for (const response of responses) check(String(response.headers['cache-control']).includes('no-store'));
+      for (const response of rejected) {
+        check(response.headers['retry-after'] === '2');
+        assert.deepEqual(response.json(), { error: 'relation_projection_busy' }, 'overload must not return a stale relation DTO');
+      }
       const repeated = await limitedApp.inject(`/api/blogs/visibility-a-${suffix}/relations?days=7`);
       check(repeated.statusCode === 200 && builders === 5);
+      check(String(repeated.headers['cache-control']).includes('no-store'));
+      check(repeated.json().outgoing.some((e: { targetBlogId: number; count: number }) => e.targetBlogId === b && e.count === 2));
     } finally {
       unblock();
       await limitedApp.close();
