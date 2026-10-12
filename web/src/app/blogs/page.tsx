@@ -2,48 +2,89 @@
 import Link from 'next/link';
 import MediaTabs from '@/components/MediaTabs';
 import TableScroller from '@/components/TableScroller';
-import { overview, taipei } from '@/lib/api';
+import { type Blog, overview, taipei } from '@/lib/api';
 import { table } from '@/lib/table-styles';
 export const dynamic = 'force-dynamic';
 export default async function BlogsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; category?: string; sort?: string; page?: string }>;
+  searchParams: Promise<{ q?: string; category?: string; sort?: string; page?: string; status?: string; dir?: string }>;
 }) {
   const data = await overview();
   const query = await searchParams;
   const q = (query.q ?? '').trim().slice(0, 100);
   const categories = [...new Set(data.blogs.map((b) => b.category).filter(Boolean))] as string[];
+  const statuses = [...new Set(data.blogs.map((blog) => blog.statusLabel ?? '待核對'))];
   const rows = data.blogs.filter(
-    (b) =>
-      (!q || `${b.name} ${b.url ?? ''}`.toLocaleLowerCase().includes(q.toLocaleLowerCase())) &&
-      (!query.category || b.category === query.category),
+    (blog) =>
+      (!q || `${blog.name} ${blog.url ?? ''}`.toLocaleLowerCase().includes(q.toLocaleLowerCase())) &&
+      (!query.category || blog.category === query.category) &&
+      (!query.status || (blog.statusLabel ?? '待核對') === query.status),
   );
-  rows.sort(
-    query.sort === 'latest'
-      ? (a, b) => Date.parse(b.lastPublishedAt ?? '1970-01-01') - Date.parse(a.lastPublishedAt ?? '1970-01-01')
-      : (a, b) => a.name.localeCompare(b.name, 'zh-Hant'),
-  );
+  const sorts = {
+    name: (blog: Blog) => blog.name,
+    category: (blog: Blog) => blog.category ?? '',
+    posts: (blog: Blog) => blog.postCount ?? -1,
+    latest: (blog: Blog) => (blog.lastPublishedAt ? Date.parse(blog.lastPublishedAt) : 0),
+    crawl: (blog: Blog) => (blog.lastCrawlSuccessAt ? Date.parse(blog.lastCrawlSuccessAt) : 0),
+    status: (blog: Blog) => blog.statusLabel ?? '待核對',
+  };
+  type SortKey = keyof typeof sorts;
+  const sort = Object.hasOwn(sorts, query.sort ?? '') ? (query.sort as SortKey) : 'name';
+  const ascendingFirst = new Set<SortKey>(['name', 'category', 'status']);
+  const dir = query.dir === 'asc' || query.dir === 'desc' ? query.dir : ascendingFirst.has(sort) ? 'asc' : 'desc';
+  rows.sort((a, b) => {
+    const x = sorts[sort](a),
+      y = sorts[sort](b);
+    const result = typeof x === 'number' && typeof y === 'number' ? x - y : String(x).localeCompare(String(y), 'zh-Hant');
+    return (dir === 'asc' ? 1 : -1) * result;
+  });
   const pages = Math.max(1, Math.ceil(rows.length / 50));
   const page = Math.min(pages, Math.max(1, Number.parseInt(query.page ?? '1', 10) || 1));
-  const href = (patch: Record<string, string>) => `/blogs/?${new URLSearchParams({ ...query, ...patch })}`;
+  const href = (patch: Record<string, string | null>) => {
+    const params = new URLSearchParams(Object.entries(query).filter((entry): entry is [string, string] => typeof entry[1] === 'string'));
+    params.delete('page');
+    for (const [key, value] of Object.entries(patch)) {
+      if (value === null) params.delete(key);
+      else params.set(key, value);
+    }
+    return `/blogs/?${params}`;
+  };
+  const sortLink = (col: SortKey) =>
+    href({ sort: col, dir: sort === col ? (dir === 'asc' ? 'desc' : 'asc') : ascendingFirst.has(col) ? 'asc' : 'desc' });
+  const Th = ({ col, label, className = '' }: { col: SortKey; label: string; className?: string }) => (
+    <th className={`${table.cell} ${className}`} aria-sort={sort === col ? (dir === 'asc' ? 'ascending' : 'descending') : undefined}>
+      <Link
+        href={sortLink(col)}
+        scroll={false}
+        className={`inline-flex items-center gap-0.5 whitespace-nowrap hover:text-brand-700 ${sort === col ? 'text-zinc-900 dark:text-zinc-100' : ''}`}
+      >
+        {label}
+        <span aria-hidden="true" className={sort === col ? '' : 'text-zinc-400 dark:text-zinc-600'}>
+          {sort === col ? (dir === 'desc' ? '▼' : '▲') : '↕'}
+        </span>
+      </Link>
+    </th>
+  );
+  const chip = (active: boolean) =>
+    `whitespace-nowrap rounded-full px-3 py-1 ${active ? 'bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900' : 'bg-zinc-100 text-zinc-700 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-300'}`;
   return (
     <div className="space-y-5 pb-8">
-      <header className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold">部落格與文章數</h1>
-          <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
-            查看收錄來源、文章與更新紀錄。各站有自己的寫作步調，沒有近期文章不代表網站失效。
-          </p>
-        </div>
-        <p className="text-xs text-zinc-500">{data.updatedAt ? `${taipei(data.updatedAt)} 更新` : '等待資料更新'}</p>
-      </header>
       <MediaTabs current="media" />
+      <div>
+        <h1 className="text-2xl font-semibold tracking-tight">部落格與文章數</h1>
+        <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
+          {data.updatedAt ? `更新於 ${taipei(data.updatedAt)}` : '等待資料更新'} ·{' '}
+          <Link href="/about/" className="hover:text-brand-700 hover:underline dark:hover:text-brand-400">
+            資料來源與計算方式 ⓘ
+          </Link>
+        </p>
+      </div>
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
         {[
           { label: '收錄部落格', value: data.totals.blogs },
           { label: '收錄文章', value: data.totals.posts },
-          { label: '已核對網址', value: data.blogs.filter((b) => b.url).length },
+          { label: '已提供網址', value: data.blogs.filter((b) => b.url).length },
           { label: '作者紀錄', value: data.authors.length },
         ].map((item) => (
           <div key={item.label} className="rounded-xl border border-zinc-300 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">
@@ -52,57 +93,63 @@ export default async function BlogsPage({
           </div>
         ))}
       </div>
-      <form className="flex flex-wrap items-end gap-3">
-        <label className="space-y-1 text-xs text-zinc-600 dark:text-zinc-400">
-          搜尋部落格
+      <div className="flex flex-wrap items-center gap-1.5 text-sm">
+        <Link href={href({ status: null })} scroll={false} className={chip(!query.status)}>
+          全部狀態
+        </Link>
+        {statuses.map((status) => (
+          <Link key={status} href={href({ status })} scroll={false} className={chip(query.status === status)}>
+            {status} {data.blogs.filter((blog) => (blog.statusLabel ?? '待核對') === status).length}
+          </Link>
+        ))}
+        <span className="mx-1 h-5 w-px bg-zinc-200 dark:bg-zinc-700" aria-hidden />
+        <Link href={href({ category: null })} scroll={false} className={chip(!query.category)}>
+          全部分類
+        </Link>
+        {categories.map((category) => (
+          <Link key={category} href={href({ category })} scroll={false} className={chip(query.category === category)}>
+            {category}
+          </Link>
+        ))}
+      </div>
+      <form className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex min-w-0 items-center gap-2">
+          <label htmlFor="blog-query" className="sr-only">
+            搜尋部落格名稱或網址
+          </label>
           <input
+            id="blog-query"
             name="q"
             defaultValue={q}
-            placeholder="名稱或網址"
-            className="block min-h-10 rounded-lg border border-zinc-300 bg-white px-3 text-sm text-zinc-900 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
+            placeholder="搜尋名稱或網址"
+            className="min-h-8 w-48 min-w-0 rounded-lg border border-zinc-300 bg-white px-3 text-xs dark:border-zinc-700 dark:bg-zinc-900"
           />
-        </label>
-        <label className="space-y-1 text-xs text-zinc-600 dark:text-zinc-400">
-          分類
-          <select
-            name="category"
-            defaultValue={query.category ?? ''}
-            className="block min-h-10 rounded-lg border border-zinc-300 bg-white px-3 text-sm dark:border-zinc-700 dark:bg-zinc-900"
-          >
-            <option value="">全部分類</option>
-            {categories.map((c) => (
-              <option key={c}>{c}</option>
+          {Object.entries(query)
+            .filter(([key]) => !['q', 'page'].includes(key))
+            .map(([key, value]) => (
+              <input key={key} type="hidden" name={key} value={value ?? ''} />
             ))}
-          </select>
-        </label>
-        <label className="space-y-1 text-xs text-zinc-600 dark:text-zinc-400">
-          排列
-          <select
-            name="sort"
-            defaultValue={query.sort ?? 'name'}
-            className="block min-h-10 rounded-lg border border-zinc-300 bg-white px-3 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+          <button
+            type="submit"
+            className="min-h-8 rounded-lg border border-zinc-300 px-3 text-xs hover:text-brand-700 dark:border-zinc-700 dark:hover:text-brand-400"
           >
-            <option value="name">名稱</option>
-            <option value="latest">最後發文</option>
-          </select>
-        </label>
-        <button className="min-h-10 rounded-lg bg-brand-700 px-4 text-sm text-white" type="submit">
-          篩選
-        </button>
+            搜尋
+          </button>
+        </div>
+        <span role="status" className="text-xs text-zinc-500">
+          共 {rows.length} 個部落格 · 沒有近期文章不代表網站失效
+        </span>
       </form>
-      <p role="status" className="text-xs text-zinc-500">
-        共 {rows.length} 個部落格
-      </p>
       <TableScroller card label="部落格與文章數表格，可左右捲動">
         <table className="w-full min-w-[52rem] text-sm">
           <thead className="bg-zinc-50 text-left text-xs text-zinc-600 dark:bg-zinc-950 dark:text-zinc-400">
             <tr>
-              <th className={table.leadHead}>部落格</th>
-              <th className={table.cell}>分類</th>
-              <th className={table.num}>已收錄文章</th>
-              <th className={table.cell}>最新文章</th>
-              <th className={table.cell}>抓取成功</th>
-              <th className={table.cell}>狀態</th>
+              <Th col="name" label="部落格" className={table.leadHead} />
+              <Th col="category" label="分類" />
+              <Th col="posts" label="已收錄文章" className="text-right" />
+              <Th col="latest" label="最新文章" />
+              <Th col="crawl" label="抓取成功" />
+              <Th col="status" label="狀態" />
             </tr>
           </thead>
           <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">

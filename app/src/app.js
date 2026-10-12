@@ -101,7 +101,8 @@ export async function buildApp(config, { logger = false, store = null } = {}) {
       [blogs[0].id],
     );
     const [tags] = await pool.query(
-      `SELECT t.slug,t.label,t.kind,t.visibility,bt.role FROM blog_tags bt JOIN tags t ON t.id=bt.tag_id
+      `SELECT t.slug,t.label,t.kind,t.visibility,bt.role,
+       (SELECT COUNT(DISTINCT p.id) FROM post_tags pt JOIN posts p ON p.id=pt.post_id WHERE pt.tag_id=t.id AND pt.status='active' AND p.blog_id=bt.blog_id) AS postCount FROM blog_tags bt JOIN tags t ON t.id=bt.tag_id
        WHERE bt.blog_id=? AND bt.status='active' AND t.visibility='public' AND t.status='active' ORDER BY t.label`,
       [blogs[0].id],
     );

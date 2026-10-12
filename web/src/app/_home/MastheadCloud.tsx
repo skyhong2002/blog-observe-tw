@@ -115,7 +115,7 @@ export default function MastheadCloud({ edition, tags }: { edition: string; tags
             ariaLabel: `${tag.label}，${tag.postCount} 篇文章，${tag.blogCount} 個部落格`,
             count: Math.max(tag.postCount, tag.blogCount, 1),
             href: `/tags/?tag=${encodeURIComponent(tag.slug)}`,
-            tone: 'strong',
+            tone: 'brand',
             card: {
               rows: [
                 ['收錄文章', `${tag.postCount} 篇`],
