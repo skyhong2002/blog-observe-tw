@@ -5,14 +5,26 @@ import { CLEANUP_VERSION } from './matching-body.ts';
 import { isTagNoise } from './vendor/tag-noise.ts';
 
 export const normalizeTerm = (value: string) => value.normalize('NFKC').toLocaleLowerCase('en-US').replace(/\s+/gu, ' ').trim();
+/** Only derived VARCHAR lookup columns are shortened; canonical identity always hashes the complete normalization. */
+export const storedNormalizedLabel = (label: string) => [...normalizeTerm(label)].slice(0, 255).join('');
 export const digest = (value: string) => createHash('sha256').update(value).digest('hex');
 const NO_EQUAL = new Set(noEqual.tags.map(normalizeTerm));
 // Exact upstream copies are retained; changing either file must change the policy identity.
 export const UPSTREAM_COMMIT = 'afe0a653fa8aae7e25a04a1d9fe87bf0400a2a39';
-export const POLICY_VERSION = `topic-policy-v2:${digest(UPSTREAM_COMMIT + readFileSync(new URL('./vendor/tag-noise.ts', import.meta.url), 'utf8') + readFileSync(new URL('../../data/topic-no-equal-tags.json', import.meta.url), 'utf8'))}`;
-export const MATCHER_VERSION = `topic-matcher-v2:${digest(POLICY_VERSION + CLEANUP_VERSION + ':nfkc-latin-boundaries-title2-body1')}`;
+export const ACTIVE_TOPIC_LIMITS = Object.freeze({
+  maxTerms: 50_000,
+  maxCodePoints: 150_000,
+  maxEstimatedBytes: 96 * 1024 * 1024,
+  bytesPerNode: 512,
+  bytesPerTerm: 1024,
+  minArticleCount: 3,
+  recentDays: 180,
+});
+export const NORMALIZATION_VERSION = `nfkc-lower-en-US-unicode-${process.versions.unicode}`;
+export const POLICY_VERSION = `topic-policy-v3:${digest(UPSTREAM_COMMIT + readFileSync(new URL('./vendor/tag-noise.ts', import.meta.url), 'utf8') + readFileSync(new URL('../../data/topic-no-equal-tags.json', import.meta.url), 'utf8') + NORMALIZATION_VERSION + JSON.stringify(ACTIVE_TOPIC_LIMITS) + ':max-alias-count-last-date-count-desc-id-desc:shadow-v3-per-snapshot')}`;
+export const MATCHER_VERSION = `topic-matcher-v3:${digest(POLICY_VERSION + CLEANUP_VERSION + ':nfkc-latin-boundaries-title2-body1')}`;
 
-const payloadObject = (value: unknown): Record<string, unknown> => {
+export const payloadObject = (value: unknown): Record<string, unknown> => {
   if (typeof value === 'string') {
     try {
       return payloadObject(JSON.parse(value));
@@ -27,6 +39,7 @@ const payloadObject = (value: unknown): Record<string, unknown> => {
 export function exclusionReason(label: string, payload?: unknown): string | null {
   const normalized = normalizeTerm(label);
   if (payloadObject(payload).noise === true) return 'upstream-noise';
+  if (payloadObject(payload).noEqual === true) return 'upstream-no-equal';
   if ([...normalized].length < 2) return 'too-short';
   if ([...normalized].length > 240 || /[\p{Cc}\p{Cf}]/u.test(normalized)) return 'invalid-label';
   if (/^[\p{Number}\s.,+\-％%]+$/u.test(normalized)) return 'pure-number';
@@ -71,7 +84,7 @@ export function projectTopicTerms(input: InputTerm[]): {
     const id = digest(normalizedLabel);
     const reasons = group.map((term) => exclusionReason(term.label, term.payload));
     // A single upstream noise marker excludes every equivalent spelling conservatively.
-    const reason = reasons.includes('upstream-noise') ? 'upstream-noise' : (reasons.find(Boolean) ?? null);
+    const reason = reasons.reduce<string | null>(mergeExclusionReasons, null);
     terms.push({
       id,
       normalizedLabel,
@@ -84,4 +97,20 @@ export function projectTopicTerms(input: InputTerm[]): {
   terms.sort((a, b) => a.id.localeCompare(b.id));
   aliases.sort((a, b) => a.termId.localeCompare(b.termId));
   return { aliases, terms };
+}
+
+const REASON_PRIORITY = [
+  'upstream-noise',
+  'upstream-no-equal',
+  'too-short',
+  'invalid-label',
+  'pure-number',
+  'pure-date',
+  'tag-noise',
+  'no-equal',
+];
+export function mergeExclusionReasons(a: string | null, b: string | null): string | null {
+  if (!a) return b;
+  if (!b) return a;
+  return REASON_PRIORITY.indexOf(a) <= REASON_PRIORITY.indexOf(b) ? a : b;
 }

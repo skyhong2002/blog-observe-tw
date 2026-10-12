@@ -8,7 +8,7 @@ import TableScroller from '@/components/TableScroller';
 import VocabularyNotice from '@/components/VocabularyNotice';
 import { type Period, periodOf, TOPICS_PERIOD, topicsApiPath } from '@/lib/public-query';
 import { table } from '@/lib/table-styles';
-import { matchingPolicyText, matchSplit, type Topics } from '@/lib/topics';
+import { formatLift, liftExplanation, matchingPolicyText, matchingReasonLabel, matchSplit, type Topics } from '@/lib/topics';
 import { asIs, type PublicLoad, usePublicJson } from '@/lib/use-public-json';
 
 export default function TopicRankingView({ days, load }: { days: Period; load: PublicLoad<Topics> }) {
@@ -38,6 +38,7 @@ export default function TopicRankingView({ days, load }: { days: Period; load: P
 }
 
 function TopicRows({ days, data }: { days: Period; data: Topics }) {
+  const liftTitle = liftExplanation(data.matchingPolicy?.frequency?.baselineDays);
   return (
     <>
       <TableScroller card label="共同話題表格，可左右捲動">
@@ -62,6 +63,9 @@ function TopicRows({ days, data }: { days: Period; data: Topics }) {
               <th scope="col" className={table.num}>
                 加權貢獻
               </th>
+              <th scope="col" className={table.num} title={liftTitle}>
+                升溫倍率
+              </th>
             </tr>
           </thead>
           <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
@@ -83,8 +87,18 @@ function TopicRows({ days, data }: { days: Period; data: Topics }) {
                 </td>
                 <td className={table.num}>{t.blogs.toLocaleString('zh-TW')}</td>
                 <td className={table.num}>{t.posts.toLocaleString('zh-TW')}</td>
-                <td className={table.num}>{matchSplit(t)}</td>
+                <td className={table.num}>
+                  {matchSplit(t)}
+                  {t.matchingReason ? (
+                    <span className="ml-1 text-xs text-zinc-500" title={matchingReasonLabel(t.matchingReason)}>
+                      只計標題
+                    </span>
+                  ) : null}
+                </td>
                 <td className={table.num}>{Number(t.score).toFixed(2)}</td>
+                <td className={`${table.num}${t.lift == null ? ' text-xs text-zinc-500' : ''}`} title={liftTitle}>
+                  {formatLift(t.lift)}
+                </td>
               </tr>
             ))}
           </tbody>
@@ -93,7 +107,9 @@ function TopicRows({ days, data }: { days: Period; data: Topics }) {
       {!data.items.length ? (
         <p className="py-8 text-zinc-500">這段期間尚無跨至少 {data.minimumBlogs} 個部落格的共同話題；個別站的主題可在部落格頁查看。</p>
       ) : null}
-      <p className="text-xs text-zinc-500">{matchingPolicyText(data.matchingPolicy)}</p>
+      <p className="text-xs text-zinc-500">
+        {matchingPolicyText(data.matchingPolicy)}排行仍依加權貢獻排序。{liftTitle}
+      </p>
       <VocabularyNotice data={data.vocabulary} />
       {data.coverage ? (
         <p className="text-xs text-zinc-500">

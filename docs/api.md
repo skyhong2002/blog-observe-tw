@@ -475,6 +475,11 @@ curl --fail-with-body -sS 'https://blog.observe.tw/api/v1/topics'
 | `items[].blogs` | integer |  |
 | `items[].titlePosts` | integer |  |
 | `items[].bodyOnlyPosts` | integer |  |
+| `items[].recentShare` | number \| null |  |
+| `items[].baselineShare` | number \| null |  |
+| `items[].lift` | number \| null | 近期文章占比 ÷ 長期基準占比；無基準時為 null，不代表零 |
+| `items[].matchingRule` | "title-only" \| "title-and-body" |  |
+| `items[].matchingReason` | string \| null |  |
 | `nextCursor` | null | 排行僅提供有界快照，不提供游標續頁 |
 | `hours` | integer |  |
 | `vocabulary` | object |  |
@@ -492,6 +497,25 @@ curl --fail-with-body -sS 'https://blog.observe.tw/api/v1/topics'
 | `vocabulary.upstreamSnapshotConsistent` | boolean |  |
 | `vocabulary.excludedTermCount` | integer | 保留但不參與比對的 canonical 詞條數 |
 | `vocabulary.exclusionReasons` | object | 排除原因與詞條數 |
+| `vocabulary.frequencyBaseline` | object \| null |  |
+| `vocabulary.frequencyBaseline.since` | string (ISO 時間) |  |
+| `vocabulary.frequencyBaseline.until` | string (ISO 時間) |  |
+| `vocabulary.frequencyBaseline.totalPosts` | integer |  |
+| `vocabulary.frequencyBaseline.coveredPosts` | integer |  |
+| `vocabulary.frequencyBaseline.thresholdRatio` | number |  |
+| `vocabulary.frequencyBaseline.version` | string |  |
+| `vocabulary.totalSourceTerms` | integer \| null | 保留的上游原始詞數，包含未參與比對的詞 |
+| `vocabulary.activeSet` | object \| null |  |
+| `vocabulary.activeSet.status` | string |  |
+| `vocabulary.activeSet.version` | string \| null |  |
+| `vocabulary.activeSet.asOf` | string (ISO 時間) \| null |  |
+| `vocabulary.activeSet.eligibleTerms` | integer |  |
+| `vocabulary.activeSet.activeTerms` | integer |  |
+| `vocabulary.activeSet.termLimit` | integer |  |
+| `vocabulary.activeSet.codePointLimit` | integer |  |
+| `vocabulary.activeSet.memoryBudgetBytes` | integer |  |
+| `vocabulary.activeSet.estimatedBytes` | integer |  |
+| `vocabulary.activeSet.inactiveReasons` | object | low-frequency 或 memory-budget；原詞仍保留 |
 | `matchingPolicy` | object |  |
 | `matchingPolicy.version` | string |  |
 | `matchingPolicy.policyVersion` | string |  |
@@ -499,6 +523,8 @@ curl --fail-with-body -sS 'https://blog.observe.tw/api/v1/topics'
 | `matchingPolicy.bodyWeight` | number |  |
 | `matchingPolicy.sameBlogDecay` | number |  |
 | `matchingPolicy.sources` | "title" \| "body"[] |  |
+| `matchingPolicy.recentBackfillHours` | integer |  |
+| `matchingPolicy.frequency` | object |  |
 | `minimumBlogs` | integer |  |
 | `generatedAt` | string (ISO 時間) |  |
 | `truncated` | boolean |  |
@@ -537,7 +563,13 @@ curl --fail-with-body -sS 'https://blog.observe.tw/api/v1/topics/rss%3A1'
 | `topic.label` | string |  |
 | `topic.source` | string |  |
 | `topic.canonicalId` | string \| null |  |
-| `topic.excludedReason` | string \| null | too-short、pure-number、pure-date、tag-noise、no-equal、upstream-noise、invalid-label 或 not-in-tag-vocabulary |
+| `topic.excludedReason` | string \| null | too-short、pure-number、pure-date、tag-noise、no-equal、upstream-noise、upstream-no-equal、invalid-label 或 not-in-tag-vocabulary |
+| `topic.inactiveReason` | string \| null | low-frequency 或 memory-budget；與雜訊排除分開 |
+| `topic.matchingStatus` | "active" \| "inactive" \| "excluded" |  |
+| `topic.articleCount` | integer \| null |  |
+| `topic.lastPublishedAt` | string (ISO 時間) \| null |  |
+| `topic.matchingRule` | "title-only" \| "title-and-body" |  |
+| `topic.matchingReason` | string \| null |  |
 | `vocabulary` | object |  |
 | `vocabulary.status` | "ready" \| "unavailable" |  |
 | `vocabulary.source` | string |  |
@@ -553,6 +585,25 @@ curl --fail-with-body -sS 'https://blog.observe.tw/api/v1/topics/rss%3A1'
 | `vocabulary.upstreamSnapshotConsistent` | boolean |  |
 | `vocabulary.excludedTermCount` | integer | 保留但不參與比對的 canonical 詞條數 |
 | `vocabulary.exclusionReasons` | object | 排除原因與詞條數 |
+| `vocabulary.frequencyBaseline` | object \| null |  |
+| `vocabulary.frequencyBaseline.since` | string (ISO 時間) |  |
+| `vocabulary.frequencyBaseline.until` | string (ISO 時間) |  |
+| `vocabulary.frequencyBaseline.totalPosts` | integer |  |
+| `vocabulary.frequencyBaseline.coveredPosts` | integer |  |
+| `vocabulary.frequencyBaseline.thresholdRatio` | number |  |
+| `vocabulary.frequencyBaseline.version` | string |  |
+| `vocabulary.totalSourceTerms` | integer \| null | 保留的上游原始詞數，包含未參與比對的詞 |
+| `vocabulary.activeSet` | object \| null |  |
+| `vocabulary.activeSet.status` | string |  |
+| `vocabulary.activeSet.version` | string \| null |  |
+| `vocabulary.activeSet.asOf` | string (ISO 時間) \| null |  |
+| `vocabulary.activeSet.eligibleTerms` | integer |  |
+| `vocabulary.activeSet.activeTerms` | integer |  |
+| `vocabulary.activeSet.termLimit` | integer |  |
+| `vocabulary.activeSet.codePointLimit` | integer |  |
+| `vocabulary.activeSet.memoryBudgetBytes` | integer |  |
+| `vocabulary.activeSet.estimatedBytes` | integer |  |
+| `vocabulary.activeSet.inactiveReasons` | object | low-frequency 或 memory-budget；原詞仍保留 |
 | `matchingPolicy` | object |  |
 | `matchingPolicy.version` | string |  |
 | `matchingPolicy.policyVersion` | string |  |
@@ -560,6 +611,8 @@ curl --fail-with-body -sS 'https://blog.observe.tw/api/v1/topics/rss%3A1'
 | `matchingPolicy.bodyWeight` | number |  |
 | `matchingPolicy.sameBlogDecay` | number |  |
 | `matchingPolicy.sources` | "title" \| "body"[] |  |
+| `matchingPolicy.recentBackfillHours` | integer |  |
+| `matchingPolicy.frequency` | object |  |
 | `blogs` | object[] |  |
 | `blogs[].id` | integer |  |
 | `blogs[].slug` | string |  |

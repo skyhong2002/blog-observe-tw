@@ -8,8 +8,37 @@ import SectionTabs from '@/components/SectionTabs';
 import VocabularyNotice from '@/components/VocabularyNotice';
 import { taipei } from '@/lib/api';
 import { type Period, periodOf, TOPICS_PERIOD, topicApiPath } from '@/lib/public-query';
-import { exclusionReasonLabel, matchingPolicyText, type TopicDetail } from '@/lib/topics';
+import {
+  exclusionReasonLabel,
+  formatPercent,
+  inactiveReasonLabel,
+  matchingPolicyText,
+  matchingReasonLabel,
+  recorded,
+  type TopicDetail,
+} from '@/lib/topics';
 import { asIs, type PublicLoad, usePublicJson } from '@/lib/use-public-json';
+
+/** Source article count and last observed post, omitting whichever the payload did not record. */
+function sourceActivity(topic: NonNullable<TopicDetail['topic']>) {
+  const posts = recorded(topic.articleCount);
+  return [
+    posts === null ? '' : `來源文章數：${posts.toLocaleString('zh-TW')} 篇`,
+    topic.lastPublishedAt ? `最近觀測發文：${taipei(topic.lastPublishedAt)}` : '',
+  ]
+    .filter(Boolean)
+    .join(' · ');
+}
+
+/** Threshold and baseline period behind a title-only term, from whichever the payload recorded. */
+function frequencyBasis(data: TopicDetail) {
+  const baseline = data.vocabulary.frequencyBaseline;
+  const ratio = data.matchingPolicy?.frequency?.highFrequencyRatio ?? baseline?.thresholdRatio;
+  const period = baseline
+    ? `${taipei(baseline.since)} 至 ${taipei(baseline.until)}`
+    : `近 ${data.matchingPolicy?.frequency?.baselineDays ?? 365} 天`;
+  return `門檻：基準期間命中文章占比超過 ${formatPercent(ratio)}。基準期間：${period}。`;
+}
 
 /** `label` titles the page while another period loads (the topic itself does not change). */
 export default function TopicDetailView({
@@ -51,6 +80,18 @@ export default function TopicDetailView({
           </section>
           <VocabularyNotice data={data.vocabulary} />
         </>
+      ) : data?.topic?.inactiveReason ? (
+        <>
+          <section role="status" className="rounded-xl border border-zinc-300 p-4 text-sm dark:border-zinc-800">
+            <h2 className="font-semibold">此詞暫未參與比對</h2>
+            <p className="mt-2 text-zinc-600 dark:text-zinc-400">
+              原因：{inactiveReasonLabel(data.topic.inactiveReason)}
+              。這不代表它是雜訊：完整的詞仍保留在詞庫中可查，只是本次比對未納入，所以這裡沒有部落格與文章。
+            </p>
+            {sourceActivity(data.topic) ? <p className="mt-1 text-xs text-zinc-500">{sourceActivity(data.topic)}</p> : null}
+          </section>
+          <VocabularyNotice data={data.vocabulary} />
+        </>
       ) : data?.topic ? (
         <>
           {data.topic.canonicalId && data.topic.canonicalId !== data.topic.id ? (
@@ -64,6 +105,15 @@ export default function TopicDetailView({
               </Link>
               」，以下為合併後的結果。
             </p>
+          ) : null}
+          {data.topic.matchingReason ? (
+            <section role="note" className="rounded-xl border border-zinc-300 p-4 text-sm dark:border-zinc-800">
+              <h2 className="font-semibold">{matchingReasonLabel(data.topic.matchingReason)}</h2>
+              <p className="mt-2 text-zinc-600 dark:text-zinc-400">
+                這個詞在長期文章中出現得很普遍，排行與升溫倍率只計標題命中；正文命中仍留在頻率統計，詞也沒有從詞庫刪除。
+              </p>
+              <p className="mt-1 text-xs text-zinc-500">{frequencyBasis(data)}</p>
+            </section>
           ) : null}
           <div className="grid gap-5 lg:grid-cols-[1fr_2fr]">
             <section className="rounded-xl border border-zinc-300 p-4 dark:border-zinc-800">

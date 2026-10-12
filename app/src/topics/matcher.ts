@@ -1,4 +1,5 @@
-import { exclusionReason, normalizeTerm } from './policy.ts';
+import { estimatedMatcherBytes } from './active-set.ts';
+import { ACTIVE_TOPIC_LIMITS, exclusionReason, normalizeTerm } from './policy.ts';
 
 export { digest, MATCHER_VERSION, normalizeTerm, POLICY_VERSION } from './policy.ts';
 
@@ -7,9 +8,18 @@ type Node = { next: Map<string, number>; failure: number; terminal: string[]; ou
 /** Bounded Aho-Corasick trie: no terms × articles regular-expression scan. */
 export class TopicMatcher {
   private readonly nodes: Node[] = [{ next: new Map(), failure: 0, terminal: [], output: 0 }];
-  private readonly labels = new Map<string, string>();
+  private readonly labels = new Map<string, { length: number; firstLatin: boolean; lastLatin: boolean }>();
+  private codePoints = 0;
+  get statistics() {
+    return {
+      terms: this.labels.size,
+      nodes: this.nodes.length,
+      codePoints: this.codePoints,
+      estimatedBytes: estimatedMatcherBytes(this.codePoints, this.labels.size),
+    };
+  }
   constructor(terms: { id: string; label: string; payload?: unknown }[]) {
-    if (terms.length > 250_000) throw Error('topic term cap');
+    if (terms.length > ACTIVE_TOPIC_LIMITS.maxTerms) throw Error('topic active term cap');
     const unique = new Map<string, { id: string; label: string; excluded: boolean }>();
     for (const term of terms) {
       const label = normalizeTerm(term.label);
@@ -23,12 +33,19 @@ export class TopicMatcher {
     for (const term of unique.values()) {
       const label = term.label;
       if (term.excluded) continue;
-      this.labels.set(term.id, label);
+      const characters = [...label];
+      this.codePoints += characters.length;
+      if (
+        this.codePoints > ACTIVE_TOPIC_LIMITS.maxCodePoints ||
+        estimatedMatcherBytes(this.codePoints, this.labels.size + 1) > ACTIVE_TOPIC_LIMITS.maxEstimatedBytes
+      )
+        throw Error('topic active memory cap');
+      this.labels.set(term.id, { length: characters.length, firstLatin: latin(characters[0]), lastLatin: latin(characters.at(-1)) });
       let state = 0;
       for (const char of label) {
         let child = this.nodes[state].next.get(char);
         if (child === undefined) {
-          if (this.nodes.length >= 1_000_000) throw Error('topic trie cap');
+          if (this.nodes.length > ACTIVE_TOPIC_LIMITS.maxCodePoints) throw Error('topic trie cap');
           child = this.nodes.length;
           this.nodes[state].next.set(char, child);
           this.nodes.push({ next: new Map(), failure: 0, terminal: [], output: 0 });
@@ -63,8 +80,8 @@ export class TopicMatcher {
       do {
         for (const id of this.nodes[output].terminal) {
           if (++transitions > 100_000) return { ids: [...found], truncated: true };
-          const label = [...this.labels.get(id)!];
-          if ((latin(label[0]) && latin(chars[pos - label.length])) || (latin(label.at(-1)) && latin(chars[pos + 1]))) continue;
+          const label = this.labels.get(id)!;
+          if ((label.firstLatin && latin(chars[pos - label.length])) || (label.lastLatin && latin(chars[pos + 1]))) continue;
           found.add(id);
           if (found.size >= cap) return { ids: [...found], truncated: true };
         }

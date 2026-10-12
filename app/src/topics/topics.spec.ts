@@ -88,42 +88,38 @@ describe('published immutable export contract', () => {
     expect(() => validatePage({ ...page, entries: [makeTerm('不同')] }, manifest, 0)).toThrow();
     expect(() => validatePage({ ...page, nextCursor: '1' }, manifest, 0)).toThrow();
   });
-  it('rejects changed version/checksum, duplicate ordering and partial imports before any publication', async () => {
-    const { manifest, page } = fixture();
-    const pool = { getConnection: vi.fn() } as unknown as Pool;
-    await expect(
-      importSnapshot(
-        pool,
-        {
-          current: async () => manifest,
-          page: async () => ({ ...page, snapshot: { ...manifest, generatedAt: '2026-10-13T00:00:00.000Z' } }),
-        },
-        new Date(timestamp),
-        async () => {},
-      ),
-    ).rejects.toThrow();
-    expect(pool.getConnection).not.toHaveBeenCalled();
-    const duplicate = fixture([makeTerm('貓'), makeTerm('貓')]);
-    await expect(
-      importSnapshot(
-        pool,
-        { current: async () => duplicate.manifest, page: async () => duplicate.page },
-        new Date(timestamp),
-        async () => {},
-      ),
-    ).rejects.toThrow('order or duplicate');
-    await expect(
-      importSnapshot(
-        pool,
-        {
-          current: async () => ({ ...manifest, sha256: '0'.repeat(64) }),
-          page: async () => ({ ...page, snapshot: { ...manifest, sha256: '0'.repeat(64) } }),
-        },
-        new Date(timestamp),
-        async () => {},
-      ),
-    ).rejects.toThrow('full checksum');
-    expect(pool.getConnection).not.toHaveBeenCalled();
+  it('retains new upstream flags and validates their exact types without filtering source terms', () => {
+    const term = { ...makeTerm('部落格'), noise: true, noEqual: false, recentArticleCount: 0 };
+    const { manifest, page } = fixture([term]);
+    expect(validatePage(page, manifest, 0).entries[0]).toEqual(term);
+    for (const patch of [
+      { noise: 'true' },
+      { noEqual: 1 },
+      { recentArticleCount: -1 },
+      { recentArticleCount: 4 },
+      { recentArticleCount: 0.5 },
+    ]) {
+      const invalid = fixture([{ ...term, ...patch } as ExportTerm]);
+      expect(() => validatePage(invalid.page, invalid.manifest, 0)).toThrow('term');
+    }
+    expect(() => validatePage(page, manifest, -1)).toThrow();
+    expect(() => validatePage(page, manifest, 1)).toThrow();
+    expect(() => validatePage({ ...page, snapshot: { ...manifest, generatedAt: '2026-10-13T00:00:00.000Z' } }, manifest, 0)).toThrow(
+      'changed',
+    );
+  });
+  it('bounds the complete pool at two million without requiring all terms in RAM', () => {
+    const { manifest } = fixture();
+    const large = {
+      ...manifest,
+      total: 2_000_000,
+      pages: Array(4000).fill('a'.repeat(64)),
+      changeCount: 4_000_000,
+      changePages: Array(8000).fill('b'.repeat(64)),
+    };
+    expect(validateManifest(large).total).toBe(2_000_000);
+    expect(() => validateManifest({ ...large, total: 2_000_001 })).toThrow();
+    expect(() => validateManifest({ ...large, changeCount: 4_000_001 })).toThrow();
   });
   it('uses fixed public origin without credentials, rejects HTTP/oversize and redirects', async () => {
     const request = vi.fn<typeof fetch>(async () => new Response('missing', { status: 404 }));
@@ -219,11 +215,31 @@ describe('bounded synchronization recovery', () => {
     const pool = {
       getConnection: async () => connection,
       execute,
-      query: async () => [
-        [{ id: 'capped-run', since_at: '2026-10-11T00:00:00.000Z', until_at: timestamp, cursor: '100_1', pages: 1000, status: 'scanning' }],
-      ],
+      query: async (sql: string) => {
+        if (sql.includes('FROM topic_snapshots')) return [sql.includes('COUNT(*)') ? [{ n: 0 }] : []];
+        return [
+          [
+            {
+              id: 'capped-run',
+              since_at: '2026-10-11T00:00:00.000Z',
+              until_at: timestamp,
+              cursor: '100_1',
+              pages: 1000,
+              status: 'scanning',
+            },
+          ],
+        ];
+      },
     } as unknown as Pool;
-    const result = await syncVocabulary(pool, { enabled: true, now: () => now });
+    const result = await syncVocabulary(pool, {
+      enabled: true,
+      now: () => now,
+      source: {
+        page: async () => {
+          throw Error('must not fetch capped run');
+        },
+      },
+    });
     expect(result).toMatchObject({ status: 'capped', reason: 'cap-pages', version: 'capped-run' });
     expect(execute.mock.calls[0]).toEqual([
       'UPDATE topic_window_runs SET status=?,updated_at=? WHERE id=?',

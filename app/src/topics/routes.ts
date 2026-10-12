@@ -2,7 +2,8 @@ import type { FastifyInstance } from 'fastify';
 import type { Pool, RowDataPacket } from 'mysql2/promise';
 import { topicBodyHash, topicBodyJoins } from './body.ts';
 import { TopicResponseCache } from './cache.ts';
-import { MATCHER_VERSION, normalizeTerm, POLICY_VERSION } from './policy.ts';
+import { FREQUENCY_POLICY } from './frequency.ts';
+import { digest, MATCHER_VERSION, normalizeTerm, POLICY_VERSION } from './policy.ts';
 import { SOURCE } from './snapshot-client.ts';
 
 export const matchingPolicy = {
@@ -12,22 +13,27 @@ export const matchingPolicy = {
   bodyWeight: 1,
   sameBlogDecay: 0.5,
   sources: ['title', 'body'],
+  recentBackfillHours: 48,
+  frequency: FREQUENCY_POLICY,
 };
 const literal = (value: string) => `'${value.replaceAll("'", "''")}'`;
 // Feed categories retain their provenance, but never create an independent ranking dictionary.
 // Collapse title/body evidence per article before weighting; canonical labels merge source aliases.
 export const evidence = (
   blogScoped = false,
-  verifiedOnly = false,
+  verifiedOnly = true,
 ) => `scoped_posts AS (SELECT p.id,p.blog_id,p.published_at,p.content_hash FROM posts p JOIN blogs b ON b.id=p.blog_id WHERE p.published_at>=? AND p.published_at<=? AND ${verifiedOnly ? "b.status='verified'" : "b.status<>'moved'"} ${blogScoped ? 'AND b.slug=?' : ''}), evidence AS (
  SELECT p.id post_id,p.blog_id,p.published_at,CONCAT('tag:',t.id) topic_id,t.label,'tag-vocabulary' source,MAX(m.source='title') title_hit
- FROM scoped_posts p JOIN topic_matches_v2 m ON m.post_id=p.id JOIN topic_current c ON c.snapshot_id=m.snapshot_id AND c.source=${literal(SOURCE)}
- JOIN topic_canonical_terms t ON t.snapshot_id=m.snapshot_id AND t.id=m.term_id
- JOIN topic_post_indexes_v2 i ON i.post_id=p.id AND i.snapshot_id=m.snapshot_id
+ FROM scoped_posts p JOIN topic_matches_v3 m ON m.post_id=p.id JOIN topic_current c ON c.snapshot_id=m.snapshot_id AND c.source=${literal(SOURCE)}
+ JOIN topic_canonical_terms_v3 t ON t.snapshot_id=m.snapshot_id AND t.id=m.term_id
+ LEFT JOIN topic_term_frequencies f ON f.snapshot_id=t.snapshot_id AND f.term_id=t.id
+ LEFT JOIN topic_frequency_runs fr ON fr.snapshot_id=t.snapshot_id AND fr.policy_version=${literal(FREQUENCY_POLICY.version)}
+ JOIN topic_post_indexes_v3 i ON i.post_id=p.id AND i.snapshot_id=m.snapshot_id
  ${topicBodyJoins}
  WHERE i.status='ok' AND (i.post_hash<=>p.content_hash) AND (i.body_hash<=>(${topicBodyHash}))
  AND i.matcher_version=${literal(MATCHER_VERSION)} AND t.policy_version=${literal(POLICY_VERSION)}
- AND t.exclusion_reason IS NULL AND m.source IN ('title','body')
+ AND t.exclusion_reason IS NULL AND t.inactive_reason IS NULL AND m.source IN ('title','body')
+ AND (m.source='title' OR fr.snapshot_id IS NULL OR COALESCE(f.high_frequency,0)=0)
  GROUP BY p.id,p.blog_id,p.published_at,t.id,t.label
 ), recent AS (SELECT * FROM evidence)`;
 export const weightedScore = (titleCount: string, bodyCount: string) =>
@@ -41,11 +47,29 @@ export async function vocabularyStatus(pool: Pool) {
     [SOURCE],
   );
   const manifest = row ? (typeof row.manifest === 'string' ? JSON.parse(row.manifest) : row.manifest) : null;
-  const [excluded] = row
-    ? await pool.query<RowDataPacket[]>(
-        'SELECT exclusion_reason reason,COUNT(*) n FROM topic_canonical_terms WHERE snapshot_id=? AND policy_version=? AND exclusion_reason IS NOT NULL GROUP BY exclusion_reason',
-        [row.id, POLICY_VERSION],
-      )
+  const [[selection]] = row
+    ? await pool.query<RowDataPacket[]>('SELECT * FROM topic_policy_selections WHERE snapshot_id=? AND policy_version=?', [
+        row.id,
+        POLICY_VERSION,
+      ])
+    : [[]];
+  const configuration = selection ? (typeof selection.config === 'string' ? JSON.parse(selection.config) : selection.config) : null;
+  const [excluded] =
+    row && !(selection?.status === 'ready' && configuration?.exclusionReasons)
+      ? await pool.query<RowDataPacket[]>(
+          'SELECT exclusion_reason reason,COUNT(*) n FROM topic_canonical_terms_v3 WHERE snapshot_id=? AND policy_version=? AND exclusion_reason IS NOT NULL GROUP BY exclusion_reason',
+          [row.id, POLICY_VERSION],
+        )
+      : [[]];
+  const exclusionReasons: Record<string, number> =
+    selection?.status === 'ready' && configuration?.exclusionReasons
+      ? configuration.exclusionReasons
+      : Object.fromEntries(excluded.map((item) => [item.reason, Number(item.n)]));
+  const [[baseline]] = row
+    ? await pool.query<RowDataPacket[]>('SELECT * FROM topic_frequency_runs WHERE snapshot_id=? AND policy_version=?', [
+        row.id,
+        FREQUENCY_POLICY.version,
+      ])
     : [[]];
   return {
     status: row ? 'ready' : 'unavailable',
@@ -58,21 +82,55 @@ export async function vocabularyStatus(pool: Pool) {
     normalizedTagCount: manifest?.normalizedTagCount ?? null,
     tagNormalization: manifest?.tagNormalization ?? null,
     upstreamSnapshotConsistent: manifest?.coverage === 'all-current-indexed-article-tags',
-    excludedTermCount: excluded.reduce((sum, item) => sum + Number(item.n), 0),
-    exclusionReasons: Object.fromEntries(excluded.map((item) => [item.reason, Number(item.n)])),
+    excludedTermCount: Object.values(exclusionReasons).reduce((sum, count) => sum + count, 0),
+    exclusionReasons,
+    frequencyBaseline: baseline
+      ? {
+          since: baseline.baseline_from,
+          until: baseline.baseline_until,
+          totalPosts: Number(baseline.total_posts),
+          coveredPosts: Number(baseline.covered_posts),
+          thresholdRatio: Number(baseline.threshold_ratio),
+          version: baseline.policy_version,
+        }
+      : null,
+    totalSourceTerms: typeof manifest?.total === 'number' ? manifest.total : null,
+    activeSet: selection
+      ? {
+          status: selection.status,
+          version: selection.selection_id,
+          asOf: selection.as_of,
+          eligibleTerms: Number(selection.eligible_terms),
+          activeTerms: Number(selection.active_terms),
+          termLimit: Number(configuration.limits.maxTerms),
+          codePointLimit: Number(configuration.limits.maxCodePoints),
+          memoryBudgetBytes: Number(configuration.limits.maxEstimatedBytes),
+          estimatedBytes: Number(selection.estimated_bytes),
+          inactiveReasons: configuration?.inactiveReasons ?? {},
+        }
+      : null,
   };
 }
-const item = (r: RowDataPacket) => ({
-  id: r.topic_id,
-  label: r.label,
-  source: r.source,
-  score: Number(r.score),
-  posts: Number(r.posts),
-  blogs: Number(r.blogs),
-  titlePosts: Number(r.title_posts),
-  bodyOnlyPosts: Number(r.body_posts),
-});
-export async function ranking(pool: Pool, days: number, slug?: string, verifiedOnly = false, limit = 100, now = new Date()) {
+const item = (r: RowDataPacket) => {
+  const recentShare = Number(r.recent_total) > 0 ? Number(r.posts) / Number(r.recent_total) : null;
+  const baselineShare = Number(r.baseline_total) > 0 ? Number(r.baseline_matched ?? 0) / Number(r.baseline_total) : null;
+  return {
+    id: r.topic_id,
+    label: r.label,
+    source: r.source,
+    score: Number(r.score),
+    posts: Number(r.posts),
+    blogs: Number(r.blogs),
+    titlePosts: Number(r.title_posts),
+    bodyOnlyPosts: Number(r.body_posts),
+    recentShare,
+    baselineShare,
+    lift: recentShare !== null && baselineShare !== null && baselineShare > 0 ? recentShare / baselineShare : null,
+    matchingRule: Number(r.high_frequency) ? 'title-only' : 'title-and-body',
+    matchingReason: Number(r.high_frequency) ? 'high-document-frequency-title-only' : null,
+  };
+};
+export async function ranking(pool: Pool, days: number, slug?: string, verifiedOnly = true, limit = 100, now = new Date()) {
   const args: unknown[] = [...range(days, now)];
   if (slug) args.push(slug);
   const boundedLimit = Math.min(200, Math.max(1, Math.floor(limit)));
@@ -80,12 +138,21 @@ export async function ranking(pool: Pool, days: number, slug?: string, verifiedO
     `WITH ${evidence(Boolean(slug), verifiedOnly)}, per_blog AS (
     SELECT r.topic_id,r.label,r.source,r.blog_id,COUNT(*) n,SUM(title_hit) title_n,SUM(1-title_hit) body_n FROM recent r
     GROUP BY r.topic_id,r.label,r.source,r.blog_id)
-    SELECT topic_id,label,source,SUM(${weightedScore('title_n', 'body_n')}) score,SUM(n) posts,COUNT(*) blogs,SUM(title_n) title_posts,SUM(body_n) body_posts FROM per_blog
-    GROUP BY topic_id,label,source HAVING COUNT(*)>=${slug ? 1 : 2}
+    SELECT ranked.*,(SELECT COUNT(*) FROM scoped_posts) recent_total,
+      fr.total_posts baseline_total,IF(fr.snapshot_id IS NOT NULL,COALESCE(f.high_frequency,0),0) high_frequency,
+      IF(f.high_frequency=1,f.title_posts,f.matched_posts) baseline_matched
+    FROM (SELECT topic_id,label,source,SUM(${weightedScore('title_n', 'body_n')}) score,SUM(n) posts,COUNT(*) blogs,SUM(title_n) title_posts,SUM(body_n) body_posts FROM per_blog
+    GROUP BY topic_id,label,source HAVING COUNT(*)>=${slug ? 1 : 2}) ranked
+    LEFT JOIN topic_current tc ON tc.source=${literal(SOURCE)}
+    LEFT JOIN topic_frequency_runs fr ON fr.snapshot_id=tc.snapshot_id AND fr.policy_version=${literal(FREQUENCY_POLICY.version)}
+    LEFT JOIN topic_term_frequencies f ON f.snapshot_id=fr.snapshot_id AND f.term_id=SUBSTRING(ranked.topic_id,5)
     ORDER BY score DESC,blogs DESC,posts DESC,topic_id LIMIT ${boundedLimit + 1}`,
     args,
   );
-  return { items: rows.slice(0, boundedLimit).map(item), truncated: rows.length > boundedLimit };
+  return {
+    items: rows.slice(0, boundedLimit).map((row) => ({ ...item(row), ...(slug || !verifiedOnly ? { lift: null } : {}) })),
+    truncated: rows.length > boundedLimit,
+  };
 }
 /** Resolve retained source IDs without allowing native feed categories to extend the tag dictionary. */
 export async function resolveTopic(pool: Pool, id: string) {
@@ -95,8 +162,8 @@ export async function resolveTopic(pool: Pool, id: string) {
     ]);
     if (!native) return null;
     const [[canonical]] = await pool.query<RowDataPacket[]>(
-      'SELECT t.id,t.label,t.exclusion_reason FROM topic_canonical_terms t JOIN topic_current c ON c.snapshot_id=t.snapshot_id AND c.source=? WHERE t.normalized_label=? AND BINARY t.normalized_label=BINARY ? AND t.policy_version=?',
-      [SOURCE, normalizeTerm(native.label), normalizeTerm(native.label), POLICY_VERSION],
+      'SELECT t.id,t.label,t.exclusion_reason,t.inactive_reason,t.article_count,t.last_published_at FROM topic_canonical_terms_v3 t JOIN topic_current c ON c.snapshot_id=t.snapshot_id AND c.source=? WHERE t.id=? AND t.policy_version=?',
+      [SOURCE, digest(normalizeTerm(native.label)), POLICY_VERSION],
     );
     return {
       id,
@@ -104,22 +171,47 @@ export async function resolveTopic(pool: Pool, id: string) {
       source: 'rss-category',
       canonicalId: canonical ? `tag:${canonical.id}` : null,
       excludedReason: canonical ? canonical.exclusion_reason : 'not-in-tag-vocabulary',
+      inactiveReason: canonical?.inactive_reason ?? null,
+      matchingStatus: !canonical || canonical.exclusion_reason ? 'excluded' : canonical.inactive_reason ? 'inactive' : 'active',
+      articleCount: canonical ? Number(canonical.article_count) : null,
+      lastPublishedAt: canonical?.last_published_at ?? null,
     };
   }
   const [rows] = await pool.query<RowDataPacket[]>(
-    `SELECT t.id,t.label,t.exclusion_reason FROM topic_canonical_terms t JOIN topic_current c ON c.snapshot_id=t.snapshot_id AND c.source=?
-     LEFT JOIN topic_term_aliases a ON a.snapshot_id=t.snapshot_id AND a.canonical_id=t.id AND a.term_id=?
+    `SELECT t.id,t.label,t.exclusion_reason,t.inactive_reason,t.article_count,t.last_published_at FROM topic_canonical_terms_v3 t JOIN topic_current c ON c.snapshot_id=t.snapshot_id AND c.source=?
+     LEFT JOIN topic_term_aliases_v3 a ON a.snapshot_id=t.snapshot_id AND a.canonical_id=t.id AND a.term_id=?
      WHERE (t.id=? OR a.term_id=?) AND t.policy_version=? ORDER BY (t.id=?) DESC LIMIT 1`,
     [SOURCE, id.slice(4), id.slice(4), id.slice(4), POLICY_VERSION, id.slice(4)],
   );
   return rows[0]
-    ? { id, label: rows[0].label, source: 'tag-vocabulary', canonicalId: `tag:${rows[0].id}`, excludedReason: rows[0].exclusion_reason }
+    ? {
+        id,
+        label: rows[0].label,
+        source: 'tag-vocabulary',
+        canonicalId: `tag:${rows[0].id}`,
+        excludedReason: rows[0].exclusion_reason,
+        inactiveReason: rows[0].inactive_reason,
+        matchingStatus: rows[0].exclusion_reason ? 'excluded' : rows[0].inactive_reason ? 'inactive' : 'active',
+        articleCount: Number(rows[0].article_count),
+        lastPublishedAt: rows[0].last_published_at ?? null,
+      }
     : null;
 }
-export async function topicEvidenceDetail(pool: Pool, id: string, days: number, verifiedOnly = false, now = new Date()) {
-  const topic = await resolveTopic(pool, id);
-  if (!topic) return null;
-  if (!topic.canonicalId || topic.excludedReason) return { topic, blogs: [], articles: [], truncated: false };
+export async function topicEvidenceDetail(pool: Pool, id: string, days: number, verifiedOnly = true, now = new Date()) {
+  const resolved = await resolveTopic(pool, id);
+  if (!resolved) return null;
+  const [[frequency]] = resolved.canonicalId
+    ? await pool.query<RowDataPacket[]>(
+        `SELECT f.high_frequency FROM topic_term_frequencies f JOIN topic_current c ON c.snapshot_id=f.snapshot_id AND c.source=? JOIN topic_frequency_runs r ON r.snapshot_id=f.snapshot_id AND r.policy_version=? WHERE f.term_id=?`,
+        [SOURCE, FREQUENCY_POLICY.version, resolved.canonicalId.slice(4)],
+      )
+    : [[]];
+  const topic = {
+    ...resolved,
+    matchingRule: Number(frequency?.high_frequency) ? 'title-only' : 'title-and-body',
+    matchingReason: Number(frequency?.high_frequency) ? 'high-document-frequency-title-only' : null,
+  };
+  if (!topic.canonicalId || topic.excludedReason || topic.inactiveReason) return { topic, blogs: [], articles: [], truncated: false };
   const args = [...range(days, now), topic.canonicalId];
   const [blogs] = await pool.query<RowDataPacket[]>(
     `WITH ${evidence(false, verifiedOnly)} SELECT b.id,b.slug,b.name,COUNT(*) posts,SUM(r.title_hit) titlePosts,SUM(1-r.title_hit) bodyOnlyPosts,${weightedScore('SUM(r.title_hit)', 'SUM(1-r.title_hit)')} score FROM recent r JOIN blogs b ON b.id=r.blog_id WHERE r.topic_id=? GROUP BY b.id,b.slug,b.name ORDER BY score DESC,posts DESC,b.id LIMIT 101`,
@@ -163,21 +255,21 @@ export function registerTopicRoutes(app: FastifyInstance, pool: Pool) {
     if (!days) return reply.code(400).send({ error: 'invalid_days' });
     return cache.get(`rank:${days}`, async () => {
       const now = new Date();
-      const results = await ranking(pool, days, undefined, false, 100, now);
+      const results = await ranking(pool, days, undefined, true, 100, now);
       const dates = range(days, now);
       const [[coverage]] = await pool.query<RowDataPacket[]>(
-        `SELECT COUNT(*) datedPosts,COALESCE(SUM(cb.status='ok' OR o.status='ok'),0) bodyObservedPosts FROM posts p JOIN blogs b ON b.id=p.blog_id ${topicBodyJoins} WHERE p.published_at>=? AND p.published_at<=? AND b.status<>'moved'`,
+        `SELECT COUNT(*) datedPosts,COALESCE(SUM(cb.status='ok' OR o.status='ok'),0) bodyObservedPosts FROM posts p JOIN blogs b ON b.id=p.blog_id ${topicBodyJoins} WHERE p.published_at>=? AND p.published_at<=? AND b.status='verified'`,
         dates,
       );
       const [[undated]] = await pool.query<RowDataPacket[]>(
-        "SELECT COUNT(*) unknownDatePosts FROM posts p JOIN blogs b ON b.id=p.blog_id WHERE p.published_at IS NULL AND b.status<>'moved'",
+        "SELECT COUNT(*) unknownDatePosts FROM posts p JOIN blogs b ON b.id=p.blog_id WHERE p.published_at IS NULL AND b.status='verified'",
       );
       const [[matched]] = await pool.query<RowDataPacket[]>(
         `WITH ${evidence()} SELECT COUNT(DISTINCT post_id) matchedPosts FROM recent`,
         dates,
       );
       const [[capped]] = await pool.query<RowDataPacket[]>(
-        "SELECT COUNT(*) n FROM topic_post_indexes_v2 i JOIN topic_current c ON c.snapshot_id=i.snapshot_id AND c.source=? WHERE i.status='capped' AND i.matcher_version=?",
+        "SELECT COUNT(*) n FROM topic_post_indexes_v3 i JOIN topic_current c ON c.snapshot_id=i.snapshot_id AND c.source=? WHERE i.status='capped' AND i.matcher_version=?",
         [SOURCE, MATCHER_VERSION],
       );
       return {

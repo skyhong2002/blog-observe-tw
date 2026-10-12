@@ -49,6 +49,50 @@ export async function runTopicsQualityIntegration(pool: Pool) {
     },
   });
   try {
+    // A real transport-shaped 503 after page one must preserve its checkpoint and last-good
+    // pointer, defer once, and make no request during cooldown. No external network is used.
+    const originalFetch = globalThis.fetch;
+    let diagnosticId: string | undefined;
+    let wireCalls = 0;
+    const publishedAt = new Date(now.getTime() - 60000).toISOString();
+    const checkpoint = `${Date.parse(publishedAt)}_998866`;
+    try {
+      globalThis.fetch = async () => {
+        wireCalls++;
+        if (wireCalls === 1)
+          return Response.json({
+            query: window,
+            articles: [{ id: 998866, media: 'fixture', publishedAt, tags: ['暫時失敗'] }],
+            nextCursor: checkpoint,
+          });
+        return new Response('private upstream details', { status: 503 });
+      };
+      const deferred = await syncVocabulary(pool, { enabled: true, now: () => now, window, maxPages: 2 });
+      assert.equal(deferred.status, 'deferred');
+      assert.equal('deferredReason' in deferred && deferred.deferredReason, 'upstream-http-503');
+      assert.ok('version' in deferred && deferred.version);
+      diagnosticId = String('version' in deferred ? deferred.version : '');
+      assert.equal(wireCalls, 2);
+      const [[checkpointRow]] = await pool.query<RowDataPacket[]>(
+        'SELECT `cursor`,pages,status,next_attempt_at FROM topic_window_runs WHERE id=?',
+        [diagnosticId],
+      );
+      assert.equal(checkpointRow.cursor, checkpoint);
+      assert.equal(Number(checkpointRow.pages), 1);
+      assert.equal(checkpointRow.status, 'scanning');
+      assert.equal(new Date(checkpointRow.next_attempt_at).getTime(), now.getTime() + 15 * 60000);
+      const [[unchanged]] = await pool.query<RowDataPacket[]>('SELECT snapshot_id FROM topic_current WHERE source=?', [SOURCE]);
+      assert.equal(unchanged?.snapshot_id, original);
+      const cooling = await syncVocabulary(pool, { enabled: true, now: () => now, window });
+      assert.equal(cooling.status, 'deferred');
+      assert.equal(wireCalls, 2);
+    } finally {
+      globalThis.fetch = originalFetch;
+      if (diagnosticId) {
+        await pool.execute('DELETE FROM topic_window_articles WHERE run_id=?', [diagnosticId]);
+        await pool.execute('DELETE FROM topic_window_runs WHERE id=?', [diagnosticId]);
+      }
+    }
     await createRun(failedId);
     const failed = await syncVocabulary(pool, {
       enabled: true,
@@ -170,6 +214,8 @@ export async function runTopicsQualityIntegration(pool: Pool) {
     assert.ok(queries > firstQueries);
     return {
       badTagsSkipped: 3,
+      upstream503CheckpointPreserved: true,
+      safeDeferredReason: true,
       normalizedTags: 1,
       schemaRunTerminated: true,
       globalBackoffMs: 3600000,
@@ -190,14 +236,14 @@ export async function runTopicsQualityIntegration(pool: Pool) {
     }
     if (tagId) await pool.execute('DELETE FROM tags WHERE id=?', [tagId]);
     for (const table of [
-      'topic_term_aliases',
-      'topic_canonical_terms',
+      'topic_term_aliases_v3',
+      'topic_canonical_terms_v3',
       'topic_terms',
       'topic_snapshots',
       'topic_window_articles',
       'topic_window_runs',
     ]) {
-      const key = ['topic_terms', 'topic_term_aliases', 'topic_canonical_terms'].includes(table)
+      const key = ['topic_terms', 'topic_term_aliases_v3', 'topic_canonical_terms_v3'].includes(table)
         ? 'snapshot_id'
         : table === 'topic_window_articles'
           ? 'run_id'

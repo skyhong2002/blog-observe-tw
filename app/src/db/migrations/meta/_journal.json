@@ -99,6 +99,34 @@
       "when": 1791809725269,
       "tag": "0013_topic_matching_quality",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "5",
+      "when": 1791811108932,
+      "tag": "0014_vocabulary_capacity",
+      "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "5",
+      "when": 1791811624902,
+      "tag": "0015_vocabulary_incremental",
+      "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "5",
+      "when": 1791811802149,
+      "tag": "0016_topic_document_frequency",
+      "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "5",
+      "when": 1791812452742,
+      "tag": "0017_shadow_topic_generations",
+      "breakpoints": true
     }
   ]
 }

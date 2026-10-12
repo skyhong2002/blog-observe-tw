@@ -10,10 +10,10 @@ export async function runTopicsIntegration(pool) {
   assertEphemeralDatabase(pool);
   assert.equal(pool.pool.config.connectionConfig.port, 18169, 'clone-only integration');
   for (const table of [
-    'topic_matches_v2',
-    'topic_post_indexes_v2',
-    'topic_term_aliases',
-    'topic_canonical_terms',
+    'topic_matches_v3',
+    'topic_post_indexes_v3',
+    'topic_term_aliases_v3',
+    'topic_canonical_terms_v3',
     'topic_matches',
     'topic_post_indexes',
     'topic_terms',
@@ -160,10 +160,10 @@ export async function runTopicsIntegration(pool) {
   } finally {
     await app.close();
     for (const table of [
-      'topic_matches_v2',
-    'topic_post_indexes_v2',
-    'topic_term_aliases',
-    'topic_canonical_terms',
+      'topic_matches_v3',
+    'topic_post_indexes_v3',
+    'topic_term_aliases_v3',
+    'topic_canonical_terms_v3',
     'topic_matches',
       'topic_post_indexes',
       'topic_terms',

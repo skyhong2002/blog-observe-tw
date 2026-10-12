@@ -213,6 +213,24 @@ const schemas: Record<string, Schema> = {
     upstreamSnapshotConsistent: bool(),
     excludedTermCount: int('保留但不參與比對的 canonical 詞條數'),
     exclusionReasons: { type: 'object', additionalProperties: int(), description: '排除原因與詞條數' },
+    frequencyBaseline: nullable(
+      obj({ since: time(), until: time(), totalPosts: int(), coveredPosts: int(), thresholdRatio: num(), version: str() }),
+    ),
+    totalSourceTerms: nullable(int('保留的上游原始詞數，包含未參與比對的詞')),
+    activeSet: nullable(
+      obj({
+        status: str(),
+        version: nullable(str()),
+        asOf: nullable(time()),
+        eligibleTerms: int(),
+        activeTerms: int(),
+        termLimit: int(),
+        codePointLimit: int(),
+        memoryBudgetBytes: int(),
+        estimatedBytes: int(),
+        inactiveReasons: { type: 'object', additionalProperties: int(), description: 'low-frequency 或 memory-budget；原詞仍保留' },
+      }),
+    ),
   }),
   MatchingPolicy: obj({
     version: str(),
@@ -221,6 +239,8 @@ const schemas: Record<string, Schema> = {
     bodyWeight: { ...num(), const: 1 },
     sameBlogDecay: { ...num(), const: 0.5 },
     sources: arr(str('', { enum: ['title', 'body'] })),
+    recentBackfillHours: int(),
+    frequency: { type: 'object', additionalProperties: true },
   }),
   Topic: obj({
     id: str('tag:<NFKC／大小寫正規化詞條 SHA-256>；舊 tag／rss ID 可在詳情解析'),
@@ -231,6 +251,11 @@ const schemas: Record<string, Schema> = {
     blogs: int(),
     titlePosts: int(),
     bodyOnlyPosts: int(),
+    recentShare: nullable(num()),
+    baselineShare: nullable(num()),
+    lift: nullable(num('近期文章占比 ÷ 長期基準占比；無基準時為 null，不代表零')),
+    matchingRule: str('', { enum: ['title-only', 'title-and-body'] }),
+    matchingReason: nullable(str()),
   }),
   Topics: obj({
     items: arr(ref('Topic')),
@@ -251,8 +276,16 @@ const schemas: Record<string, Schema> = {
       source: str(),
       canonicalId: nullable(str()),
       excludedReason: nullable(
-        str('too-short、pure-number、pure-date、tag-noise、no-equal、upstream-noise、invalid-label 或 not-in-tag-vocabulary'),
+        str(
+          'too-short、pure-number、pure-date、tag-noise、no-equal、upstream-noise、upstream-no-equal、invalid-label 或 not-in-tag-vocabulary',
+        ),
       ),
+      inactiveReason: nullable(str('low-frequency 或 memory-budget；與雜訊排除分開')),
+      matchingStatus: str('', { enum: ['active', 'inactive', 'excluded'] }),
+      articleCount: nullable(int()),
+      lastPublishedAt: nullable(time()),
+      matchingRule: str('', { enum: ['title-only', 'title-and-body'] }),
+      matchingReason: nullable(str()),
     }),
     vocabulary: ref('Vocabulary'),
     matchingPolicy: ref('MatchingPolicy'),
