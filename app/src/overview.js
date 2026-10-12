@@ -1,7 +1,40 @@
+import { publicPost } from './public-post.ts';
+import { TopicResponseCache } from './topics/cache.ts';
+
+const overviewCaches = new WeakMap();
+export function loadOverview(pool) {
+  let cache = overviewCaches.get(pool);
+  if (!cache) {
+    cache = new TopicResponseCache(60000, 1);
+    overviewCaches.set(pool, cache);
+  }
+  return cache.get('overview', () => loadProjection(pool));
+}
+export function invalidateOverviewCache(pool) {
+  overviewCaches.get(pool)?.clear();
+}
+
+const blogFields = `b.id,b.slug,b.name,b.url,b.category,b.description,b.status,b.status_label AS statusLabel,
+  b.last_crawl_success_at AS lastCrawlSuccessAt,b.last_published_at AS lastPublishedAt,
+  b.expected_interval_hours AS expectedIntervalHours,(SELECT COUNT(*) FROM posts cp WHERE cp.blog_id=b.id) AS postCount,
+  latest.id latestPostId,latest.title latestPostTitle,latest.url latestPostUrl,latest.published_at latestPostPublishedAt`;
+const latestJoin = `LEFT JOIN posts latest ON latest.id=(SELECT lp.id FROM posts lp WHERE lp.blog_id=b.id
+  AND (lp.published_at IS NULL OR lp.published_at<=UTC_TIMESTAMP()) ORDER BY lp.published_at DESC,lp.id DESC LIMIT 1)`;
+const blogDto = (row) => {
+  const { latestPostId, latestPostTitle, latestPostUrl, latestPostPublishedAt, ...blog } = row;
+  return {
+    ...blog,
+    postCount: Number(blog.postCount),
+    latestPost: latestPostId
+      ? { id: Number(latestPostId), title: latestPostTitle, url: latestPostUrl, publishedAt: latestPostPublishedAt }
+      : null,
+  };
+};
+
 /** Read-only projection for the shared Next UI. Counts describe indexed data,
  * not traffic, quality, or growth. No sibling database is queried. */
-export async function loadOverview(pool) {
-  const [postRows, tagRows, authorRows, blogRows, totalRows] = await Promise.all([
+async function loadProjection(pool) {
+  const [postRows, tagRows, authorRows, blogRows, totalRows, recentRows] = await Promise.all([
     pool.query(`SELECT p.id,p.guid,p.title,p.url,p.summary,p.author,p.published_at AS publishedAt,p.image_url AS imageUrl,
       b.slug AS blogSlug,b.name AS blogName FROM posts p JOIN blogs b ON b.id=p.blog_id
       WHERE b.status <> 'moved' ORDER BY p.published_at DESC,p.id DESC LIMIT 200`),
@@ -16,21 +49,22 @@ export async function loadOverview(pool) {
       LEFT JOIN posts p ON p.id=pa.post_id AND p.blog_id=b.id
       WHERE a.status <> 'rejected' AND ba.status='active' AND b.status <> 'moved'
       GROUP BY a.id,a.display_name,b.slug,b.name ORDER BY a.display_name,b.slug LIMIT 200`),
-    pool.query(`SELECT b.id,b.slug,b.name,b.url,b.category,b.description,b.status,b.status_label AS statusLabel,
-      b.last_crawl_success_at AS lastCrawlSuccessAt,b.last_published_at AS lastPublishedAt,
-      b.expected_interval_hours AS expectedIntervalHours,COUNT(p.id) AS postCount
-      FROM blogs b LEFT JOIN posts p ON p.blog_id=b.id WHERE b.status <> 'moved'
-      GROUP BY b.id ORDER BY postCount DESC,b.name LIMIT 200`),
+    pool.query(`SELECT ${blogFields} FROM blogs b ${latestJoin} WHERE b.status <> 'moved' ORDER BY postCount DESC,b.name LIMIT 200`),
     pool.query(`SELECT (SELECT COUNT(*) FROM blogs WHERE status <> 'moved') AS blogs,
       (SELECT COUNT(*) FROM posts p JOIN blogs b ON b.id=p.blog_id WHERE b.status <> 'moved') AS posts,
       (SELECT MAX(last_crawl_success_at) FROM blogs) AS updatedAt`),
+    pool.query(`SELECT ${blogFields} FROM blogs b ${latestJoin} WHERE b.status <> 'moved' AND latest.published_at IS NOT NULL
+      ORDER BY latest.published_at DESC,latest.id DESC,b.id LIMIT 20`),
   ]);
   const row = totalRows[0][0];
   return {
-    posts: postRows[0],
+    generatedAt: new Date().toISOString(),
+    cacheSeconds: 60,
+    posts: postRows[0].map(publicPost),
     tags: tagRows[0],
     authors: authorRows[0],
-    blogs: blogRows[0],
+    blogs: blogRows[0].map(blogDto),
+    recentBlogs: recentRows[0].map(blogDto),
     totals: { blogs: Number(row.blogs), posts: Number(row.posts) },
     updatedAt: row.updatedAt,
   };

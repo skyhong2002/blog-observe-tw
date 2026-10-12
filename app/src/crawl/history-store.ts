@@ -88,8 +88,21 @@ async function enqueue(connection: PoolConnection, blog: BlogToCrawl, tasks: His
   const added = unique.size - existing;
   if (Number(count.total) + added > cap) throw historyLimit('history_task_limit');
   const entries = [...unique.entries()];
-  for (let start = 0; start < entries.length; start += 100) {
-    const batch = entries.slice(start, start + 100);
+  for (let start = 0; start < entries.length; ) {
+    // Full internal bodies make queued rows larger than the former short excerpts.
+    // Bound the escaped SQL packet as well as row count; mysql2.query can double
+    // backslashes/quotes when formatting JSON, so reserve twice the raw byte size.
+    let end = start,
+      bytes = 0;
+    while (end < entries.length && end - start < 100) {
+      const task = entries[end][1];
+      const estimated = 2 * Buffer.byteLength(JSON.stringify(task)) + 2048;
+      if (end > start && bytes + estimated > 4 * 1024 * 1024) break;
+      bytes += estimated;
+      end++;
+    }
+    const batch = entries.slice(start, end);
+    start = end;
     await connection.query(
       `INSERT INTO history_tasks (id,blog_id,url,kind,source_url,source_type,depth,payload,status,created_at) VALUES ${batch.map(() => "(?,?,?,?,?,?,?,?,'pending',?)").join(',')} ON DUPLICATE KEY UPDATE id=id`,
       batch.flatMap(([id, task]) => [

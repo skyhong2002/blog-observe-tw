@@ -60,6 +60,9 @@ try {
     ['relations-quality', '../app/src/relations/quality.integration.ts', 'runRelationQualityIntegration'],
     ['topics', '../tests/integration/topics.mjs', 'runTopicsIntegration'],
     ['topics-quality', '../app/src/topics/integration.ts', 'runTopicsQualityIntegration'],
+    ['content-topics', '../app/src/topics/content.integration.ts', 'runContentTopicsIntegration'],
+    ['content-feed', '../app/src/crawl/feed-content.integration.ts', 'runFeedContentIntegration'],
+    ['content', '../app/src/content/content.integration.ts', 'runContentIntegration'],
     ['admin', '../tests/integration/admin.mjs', 'runAdminIntegration'],
   ];
   for (const [label, module, entry] of suites) {

@@ -182,3 +182,21 @@ it('does not enqueue oEmbed alternatives as history feeds', () => {
   );
   expect(home.tasks.filter((item) => item.kind === 'feed').map((item) => item.url)).toEqual(['https://history.test/real.xml']);
 });
+
+it('keeps all supported platform owner paths and Gamer query identities separate during history import', () => {
+  for (const [home, own, other] of [
+    ['https://note.com/alice', 'https://note.com/alice/n/one', 'https://note.com/bob/n/one'],
+    ['https://matters.town/@alice', 'https://matters.town/@alice/one', 'https://matters.town/@bob/one'],
+    ['https://hackmd.io/@alice', 'https://hackmd.io/@alice/one', 'https://hackmd.io/@bob/one'],
+    ['https://substack.com/@alice', 'https://substack.com/@alice/post', 'https://substack.com/@bob/post'],
+    [
+      'https://home.gamer.com.tw/homeindex.php?owner=alice',
+      'https://home.gamer.com.tw/creation.php?owner=alice&sn=1',
+      'https://home.gamer.com.tw/creation.php?owner=bob&sn=1',
+    ],
+  ]) {
+    expect(historyInPublication(own, home)).toBe(true);
+    expect(historyInPublication(other, home)).toBe(false);
+  }
+  expect(historyInPublication('https://custom.example/elsewhere', 'https://custom.example/blog')).toBe(false);
+});

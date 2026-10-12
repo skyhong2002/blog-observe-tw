@@ -8,6 +8,7 @@ const config = loadConfig();
 const connection = new Redis(config.redisUrl, { maxRetriesPerRequest: null });
 const queue = new Queue(config.queueName, { connection, prefix: config.queuePrefix });
 const relationshipJobs = [
+  'blogs-content',
   'blogs-relation-snapshots',
   'blogs-relations',
   'blogs-publication-discovery',

@@ -169,7 +169,7 @@ function durableFixture(name: string, xml: string, failAt?: string, status = 200
   const fetcher = vi.fn<FeedFetcher>(async (input) =>
     String(input).endsWith('/robots.txt')
       ? new Response('')
-      : new Response(status === 304 ? null : xml, {
+      : new Response(status === 304 ? null : xml.replaceAll('https://metadata.test/', `https://${name}.test/`), {
           status,
           headers: { etag: 'new-etag', 'last-modified': 'Mon, 01 Jun 2026 00:00:00 GMT', 'content-type': 'application/rss+xml' },
         }),
@@ -196,8 +196,8 @@ describe('durable feed import and schema bounds', () => {
     await crawlBlog({ pool: f.pool }, f.blog, f.options);
     const values = f.execute.mock.calls.find(([sql]) => sql.startsWith('INSERT INTO posts'))?.[1];
     const stored = String(values?.[4]);
-    expect(Buffer.byteLength(stored, 'utf8')).toBeLessThanOrEqual(60 * 1024);
-    expect(Buffer.byteLength(stored, 'utf8')).toBeGreaterThan(60 * 1024 - 4);
+    expect(Array.from(stored)).toHaveLength(500);
+    expect(Buffer.byteLength(stored, 'utf8')).toBeLessThanOrEqual(500 * 4);
     expect(stored.isWellFormed()).toBe(true);
     expect(summary.startsWith(stored)).toBe(true);
     expect(Array.from(String(values?.[5]))).toHaveLength(255);
@@ -278,4 +278,15 @@ describe('registered source priority', () => {
     expect(requested.filter((url) => /\/(?:real-post|misc\d+)$/.test(url))).toHaveLength(30);
     expect(requested).not.toContain(`${home}/misc29`);
   }, 15000);
+});
+
+it('does not write another author from a shared platform feed', async () => {
+  const feed = 'https://note.com/alice/rss';
+  const f = setup([{ url: feed, type: 'rss' }], {
+    [feed]:
+      '<rss><channel><item><guid>1</guid><link>https://note.com/bob/n/one</link><title>Another author</title><description>Excerpt</description></item></channel></rss>',
+  });
+  const result = await crawlBlog({ pool: f.pool }, { id: 90, slug: 'owner-boundary', url: 'https://note.com/alice' }, f.options);
+  expect(result.posts).toBe(0);
+  expect(f.execute.mock.calls.some(([sql]) => sql.startsWith('INSERT INTO posts'))).toBe(false);
 });

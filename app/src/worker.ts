@@ -3,6 +3,7 @@ import { Redis } from 'ioredis';
 import pino from 'pino';
 import { runAiBatch } from './ai/batch.ts';
 import { loadConfig } from './config.js';
+import { runContentBatch } from './content/worker.ts';
 import { runCandidateReviewBatch } from './crawl/candidate-review.ts';
 import { discoverBlogblog, discoverSimilar } from './crawl/discovery.ts';
 import { refreshMissingBlogFavicons } from './crawl/favicon-batch.ts';
@@ -47,9 +48,11 @@ const relationsEnabled = process.env.BLOG_RELATIONS_ENABLED === 'true';
 const aiEnabled = process.env.BLOG_AI_ENABLED === 'true';
 const topicsEnabled = process.env.BLOG_TOPICS_ENABLED === 'true';
 const vocabularyEnabled = process.env.BLOG_VOCABULARY_ENABLED === 'true';
+const contentEnabled = process.env.BLOG_CONTENT_ENABLED === 'true';
 const shutdown = new AbortController();
 const missingIconsEnabled = process.env.BLOG_MISSING_FAVICONS_ENABLED !== 'false';
 for (const [name, every, enabled] of [
+  ['blogs-content', 5 * 60_000, contentEnabled],
   ['blogs-relation-snapshots', 5 * 60_000, process.env.BLOG_RELATION_SNAPSHOTS_ENABLED !== 'false'],
   ['blogs-relations', 5 * 60_000, relationsEnabled],
   ['blogs-publication-discovery', 30 * 60_000, relationsEnabled],
@@ -76,6 +79,7 @@ const worker = new Worker(
       userAgent: config.crawlUserAgent,
       delayMs: config.crawlDelayMs,
     };
+    if (job.name === 'blogs-content') return contentEnabled ? runContentBatch(store.pool, batchOptions) : { skipped: 'disabled' };
     if (job.name === 'blogs-relation-snapshots') return runRelationSnapshotBatch(store.pool, batchOptions);
     if (job.name === 'blogs-publication-discovery')
       return relationsEnabled ? runPublicationDiscoveryBatch(store.pool, batchOptions) : { skipped: 'disabled' };

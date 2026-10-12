@@ -1,11 +1,12 @@
 import { createHash } from 'node:crypto';
 import type { Pool, RowDataPacket } from 'mysql2/promise';
 import { fetch as undiciFetch } from 'undici';
+import { ingestContentEvidence, storedRelationContent } from '../content/store.ts';
 import { type FeedFetcher, politeFetch } from '../crawl/feed.ts';
 import { reserveBudget } from '../jobs/budget.ts';
 import type { BatchOptions, BatchResult } from '../jobs/contracts.ts';
 import { withJobLease } from '../jobs/lease.ts';
-import { PARSER_VERSION, parseArticleLinks } from './parser.ts';
+import { PARSER_VERSION } from './parser.ts';
 import { invalidateRelationCache } from './routes.ts';
 import {
   type ArticleRow,
@@ -69,6 +70,7 @@ export async function relationBudgetAvailable(pool: Pool, url: string, now = new
 
 export function relationFailureCode(error: unknown): string {
   const message = error instanceof Error ? error.message : '';
+  if (message === 'content_not_complete') return 'body-incomplete';
   if (/relation_http_budget/.test(message)) return 'budget-exhausted';
   if (/relation_batch_stopped/.test(message)) return 'batch-stopped';
   if (/robots disallow/.test(message)) return 'robots-denied-or-unavailable';
@@ -79,7 +81,8 @@ export function relationFailureCode(error: unknown): string {
 }
 
 /** Called only by the explicitly enabled worker scheduler. One lease, bounded pages and durable UTC budgets. */
-export async function runRelationBatch(pool: Pool, options: BatchOptions = {}): Promise<BatchResult> {
+export async function runRelationBatch(pool: Pool, options: BatchOptions & { blogId?: number } = {}): Promise<BatchResult> {
+  if (options.blogId !== undefined && (!Number.isSafeInteger(options.blogId) || options.blogId < 1)) throw Error('invalid blog id');
   const empty: BatchResult = { processed: 0, skipped: 0, truncated: false, reservedUnused: 0 };
   return (
     (await withJobLease(pool, 'relations', async (assertLease) => {
@@ -92,10 +95,10 @@ export async function runRelationBatch(pool: Pool, options: BatchOptions = {}): 
       const [rows] = await pool.query<RowDataPacket[]>(
         `SELECT p.id,p.blog_id,p.url,p.published_at,b.url blog_url,COALESCE(rp.depth,0) depth,o.etag,o.last_modified,o.status,o.parser_version
       FROM posts p JOIN blogs b ON b.id=p.blog_id LEFT JOIN relation_observations o ON o.post_id=p.id
-      LEFT JOIN relation_publications rp ON rp.blog_id=b.id
-      WHERE b.status='verified' AND (o.post_id IS NULL OR o.next_attempt_at<=? OR (o.parser_version<>? AND o.status IN ('ok','no-body') AND o.error_code IS NULL))
+      LEFT JOIN relation_publications rp ON rp.blog_id=b.id LEFT JOIN content_post_bodies cb ON cb.post_id=p.id
+      WHERE b.status='verified' AND (? IS NULL OR p.blog_id=?) AND (o.post_id IS NULL OR o.next_attempt_at<=? OR (o.parser_version<>? AND o.status IN ('ok','no-body') AND o.error_code IS NULL) OR (cb.status='ok' AND NOT(o.extraction<=>CONCAT('content:',cb.source_kind,':',LEFT(cb.content_hash,24)))))
       ORDER BY COALESCE(o.next_attempt_at,'1970-01-01'),p.published_at DESC,p.id DESC LIMIT ?`,
-        [now(), PARSER_VERSION, 50],
+        [options.blogId ?? null, options.blogId ?? null, now(), PARSER_VERSION, 50],
       );
       const fetcher = budgetedRelationFetcher(pool, options, assertLease, deadline);
       let attempts = 0;
@@ -107,6 +110,15 @@ export async function runRelationBatch(pool: Pool, options: BatchOptions = {}): 
         }
         await assertLease();
         const post = raw as ArticleRow;
+        const cached = await storedRelationContent(pool, post.id, post.blog_id, aliases);
+        if (cached) {
+          await saveObservation(pool, post, cached.parsed, new Response(null), now());
+          await discoverCandidates(pool, post, cached.parsed, now());
+          result.processed++;
+          attempts++;
+          continue;
+        }
+
         if (!(await relationBudgetAvailable(pool, post.url, now()))) {
           await deferObservation(pool, post, now());
           result.skipped++;
@@ -139,7 +151,36 @@ export async function runRelationBatch(pool: Pool, options: BatchOptions = {}): 
           } else {
             if (!response.ok) throw Error(`http_${response.status}`);
             if (!/text\/html|application\/xhtml\+xml/i.test(response.headers.get('content-type') || '')) throw Error('non-html');
-            const parsed = parseArticleLinks(await response.text(), response.url || post.url, post.blog_id, aliases);
+            const html = await response.text();
+            const c = await pool.getConnection();
+            try {
+              await c.beginTransaction();
+              await ingestContentEvidence(
+                c,
+                {
+                  postId: post.id,
+                  blogId: post.blog_id,
+                  blogUrl: post.blog_url,
+                  articleUrl: post.url,
+                  sourceUrl: response.url || post.url,
+                  html,
+                  kind: 'article-html',
+                  obtainedAt: now(),
+                  etag: response.headers.get('etag'),
+                  lastModified: response.headers.get('last-modified'),
+                },
+                now(),
+              );
+              await c.commit();
+            } catch (error) {
+              await c.rollback();
+              throw error;
+            } finally {
+              c.release();
+            }
+            const content = await storedRelationContent(pool, post.id, post.blog_id, aliases);
+            if (!content) throw Error('content_not_complete');
+            const parsed = content.parsed;
             await assertLease();
             await saveObservation(pool, post, parsed, response, now());
             await discoverCandidates(pool, post, parsed, now());

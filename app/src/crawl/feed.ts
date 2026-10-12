@@ -6,14 +6,28 @@ import * as cheerio from 'cheerio';
 import { XMLParser, XMLValidator } from 'fast-xml-parser';
 import type { Pool } from 'mysql2/promise';
 import { Agent, type Dispatcher, fetch as undiciFetch } from 'undici';
+import { type Completeness, type ContentKind, MAX_CONTENT_HTML_BYTES } from '../content/contracts.ts';
+import { ingestContentEvidence } from '../content/store.ts';
+import { identityKey, publicationDecision } from '../relations/identity.ts';
 
 export type FeedSourceType = 'rss' | 'atom' | 'sitemap' | 'wordpress';
 export type FeedLink = { url: string; type: FeedSourceType };
+/** Internal-only evidence. Public lists and RSS continue reading the bounded posts.summary. */
+export type FeedContent = {
+  html: string;
+  kind: ContentKind;
+  completeness: Completeness;
+  sourceUrl: string;
+  obtainedAt?: string;
+  modifiedAt?: string | null;
+  truncated?: boolean;
+};
 export type FeedEntry = {
   guid: string;
   url: string;
   title: string;
   summary: string;
+  content?: FeedContent;
   author: string | null;
   publishedAt: Date | null;
   updatedAt: Date | null;
@@ -108,6 +122,37 @@ const truncateUtf8 = (value: string, maxBytes: number): string => {
   }
   return result;
 };
+export const MAX_CONTENT_BYTES = MAX_CONTENT_HTML_BYTES;
+export const MAX_PUBLIC_SUMMARY_CHARACTERS = 500;
+/** Text-only short display preview; full content has its own private evidence field. */
+export function publicSummary(html: string): string {
+  const $ = cheerio.load(html);
+  $('script,style,noscript,iframe').remove();
+  return truncateCharacters($.root().text().replace(/\s+/g, ' ').trim(), MAX_PUBLIC_SUMMARY_CHARACTERS);
+}
+const escapedText = (value: string) => value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+/** Only explicit continuation markers downgrade a content field; short/image-only entries remain valid full bodies. */
+export function boundedFeedContent(content: FeedContent, maxBytes = MAX_CONTENT_BYTES): FeedContent {
+  const html = truncateUtf8(content.html, Math.min(MAX_CONTENT_BYTES, maxBytes));
+  const truncated = Boolean(content.truncated) || html !== content.html;
+  const $ = cheerio.load(html);
+  const excerpt =
+    $('.more-link,.read-more,.readmore,[data-excerpt="true"]').length > 0 ||
+    $('a')
+      .toArray()
+      .some((node) =>
+        /^(?:read (?:the )?(?:full (?:post|article)|more)|continue reading|繼續閱讀|閱讀全文|阅读全文|繼續閲讀)(?:\s*[»›→…]+)?$/i.test(
+          $(node).text().trim(),
+        ),
+      );
+  return {
+    ...content,
+    html,
+    completeness: truncated || excerpt ? 'partial' : content.completeness,
+    ...(truncated ? { truncated: true } : {}),
+  };
+}
+
 const shortHash = (value: string) => createHash('sha256').update(value).digest('hex');
 const hostnameOf = (url: URL): string => url.hostname.replace(/^\[|\]$/g, '');
 
@@ -448,19 +493,62 @@ export function parseFeed(xml: string, baseUrl: string): FeedEntry[] {
   } catch {
     return [];
   }
+  // Keep XHTML markup separately; the metadata parser intentionally flattens text fields.
+  const obtainedAt = new Date().toISOString();
+  const xmlDocument = cheerio.load(xml, { xmlMode: true });
+  const local = (name: string) => name.split(':').at(-1)?.toLowerCase();
+  const xmlRoot = xmlDocument.root().children().first();
+  const xmlEntries =
+    local(xmlRoot[0]?.tagName || '') === 'rss'
+      ? xmlRoot
+          .children()
+          .filter((_, node) => local(node.tagName) === 'channel')
+          .first()
+          .children()
+          .filter((_, node) => local(node.tagName) === 'item')
+      : xmlRoot.children().filter((_, node) => local(node.tagName) === 'entry');
+  const fieldHtml = (index: number, name: string, atom = false): string => {
+    const node = xmlEntries
+      .eq(index)
+      .children()
+      .filter((_, child) => local(child.tagName) === name)
+      .first();
+    if (!node.length || node.attr('src')) return '';
+    const type = (node.attr('type') || (atom ? 'text' : 'html')).toLowerCase();
+    if (type === 'xhtml' || type === 'application/xhtml+xml') return node.html() || '';
+    if (!['html', 'text/html', 'text', 'text/plain'].includes(type)) return '';
+    const value = node.text();
+    if (type === 'text' || type === 'text/plain') return escapedText(value);
+    return value;
+  };
   const channel = (root.rss as Record<string, unknown> | undefined)?.channel as Record<string, unknown> | undefined;
   if (channel) {
     if (isCommentsFeed(baseUrl, textOf(channel.title))) return [];
     return asArray(channel.item as unknown)
-      .map((item): FeedEntry | null => {
+      .map((item, index): FeedEntry | null => {
         const object = (item || {}) as Record<string, unknown>;
         const url = absolute(object.link ?? object.guid, baseUrl);
         if (!url || /#comment|[?&]replytocom=/i.test(url)) return null;
+        const full = fieldHtml(index, 'encoded') || textOf(object.encoded || object['content:encoded']);
+        const description = fieldHtml(index, 'description') || textOf(object.description);
+        const html = full || description;
         return {
           guid: textOf(object.guid || object.link || object.title).slice(0, 1024),
           url,
           title: textOf(object.title) || '未命名文章',
-          summary: textOf(object.description || object.encoded || object['content:encoded']),
+          summary: publicSummary(description || full),
+          ...(html
+            ? {
+                content: boundedFeedContent({
+                  html,
+                  kind: 'rss-content',
+                  completeness: full ? 'full' : 'partial',
+                  sourceUrl: baseUrl,
+                  obtainedAt,
+                  modifiedAt: dateOf(object.updated || object.pubDate)?.toISOString() ?? null,
+                }),
+              }
+            : {}),
           author: textOf(object.author || object.creator || object['dc:creator']) || null,
           publishedAt: dateOf(object.pubDate || object.published || object.date),
           updatedAt: dateOf(object.updated || object.pubDate),
@@ -478,17 +566,32 @@ export function parseFeed(xml: string, baseUrl: string): FeedEntry[] {
   if (atom) {
     if (isCommentsFeed(baseUrl, textOf(atom.title))) return [];
     return asArray(atom.entry as unknown)
-      .map((entry): FeedEntry | null => {
+      .map((entry, index): FeedEntry | null => {
         const object = (entry || {}) as Record<string, unknown>;
         const links = asArray(object.link as unknown).map((item) => (item || {}) as Record<string, unknown>);
         const link = links.find((item) => item['@_rel'] === 'alternate') || links[0];
         const url = absolute(link?.['@_href'] || link, baseUrl);
         if (!url || /#comment|[?&]replytocom=/i.test(url)) return null;
+        const full = fieldHtml(index, 'content', true);
+        const summary = fieldHtml(index, 'summary', true);
+        const html = full || summary;
         return {
           guid: textOf(object.id || link?.['@_href'] || object.title).slice(0, 1024),
           url,
           title: textOf(object.title) || '未命名文章',
-          summary: textOf(object.summary || object.content),
+          summary: publicSummary(summary || full),
+          ...(html
+            ? {
+                content: boundedFeedContent({
+                  html,
+                  kind: 'atom-content',
+                  completeness: full ? 'full' : 'partial',
+                  sourceUrl: baseUrl,
+                  obtainedAt,
+                  modifiedAt: dateOf(object.updated || object.published)?.toISOString() ?? null,
+                }),
+              }
+            : {}),
           author: textOf((object.author as Record<string, unknown> | undefined)?.name || object.author) || null,
           publishedAt: dateOf(object.published),
           updatedAt: dateOf(object.updated || object.published),
@@ -538,12 +641,13 @@ const cleanMetadata = (value: unknown, max: number): string => textOf(value).rep
 
 /** A sitemap proves a URL exists, not that it is an article. Never index shop/category URLs by their path alone. */
 export function parseSitemapArticle(html: string, candidate: FeedEntry, finalUrl: string): FeedEntry | null {
+  const expectedIdentity = articleIdentityKey(candidate.url);
+  if (!expectedIdentity || expectedIdentity !== articleIdentityKey(finalUrl)) return null;
   const $ = cheerio.load(html);
   const meta = (name: string) => $(`meta[property="${name}"], meta[name="${name}"]`).first().attr('content') || '';
-  const pageIdentity = (value: string) => {
-    const url = new URL(value, finalUrl);
-    return `${url.hostname.replace(/^www\./, '')}${url.pathname.replace(/\/$/, '')}`;
-  };
+  const pageIdentity = (value: string) => articleIdentityKey(value, finalUrl);
+  const canonical = $('link[rel="canonical"]').first().attr('href');
+  if (canonical && pageIdentity(canonical) !== expectedIdentity) return null;
   const articles: Record<string, unknown>[] = [];
   let visited = 0;
   const inspect = (value: unknown) => {
@@ -586,7 +690,15 @@ export function parseSitemapArticle(html: string, candidate: FeedEntry, finalUrl
     ...candidate,
     url: finalUrl,
     title,
-    summary: cleanMetadata(article?.description || meta('og:description') || meta('description'), 20_000),
+    summary: publicSummary(cleanMetadata(article?.description || meta('og:description') || meta('description'), 20_000)),
+    content: boundedFeedContent({
+      html,
+      kind: 'article-html',
+      completeness: 'unknown',
+      sourceUrl: finalUrl,
+      obtainedAt: new Date().toISOString(),
+      modifiedAt: (dateOf(article?.dateModified || meta('article:modified_time')) || candidate.updatedAt)?.toISOString() ?? null,
+    }),
     author: cleanMetadata(objectOf(author)?.name || author || meta('author'), 255) || null,
     publishedAt,
     updatedAt: dateOf(article?.dateModified || meta('article:modified_time')) || candidate.updatedAt,
@@ -600,23 +712,28 @@ export function parseSitemapArticle(html: string, candidate: FeedEntry, finalUrl
   };
 }
 
-function sitemapUrlInBlog(value: string, home: string): boolean {
-  const url = new URL(value);
-  const blog = new URL(home);
-  const host = (item: URL) => item.hostname.replace(/^www\./, '');
-  if (host(url) !== host(blog)) return false;
-  if (!['medium.com', 'vocus.cc', 'xuite.net'].includes(host(blog))) return true;
-  const path = blog.pathname.replace(/\/$/, '');
-  return url.pathname === path || url.pathname.startsWith(`${path}/`);
+/** Shared publication boundary for feed/history article URLs, including path/query-owned platforms. */
+export function articleInPublication(value: string, home: string): boolean {
+  if (!isAllowedCrawlUrl(value) || !isAllowedCrawlUrl(home)) return false;
+  const url = new URL(value),
+    blog = new URL(home);
+  if (url.hostname.replace(/^www\./, '') !== blog.hostname.replace(/^www\./, '')) return false;
+  const source = publicationDecision(home).home,
+    target = publicationDecision(value).home;
+  if (!source || !target || identityKey(source) !== identityKey(target)) return false;
+  if (blog.hostname === 'home.gamer.com.tw')
+    return Boolean(blog.searchParams.get('owner')) && blog.searchParams.get('owner') === url.searchParams.get('owner');
+  const path = blog.pathname.replace(/\/+$/, '');
+  return !path || url.pathname.replace(/\/+$/, '') === path || url.pathname.startsWith(`${path}/`);
 }
 
 async function verifySitemapArticles(entries: FeedEntry[], blogUrl: string, options: FeedCrawlerOptions): Promise<FeedEntry[]> {
   const verified: FeedEntry[] = [];
   for (const candidate of entries) {
-    if (!sitemapUrlInBlog(candidate.url, blogUrl)) continue;
+    if (!articleInPublication(candidate.url, blogUrl)) continue;
     try {
       const response = await politeFetch(candidate.url, { accept: 'text/html,application/xhtml+xml' }, options);
-      if (!response.ok || !sitemapUrlInBlog(response.url || candidate.url, blogUrl)) continue;
+      if (!response.ok || !articleInPublication(response.url || candidate.url, blogUrl)) continue;
       const contentType = response.headers.get('content-type');
       if (contentType && !/text\/html|application\/xhtml\+xml/i.test(contentType)) continue;
       const article = parseSitemapArticle(await response.text(), candidate, response.url || candidate.url);
@@ -668,6 +785,18 @@ export function canonicalArticleUrl(value: string): string {
   return url.href;
 }
 
+/** Article identity retains meaningful query IDs (unlike a publication/owner identity). */
+export function articleIdentityKey(value: string, base?: string): string | null {
+  try {
+    const resolved = new URL(value, base).href;
+    if (!isAllowedCrawlUrl(resolved)) return null;
+    const url = new URL(canonicalArticleUrl(resolved));
+    return `${url.hostname.toLowerCase().replace(/^www\./, '')}${url.pathname.replace(/\/+$/, '')}${url.search}`;
+  } catch {
+    return null;
+  }
+}
+
 /** Shared writer. Production callers hold the blog row in a transaction so URL/guid identity is serialized. */
 export async function writeFeedEntries(
   pool: SqlPool,
@@ -678,13 +807,15 @@ export async function writeFeedEntries(
 ): Promise<number> {
   let written = 0;
   for (const original of entries) {
+    if (!articleInPublication(original.url, blog.url)) continue;
     const entry = { ...original, url: canonicalArticleUrl(original.url) };
     const [existingUrl] = await pool.execute('SELECT guid FROM posts WHERE blog_id=? AND url=? ORDER BY id LIMIT 1', [blog.id, entry.url]);
     if (Array.isArray(existingUrl) && existingUrl[0]) entry.guid = String((existingUrl[0] as { guid: string }).guid);
     const title = truncateCharacters(entry.title, 512);
     // MariaDB TEXT is limited in bytes. Chinese/emoji summaries can exceed
     // it long before a JavaScript string reaches 65k characters.
-    const summary = truncateUtf8(entry.summary || '', 60 * 1024);
+    // Parsers already emit plain text. Re-parsing it as HTML would erase literal code such as <div>.
+    const summary = truncateCharacters((entry.summary || '').replace(/\s+/g, ' ').trim(), MAX_PUBLIC_SUMMARY_CHARACTERS);
     const author = entry.author ? truncateCharacters(entry.author.trim(), 255) || null : null;
     // Truncating a URL creates a different resource; omit an oversized image.
     const imageUrl = entry.imageUrl && entry.imageUrl.length <= 1024 ? entry.imageUrl : null;
@@ -706,6 +837,21 @@ export async function writeFeedEntries(
         now,
       ],
     );
+    if (entry.content?.html) {
+      const content = boundedFeedContent(entry.content);
+      await ingestContentEvidence(
+        pool,
+        {
+          ...content,
+          blogId: blog.id,
+          blogUrl: blog.url,
+          articleUrl: entry.url,
+          obtainedAt: content.obtainedAt ? dateOf(content.obtainedAt) || now : now,
+          modifiedAt: content.modifiedAt ? dateOf(content.modifiedAt) : entry.updatedAt,
+        },
+        now,
+      );
+    }
     // A pen name is resolved within this blog only. Matching names on two
     // sites therefore create two author identities until a human explicitly
     // merges them. Crawler updates never replace manual/community links.
@@ -878,7 +1024,9 @@ export async function crawlBlog(
     try {
       if (connection) {
         await connection.beginTransaction();
-        await connection.execute('SELECT id FROM blogs WHERE id=? FOR UPDATE', [blog.id]);
+        const [current] = await connection.execute('SELECT id,url,status FROM blogs WHERE id=? FOR UPDATE', [blog.id]);
+        const row = Array.isArray(current) ? (current[0] as { url?: string; status?: string } | undefined) : undefined;
+        if (row?.url !== blog.url || row?.status !== 'verified') throw new Error('crawl_blog_identity_changed');
       }
       total += await writeFeedEntries(writer, blog, source, entries, now);
       // A validator acknowledges durable import of the entire source, including

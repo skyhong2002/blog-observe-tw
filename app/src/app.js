@@ -8,9 +8,12 @@ import { registerLogin } from './auth/google-login.ts';
 import { dbLoginStore } from './auth/store.ts';
 import { loadCatalog } from './catalog.js';
 import { loadAuthorCatalog } from './catalog-authors.js';
+import { registerContentRoutes } from './content/routes.ts';
 import { createDb } from './db/client.ts';
 import { loadOverview } from './overview.js';
+import { publicPost, publicRss } from './public-post.ts';
 import { registerRelationRoutes } from './relations/routes.ts';
+import { registerSearchRoutes } from './search.ts';
 import { registerTopicRoutes } from './topics/routes.ts';
 import { createUiProxy } from './ui-proxy.js';
 import { iconManifest, registerFavicons } from './v1/favicon-routes.ts';
@@ -20,10 +23,6 @@ import { registerSimilarwebTraffic } from './v1/similarweb-routes.ts';
 const esc = (value) =>
   String(value ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&apos;' })[c]);
 const sameOrigin = (request, origin) => !request.headers.origin || request.headers.origin === origin;
-
-function rss(items, title, link) {
-  return `<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"><channel><title>${esc(title)}</title><link>${esc(link)}</link><description>${esc(title)}</description>${items.map((item) => `<item><title>${esc(item.title)}</title><link>${esc(item.url)}</link><guid>${esc(item.guid || item.url)}</guid>${item.publishedAt ? `<pubDate>${esc(new Date(item.publishedAt).toUTCString())}</pubDate>` : ''}<description>${esc(item.summary || '')}</description></item>`).join('')}</channel></rss>`;
-}
 
 export async function buildApp(config, { logger = false, store = null } = {}) {
   const app = Fastify({ logger, logController: new LogController({ disableRequestLogging: true }), exposeHeadRoutes: true });
@@ -47,6 +46,8 @@ export async function buildApp(config, { logger = false, store = null } = {}) {
   registerRelationRoutes(app, pool);
   registerAiRoutes(app, pool);
   registerTopicRoutes(app, pool);
+  registerSearchRoutes(app, pool);
+  registerContentRoutes(app, pool);
   for (const type of ['application/xml', 'text/xml', 'application/x-opml']) {
     app.addContentTypeParser(type, { parseAs: 'string', bodyLimit: 1024 * 1024 }, (_request, body, done) => done(null, body));
   }
@@ -109,7 +110,7 @@ export async function buildApp(config, { logger = false, store = null } = {}) {
       FROM blogs b WHERE b.status <> 'moved' AND (EXISTS (SELECT 1 FROM blog_tags bt WHERE bt.blog_id=b.id AND bt.tag_id=? AND bt.status='active') OR EXISTS (SELECT 1 FROM posts p JOIN post_tags pt ON pt.post_id=p.id WHERE p.blog_id=b.id AND pt.tag_id=? AND pt.status='active')) ORDER BY b.name LIMIT 200`,
       [tags[0].id, tags[0].id],
     );
-    return { tag: tags[0], posts, blogs };
+    return { tag: tags[0], posts: posts.map(publicPost), blogs };
   });
 
   app.get('/api/blogs', async (request) => {
@@ -142,7 +143,7 @@ export async function buildApp(config, { logger = false, store = null } = {}) {
        WHERE bt.blog_id=? AND bt.status='active' AND t.visibility='public' AND t.status='active' ORDER BY t.label`,
       [blogs[0].id],
     );
-    return { blog: { ...blogs[0], iconUrl: iconUrl(blogs[0].slug, await iconManifest()), authors, tags }, posts };
+    return { blog: { ...blogs[0], iconUrl: iconUrl(blogs[0].slug, await iconManifest()), authors, tags }, posts: posts.map(publicPost) };
   });
 
   const login = registerLogin(app, config.login ? dbLoginStore(own.db, { pool, adminEmails: config.adminEmails }) : null, config.login);
@@ -196,7 +197,7 @@ export async function buildApp(config, { logger = false, store = null } = {}) {
     );
     return reply
       .type('application/rss+xml; charset=utf-8')
-      .send(rss(items, '我的 blog.observe.tw 閱讀清單', `${config.publicOrigin}/me/feed.xml`));
+      .send(publicRss(items, '我的 blog.observe.tw 閱讀清單', `${config.publicOrigin}/me/feed.xml`));
   });
   app.get('/me/opml', async (request, reply) => {
     const user = await requireUser(request, reply);

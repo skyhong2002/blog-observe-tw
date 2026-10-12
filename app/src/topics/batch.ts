@@ -3,6 +3,7 @@ import type { Pool, RowDataPacket } from 'mysql2/promise';
 import { reserveBudget } from '../jobs/budget.ts';
 import type { BatchOptions, BatchResult } from '../jobs/contracts.ts';
 import { withJobLease } from '../jobs/lease.ts';
+import { topicBodyHash, topicBodyJoins, topicBodyText } from './body.ts';
 import { digest, TopicMatcher } from './matcher.ts';
 import { SOURCE } from './snapshot-client.ts';
 
@@ -23,11 +24,11 @@ export async function runTopicsBatch(pool: Pool, options: BatchOptions = {}): Pr
       const started = Date.now();
       const [posts] = await pool.query<RowDataPacket[]>(
         `SELECT p.id,p.title,p.summary,p.content_hash,
-      CASE WHEN o.status='ok' THEN o.body_text END body_text, CASE WHEN o.status='ok' THEN o.content_hash END body_hash
-      FROM posts p JOIN blogs b ON b.id=p.blog_id LEFT JOIN relation_observations o ON o.post_id=p.id
+      ${topicBodyText} body_text, ${topicBodyHash} body_hash
+      FROM posts p JOIN blogs b ON b.id=p.blog_id ${topicBodyJoins}
       LEFT JOIN topic_post_indexes i ON i.post_id=p.id
       WHERE b.status<>'moved' AND (i.post_id IS NULL OR i.snapshot_id<>? OR NOT(i.post_hash<=>p.content_hash)
-      OR NOT(i.body_hash<=>(CASE WHEN o.status='ok' THEN o.content_hash END))) ORDER BY p.published_at DESC,p.id DESC LIMIT ?`,
+      OR NOT(i.body_hash<=>(${topicBodyHash}))) ORDER BY p.published_at DESC,p.id DESC LIMIT ?`,
         [current.snapshot_id, limit],
       );
       result.truncated = posts.length === limit;
@@ -54,7 +55,7 @@ export async function runTopicsBatch(pool: Pool, options: BatchOptions = {}): Pr
         try {
           await c.beginTransaction();
           const [[fresh]] = await c.query<RowDataPacket[]>(
-            `SELECT p.content_hash,CASE WHEN o.status='ok' THEN o.content_hash END body_hash FROM posts p LEFT JOIN relation_observations o ON o.post_id=p.id WHERE p.id=? FOR UPDATE`,
+            `SELECT p.content_hash,${topicBodyHash} body_hash FROM posts p ${topicBodyJoins} WHERE p.id=? FOR UPDATE`,
             [p.id],
           );
           if (!fresh || fresh.content_hash !== p.content_hash || fresh.body_hash !== p.body_hash) {

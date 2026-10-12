@@ -1,8 +1,17 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { buildApp } from './app.js';
 import { loadOverview } from './overview.js';
 
 describe('read-only frontend projection', () => {
+  it('coalesces the homepage projection per pool for sixty seconds', async () => {
+    const query = vi.fn(async (sql: string) => [sql.includes('AS blogs,') ? [{ blogs: 1, posts: 1, updatedAt: null }] : []]);
+    const pool = { query };
+    const results = await Promise.all(Array.from({ length: 12 }, () => loadOverview(pool)));
+    expect(query).toHaveBeenCalledTimes(6);
+    expect(results[0].cacheSeconds).toBe(60);
+    await loadOverview(pool);
+    expect(query).toHaveBeenCalledTimes(6);
+  });
   it('returns separate indexed counts and the actual collection timestamp', async () => {
     const responses = [
       [{ title: '一張照片', publishedAt: null }],
@@ -10,6 +19,17 @@ describe('read-only frontend projection', () => {
       [],
       [],
       [{ blogs: 135, posts: 88, updatedAt: '2026-10-12T02:56:36Z' }],
+      [
+        {
+          id: 99,
+          slug: 'low-frequency',
+          postCount: '1',
+          latestPostId: 7,
+          latestPostTitle: '最新',
+          latestPostUrl: 'https://low.example/new',
+          latestPostPublishedAt: '2026-10-12T02:00:00Z',
+        },
+      ],
     ];
     const sql: string[] = [];
     const data = await loadOverview({
@@ -23,6 +43,10 @@ describe('read-only frontend projection', () => {
     expect(data.posts[0].publishedAt).toBeNull();
     expect(sql.every((query) => query.trim().startsWith('SELECT'))).toBe(true);
     expect(sql[1]).toContain("t.visibility='public'");
+    expect(data.recentBlogs[0]).toMatchObject({ slug: 'low-frequency', postCount: 1, latestPost: { id: 7, title: '最新' } });
+    expect(data.recentBlogs[0]).not.toHaveProperty('latestPostId');
+    expect(sql[5]).toContain('ORDER BY latest.published_at DESC');
+    expect(sql[5]).not.toContain('ORDER BY postCount');
   });
 
   it('terminates unknown API paths at the gateway instead of looping through Next', async () => {

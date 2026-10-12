@@ -23,7 +23,7 @@ function fixture(failWrite = false) {
     commit: vi.fn(async () => {}),
     rollback: vi.fn(async () => {}),
     release: vi.fn(),
-    query: vi.fn(async (sql: string) => {
+    query: vi.fn(async (sql: string, _params?: unknown[]) => {
       queries.push(sql);
       if (sql.startsWith('SELECT id,url,status')) return [[{ id: 7, url: blog.url, status: 'verified' }], []];
       if (sql.startsWith('SELECT * FROM history_tasks')) return [[{ ...task, source_url: task.sourceUrl }], []];
@@ -182,5 +182,33 @@ it('initializes only real syndication sources from legacy feed_sources rows', as
   const values = query.mock.calls.find(([sql]) => sql.startsWith('INSERT INTO history_tasks'))?.[1];
   expect(values).toContain(`${blog.url}official.xml`);
   expect(values?.some((value) => typeof value === 'string' && value.includes('/oembed/'))).toBe(false);
+  await store.release();
+});
+
+it('splits large durable body rows into bounded SQL packets', async () => {
+  const f = fixture();
+  const store = createHistoryStore(f.pool);
+  await store.acquire();
+  const tasks = Array.from({ length: 30 }, (_, index) => ({
+    url: `${blog.url}large-${index}`,
+    sourceUrl: blog.url,
+    sourceType: 'rss' as const,
+    kind: 'entry' as const,
+    depth: 1,
+    payload: {
+      entry: {
+        ...result.entries[0],
+        url: `${blog.url}large-${index}`,
+        publishedAt: null,
+        updatedAt: null,
+        content: { html: 'x'.repeat(200 * 1024), kind: 'rss-content' as const, completeness: 'full' as const, sourceUrl: blog.url },
+      },
+    },
+  }));
+  await store.commitTask(blog, task, { ...result, entries: [], tasks }, caps, new Date());
+  const inserts = f.connection.query.mock.calls.filter(([sql]) => sql.startsWith('INSERT INTO history_tasks'));
+  expect(inserts.length).toBeGreaterThan(1);
+  for (const [, values] of inserts) expect(Buffer.byteLength(JSON.stringify(values)) * 2).toBeLessThan(4 * 1024 * 1024);
+  expect(f.connection.commit).toHaveBeenCalledOnce();
   await store.release();
 });

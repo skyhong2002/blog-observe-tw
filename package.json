@@ -32,7 +32,9 @@
     "ai:once": "node --env-file-if-exists=.env tools/ai-once.ts",
     "topics:once": "node --env-file-if-exists=.env tools/topics-once.ts",
     "vocabulary:sync": "node --env-file-if-exists=.env tools/topics-once.ts --sync",
-    "test:integration": "node tools/test-integration.mjs"
+    "test:integration": "node tools/test-integration.mjs",
+    "content:once": "node --env-file-if-exists=.env tools/content-once.ts",
+    "test:web": "node --test web/test/*.test.ts"
   },
   "dependencies": {
     "@fastify/rate-limit": "^11.2.0",

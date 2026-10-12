@@ -19,3 +19,8 @@ skyhong2002/youtube-board platform/jobs/src (local reviewed implementation,
 2026-10-12); provider contract from tag's tag-vocabulary-export worktree. These
 adaptations retain the MIT license and upstream copyright:
 Copyright (c) 2026 Sky Hong
+
+Article content extraction, JSON-LD entity selection and per-source registry
+patterns selectively adapted from app/src/crawl/article-content.ts, article.ts
+and registry.ts at tag.observe.tw afe0a653fa8aae7e25a04a1d9fe87bf0400a2a39.
+Copyright (c) 2026 Sky Hong

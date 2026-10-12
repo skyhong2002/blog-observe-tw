@@ -2,14 +2,18 @@ import { createHash } from 'node:crypto';
 import * as cheerio from 'cheerio';
 import { XMLParser, XMLValidator } from 'fast-xml-parser';
 import {
+  articleInPublication,
   type BlogToCrawl,
+  boundedFeedContent,
   canonicalArticleUrl,
   type FeedEntry,
   isAllowedCrawlUrl,
   isCommentsFeed,
   isNonSyndicationSource,
+  MAX_PUBLIC_SUMMARY_CHARACTERS,
   parseFeed,
   parseSitemap,
+  publicSummary,
   rankedSitemapUrls,
 } from './feed.ts';
 import type { HistoryPageResult, HistoryTask, HistoryTaskInput, StoredEntry } from './history-types.ts';
@@ -36,15 +40,9 @@ export function historyTaskKey(blogId: number, task: HistoryTaskInput) {
 
 /** Same-site author identity; the platform's global domain is never an identity. */
 export function historyInPublication(value: string, homepage: string): boolean {
-  if (!safe(value) || !safe(homepage)) return false;
-  const url = new URL(value);
-  const home = new URL(homepage);
-  if (!sameHost(url, home)) return false;
-  if (!sharedHosts.has(home.hostname.replace(/^www\./, ''))) return true;
-  const path = home.pathname.replace(/\/+$/, '');
-  if (!path) return false;
-  return url.pathname.replace(/\/+$/, '') === path || url.pathname.startsWith(`${path}/`);
+  return safe(value) && safe(homepage) && articleInPublication(value, homepage);
 }
+
 export function historySourceInScope(value: string, blog: BlogToCrawl, sourceUrl: string): boolean {
   if (!safe(value)) return false;
   if (historyInPublication(value, blog.url)) return true;
@@ -76,9 +74,10 @@ function utf8Prefix(value: string, bytes = 60 * 1024) {
   return result;
 }
 export function storedEntry(entry: FeedEntry): StoredEntry {
-  return {
+  const stored: StoredEntry = {
     ...entry,
-    summary: utf8Prefix(entry.summary),
+    summary: Array.from(entry.summary.replace(/\s+/g, ' ').trim()).slice(0, MAX_PUBLIC_SUMMARY_CHARACTERS).join(''),
+    ...(entry.content ? { content: boundedFeedContent(entry.content) } : {}),
     title: Array.from(entry.title).slice(0, 512).join(''),
     guid: entry.guid.length > 1024 ? `sha256:${historyHash(entry.guid)}` : entry.guid,
     author: entry.author ? Array.from(entry.author).slice(0, 255).join('') : null,
@@ -87,6 +86,21 @@ export function storedEntry(entry: FeedEntry): StoredEntry {
     publishedAt: entry.publishedAt?.toISOString() ?? null,
     updatedAt: entry.updatedAt?.toISOString() ?? null,
   };
+  // A history payload also includes up to 32 ancestor URLs. Bound JSON bytes,
+  // including HTML quotes/backslashes, rather than just the unescaped string.
+  if (stored.content && Buffer.byteLength(JSON.stringify(stored)) > 208 * 1024) {
+    let low = 0,
+      high = Buffer.byteLength(stored.content.html);
+    const content = stored.content;
+    while (low < high) {
+      const mid = Math.ceil((low + high) / 2);
+      stored.content = { ...content, html: utf8Prefix(content.html, mid), completeness: 'partial', truncated: true };
+      if (Buffer.byteLength(JSON.stringify(stored)) <= 208 * 1024) low = mid;
+      else high = mid - 1;
+    }
+    stored.content = { ...content, html: utf8Prefix(content.html, low), completeness: 'partial', truncated: true };
+  }
+  return stored;
 }
 export function restoreEntry(entry: StoredEntry): FeedEntry {
   return {
@@ -286,12 +300,27 @@ export function parseHistoryWordpress(
     const embedded = object(row._embedded);
     const author = object(many(embedded?.author)[0]);
     const media = object(many(embedded?.['wp:featuredmedia'])[0]);
+    const rendered = text(object(row.content)?.rendered);
+    const excerpt = text(object(row.excerpt)?.rendered);
+    const html = rendered || excerpt;
     return [
       {
         guid: text(object(row.guid)?.rendered) || canonicalArticleUrl(url),
         url,
         title: htmlText(row.title) || '未命名文章',
-        summary: htmlText(row.excerpt),
+        summary: publicSummary(excerpt || rendered),
+        ...(html
+          ? {
+              content: boundedFeedContent({
+                html,
+                kind: 'wordpress-api',
+                completeness: rendered && object(row.content)?.protected !== true ? 'full' : 'partial',
+                sourceUrl: finalUrl,
+                obtainedAt: new Date().toISOString(),
+                modifiedAt: utc(row.modified_gmt)?.toISOString() ?? null,
+              }),
+            }
+          : {}),
         author: text(author?.name) || null,
         publishedAt: utc(row.date_gmt),
         updatedAt: utc(row.modified_gmt),

@@ -1,5 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import type { Pool, RowDataPacket } from 'mysql2/promise';
+import { topicBodyHash, topicBodyJoins } from './body.ts';
 import { TopicResponseCache } from './cache.ts';
 import { SOURCE } from './snapshot-client.ts';
 
@@ -16,8 +17,8 @@ const evidence = (
  FROM scoped_posts p JOIN topic_matches m ON m.post_id=p.id JOIN topic_current c ON c.snapshot_id=m.snapshot_id
  JOIN topic_terms t ON t.snapshot_id=m.snapshot_id AND t.id=m.term_id
  JOIN topic_post_indexes i ON i.post_id=p.id AND i.snapshot_id=m.snapshot_id
- LEFT JOIN relation_observations o ON o.post_id=p.id
- WHERE i.status='ok' AND (i.post_hash<=>p.content_hash) AND (i.body_hash<=>(CASE WHEN o.status='ok' THEN o.content_hash END))
+ ${topicBodyJoins}
+ WHERE i.status='ok' AND (i.post_hash<=>p.content_hash) AND (i.body_hash<=>(${topicBodyHash}))
  UNION
  SELECT p.id,p.blog_id,p.published_at,CONCAT('tag:',t.id),t.label,'tag-vocabulary'
  FROM scoped_posts p JOIN post_tags pt ON pt.post_id=p.id JOIN tags native ON native.id=pt.tag_id
@@ -72,13 +73,19 @@ async function ranking(pool: Pool, days: number, slug?: string) {
   );
   return { items: rows.slice(0, 100).map(item), truncated: rows.length > 100 };
 }
-const caches = new WeakMap<Pool, TopicResponseCache>();
+const caches = new WeakMap<Pool, Set<TopicResponseCache>>();
 export function invalidateTopicCache(pool: Pool) {
-  caches.get(pool)?.clear();
+  for (const cache of caches.get(pool) ?? []) cache.clear();
 }
 export function registerTopicRoutes(app: FastifyInstance, pool: Pool) {
   const cache = new TopicResponseCache();
-  caches.set(pool, cache);
+  const active = caches.get(pool) ?? new Set<TopicResponseCache>();
+  active.add(cache);
+  caches.set(pool, active);
+  app.addHook('onClose', async () => {
+    active.delete(cache);
+    if (!active.size) caches.delete(pool);
+  });
   const metadata = () => ({ generatedAt: new Date().toISOString(), cacheSeconds: cache.ttlMs / 1000 });
   app.get<{ Querystring: { days?: string } }>('/api/topics', async (req, reply) => {
     const days = daysValue(req.query.days);
@@ -87,7 +94,7 @@ export function registerTopicRoutes(app: FastifyInstance, pool: Pool) {
       const results = await ranking(pool, days);
       const dates = range(days);
       const [[coverage]] = await pool.query<RowDataPacket[]>(
-        `SELECT COUNT(*) datedPosts,COALESCE(SUM(o.status='ok'),0) bodyObservedPosts FROM posts p JOIN blogs b ON b.id=p.blog_id LEFT JOIN relation_observations o ON o.post_id=p.id WHERE p.published_at>=? AND p.published_at<=? AND b.status<>'moved'`,
+        `SELECT COUNT(*) datedPosts,COALESCE(SUM(cb.status='ok' OR o.status='ok'),0) bodyObservedPosts FROM posts p JOIN blogs b ON b.id=p.blog_id ${topicBodyJoins} WHERE p.published_at>=? AND p.published_at<=? AND b.status<>'moved'`,
         dates,
       );
       const [[undated]] = await pool.query<RowDataPacket[]>(
