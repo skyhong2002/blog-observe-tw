@@ -6,8 +6,10 @@ import BlogRelations from '@/components/BlogRelations';
 import BlogTopics from '@/components/BlogTopics';
 import SimilarwebTraffic from '@/components/SimilarwebTraffic';
 import SourceProfile from '@/components/SourceProfile';
+import { plainText } from '@/lib/api';
 import { getBlog } from '@/lib/public-api';
 import { decodeParam, isSlug } from '@/lib/public-query';
+import { blogPath, breadcrumbSchema, pageMetadata, serializeJsonLd, shortText } from '@/lib/seo';
 
 // ISR (PUBLIC_REVALIDATE_SECONDS), generated on first request and never at build
 // (no list of every blog is fetched). The in-page ?q= post filter runs in the browser.
@@ -25,13 +27,23 @@ async function blogOf(params: Props['params']) {
 }
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const blog = await blogOf(params);
-  return { title: blog?.name ?? '找不到部落格', description: blog?.description ?? undefined };
+  // A 404 here, not only in the page, so a missing blog is never streamed as a 200.
+  if (!blog) notFound();
+  const description =
+    shortText(plainText(blog.description)) || `${shortText(blog.name, 60)}的最新文章、內文來源與共同話題，收錄於部落格觀察。`;
+  return pageMetadata(blogPath(blog.slug), blog.name, description);
 }
 export default async function BlogDetailPage({ params }: Props) {
   const blog = await blogOf(params);
   if (!blog) notFound();
+  const breadcrumb = breadcrumbSchema([
+    ['/blogs/', '部落格目錄'],
+    [blogPath(blog.slug), blog.name],
+  ]);
   return (
     <>
+      {/* Public blog name only; serializeJsonLd escapes '<'. */}
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: serializeJsonLd(breadcrumb) }} />
       <SourceProfile
         blog={blog}
         sidebar={

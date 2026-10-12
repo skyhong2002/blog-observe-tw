@@ -3,17 +3,20 @@ import SiteFooter from '@/components/SiteFooter';
 import SiteHeader from '@/components/SiteHeader';
 import ThemeSync from '@/components/ThemeSync';
 import TouchTitleHint from '@/components/TouchTitleHint';
+import { SITE_DESCRIPTION, SITE_NAME, SITE_ORIGIN, SITE_TITLE } from '@/lib/seo';
 import './globals.css';
 
+// No canonical here: each public page sets its own (lib/seo.ts), so a page
+// without one never inherits the home page's. The personal RSS feed is private
+// and is not advertised as a public alternate.
 export const metadata: Metadata = {
-  metadataBase: new URL('https://blog.observe.tw'),
-  title: { default: '部落格觀察：每一種生活，各自怎麼寫', template: '%s · 部落格觀察' },
-  description: '每一種生活，各自怎麼寫。台灣部落格文章、作者與標籤，持續閱讀不同的生活',
-  applicationName: '部落格觀察',
-  openGraph: { siteName: '部落格觀察', locale: 'zh_TW', images: ['/opengraph-image.png'] },
+  metadataBase: new URL(SITE_ORIGIN),
+  title: { default: SITE_TITLE, template: `%s · ${SITE_NAME}` },
+  description: SITE_DESCRIPTION,
+  applicationName: SITE_NAME,
+  openGraph: { siteName: SITE_NAME, locale: 'zh_TW', images: ['/opengraph-image.png'] },
   twitter: { card: 'summary_large_image' },
-  appleWebApp: { capable: true, title: '部落格觀察', statusBarStyle: 'default' },
-  alternates: { types: { 'application/rss+xml': [{ url: '/me/feed.xml', title: '部落格觀察｜個人閱讀' }] } },
+  appleWebApp: { capable: true, title: SITE_NAME, statusBarStyle: 'default' },
 };
 
 export const viewport: Viewport = {
