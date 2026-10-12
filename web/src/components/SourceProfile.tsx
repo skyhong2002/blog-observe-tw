@@ -10,8 +10,7 @@ import FollowButton from './follow-button';
 import MediaSidebar from './MediaSidebar';
 import MediaWordCloud from './MediaWordCloud';
 import SectionTabs from './SectionTabs';
-/** `note`: why a valid page is noindex (page-links.ts indexabilityNote), shown under the blog's data. */
-export default function SourceProfile({ blog, sidebar, note }: { blog: Blog; sidebar?: ReactNode; note?: string | null }) {
+export default function SourceProfile({ blog, sidebar }: { blog: Blog; sidebar?: ReactNode }) {
   const allPosts = blog.posts ?? [];
   const owner = { slug: blog.slug, name: blog.name, canonicalPath: blog.canonicalPath };
   return (
@@ -86,7 +85,6 @@ export default function SourceProfile({ blog, sidebar, note }: { blog: Blog; sid
             <p className="mt-3 border-t border-zinc-200 pt-3 leading-5 text-zinc-500 dark:border-zinc-800">
               沒有近期文章不代表網站失效，抓取成功與發文時間分開記錄。
             </p>
-            {note ? <p className="mt-2 leading-5 text-zinc-500">{note}</p> : null}
           </section>
           {sidebar}
           <section id="authors" className="rounded-lg border border-zinc-200 p-3 text-xs dark:border-zinc-800">

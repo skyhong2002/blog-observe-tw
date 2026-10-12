@@ -4,11 +4,13 @@ import { topicBodyHash, topicBodyJoins } from './body.ts';
 import { TopicResponseCache } from './cache.ts';
 import { FREQUENCY_POLICY } from './frequency.ts';
 import { digest, MATCHER_VERSION, normalizeTerm, POLICY_VERSION } from './policy.ts';
+import { PUBLICATION_NOISE_VERSION, publicationExclusionReason, publicationLabelSql } from './publication-noise.ts';
 import { SOURCE } from './snapshot-client.ts';
 
 export const matchingPolicy = {
   version: MATCHER_VERSION,
   policyVersion: POLICY_VERSION,
+  publicationNoiseVersion: PUBLICATION_NOISE_VERSION,
   titleWeight: 2,
   bodyWeight: 1,
   sameBlogDecay: 0.5,
@@ -32,7 +34,7 @@ export const evidence = (
  ${topicBodyJoins}
  WHERE i.status='ok' AND (i.post_hash<=>p.content_hash) AND (i.body_hash<=>(${topicBodyHash}))
  AND i.matcher_version=${literal(MATCHER_VERSION)} AND t.policy_version=${literal(POLICY_VERSION)}
- AND t.exclusion_reason IS NULL AND t.inactive_reason IS NULL AND m.source IN ('title','body')
+ AND t.exclusion_reason IS NULL AND t.inactive_reason IS NULL AND ${publicationLabelSql('t.label')} AND m.source IN ('title','body')
  AND (m.source='title' OR fr.snapshot_id IS NULL OR COALESCE(f.high_frequency,0)=0)
  GROUP BY p.id,p.blog_id,p.published_at,t.id,t.label
 ), recent AS (SELECT * FROM evidence)`;
@@ -165,14 +167,16 @@ export async function resolveTopic(pool: Pool, id: string) {
       'SELECT t.id,t.label,t.exclusion_reason,t.inactive_reason,t.article_count,t.last_published_at FROM topic_canonical_terms_v3 t JOIN topic_current c ON c.snapshot_id=t.snapshot_id AND c.source=? WHERE t.id=? AND t.policy_version=?',
       [SOURCE, digest(normalizeTerm(native.label)), POLICY_VERSION],
     );
+    const excludedReason =
+      publicationExclusionReason(canonical?.label ?? native.label) ?? (canonical ? canonical.exclusion_reason : 'not-in-tag-vocabulary');
     return {
       id,
       label: canonical?.label ?? native.label,
       source: 'rss-category',
       canonicalId: canonical ? `tag:${canonical.id}` : null,
-      excludedReason: canonical ? canonical.exclusion_reason : 'not-in-tag-vocabulary',
+      excludedReason,
       inactiveReason: canonical?.inactive_reason ?? null,
-      matchingStatus: !canonical || canonical.exclusion_reason ? 'excluded' : canonical.inactive_reason ? 'inactive' : 'active',
+      matchingStatus: excludedReason ? 'excluded' : canonical?.inactive_reason ? 'inactive' : 'active',
       articleCount: canonical ? Number(canonical.article_count) : null,
       lastPublishedAt: canonical?.last_published_at ?? null,
     };
@@ -183,15 +187,16 @@ export async function resolveTopic(pool: Pool, id: string) {
      WHERE (t.id=? OR a.term_id=?) AND t.policy_version=? ORDER BY (t.id=?) DESC LIMIT 1`,
     [SOURCE, id.slice(4), id.slice(4), id.slice(4), POLICY_VERSION, id.slice(4)],
   );
+  const excludedReason = rows[0] ? (publicationExclusionReason(rows[0].label) ?? rows[0].exclusion_reason) : null;
   return rows[0]
     ? {
         id,
         label: rows[0].label,
         source: 'tag-vocabulary',
         canonicalId: `tag:${rows[0].id}`,
-        excludedReason: rows[0].exclusion_reason,
+        excludedReason,
         inactiveReason: rows[0].inactive_reason,
-        matchingStatus: rows[0].exclusion_reason ? 'excluded' : rows[0].inactive_reason ? 'inactive' : 'active',
+        matchingStatus: excludedReason ? 'excluded' : rows[0].inactive_reason ? 'inactive' : 'active',
         articleCount: Number(rows[0].article_count),
         lastPublishedAt: rows[0].last_published_at ?? null,
       }

@@ -125,6 +125,51 @@ export async function runPublicRoutesIntegration(pool: Pool) {
     await assert.rejects(
       pool.execute('UPDATE public_page_routes SET canonical_key=? WHERE kind=? AND entity_id=?', [topic!.slug, 'topic', topics[1]]),
     );
+    await pool.execute('UPDATE topic_canonical_terms_v3 SET label=? WHERE snapshot_id=? AND id=?', ['™', snapshot, topics[0]]);
+    assert.equal(
+      await resolvePublicPage(pool, 'topic', `tag:${topics[0]}`),
+      null,
+      'pure symbols have no public URL even if NFKC expands them to letters',
+    );
+    const [[retainedRoute]] = await pool.query<RowDataPacket[]>(
+      "SELECT canonical_key FROM public_page_routes WHERE kind='topic' AND entity_id=?",
+      [topics[0]],
+    );
+    assert.equal(retainedRoute.canonical_key, topic!.slug, 'noise exclusion does not delete or rename retained keys');
+    await pool.execute('UPDATE topic_canonical_terms_v3 SET label=? WHERE snapshot_id=? AND id=?', ['顯示名稱已變更', snapshot, topics[0]]);
+    // Explicit future maintenance may change the canonical key without deleting aliases.
+    // Every old key still resolves to the entity's one final key, never another alias.
+    for (const [kind, entity, oldKeys] of [
+      ['blog', String(blogs[0]), [first!.slug, `discovered-${suffix}-0`]],
+      ['topic', topics[0], [topic!.slug, `tag:${topics[0]}`, `tag:${rawAlias}`]],
+    ] as const) {
+      const renamed = `maintained-${kind}-${suffix}`;
+      const c = await pool.getConnection();
+      try {
+        await c.beginTransaction();
+        await c.execute('INSERT INTO public_route_keys(kind,route_key,entity_id,created_at) VALUES (?,?,?,?)', [
+          kind,
+          renamed,
+          entity,
+          now,
+        ]);
+        await c.execute('UPDATE public_page_routes SET canonical_key=? WHERE kind=? AND entity_id=?', [renamed, kind, entity]);
+        await c.commit();
+      } catch (error) {
+        await c.rollback();
+        throw error;
+      } finally {
+        c.release();
+      }
+      for (const key of [...oldKeys, renamed])
+        assert.equal((await resolvePublicPage(pool, kind, key))?.canonicalPath, `/${kind === 'blog' ? 'blogs' : 'topics'}/${renamed}/`);
+      await backfillPublicRoutes(pool, { kind, afterId: kind === 'blog' ? String(blogs[0] - 1) : undefined, limit: 3 });
+      assert.equal(
+        (await resolvePublicPage(pool, kind, oldKeys[0]))?.slug,
+        renamed,
+        'routine backfill does not undo explicit canonical maintenance',
+      );
+    }
     // Old routes go directly to a verified final URL owner, including an intermediate moved site.
     await pool.execute("UPDATE blogs SET status='moved' WHERE id IN (?,?)", [blogs[0], blogs[1]]);
     await pool.execute('UPDATE blogs SET url=? WHERE id=?', [`https://final-${suffix}.example/`, blogs[2]]);
@@ -149,6 +194,8 @@ export async function runPublicRoutesIntegration(pool: Pool) {
       sourceAliases: true,
       rerunIdempotent: true,
       canonicalOwnerEnforced: true,
+      explicitRenameKeepsSingleHopAliases: true,
+      punctuationNoPublicUrlPreservesRegistry: true,
       movedSingleFinalTarget: true,
       ambiguousMoveRejected: true,
       nonVerifiedPagePreserved: true,

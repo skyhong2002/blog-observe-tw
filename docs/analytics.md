@@ -38,7 +38,7 @@ select_content：連到可讀網址的連結，若伺服器資料提供穩定 ID
 
 | 事件 | 資料 |
 | --- | --- |
-| open_original | link_domain、source_page_type（`data-analytics="open_original"`：SourceLink 與首頁真正的原文連結；退回 `/blogs/` 的連結不標記） |
+| open_original | link_domain、source_page_type（`data-analytics="open_original"`：SourceLink、首頁與話題詳細頁文章標題中真正的原文 http(s) 連結；退回 `/blogs/` 或其他站內部落格連結不標記） |
 | select_content | content_type、經驗證的 slug／數字／hash content_id（取自舊形網址或連結的 `data-analytics-content-id`）、source_page_type |
 | rss_click | 無內容或身分參數 |
 | login | method=google |

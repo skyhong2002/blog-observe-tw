@@ -88,10 +88,84 @@ describe('bounded API canonical links', () => {
     });
     expect(output).toMatchObject({
       items: [
-        { id: `tag:${alias}`, canonicalPath: '/topics/ai/' },
+        {
+          id: `tag:${alias}`,
+          canonicalPath: '/topics/ai/',
+        },
         { id: 'rss:42', canonicalPath: '/topics/%E4%BA%BA%E5%B7%A5%E6%99%BA%E6%85%A7/' },
       ],
     });
+    for (const topic of (output as { items: object[] }).items) expect(topic).not.toHaveProperty('url');
+  });
+  it('changes only public blog url, preserves sourceUrl and cached/internal/article URLs', async () => {
+    const { pool } = fixture();
+    const source = 'https://writer.example/';
+    const blog = { id: 1, slug: 'writer', name: '作者', url: source, iconUrl: '/favicons/writer.png' };
+    const localUrl = 'https://blog.observe.tw' + canonical;
+    const list = await enrichPageLinks(pool, '/api/v1/blogs', { items: [blog] });
+    expect(list).toMatchObject({ items: [{ ...blog, url: localUrl, sourceUrl: source, canonicalPath: canonical }] });
+    expect((list as { items: object[] }).items[0]).not.toHaveProperty('pageUrl');
+    const detail = await enrichPageLinks(pool, '/api/v1/blogs/writer', { blog });
+    expect(detail).toMatchObject({ blog: { url: localUrl, sourceUrl: source } });
+    expect((detail as { blog: object }).blog).not.toHaveProperty('pageUrl');
+    const internal = await enrichPageLinks(pool, '/api/blogs/writer', { blog });
+    expect(internal).toMatchObject({ blog: { url: source, canonicalPath: canonical } });
+    expect((internal as { blog: object }).blog).not.toHaveProperty('sourceUrl');
+    expect((internal as { blog: object }).blog).not.toHaveProperty('pageUrl');
+    const article = { id: 9, title: '文章', url: 'https://writer.example/post?original=1', blogSlug: 'writer' };
+    expect(await enrichPageLinks(pool, '/api/v1/articles', { items: [article] })).toMatchObject({
+      items: [{ ...article, blogCanonicalPath: canonical }],
+    });
+    expect(blog.url).toBe(source);
+    expect(blog).not.toHaveProperty('sourceUrl');
+  });
+  it('keeps sourceUrl and supplies a local url fallback when registry lookup fails', async () => {
+    const { pool } = fixture({ fail: true });
+    const source = 'https://original.example/';
+    expect(await enrichPageLinks(pool, '/api/v1/blogs', { items: [{ slug: 'discovered-abc', name: '作者', url: source }] })).toMatchObject({
+      items: [
+        {
+          sourceUrl: source,
+          url: 'https://blog.observe.tw/blogs/discovered-abc/',
+        },
+      ],
+    });
+  });
+  it('preserves nullable source URLs and adds public topic url without pageUrl', async () => {
+    const { pool } = fixture();
+    const output = await enrichPageLinks(pool, '/api/v1/blogs', { items: [{ slug: 'writer', name: '無網址', url: null }] });
+    expect(output).toMatchObject({ items: [{ sourceUrl: null, url: 'https://blog.observe.tw' + canonical }] });
+    const topic = await enrichPageLinks(pool, '/api/v1/topics', {
+      items: [{ id: `tag:${alias}`, label: 'AI' }],
+    });
+    expect(topic).toMatchObject({ items: [{ url: 'https://blog.observe.tw/topics/ai/' }] });
+    expect((topic as { items: object[] }).items[0]).not.toHaveProperty('pageUrl');
+    expect(await enrichPageLinks(pool, '/api/v1/topics/ai', { topic: { id: `tag:${alias}`, label: 'AI' } })).toMatchObject({
+      topic: { url: 'https://blog.observe.tw/topics/ai/' },
+    });
+  });
+  it('supplies topic legacy local fallback without mutating cached DTOs on a database failure', async () => {
+    const { pool } = fixture({ fail: true });
+    const payload = Object.freeze({ topic: Object.freeze({ id: `tag:${term}`, label: 'AI' }) });
+    const output = await enrichPageLinks(pool, `/api/v1/topics/tag%3A${term}`, payload);
+    expect(output).toMatchObject({ topic: { id: `tag:${term}`, url: `https://blog.observe.tw/topics/tag%3A${term}/` } });
+    expect(payload.topic).not.toHaveProperty('url');
+  });
+  it('does not add pageUrl variants to any internal/public DTO', async () => {
+    const { pool } = fixture();
+    const payload = {
+      blogs: [{ slug: 'writer', name: 'Writer', url: 'https://source.example/' }],
+      posts: [{ blogSlug: 'writer' }],
+      edges: [{ sourceBlogId: 1, targetBlogId: 1 }],
+    };
+    const output = await enrichPageLinks(pool, '/api/overview', payload);
+    expect(JSON.stringify(output)).not.toMatch(/(?:pageUrl|PageUrl|sourceUrl)/);
+  });
+  it('does not publish URLs for punctuation-only topic labels', async () => {
+    const { pool, calls } = fixture();
+    const payload = { items: [{ id: `tag:${term}`, label: '／＋－…' }] };
+    expect(await enrichPageLinks(pool, '/api/v1/topics', payload)).toBe(payload);
+    expect(calls).toHaveLength(0);
   });
   it('uses bounded batch queries and single-flight positive/negative caching', async () => {
     let release!: () => void;

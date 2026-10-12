@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import noEqual from '../../data/topic-no-equal-tags.json' with { type: 'json' };
 import { CLEANUP_VERSION } from './matching-body.ts';
+import { publicationExclusionReason } from './publication-noise.ts';
 import { isTagNoise } from './vendor/tag-noise.ts';
 
 export const normalizeTerm = (value: string) => value.normalize('NFKC').toLocaleLowerCase('en-US').replace(/\s+/gu, ' ').trim();
@@ -40,6 +41,8 @@ export function exclusionReason(label: string, payload?: unknown): string | null
   const normalized = normalizeTerm(label);
   if (payloadObject(payload).noise === true) return 'upstream-noise';
   if (payloadObject(payload).noEqual === true) return 'upstream-no-equal';
+  const publicationReason = publicationExclusionReason(label);
+  if (publicationReason) return publicationReason;
   if ([...normalized].length < 2) return 'too-short';
   if ([...normalized].length > 240 || /[\p{Cc}\p{Cf}]/u.test(normalized)) return 'invalid-label';
   if (/^[\p{Number}\s.,+\-％%]+$/u.test(normalized)) return 'pure-number';
@@ -102,6 +105,8 @@ export function projectTopicTerms(input: InputTerm[]): {
 const REASON_PRIORITY = [
   'upstream-noise',
   'upstream-no-equal',
+  'empty-label',
+  'punctuation-only',
   'too-short',
   'invalid-label',
   'pure-number',

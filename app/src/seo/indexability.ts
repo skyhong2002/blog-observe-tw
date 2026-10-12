@@ -1,6 +1,7 @@
 import type { Pool, RowDataPacket } from 'mysql2/promise';
 import { TopicResponseCache } from '../topics/cache.ts';
 import { POLICY_VERSION } from '../topics/policy.ts';
+import { publicationExclusionReason } from '../topics/publication-noise.ts';
 import { evidence } from '../topics/routes.ts';
 import { SOURCE } from '../topics/snapshot-client.ts';
 import { getPublicPages, type PublicPage, type PublicPageKind } from './page-routes.ts';
@@ -17,39 +18,26 @@ export type PageIndexability = {
 };
 export type IndexablePage = PublicPage & PageIndexability & { lastmod: unknown };
 type Counts = { posts: number; blogs: number; lastmod: unknown };
-type Projection = { version: string | null; topics: Map<string, Counts>; blogs: Map<string, Counts> };
+type Projection = { version: string | null; topics: Map<string, Counts>; blogs: Map<string, Counts>; sitemapBlogIds: Set<string> };
 const validPostDate =
   'COALESCE(CASE WHEN p.updated_at<=UTC_TIMESTAMP() THEN p.updated_at END,CASE WHEN p.published_at<=UTC_TIMESTAMP() THEN p.published_at END,CASE WHEN p.created_at<=UTC_TIMESTAMP() THEN p.created_at END)';
-const validBlogUrl = (value: unknown) => {
-  if (typeof value !== 'string') return false;
-  try {
-    const url = new URL(value);
-    return ['http:', 'https:'].includes(url.protocol) && Boolean(url.hostname) && !url.username && !url.password;
-  } catch {
-    return false;
-  }
-};
+const legacySitemapBlog = (row: RowDataPacket) =>
+  row.status === 'verified' &&
+  typeof row.slug === 'string' &&
+  /^[a-z0-9][a-z0-9_-]{0,179}$/.test(row.slug) &&
+  typeof row.url === 'string' &&
+  /^https?:\/\//.test(row.url);
 export const topicIndexabilitySql = `WITH ${evidence(false, true)}
  SELECT SUBSTRING(r.topic_id,5) entity_id,COUNT(*) posts,COUNT(DISTINCT r.blog_id) blogs,MAX(${validPostDate}) lastmod
  FROM recent r JOIN posts p ON p.id=r.post_id GROUP BY r.topic_id`;
-/** The same per-post evidence and thresholds drive the page DTO and sitemap membership. */
+/** Counts describe observed coverage, never a new minimum-content or low-frequency noindex gate. */
 export function topicIndexability(
   counts: { posts: number; blogs: number },
   currentVersion: string | null,
-  term?: { exclusionReason: string | null; inactiveReason: string | null } | null,
+  term?: { exclusionReason: string | null; inactiveReason: string | null; label?: string } | null,
 ): PageIndexability {
-  const reason =
-    !currentVersion || !term
-      ? 'not-current-term'
-      : term.exclusionReason
-        ? 'excluded-term'
-        : term.inactiveReason
-          ? 'inactive-term'
-          : counts.posts < 3
-            ? 'insufficient-posts'
-            : counts.blogs < 2
-              ? 'insufficient-blogs'
-              : null;
+  const excluded = term?.exclusionReason || (typeof term?.label === 'string' ? publicationExclusionReason(term.label) : null);
+  const reason = excluded ? 'excluded-term' : null;
   return { indexable: !reason, indexabilityReason: reason, windowDays: 90, ...counts, currentVersion };
 }
 class PageIndexabilityStore {
@@ -71,20 +59,17 @@ class PageIndexabilityStore {
           since = new Date(now.getTime() - INDEXABILITY_WINDOW_DAYS * 86400_000);
         const [topics] = current ? await c.query<RowDataPacket[]>(topicIndexabilitySql, [since, now]) : [[]];
         const [blogs] = await c.query<RowDataPacket[]>(
-          `SELECT b.id entity_id,b.url,SUM(CASE WHEN p.published_at>=? AND p.published_at<=? THEN 1 ELSE 0 END) posts,
+          `SELECT b.id entity_id,b.url,b.slug,b.status,SUM(CASE WHEN p.published_at>=? AND p.published_at<=? THEN 1 ELSE 0 END) posts,
           COALESCE(MAX(${validPostDate}),CASE WHEN b.discovered_at<=UTC_TIMESTAMP() THEN b.discovered_at END) lastmod
-          FROM blogs b LEFT JOIN posts p ON p.blog_id=b.id WHERE b.status='verified' AND b.url REGEXP '^https?://' GROUP BY b.id`,
+          FROM blogs b LEFT JOIN posts p ON p.blog_id=b.id WHERE b.status<>'moved' GROUP BY b.id`,
           [since, now],
         );
         await c.commit();
         return {
           version: current?.id ?? null,
           topics: new Map(topics.map((r) => [String(r.entity_id), { posts: Number(r.posts), blogs: Number(r.blogs), lastmod: r.lastmod }])),
-          blogs: new Map(
-            blogs
-              .filter((r) => validBlogUrl(r.url))
-              .map((r) => [String(r.entity_id), { posts: Number(r.posts), blogs: 1, lastmod: r.lastmod }]),
-          ),
+          blogs: new Map(blogs.map((r) => [String(r.entity_id), { posts: Number(r.posts), blogs: 1, lastmod: r.lastmod }])),
+          sitemapBlogIds: new Set(blogs.filter(legacySitemapBlog).map((r) => String(r.entity_id))),
         };
       } catch (error) {
         await c.rollback();
@@ -99,11 +84,11 @@ class PageIndexabilityStore {
     if (kind === 'blog') {
       const row = projection.blogs.get(entityId);
       return {
-        indexable: Boolean(row),
-        indexabilityReason: row ? null : 'unverified-or-invalid-url',
+        indexable: true,
+        indexabilityReason: null,
         windowDays: 90,
         posts: row?.posts ?? 0,
-        blogs: row ? 1 : 0,
+        blogs: 1,
         currentVersion: projection.version,
       };
     }
@@ -116,7 +101,7 @@ class PageIndexabilityStore {
     return this.cache.get(`topic:${projection.version}:${entityId}`, async () => {
       const [[term]] = projection.version
         ? await this.pool.query<RowDataPacket[]>(
-            'SELECT exclusion_reason,inactive_reason FROM topic_canonical_terms_v3 WHERE snapshot_id=? AND id=? AND policy_version=?',
+            'SELECT label,exclusion_reason,inactive_reason FROM topic_canonical_terms_v3 WHERE snapshot_id=? AND id=? AND policy_version=?',
             [projection.version, entityId, POLICY_VERSION],
           )
         : [[]];
@@ -124,19 +109,15 @@ class PageIndexabilityStore {
       return topicIndexability(
         { posts: counts?.posts ?? 0, blogs: counts?.blogs ?? 0 },
         projection.version,
-        term ? { exclusionReason: term.exclusion_reason, inactiveReason: term.inactive_reason } : null,
+        term ? { exclusionReason: term.exclusion_reason, inactiveReason: term.inactive_reason, label: term.label } : null,
       );
     });
   }
   async sitemap(kind: PublicPageKind): Promise<IndexablePage[]> {
     return this.cache.get(`sitemap:${kind}`, async () => {
       const projection = await this.projection();
-      const rows =
-        kind === 'blog'
-          ? [...projection.blogs]
-          : [...projection.topics].filter(
-              ([, counts]) => topicIndexability(counts, projection.version, { exclusionReason: null, inactiveReason: null }).indexable,
-            );
+      // Match the deployed sitemap set: >=1 valid article in 90 days, with no 3-post/2-blog gate.
+      const rows = kind === 'blog' ? [...projection.blogs].filter(([id]) => projection.sitemapBlogIds.has(id)) : [...projection.topics];
       const pages: IndexablePage[] = [];
       for (let offset = 0; offset < rows.length; offset += 500) {
         const batch = rows.slice(offset, offset + 500);

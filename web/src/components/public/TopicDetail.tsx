@@ -1,5 +1,5 @@
 'use client';
-// One view for a prerendered (on demand) 90-day topic page and the browser's ?days=7|30; see app/topics/[id]/page.tsx.
+// One view for a prerendered (on demand) 30-day topic page and the browser's ?days=7|90; see app/topics/[id]/page.tsx.
 
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
@@ -7,6 +7,7 @@ import BlogIcon from '@/components/BlogIcon';
 import SectionTabs from '@/components/SectionTabs';
 import VocabularyNotice from '@/components/VocabularyNotice';
 import { taipei } from '@/lib/api';
+import { externalHref } from '@/lib/images';
 import { blogLink, TOPIC_DETAIL_PERIOD, topicHref, topicLink } from '@/lib/page-links';
 import { type Period, periodOf, topicApiPath } from '@/lib/public-query';
 import {
@@ -41,11 +42,27 @@ function frequencyBasis(data: TopicDetail) {
   return `門檻：基準期間命中文章占比超過 ${formatPercent(ratio)}。基準期間：${period}。`;
 }
 
+/** The original article, with SourceLink's open_original marker; a non-http(s) URL stays plain text. */
+function ArticleTitle({ url, title }: { url: string; title: string }) {
+  const href = externalHref(url);
+  if (!href) return <span className="font-medium">{title}</span>;
+  return (
+    <a
+      href={href}
+      data-analytics="open_original"
+      target="_blank"
+      rel="noopener noreferrer"
+      className="font-medium hover:text-brand-700 dark:hover:text-brand-400"
+    >
+      {title}
+    </a>
+  );
+}
+
 /**
  * `id` is the stable topic id every API read uses; `path` the page's canonical
  * (readable) URL, for the period tabs. `label` titles the page while another
- * period loads (the topic itself does not change). `note` explains a noindex
- * page with its 90-day counts, separate from the period tab's counts.
+ * period loads (the topic itself does not change).
  */
 export default function TopicDetailView({
   id,
@@ -53,14 +70,12 @@ export default function TopicDetailView({
   days,
   load,
   label,
-  note,
 }: {
   id: string;
   path: string;
   days: Period;
   load: PublicLoad<TopicDetail>;
   label?: string;
-  note?: string | null;
 }) {
   const data = load.status === 'ready' ? load.data : null;
   return (
@@ -79,7 +94,6 @@ export default function TopicDetailView({
           current: d === days,
         }))}
       />
-      {note ? <p className="text-xs text-zinc-500">{note}</p> : null}
       {data?.topic?.excludedReason ? (
         <>
           <section role="status" className="rounded-xl border border-zinc-300 p-4 text-sm dark:border-zinc-800">
@@ -150,14 +164,7 @@ export default function TopicDetailView({
               <ul className="mt-3 divide-y divide-zinc-200 dark:divide-zinc-800">
                 {data.articles.map((a) => (
                   <li className="py-4" key={a.id}>
-                    <a
-                      href={a.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="font-medium hover:text-brand-700 dark:hover:text-brand-400"
-                    >
-                      {a.title}
-                    </a>
+                    <ArticleTitle url={a.url} title={a.title} />
                     <p className="mt-2 text-xs text-zinc-500">
                       <Link {...blogLink(a.blogSlug, a.blogCanonicalPath)}>{a.blogName}</Link> · {taipei(a.publishedAt)}
                     </p>
@@ -187,21 +194,11 @@ const parseDetail = asIs<TopicDetail>;
 
 /**
  * Reads ?days= (inside the page's Suspense boundary); periods other than the
- * prerendered 90 days come from /api/topics/:id, always by the stable id.
+ * prerendered 30 days come from /api/topics/:id, always by the stable id.
  */
-export function TopicDetailFromUrl({
-  id,
-  path,
-  baseline,
-  note,
-}: {
-  id: string;
-  path: string;
-  baseline: PublicLoad<TopicDetail>;
-  note?: string | null;
-}) {
+export function TopicDetailFromUrl({ id, path, baseline }: { id: string; path: string; baseline: PublicLoad<TopicDetail> }) {
   const days = periodOf(useSearchParams(), TOPIC_DETAIL_PERIOD);
   const load = usePublicJson(days === TOPIC_DETAIL_PERIOD ? null : topicApiPath(id, days), parseDetail);
   const label = baseline.status === 'ready' ? baseline.data.topic?.label : undefined;
-  return <TopicDetailView id={id} path={path} days={days} load={load ?? baseline} label={label} note={note} />;
+  return <TopicDetailView id={id} path={path} days={days} load={load ?? baseline} label={label} />;
 }

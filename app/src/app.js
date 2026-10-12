@@ -306,7 +306,7 @@ export async function buildApp(config, { logger = false, store = null } = {}) {
 
   const proxyToUi = createUiProxy(config.uiOrigin);
   registerPageApi(app, pool);
-  const redirectPublicPage = createPublicPageRedirect(pool);
+  const redirectPublicPage = createPublicPageRedirect(pool, { legacyUiPaths: config.uiLegacyPagePaths === true });
   registerApiStatus(app, proxyToUi, pool);
   app.get('/api', proxyToUi);
   app.get('/api/', proxyToUi);
@@ -315,7 +315,7 @@ export async function buildApp(config, { logger = false, store = null } = {}) {
     if (/^\/(api|auth)(?:\/|$)/.test(request.url))
       return reply.code(404).send({ error: publicApiPath(request.url) ? 'not_found' : 'not found' });
     if (await redirectPublicPage(request, reply)) return;
-    return proxyToUi(request, reply);
+    return proxyToUi(request, reply, redirectPublicPage.uiPath(request));
   };
   app.route({ method: ['GET', 'HEAD'], url: '/', handler });
   app.route({ method: ['GET', 'HEAD'], url: '/*', handler });

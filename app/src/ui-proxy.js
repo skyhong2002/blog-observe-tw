@@ -15,30 +15,36 @@ const HOP = new Set([
 
 export function createUiProxy(origin, { request = undiciRequest, timeout = 15000 } = {}) {
   const base = new URL(origin);
-  return async function proxyToUi(req, reply) {
+  /** @param {string} [pathOverride] Trusted internal path; still passes origin/path validation. */
+  return async function proxyToUi(req, reply, pathOverride = undefined) {
     // Fastify's catch-all also receives path-preserving requests.  Never let
     // WHATWG URL parsing reinterpret `//host` as a new origin, and do not
     // carry gateway credentials into the UI origin (or an attacker-controlled
     // URL if a future route regresses this guard).
-    const rawPath = String(req.raw.url ?? req.url ?? '');
-    let decodedPath = rawPath;
-    try {
-      decodedPath = decodeURIComponent(rawPath);
-    } catch {
+    const originalPath = String(req.raw.url ?? req.url ?? '');
+    if (pathOverride !== undefined && (typeof pathOverride !== 'string' || !['GET', 'HEAD'].includes(req.method)))
       return reply.code(400).send({ error: 'invalid path' });
+    const rawPath = pathOverride ?? originalPath;
+    for (const candidate of new Set([originalPath, rawPath])) {
+      let decodedPath = candidate;
+      try {
+        decodedPath = decodeURIComponent(candidate);
+      } catch {
+        return reply.code(400).send({ error: 'invalid path' });
+      }
+      if (
+        !candidate.startsWith('/') ||
+        candidate.startsWith('//') ||
+        candidate.startsWith('/\\') ||
+        /^\/(?:%2f|%5c)/i.test(candidate) ||
+        decodedPath.startsWith('//') ||
+        decodedPath.startsWith('/\\') ||
+        /^[a-z][a-z\d+.-]*:/i.test(candidate)
+      ) {
+        return reply.code(400).send({ error: 'invalid path' });
+      }
     }
-    if (
-      !rawPath.startsWith('/') ||
-      rawPath.startsWith('//') ||
-      rawPath.startsWith('/\\') ||
-      /^\/(?:%2f|%5c)/i.test(rawPath) ||
-      decodedPath.startsWith('//') ||
-      decodedPath.startsWith('/\\') ||
-      /^[a-z][a-z\d+.-]*:/i.test(rawPath)
-    ) {
-      return reply.code(400).send({ error: 'invalid path' });
-    }
-    const path = rawPath.startsWith('/') ? rawPath : `/${rawPath}`;
+    const path = rawPath;
     const target = new URL(`${base.origin}${path}`);
     if (target.host !== base.host) return reply.code(400).send({ error: 'invalid upstream' });
     const headers = {};

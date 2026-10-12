@@ -37,4 +37,32 @@ describe('UI proxy path isolation', () => {
       expect(request.mock.calls[0][1].headers).not.toHaveProperty('authorization');
     },
   );
+  it('uses an explicit legacy path without mutating the request or double-encoding its query', async () => {
+    const request = vi.fn().mockResolvedValue({ statusCode: 200, headers: {}, body: { dump: vi.fn() } });
+    const proxy = createUiProxy('http://127.0.0.1:18162', { request });
+    const reply: any = { code: vi.fn().mockReturnThis(), send: vi.fn(), header: vi.fn().mockReturnThis() };
+    const body = { untouched: true },
+      original = '/topics/%E7%BE%8E%E9%A3%9F/?q=%2Ftest';
+    const req: any = { raw: { url: original }, url: original, body, headers: {}, method: 'HEAD', log: { warn: vi.fn() } };
+    await proxy(req, reply, '/topics/tag%3Aabc/?q=%2Ftest');
+    expect(request.mock.calls[0][0].href).toBe('http://127.0.0.1:18162/topics/tag%3Aabc/?q=%2Ftest');
+    expect(request.mock.calls[0][1].method).toBe('HEAD');
+    expect(req.raw.url).toBe(original);
+    expect(req.url).toBe(original);
+    expect(req.body).toBe(body);
+  });
+  it.each([
+    ['/blogs/x/', '//evil.test/'],
+    ['/blogs/x/', '/%2F%2Fevil.test/'],
+    ['/blogs/x/', 'https://evil.test/'],
+    ['//evil.test/', '/blogs/stable/'],
+    ['/blogs/%', '/blogs/stable/'],
+  ])('validates both original %s and override %s', async (original, override) => {
+    const request = vi.fn(),
+      proxy = createUiProxy('http://127.0.0.1:18162', { request });
+    const reply: any = { code: vi.fn().mockReturnThis(), send: vi.fn() };
+    await proxy({ raw: { url: original }, headers: {}, method: 'GET' } as any, reply, override);
+    expect(reply.code).toHaveBeenCalledWith(400);
+    expect(request).not.toHaveBeenCalled();
+  });
 });

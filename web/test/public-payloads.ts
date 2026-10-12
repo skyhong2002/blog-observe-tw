@@ -83,15 +83,13 @@ export const EMPTY: Record<PublicKind, unknown> = {
     sources: [],
     publicContent: 'summary-only',
   },
-  // app/src/seo/page-api.ts: a thin page is valid (indexable false, with a reason).
+  // app/src/seo/page-api.ts: zero counts are a valid registered page (counts never gate indexing).
   blogPage: {
     page: {
       entityId: '12',
       stableId: 'discovered-abc',
       slug: 'example.com',
       canonicalPath: '/blogs/example.com/',
-      indexable: false,
-      indexabilityReason: 'unverified-or-invalid-url',
       windowDays: 90,
       posts: 0,
       blogs: 0,
@@ -104,8 +102,6 @@ export const EMPTY: Record<PublicKind, unknown> = {
       stableId: `tag:${'a'.repeat(64)}`,
       slug: '旅行',
       canonicalPath: '/topics/%E6%97%85%E8%A1%8C/',
-      indexable: false,
-      indexabilityReason: 'insufficient-posts',
       windowDays: 90,
       posts: 0,
       blogs: 0,

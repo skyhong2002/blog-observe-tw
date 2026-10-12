@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import type { Pool, RowDataPacket } from 'mysql2/promise';
 import { digest, normalizeTerm } from '../topics/policy.ts';
+import { publicationExclusionReason } from '../topics/publication-noise.ts';
 import { SOURCE } from '../topics/snapshot-client.ts';
 import { getPublicPages, isPublicRouteKey, type PublicPageKind } from './page-routes.ts';
 
@@ -10,6 +11,7 @@ type Node = Record<string, unknown>;
 const keyOf = (ref: Ref) => `${ref.kind}:${ref.value}`;
 const topicId = /^(tag:[a-f0-9]{64}|rss:[1-9]\d{0,9})$/;
 const numericId = /^[1-9]\d{0,14}$/;
+const PAGE_ORIGIN = 'https://blog.observe.tw';
 // Route allowlist, not a generic /api hook: never traverse credentials, admin
 // evidence, page-registry responses, OpenAPI, sessions or arbitrary plugin DTOs.
 export function pageLinksEndpoint(path: string): boolean {
@@ -143,6 +145,8 @@ export async function enrichPageLinks(pool: Pool, path: string, payload: unknown
   if (!pageLinksEndpoint(path) || (!plain(payload) && !Array.isArray(payload))) return payload;
   const refs = new Map<string, Ref>();
   const targets = new Map<Node, Map<string, string>>();
+  const publicBlogNodes = new Map<Node, string>();
+  const publicTopicNodes = new Map<Node, string>();
   const seen = new WeakSet<object>();
   let visited = 0;
   let overBudget = false;
@@ -175,6 +179,8 @@ export async function enrichPageLinks(pool: Pool, path: string, payload: unknown
       isPublicRouteKey('blog', value.slug)
     ) {
       add(value, 'canonicalPath', { kind: 'blog-slug', value: value.slug });
+      if ((path === '/api/v1/blogs' && container === 'items') || (/^\/api\/v1\/blogs\/[^/]+$/.test(path) && container === 'blog'))
+        publicBlogNodes.set(value, `/blogs/${encodeURIComponent(value.slug)}/`);
     }
     if (typeof value.blogSlug === 'string' && isPublicRouteKey('blog', value.blogSlug))
       add(value, 'blogCanonicalPath', { kind: 'blog-slug', value: value.blogSlug });
@@ -187,8 +193,15 @@ export async function enrichPageLinks(pool: Pool, path: string, payload: unknown
       if ((typeof id === 'number' || typeof id === 'string') && numericId.test(String(id)))
         add(value, pathField, { kind: 'blog-id', value: String(id) });
     }
-    if (typeof value.id === 'string' && topicId.test(value.id) && typeof value.label === 'string')
+    if (
+      typeof value.id === 'string' &&
+      topicId.test(value.id) &&
+      typeof value.label === 'string' &&
+      !publicationExclusionReason(value.label)
+    ) {
       add(value, 'canonicalPath', { kind: 'topic', value: value.id });
+      if (/^\/api\/v1\/topics(?:\/[^/]+)?$/.test(path)) publicTopicNodes.set(value, `/topics/${encodeURIComponent(value.id)}/`);
+    }
     for (const property in value) {
       if (overBudget) break;
       if (Object.hasOwn(value, property)) walk(value[property], property, depth + 1);
@@ -197,7 +210,7 @@ export async function enrichPageLinks(pool: Pool, path: string, payload: unknown
   walk(payload, '', 0);
   if (overBudget || !refs.size) return payload;
   const links = await cachedLinks(pool, [...refs.values()]);
-  if (!links.size) return payload;
+  if (!links.size && !publicBlogNodes.size && !publicTopicNodes.size) return payload;
   // Traverse only the bounded graph visited above. Large untouched subtrees are
   // shared; no stringify/parse or deep clone of article bodies is necessary.
   const copies = new WeakMap<object, unknown>();
@@ -216,6 +229,17 @@ export async function enrichPageLinks(pool: Pool, path: string, payload: unknown
           changed = true;
         }
       }
+    if (plain(value) && (publicBlogNodes.has(value) || publicTopicNodes.has(value))) {
+      const reference = targets.get(value)?.get('canonicalPath');
+      // Public v1 explicitly changed blog.url to the local page on 2026-10-12.
+      // Keep source URL separately; internal DTOs and article.url are untouched.
+      const fallback = publicBlogNodes.get(value) ?? publicTopicNodes.get(value)!;
+      const canonicalUrl = PAGE_ORIGIN + ((reference && links.get(reference)) || fallback);
+      if (publicBlogNodes.has(value))
+        (output as Node).sourceUrl = Object.hasOwn(value, 'sourceUrl') ? value.sourceUrl : (value.url ?? null);
+      (output as Node).url = canonicalUrl;
+      changed = true;
+    }
     for (const property of Object.keys(value)) {
       const previous = (value as Node)[property];
       if (!previous || typeof previous !== 'object' || !seen.has(previous)) continue;

@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import Fastify from 'fastify';
 import type { Pool, ResultSetHeader, RowDataPacket } from 'mysql2/promise';
+import { publicationLabelSql } from './publication-noise.ts';
 import { invalidateTopicCache, registerTopicRoutes } from './routes.ts';
 import { SOURCE } from './snapshot-client.ts';
 import { syncVocabulary } from './sync.ts';
@@ -12,6 +13,39 @@ import { TagArticleSource, TagSourceSchemaError } from './tag-source.ts';
 export async function runTopicsQualityIntegration(pool: Pool) {
   const port = (pool as unknown as { pool: { config: { connectionConfig: { port: number } } } }).pool.config.connectionConfig.port;
   assert.equal(port, 18169, 'clone-only topics integration');
+  // Real-column regression: table utf8mb4_unicode_ci and newer servers' default
+  // utf8mb4_uca1400_ai_ci otherwise produce ER_CANT_AGGREGATE_2COLLATIONS.
+  const probe = await pool.getConnection();
+  try {
+    await probe.query(
+      'CREATE TEMPORARY TABLE topic_noise_probe (label VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci, expected TINYINT)',
+    );
+    const values: Array<[string, number]> = [
+      ['', 0],
+      [' ', 0],
+      ['""', 0],
+      ['！？', 0],
+      ['♥★', 0],
+      ['™', 0],
+      ['㍿', 0],
+      ['C++', 1],
+      ['C#', 1],
+      ['AI', 1],
+      ['ＡＩ', 1],
+      ['台灣', 1],
+      ['한국어', 1],
+      ['café', 1],
+    ];
+    await probe.query('INSERT INTO topic_noise_probe(label,expected) VALUES ?', [values]);
+    const [rows] = await probe.query<RowDataPacket[]>(
+      `SELECT label,expected,${publicationLabelSql('label')} allowed FROM topic_noise_probe`,
+    );
+    assert.equal(rows.length, values.length);
+    for (const row of rows) assert.equal(Number(row.allowed), Number(row.expected), `Unicode noise SQL: ${row.label}`);
+  } finally {
+    await probe.query('DROP TEMPORARY TABLE IF EXISTS topic_noise_probe');
+    probe.release();
+  }
   const original = (await pool.query<RowDataPacket[]>('SELECT snapshot_id FROM topic_current WHERE source=?', [SOURCE]))[0][0]?.snapshot_id;
   const [[active]] = await pool.query<RowDataPacket[]>("SELECT COUNT(*) n FROM topic_window_runs WHERE status IN ('scanning','ready')");
   assert.equal(Number(active.n), 0, 'fixture requires no unfinished sync');
@@ -213,6 +247,7 @@ export async function runTopicsQualityIntegration(pool: Pool) {
     await app.inject('/api/topics?days=7');
     assert.ok(queries > firstQueries);
     return {
+      unicodeNoiseSqlCollation: true,
       badTagsSkipped: 3,
       upstream503CheckpointPreserved: true,
       safeDeferredReason: true,

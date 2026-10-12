@@ -1,9 +1,19 @@
-# 未發布原型：等待 SEO 決策
+# 可讀網址：核准範圍與部署條件
 
-2026-10-12 使用者改為先審閱薄話題頁的分布與內容證據。此分支保存先前已完成的可讀網址／noindex／sitemap 原型，**不是正式版，不可直接合併或部署**。
+本批以使用者指定的 `249bbc7` 草稿為基礎，合併遠端 `origin/main` 的 `a1a226d`，保留正式 `d6fd44a` 的 GA 隱私保護。使用者核准可讀網址，**尚未核准薄頁 noindex 門檻**；原型中的 3 文／2 站、低頻及 seed 額外索引門檻已移除。
 
-正式服務仍是 `d6fd44a`。正式 noindex 與 sitemap 規則未套用本分支的新門檻。正式 DB 的 0018 只新增網址 registry／aliases 並完成回補，正式服務尚未讀取，原始 slug／ID／favicon／文章資料不變。
+- 部落格與話題改用持久化 canonical key，舊 hash／discovered 網址一次 301 到最終頁；ID、API slug、favicon key 不變。
+- 使用者明確核准公開 v1 部落格 `url` 改為本站頁面、原站改用 `sourceUrl`；話題新增本站 `url`，不另加 `pageUrl`。文章 `url` 仍連原文，內部 API 的原站網址保持不變。遷移日期與受影響端點列在產生的 API 文件。
+- sitemap 保留原有內容集合，僅網址遷移及使用者核准的空白／純標點噪音排除。
+- 已發布 key 不因顯示名稱、大小寫代表寫法或例行回補而改變。明確改名的維護流程见 `docs/seo.md`，所有舊 key 直接解析到最終 canonical。
+- Migration 0018 僅新增 registry／alias，已備份與回補；舊正式版本不讀取這兩張表，回滾不需刪資料。
 
-下一步先依 main 的 `docs/seo-audit-2026-10-12.md` 與使用者決策調整：若只核准可讀網址，必須把薄頁索引政策從本分支拆除，保留既有 sitemap 成員與 noindex 行為後再驗證。不能把這份原型視為使用者已核准 3 篇／2 站門檻。
+所有 web 修改由 `claude-opus-5-5` CLI 實作；Codex 負責後端、交叉審查、整合測試與部署。部署前必須通過隔離 SQL 測試、clean build，以及實際 HTTP 單跳與 canonical 驗證；不可把單元測試當作已部署的證明。
 
-已完成：600 個 backend unit、149 個 web tests（含後續 d6fd44a 隱私 guard）、23 個隔離 SQL suites；尚未做整合 clean build／公開網址切換驗收。所有 web 修改由 claude-opus-5-5 CLI 實作，Codex 處理後端與整合。
+任何大檔建置／備份／release 複製前先執行 `node tools/disk-space.mjs`，低於 10 GiB 就暫停。2026-10-12 使用者本人僅另准清理 `blog-completion-release` 與 `blog-icon-fix` 中的 `node_modules`、`web/node_modules`、`web/.next` 六個目錄；已清理。其餘候選、正式 release、回滾與備份一律保留，後續清理需本人另准。
+
+## 目前發布狀態
+
+2026-10-12 最後容量檢查再次低於 10 GiB，因此**尚未切換正式服務**，正式 release 仍是 `d6fd44a35da4ac92052e04bff670c6c161e50b3d`。可讀網址預覽已完成 5 個部落格與 5 個話題的 301→200、自我 canonical、Unicode／雙重編碼、三類 metadata／JSON-LD 及相容回滾測試。最新 API 欄位意義依使用者最終決定已更新規格與文件，`/api/` 自動讀取同一份產生的規格；仍須在容量恢復後重新建置該文件頁並完成正式網址驗收。
+
+備份後補齊期間新增的 registry／alias，未修改文章 ID／原站 URL／favicon。這些新增表在 d6 正式版中尚未被使用。下一次先 fetch origin、確認此分支的最新 commit、檢查空間，通過建置與全部驗證後再合併 main／push／切換；不得拿本狀態文件當成已部署證明。

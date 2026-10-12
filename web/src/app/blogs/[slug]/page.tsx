@@ -7,9 +7,8 @@ import BlogTopics from '@/components/BlogTopics';
 import SimilarwebTraffic from '@/components/SimilarwebTraffic';
 import SourceProfile from '@/components/SourceProfile';
 import { plainText } from '@/lib/api';
-import { indexabilityNote } from '@/lib/page-links';
 import { getBlog, getPublicPage } from '@/lib/public-api';
-import { breadcrumbSchema, detailPageMetadata, serializeJsonLd, shortText } from '@/lib/seo';
+import { breadcrumbSchema, pageMetadata, serializeJsonLd, shortText } from '@/lib/seo';
 
 // ISR (PUBLIC_REVALIDATE_SECONDS), generated on first request and never at build
 // (no list of every blog is fetched). The in-page ?q= post filter runs in the browser.
@@ -21,8 +20,8 @@ export function generateStaticParams() {
 
 type Props = { params: Promise<{ slug: string }> };
 /**
- * The segment is a readable key or a legacy slug, already decoded once by Next
- * (never decoded again). The page registry resolves it; the blog itself is
+ * The segment is a readable key or a legacy slug, which Next passes
+ * percent-encoded; getPublicPage decodes it exactly once. The page registry resolves it; the blog itself is
  * read by its stable API slug. Unknown keys and a gateway 404 are the page's 404.
  */
 async function blogOf(params: Props['params']) {
@@ -36,7 +35,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { page, blog } = await blogOf(params);
   const description =
     shortText(plainText(blog.description)) || `${shortText(blog.name, 60)}的最新文章、內文來源與共同話題，收錄於部落格觀察。`;
-  return detailPageMetadata(page, blog.name, description);
+  return pageMetadata(page.canonicalPath, blog.name, description);
 }
 export default async function BlogDetailPage({ params }: Props) {
   const { page, blog } = await blogOf(params);
@@ -50,7 +49,6 @@ export default async function BlogDetailPage({ params }: Props) {
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: serializeJsonLd(breadcrumb) }} />
       <SourceProfile
         blog={{ ...blog, canonicalPath: page.canonicalPath }}
-        note={indexabilityNote(page, 'blog')}
         sidebar={
           <>
             <BlogContentSources slug={blog.slug} />

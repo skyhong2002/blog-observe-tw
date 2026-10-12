@@ -67,17 +67,6 @@ export const privatePageMetadata = (title: string) => ({
   robots: { index: false, follow: false },
 });
 
-/**
- * A blog or topic page: its registry canonicalPath (page-links.ts validated it)
- * as canonical and Open Graph URL. A valid page below the 90-day threshold,
- * or an unverified blog, stays a readable 200 with noindex,follow so its links
- * are still crawled.
- */
-export function detailPageMetadata(page: { canonicalPath: string; indexable: boolean }, title: string, description: string) {
-  const meta = pageMetadata(page.canonicalPath, title, description);
-  return page.indexable ? meta : { ...meta, robots: { index: false, follow: true } };
-}
-
 /** /blogs/<slug>/ with the slug percent-encoded once (the legacy, stable-slug URL). */
 export const blogPath = (slug: string) => `/blogs/${encodeURIComponent(slug)}/`;
 /** /topics/<id>/, e.g. /topics/tag%3A<hash>/. */

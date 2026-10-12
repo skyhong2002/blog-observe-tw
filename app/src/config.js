@@ -17,6 +17,7 @@ export function loadConfig(env = process.env) {
     port,
     publicOrigin: publicOrigin.origin,
     uiOrigin: uiOrigin.origin,
+    uiLegacyPagePaths: env.BLOG_UI_LEGACY_PAGE_PATHS === 'true',
     blogDbUrl: env.BLOG_DB_URL,
     redisUrl,
     queueName,

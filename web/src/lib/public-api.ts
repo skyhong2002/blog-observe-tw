@@ -1,7 +1,7 @@
 import 'server-only';
 import { cache } from 'react';
 import type { AuthorCatalog, AuthorCatalogQuery, Blog, Catalog, CatalogQuery, Overview, Post } from './api';
-import { isPageKey, type PageKind, type PublicPageInfo, pageApiPath, pageInfoOf } from './page-links';
+import { type PageKind, type PublicPageInfo, pageApiPath, pageInfoOf, pageKeyOfParam } from './page-links';
 import { authorApiPath, catalogApiPath } from './public-query';
 import { PublicGatewayError, readPublic } from './public-read';
 import { gatewayOrigin } from './server-gateway';
@@ -40,11 +40,12 @@ export const authorCatalog = (query: AuthorCatalogQuery = {}) => publicJson<Auth
 
 /**
  * The page registry entry for a /blogs/<key>/ or /topics/<key>/ param: null for
- * a key the registry could not have minted or the gateway's 404. `key` is the
- * param as Next passed it (decoded once); it is never decoded again.
+ * a key the registry could not have minted or the gateway's 404. `param` is the
+ * raw Next param (percent-encoded); pageKeyOfParam decodes it exactly once.
  */
-export async function getPublicPage(kind: PageKind, key: string): Promise<PublicPageInfo | null> {
-  if (!isPageKey(kind, key)) return null;
+export async function getPublicPage(kind: PageKind, param: string): Promise<PublicPageInfo | null> {
+  const key = pageKeyOfParam(kind, param);
+  if (key === null) return null;
   // A 200 that pageInfoOf rejects already threw in readPublic (public-contracts.ts).
   return pageInfoOf(kind, await publicJsonOrNull<unknown>(pageApiPath(kind, key)));
 }

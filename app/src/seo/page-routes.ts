@@ -3,6 +3,7 @@ import { domainToUnicode } from 'node:url';
 import type { Pool, PoolConnection, RowDataPacket } from 'mysql2/promise';
 import { withJobLease } from '../jobs/lease.ts';
 import { publicationHome } from '../relations/identity.ts';
+import { publicationLabelSql } from '../topics/publication-noise.ts';
 import { SOURCE } from '../topics/snapshot-client.ts';
 
 export type PublicPageKind = 'blog' | 'topic';
@@ -78,7 +79,7 @@ export async function getPublicPages(pool: Pool, kind: PublicPageKind, entityIds
   const [rows] = await pool.query<RowDataPacket[]>(
     kind === 'blog'
       ? `SELECT r.entity_id,r.canonical_key,b.slug stable_id FROM public_page_routes r JOIN blogs b ON b.id=r.entity_id WHERE r.kind='blog' AND r.entity_id IN (?) AND b.status<>'moved'`
-      : `SELECT r.entity_id,r.canonical_key,CONCAT('tag:',r.entity_id) stable_id FROM public_page_routes r JOIN topic_current c ON c.source=? JOIN topic_canonical_terms_v3 t ON t.snapshot_id=c.snapshot_id AND t.id=r.entity_id WHERE r.kind='topic' AND r.entity_id IN (?)`,
+      : `SELECT r.entity_id,r.canonical_key,CONCAT('tag:',r.entity_id) stable_id FROM public_page_routes r JOIN topic_current c ON c.source=? JOIN topic_canonical_terms_v3 t ON t.snapshot_id=c.snapshot_id AND t.id=r.entity_id WHERE r.kind='topic' AND r.entity_id IN (?) AND ${publicationLabelSql('t.label')}`,
     kind === 'blog' ? [ids] : [SOURCE, ids],
   );
   return new Map(rows.filter((r) => isPublicRouteKey(kind, r.canonical_key)).map((r) => [String(r.entity_id), page(kind, r)]));
@@ -209,7 +210,7 @@ export async function backfillPublicRoutes(pool: Pool, options: BackfillOptions 
       const [rows] = await pool.query<RowDataPacket[]>(
         kind === 'blog'
           ? `SELECT b.id,b.slug,b.name,b.url FROM blogs b WHERE b.status<>'moved' AND b.id>? ${options.missingOnly ? "AND NOT EXISTS (SELECT 1 FROM public_page_routes r WHERE r.kind='blog' AND r.entity_id=CAST(b.id AS CHAR))" : ''} ORDER BY b.id LIMIT ${limit}`
-          : `SELECT t.id,t.label FROM topic_canonical_terms_v3 t JOIN topic_current c ON c.snapshot_id=t.snapshot_id AND c.source=? WHERE t.id>? ${options.missingOnly ? "AND NOT EXISTS (SELECT 1 FROM public_page_routes r WHERE r.kind='topic' AND r.entity_id=t.id)" : ''} ORDER BY t.id LIMIT ${limit}`,
+          : `SELECT t.id,t.label FROM topic_canonical_terms_v3 t JOIN topic_current c ON c.snapshot_id=t.snapshot_id AND c.source=? WHERE t.id>? AND ${publicationLabelSql('t.label')} ${options.missingOnly ? "AND NOT EXISTS (SELECT 1 FROM public_page_routes r WHERE r.kind='topic' AND r.entity_id=t.id)" : ''} ORDER BY t.id LIMIT ${limit}`,
         kind === 'blog' ? [afterId || '0'] : [SOURCE, afterId],
       );
       for (const row of rows) {

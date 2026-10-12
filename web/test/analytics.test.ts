@@ -857,6 +857,8 @@ test('page-links: link props carry only analytics-safe stable ids, never readabl
   });
   assert.deepEqual(blogLink('甲'), { href: '/blogs/%E7%94%B2/' });
   assert.deepEqual(topicLink(`tag:${HASH}`, READABLE_TOPIC), { href: READABLE_TOPIC, 'data-analytics-content-id': HASH });
-  assert.deepEqual(topicLink('rss:42', undefined, '30'), { href: '/topics/rss%3A42/?days=30', 'data-analytics-content-id': '42' });
+  assert.deepEqual(topicLink('rss:42', undefined, '90'), { href: '/topics/rss%3A42/?days=90', 'data-analytics-content-id': '42' });
+  // The detail page's own 30-day period is the bare canonical URL.
+  assert.deepEqual(topicLink('rss:42', undefined, '30'), { href: '/topics/rss%3A42/', 'data-analytics-content-id': '42' });
   assert.deepEqual(topicLink('旅行'), { href: '/topics/%E6%97%85%E8%A1%8C/' });
 });

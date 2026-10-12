@@ -13,13 +13,13 @@
  * imports this file.
  */
 import { safeContentId } from './analytics-consent.mts';
-import type { Period } from './public-query.ts';
+import { type Period, TOPICS_PERIOD } from './public-query.ts';
 
 export type PageKind = 'blog' | 'topic';
 
 const PREFIX: Record<PageKind, string> = { blog: '/blogs/', topic: '/topics/' };
-/** The period a topic detail page renders without ?days= (its indexability window). */
-export const TOPIC_DETAIL_PERIOD: Period = '90';
+/** The period a topic detail page renders without ?days= (30 days, as before readable URLs). */
+export const TOPIC_DETAIL_PERIOD: Period = TOPICS_PERIOD;
 
 /**
  * An already-decoded page key the registry could have minted (mirrors
@@ -54,6 +54,28 @@ export function pageKeyOf(kind: PageKind, path: unknown): string | null {
     return null;
   }
   return isPageKey(kind, key) && encodeURIComponent(key) === segment ? key : null;
+}
+
+/**
+ * The page key of a /blogs/[slug] or /topics/[id] param, else null. Next 16
+ * hands page code the segment re-encoded with encodeURIComponent
+ * (getParamValue in next/dist/shared/lib/router/utils/get-dynamic-param.js),
+ * so `資訊安全` arrives as `%E8%B3%87…` and `tag:<hash>` as `tag%3A<hash>`.
+ * This is the one place that decodes it, exactly once: the param must be the
+ * key's encodeURIComponent form (or the key itself, should Next ever pass it
+ * decoded) and the decoded key must pass isPageKey. A double-encoded `%252F`
+ * decodes to `%2F` and an encoded `/`, `\`, `?`, `#` or `@` to themselves, all
+ * of which isPageKey rejects.
+ */
+export function pageKeyOfParam(kind: PageKind, raw: unknown): string | null {
+  if (typeof raw !== 'string' || raw.length > 2048) return null;
+  let key: string;
+  try {
+    key = decodeURIComponent(raw);
+  } catch {
+    return null;
+  }
+  return isPageKey(kind, key) && (raw === key || encodeURIComponent(key) === raw) ? key : null;
 }
 
 export const isCanonicalPagePath = (kind: PageKind, path: unknown): path is string => pageKeyOf(kind, path) !== null;
@@ -94,15 +116,18 @@ export function topicLink(id: string, canonicalPath?: unknown, days?: Period): L
 /** /api/pages/blogs/:key and /api/pages/topics/:key for an already-decoded key, encoded once. */
 export const pageApiPath = (kind: PageKind, key: string) => `/api/pages/${kind === 'blog' ? 'blogs' : 'topics'}/${encodeURIComponent(key)}`;
 
-/** GET /api/pages/... `page` (app/src/seo/page-api.ts). */
+/**
+ * GET /api/pages/... `page` (app/src/seo/page-api.ts). A registered page gets
+ * the same indexable metadata as any public page; unknown or noise keys are the
+ * gateway's 404. The 90-day counts are descriptive only and never drive robots;
+ * any indexable/indexabilityReason fields in the answer are ignored.
+ */
 export type PublicPageInfo = {
   entityId: string;
   /** Blog: the original API slug. Topic: tag:<hash>. Used for every existing API read. */
   stableId: string;
   slug: string;
   canonicalPath: string;
-  indexable: boolean;
-  indexabilityReason: string | null;
   windowDays: 90;
   posts: number;
   blogs: number;
@@ -118,47 +143,21 @@ export function pageInfoOf(kind: PageKind, raw: unknown): PublicPageInfo | null 
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
   const page = (raw as { page?: unknown }).page as Record<string, unknown> | undefined;
   if (!page || typeof page !== 'object' || Array.isArray(page)) return null;
-  const { entityId, stableId, slug, canonicalPath, indexable, indexabilityReason, windowDays, posts, blogs, currentVersion } = page;
+  const { entityId, stableId, slug, canonicalPath, windowDays, posts, blogs, currentVersion } = page;
   if (typeof entityId !== 'string' || !ENTITY[kind].test(entityId)) return null;
   if (typeof stableId !== 'string' || !STABLE[kind].test(stableId)) return null;
   if (kind === 'topic' && stableId !== `tag:${entityId}`) return null;
   if (typeof slug !== 'string' || pageKeyOf(kind, canonicalPath) !== slug) return null;
-  if (typeof indexable !== 'boolean' || windowDays !== 90 || !count(posts) || !count(blogs)) return null;
-  if (!(indexabilityReason === null || (typeof indexabilityReason === 'string' && indexabilityReason.length <= 64))) return null;
-  if (indexable && indexabilityReason !== null) return null;
+  if (windowDays !== 90 || !count(posts) || !count(blogs)) return null;
   if (!(currentVersion === null || typeof currentVersion === 'string')) return null;
   return {
     entityId,
     stableId,
     slug,
     canonicalPath: canonicalPath as string,
-    indexable,
-    indexabilityReason: indexabilityReason as string | null,
     windowDays: 90,
     posts: posts as number,
     blogs: blogs as number,
     currentVersion: currentVersion as string | null,
   };
-}
-
-const REASONS: Record<string, string> = {
-  'insufficient-posts': '近 90 天比對到的文章少於 3 篇',
-  'insufficient-blogs': '近 90 天只有 1 個部落格寫到',
-  'excluded-term': '此詞不參與話題比對',
-  'inactive-term': '此詞暫未參與比對',
-  'not-current-term': '不在目前詞庫版本',
-  'unverified-or-invalid-url': '尚未核准或沒有有效網址',
-};
-
-/**
- * One line on why a valid page is not offered to search engines, with the
- * 90-day counts the threshold is checked against (independent of the period
- * tab the page shows). null when indexable.
- */
-export function indexabilityNote(page: Pick<PublicPageInfo, 'indexable' | 'indexabilityReason' | 'posts' | 'blogs'>, kind: PageKind) {
-  if (page.indexable) return null;
-  const reason = REASONS[page.indexabilityReason ?? ''] ?? '尚未達收錄門檻';
-  return kind === 'topic'
-    ? `暫不提供搜尋引擎索引：${reason}（近 90 天 ${page.posts} 篇、${page.blogs} 個部落格；門檻為至少 3 篇、2 個部落格）。`
-    : `暫不提供搜尋引擎索引：${reason}。`;
 }

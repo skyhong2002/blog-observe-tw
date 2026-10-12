@@ -39,11 +39,13 @@ def validate(schema):
         else:raise AssertionError('Unsupported schema shape: '+str(typ))
     return types
 base=sys.argv[1].rstrip('/') if len(sys.argv)>1 else 'https://blog.observe.tw'
-# Public API only supplies the canonical topic ID; no private data is queried.
+# Public API supplies stable IDs plus additive canonical page paths; no private data is queried.
 with urllib.request.urlopen(base+'/api/v1/topics',timeout=30) as r:topics=json.load(r)
 items=topics.get('items',topics.get('data',[]));topic=items[0]['id']
 from urllib.parse import quote
-paths=['/','/blogs/kocpc/','/topics/'+quote(topic,safe='')+'/'];results=[]
+topic_path=items[0].get('canonicalPath') or '/topics/'+quote(topic,safe='')+'/'
+assert topic_path.startswith('/topics/') and not urlsplit(topic_path).netloc
+paths=['/','/blogs/kocpc/',topic_path];results=[]
 for path in paths:
     with urllib.request.urlopen(base+path,timeout=30) as r:assert r.status==200;body=r.read().decode()
     p=Page();p.feed(body);url='https://blog.observe.tw'+path

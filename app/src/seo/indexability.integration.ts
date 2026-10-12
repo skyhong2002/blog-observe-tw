@@ -107,25 +107,13 @@ export async function runIndexabilityIntegration(pool: Pool) {
     const statuses = await Promise.all(terms.map((term) => getPageIndexability(pool, 'topic', term.id)));
     assert.deepEqual(
       statuses.map((s) => s.indexabilityReason),
-      [
-        null,
-        'insufficient-posts',
-        'insufficient-blogs',
-        'excluded-term',
-        'inactive-term',
-        'insufficient-posts',
-        'insufficient-posts',
-        'insufficient-posts',
-      ],
+      [null, null, null, 'excluded-term', null, null, null, null],
     );
     assert.equal(statuses[0].posts, 3, 'title/body and private source do not inflate posts');
     assert.equal(statuses[0].blogs, 2);
     assert.ok(statuses.every((s) => s.currentVersion === snapshot && s.windowDays === 90));
     const list = await getIndexablePages(pool, 'topic');
-    assert.deepEqual(
-      list.map((p) => p.entityId),
-      [terms[0].id],
-    );
+    assert.deepEqual(list.map((p) => p.entityId).sort(), [0, 1, 2, 5, 6].map((i) => terms[i].id).sort());
     const xml = await app.inject('/sitemaps/topics.xml');
     assert.equal(xml.statusCode, 200);
     assert.ok(xml.body.includes(`${SEO_ORIGIN}/topics/${encodeURIComponent(terms[0].key)}/`));
@@ -133,24 +121,32 @@ export async function runIndexabilityIntegration(pool: Pool) {
     for (const [i, term] of terms.entries()) {
       const response = await app.inject(`/api/pages/topics/${encodeURIComponent(term.key)}`);
       assert.equal(response.statusCode, 200);
-      assert.equal(response.json().page.indexable, i === 0);
-      assert.equal(xml.body.includes(`/topics/${encodeURIComponent(term.key)}/`), response.json().page.indexable);
+      assert.equal(response.json().page.indexable, i !== 3);
+      assert.equal(
+        xml.body.includes(`/topics/${encodeURIComponent(term.key)}/`),
+        [0, 1, 2, 5, 6].includes(i),
+        'sitemap preserves the old >=1 valid evidence set without adding a page noindex gate',
+      );
     }
     const blogXml = await app.inject('/sitemaps/blogs.xml');
     assert.ok(blogXml.body.includes(`/blogs/quality-0-${snapshot.slice(0, 8)}.example/`));
     assert.ok(!blogXml.body.includes(`/blogs/quality-2-${snapshot.slice(0, 8)}.example/`));
-    assert.ok(!blogXml.body.includes(`/blogs/quality-3-${snapshot.slice(0, 8)}.example/`));
-    assert.equal((await getPageIndexability(pool, 'blog', String(blogs[3]))).indexabilityReason, 'unverified-or-invalid-url');
+    assert.ok(
+      blogXml.body.includes(`/blogs/quality-3-${snapshot.slice(0, 8)}.example/`),
+      'preserve the deployed HTTP-prefix sitemap rule without adding URL eligibility policy',
+    );
+    assert.equal((await getPageIndexability(pool, 'blog', String(blogs[3]))).indexabilityReason, null);
+    assert.equal((await getPageIndexability(pool, 'blog', String(blogs[2]))).indexable, true, 'seed blog pages gain no new noindex policy');
     assert.equal((await app.inject('/api/pages/topics/unknown')).statusCode, 404);
     assert.equal((await app.inject('/api/pages/topics/%252F')).statusCode, 404);
     const lowFrequency = await getPageIndexability(pool, 'blog', String(blogs[1]));
     assert.equal(lowFrequency.indexable, true, 'single low-frequency blog has no multi-blog minimum');
     return {
-      thresholds: true,
+      noNewContentThresholds: true,
       samePostDeduplicated: true,
       privateExcluded: true,
       staleAndFutureExcluded: true,
-      sitemapMatchesPage: true,
+      legacySitemapMembershipPreserved: true,
       chineseEncoding: true,
       unknown404: true,
       lowFrequencyBlogPreserved: true,
