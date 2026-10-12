@@ -31,3 +31,14 @@ it('deadline prevents even budget writes or outbound requests', async () => {
   expect(budget).not.toHaveBeenCalled();
   expect(original).not.toHaveBeenCalled();
 });
+it('rechecks lease/permission after reserving and before I/O', async () => {
+  let checks = 0;
+  const original = vi.fn();
+  const assert = async () => {
+    if (++checks === 2) throw Error('admin_access_revoked');
+  };
+  const fetcher = budgetedCandidateFetcher({} as Pool, { fetcher: original }, assert, Date.now() + 60000, () => {});
+  await expect(fetcher('https://writer.test/')).rejects.toThrow('revoked');
+  expect(budget).toHaveBeenCalledOnce();
+  expect(original).not.toHaveBeenCalled();
+});

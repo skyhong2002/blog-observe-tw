@@ -40,6 +40,7 @@ export function budgetedCandidateFetcher(
       onStop();
       throw Error('candidate_batch_stopped');
     }
+    await assert(); // Permission/lease can change while waiting for the budget transaction.
     return fetcher(input, init);
   };
 }

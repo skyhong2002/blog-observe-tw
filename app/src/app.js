@@ -1,6 +1,8 @@
 import rateLimit from '@fastify/rate-limit';
 import * as cheerio from 'cheerio';
 import Fastify, { LogController } from 'fastify';
+import { isAdmin } from './admin/identity.ts';
+import { registerAdminRoutes } from './admin/routes.ts';
 import { registerAiRoutes } from './ai/routes.ts';
 import { registerLogin } from './auth/google-login.ts';
 import { dbLoginStore } from './auth/store.ts';
@@ -126,7 +128,7 @@ export async function buildApp(config, { logger = false, store = null } = {}) {
     );
     if (!blogs.length) return reply.code(404).send({ error: 'blog not found' });
     const [posts] = await pool.query(
-      'SELECT guid,title,url,summary,author,published_at AS publishedAt,updated_at AS updatedAt,image_url AS imageUrl FROM posts WHERE blog_id=? ORDER BY COALESCE(published_at,updated_at,created_at) DESC LIMIT 50',
+      'SELECT id,guid,title,url,summary,author,published_at AS publishedAt,updated_at AS updatedAt,image_url AS imageUrl FROM posts WHERE blog_id=? ORDER BY COALESCE(published_at,updated_at,created_at) DESC LIMIT 50',
       [blogs[0].id],
     );
     const [authors] = await pool.query(
@@ -143,25 +145,16 @@ export async function buildApp(config, { logger = false, store = null } = {}) {
     return { blog: { ...blogs[0], iconUrl: iconUrl(blogs[0].slug, await iconManifest()), authors, tags }, posts };
   });
 
-  const login = registerLogin(app, config.login ? dbLoginStore(own.db) : null, config.login);
+  const login = registerLogin(app, config.login ? dbLoginStore(own.db, { pool, adminEmails: config.adminEmails }) : null, config.login);
   app.get('/api/me/capabilities', async (request, reply) => {
     reply.header('cache-control', 'no-store');
     const user = await login.currentUser(request);
-    return { admin: Boolean(user && config.adminEmails?.has(user.email.toLowerCase())) };
+    return { admin: Boolean(user && (await isAdmin(pool, user, config.adminEmails))) };
   });
   const requireUser = async (request, reply) => {
     const user = await login.currentUser(request);
     if (!user) {
       reply.code(401).send({ error: 'login required' });
-      return null;
-    }
-    return user;
-  };
-  const requireAdmin = async (request, reply) => {
-    const user = await requireUser(request, reply);
-    if (!user) return null;
-    if (!(config.adminEmails ?? new Set()).has(user.email.toLowerCase())) {
-      reply.code(403).send({ error: 'admin access required' });
       return null;
     }
     return user;
@@ -262,79 +255,14 @@ export async function buildApp(config, { logger = false, store = null } = {}) {
     return { followed, candidates };
   });
 
-  // Candidate review is deliberately an allow-listed operator surface. Every
-  // decision leaves an immutable audit row so discovery provenance survives a
-  // later approval or rejection.
-  app.get('/api/admin/discovery', async (request, reply) => {
-    const admin = await requireAdmin(request, reply);
-    if (!admin) return;
-    const query = request.query ?? {};
-    const limit = Math.min(200, Math.max(1, Number(query.limit || 100)));
-    const status = typeof query.status === 'string' && /^(candidate|approved|rejected)$/.test(query.status) ? query.status : 'candidate';
-    const [rows] = await pool.query(
-      `SELECT id,url,name,source_type AS sourceType,source_url AS sourceUrl,source_evidence AS sourceEvidence,status,discovered_at AS discoveredAt
-       FROM discovery_candidates WHERE status=? ORDER BY discovered_at DESC LIMIT ?`,
-      [status, limit],
-    );
-    const icons = await iconManifest();
-    return {
-      candidates: rows.map((candidate) => ({ ...candidate, iconUrl: iconUrl(`candidate-${candidate.id}`, icons) })),
-      status,
-      reviewer: { id: admin.id, email: admin.email },
-    };
-  });
-  app.post('/api/admin/discovery/review', async (request, reply) => {
-    if (!sameOrigin(request, config.publicOrigin)) return reply.code(403).send({ error: 'same-origin requests only' });
-    const admin = await requireAdmin(request, reply);
-    if (!admin) return;
-    const body = request.body && typeof request.body === 'object' ? request.body : {};
-    if (Array.isArray(body.ids) && body.ids.length > 100) return reply.code(400).send({ error: 'maximum 100 candidates per batch' });
-    const ids = Array.isArray(body.ids)
-      ? [...new Set(body.ids.map(Number).filter((id) => Number.isInteger(id) && id > 0))].slice(0, 100)
-      : [];
-    const nextStatus = body.status === 'approved' || body.status === 'rejected' ? body.status : '';
-    if (!ids.length || !nextStatus) return reply.code(400).send({ error: 'ids and status are required' });
-    const note = typeof body.note === 'string' ? body.note.slice(0, 1000) : null;
-    const connection = await pool.getConnection();
-    let changed = 0;
-    try {
-      await connection.beginTransaction();
-      for (const id of ids) {
-        const [rows] = await connection.query(
-          'SELECT id,status,url,source_type,source_url,source_evidence FROM discovery_candidates WHERE id=? FOR UPDATE',
-          [id],
-        );
-        const candidate = rows[0];
-        if (!candidate || candidate.status === nextStatus) continue;
-        await connection.execute('UPDATE discovery_candidates SET status=? WHERE id=?', [nextStatus, id]);
-        await connection.execute(
-          `INSERT INTO discovery_candidate_audits
-           (candidate_id,action,previous_status,next_status,source_type,source_actor_id,source_url,source_evidence,note,occurred_at,created_at)
-           VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
-          [
-            id,
-            nextStatus === 'approved' ? 'approve' : 'reject',
-            candidate.status,
-            nextStatus,
-            'human-review',
-            admin.id,
-            candidate.source_url,
-            candidate.source_evidence,
-            note,
-            new Date(),
-            new Date(),
-          ],
-        );
-        changed += 1;
-      }
-      await connection.commit();
-    } catch (error) {
-      await connection.rollback();
-      throw error;
-    } finally {
-      connection.release();
-    }
-    return { changed, status: nextStatus };
+  registerAdminRoutes(app, {
+    pool,
+    login,
+    publicOrigin: config.publicOrigin,
+    sessionSecret: config.login?.sessionSecret || '',
+    adminEmails: config.adminEmails ?? new Set(),
+    similarEnabled: config.similarWeb?.enabled ?? false,
+    userAgent: config.crawlUserAgent,
   });
 
   const proxyToUi = createUiProxy(config.uiOrigin);

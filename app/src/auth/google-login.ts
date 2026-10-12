@@ -12,13 +12,14 @@ export type LoginConfig = {
 };
 
 export type GoogleIdentity = {
+  readonly emailVerified?: true;
   sub: string;
   email: string;
   name: string | null;
   picture: string | null;
 };
 
-export type SessionUser = GoogleIdentity & { id: number };
+export type SessionUser = GoogleIdentity & { id: number; role?: string };
 
 export interface LoginStore {
   upsertUser(identity: GoogleIdentity, at: Date): Promise<number>;
@@ -89,6 +90,7 @@ export function verifiedIdentity(
   if (typeof sub !== 'string' || !sub || sub.length > 255) return null;
   if (typeof email !== 'string' || !email || email.length > 255) return null;
   return {
+    emailVerified: true,
     sub,
     email: email.toLowerCase(),
     name: typeof name === 'string' && name ? name.slice(0, 255) : null,
@@ -145,7 +147,11 @@ export function registerLogin(app: FastifyInstance, store: LoginStore | null, co
 
   app.get('/auth/me', async (request, reply) => {
     reply.header('cache-control', 'no-store');
-    return { enabled, user: await currentUser(request) };
+    const user = await currentUser(request);
+    return {
+      enabled,
+      user: user ? { id: user.id, email: user.email, name: user.name, picture: user.picture, role: user.role || 'reader' } : null,
+    };
   });
 
   if (!store || !config) return { currentUser };

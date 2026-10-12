@@ -64,6 +64,13 @@
       "when": 1791792295799,
       "tag": "0008_tag_sync_retry_after",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "5",
+      "when": 1791793391751,
+      "tag": "0009_admin_identity_roles",
+      "breakpoints": true
     }
   ]
 }

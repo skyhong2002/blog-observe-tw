@@ -1,4 +1,6 @@
 import { and, eq, gt, lt } from 'drizzle-orm';
+import type { Pool } from 'mysql2/promise';
+import { bootstrapAdmin, isAdmin } from '../admin/identity.ts';
 import type { Db } from '../db/client.ts';
 import { userSessions, users } from '../db/schema.ts';
 import type { GoogleIdentity, LoginStore, SessionUser } from './google-login.ts';
@@ -6,7 +8,7 @@ import { hashToken } from './google-login.ts';
 
 /** Drizzle-backed reader sessions.  The gateway passes the blog-only Db
  * instance; this store never points at the tag or YouTube databases. */
-export function dbLoginStore(db: Db): LoginStore {
+export function dbLoginStore(db: Db, options: { pool?: Pool; adminEmails?: Set<string> } = {}): LoginStore {
   return {
     async upsertUser(identity: GoogleIdentity, at: Date) {
       await db
@@ -24,6 +26,7 @@ export function dbLoginStore(db: Db): LoginStore {
         });
       const [row] = await db.select({ id: users.id }).from(users).where(eq(users.googleSub, identity.sub));
       if (!row) throw new Error('Google user was not persisted');
+      if (options.pool) await bootstrapAdmin(options.pool, row.id, identity, options.adminEmails || new Set(), at);
       return row.id;
     },
 
@@ -39,6 +42,7 @@ export function dbLoginStore(db: Db): LoginStore {
       const [row] = await db
         .select({
           id: users.id,
+          role: users.role,
           sub: users.googleSub,
           email: users.email,
           name: users.name,
@@ -47,7 +51,9 @@ export function dbLoginStore(db: Db): LoginStore {
         .from(userSessions)
         .innerJoin(users, eq(users.id, userSessions.userId))
         .where(and(eq(userSessions.tokenHash, tokenHash), gt(userSessions.expiresAt, at)));
-      return row ?? null;
+      if (!row) return null;
+      const role = options.pool && (await isAdmin(options.pool, row, options.adminEmails || new Set())) ? 'admin' : 'reader';
+      return { ...row, role };
     },
 
     async deleteSession(tokenHash: string) {

@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 import type { Pool, PoolConnection, ResultSetHeader, RowDataPacket } from 'mysql2/promise';
+import { type AdminActor, requireAdminTransaction, writeAudit } from '../admin/identity.ts';
 import { inputKey, normalizeInput } from '../ai/contracts.ts';
 import { deterministicPersonalProof } from '../ai/personal.ts';
 import { reserveBudgetOnConnection } from '../jobs/budget.ts';
@@ -42,7 +43,12 @@ async function releasePromotion(connection: PoolConnection, held: boolean) {
   connection.release();
 }
 /** No network in this transaction. Recheck ownership and operator decisions after validation. */
-export async function recordCandidateCheck(pool: Pool, check: CandidateCheck, apply: boolean) {
+export async function recordCandidateCheck(
+  pool: Pool,
+  check: CandidateCheck,
+  apply: boolean,
+  admin?: { actor: AdminActor; emails: Set<string>; note?: string },
+) {
   if (
     check.policy !== CANDIDATE_POLICY ||
     !Number.isSafeInteger(check.id) ||
@@ -61,11 +67,16 @@ export async function recordCandidateCheck(pool: Pool, check: CandidateCheck, ap
     if (Number(lock?.held) !== 1) return { status: 'busy' };
     locked = true;
     await c.beginTransaction();
+    if (admin) await requireAdminTransaction(c, admin.actor, admin.emails);
     const [[candidate]] = await c.query<RowDataPacket[]>(
       'SELECT id,url,name,status,source_type,source_evidence FROM discovery_candidates WHERE id=? FOR UPDATE',
       [check.id],
     );
-    if (!candidate || candidate.url !== check.inputUrl || candidate.status !== 'candidate') {
+    if (
+      !candidate ||
+      candidate.url !== check.inputUrl ||
+      !(candidate.status === 'candidate' || (admin && candidate.status === 'rejected'))
+    ) {
       await c.rollback();
       return { status: 'decision-changed' };
     }
@@ -73,7 +84,7 @@ export async function recordCandidateCheck(pool: Pool, check: CandidateCheck, ap
       "SELECT id FROM discovery_candidate_audits WHERE candidate_id=? AND (source_type IN ('manual','human-review','admin') OR source_actor_id IS NOT NULL) LIMIT 1",
       [check.id],
     );
-    if (manual) {
+    if (manual && !admin) {
       await c.rollback();
       return { status: 'manual-decision-preserved' };
     }
@@ -141,12 +152,14 @@ export async function recordCandidateCheck(pool: Pool, check: CandidateCheck, ap
     // biome-ignore lint/suspicious/noConfusingLabels: all declines must reach the shared append-only audit below.
     admission: if (apply && check.eligible) {
       if (
-        candidatePreflight({ ...candidate, name: effectiveName } as Parameters<typeof candidatePreflight>[0]) ||
+        candidatePreflight({ ...candidate, status: 'candidate', name: effectiveName } as Parameters<typeof candidatePreflight>[0]) ||
         !v?.validated ||
         !v.finalUrl ||
         v.inputUrl !== check.inputUrl ||
         v.id !== check.id ||
-        candidatePreflight({ ...candidate, name: effectiveName, url: v.finalUrl } as Parameters<typeof candidatePreflight>[0]) ||
+        candidatePreflight({ ...candidate, status: 'candidate', name: effectiveName, url: v.finalUrl } as Parameters<
+          typeof candidatePreflight
+        >[0]) ||
         !v.evidence.identityMatches.length ||
         !check.feed ||
         !candidateIdentityConfirmed(effectiveName, v, check.feed.title) ||
@@ -182,13 +195,13 @@ export async function recordCandidateCheck(pool: Pool, check: CandidateCheck, ap
         break admission;
       }
       const keys = new Set([safeKey(candidate.url), safeKey(v.finalUrl)]);
-      const [rejected] = await c.query<RowDataPacket[]>("SELECT url FROM discovery_candidates WHERE status='rejected' FOR UPDATE");
+      const [rejected] = await c.query<RowDataPacket[]>("SELECT id,url FROM discovery_candidates WHERE status='rejected' FOR UPDATE");
       const [known] = await c.query<RowDataPacket[]>(
         'SELECT b.id,b.slug,b.url,b.status,u.url AS alias_url FROM blogs b LEFT JOIN blog_urls u ON u.blog_id=b.id FOR UPDATE',
       );
       const owners = new Map<number, RowDataPacket>();
       for (const row of known) if ([row.url, row.alias_url].some((u) => u && keys.has(safeKey(u)))) owners.set(row.id, row);
-      if (rejected.some((r) => keys.has(safeKey(r.url)))) reason = 'rejected_identity_preserved';
+      if (rejected.some((r) => !(admin && r.id === candidate.id) && keys.has(safeKey(r.url)))) reason = 'rejected_identity_preserved';
       else if (owners.size > 1) reason = 'publication_ownership_conflict';
       else if ([...owners.values()].some((r) => r.status !== 'verified')) reason = 'existing_blog_not_verified';
       else {
@@ -255,21 +268,25 @@ export async function recordCandidateCheck(pool: Pool, check: CandidateCheck, ap
         }
       }
     }
-    const status = blogId ? 'approved' : 'candidate';
+    const status = blogId ? 'approved' : candidate.status;
     const review = { ...check, eligible: check.eligible, reason, blogId, slug, applied: Boolean(blogId) };
     // JSON_MERGE_PATCH would delete null-valued keys inside user evidence; replace only this machine-owned key.
     const evidence = { ...decode(candidate.source_evidence), automaticReview: review };
-    await c.execute("UPDATE discovery_candidates SET status=?,source_evidence=? WHERE id=? AND status='candidate'", [
+    await c.execute('UPDATE discovery_candidates SET status=?,source_evidence=? WHERE id=? AND status=?', [
       status,
       JSON.stringify(evidence),
       check.id,
+      candidate.status,
     ]);
     await c.execute(
-      "INSERT INTO discovery_candidate_audits (candidate_id,action,previous_status,next_status,source_type,source_url,source_evidence,note,occurred_at,created_at) VALUES (?,?,'candidate',?,'automatic-rss-review',?,?,?,?,?)",
+      'INSERT INTO discovery_candidate_audits (candidate_id,action,previous_status,next_status,source_type,source_actor_id,source_url,source_evidence,note,occurred_at,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)',
       [
         check.id,
-        blogId ? 'auto-approve' : 'auto-verify',
+        blogId ? (admin ? 'approve' : 'auto-approve') : admin ? 'verify' : 'auto-verify',
+        candidate.status,
         status,
+        admin ? 'human-review' : 'automatic-rss-review',
+        admin?.actor.id || null,
         candidate.url,
         JSON.stringify(review),
         reason,
@@ -277,6 +294,17 @@ export async function recordCandidateCheck(pool: Pool, check: CandidateCheck, ap
         new Date(),
       ],
     );
+    if (admin)
+      await writeAudit(
+        c,
+        admin.actor.id,
+        blogId ? 'candidate.approve' : 'candidate.verify',
+        'candidate',
+        String(check.id),
+        { status: candidate.status },
+        { status, blogId, reason },
+        admin.note || null,
+      );
     await c.commit();
     return { id: check.id, status, reason, blogId, slug, created };
   } catch (error) {

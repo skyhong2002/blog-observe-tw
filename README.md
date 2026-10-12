@@ -68,3 +68,5 @@ npm run blogs:merge -- old-slug new-slug --apply
 `relations:once`、`ai:once`、`topics:once`、`vocabulary:sync` 可手動執行同一個有預算的工作。
 AI 一律使用 `sky-quality` 別名，標示「AI 推定」；私密金鑰不入庫，人工覆寫優先於自動產生的簡介／主題。
 Similarweb 目前不提供引薦流量欄位，擴充需求見[欄位提案](docs/similarweb-referrals-proposal.md)，沒有修改 tag。
+
+管理員身分綁定、權限與稽核：見 [docs/admin-access.md](docs/admin-access.md)。

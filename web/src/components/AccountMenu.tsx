@@ -82,11 +82,7 @@ export default function AccountMenu() {
             </Link>
           ))}
           {user.role === 'admin' && (
-            <Link
-              role="menuitem"
-              href="/admin/discovery/"
-              className="block rounded-md px-2 py-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-800"
-            >
+            <Link role="menuitem" href="/admin/" className="block rounded-md px-2 py-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-800">
               管理後台
             </Link>
           )}

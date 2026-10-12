@@ -35,6 +35,21 @@ export type RelationDTO = {
   mutual: { sourceBlogId: number; targetBlogId: number; forwardCount: number; reverseCount: number }[];
   coverage: RelationCoverage;
 };
+// Stable source-post / exact target / location identity survives crawler ordinal changes.
+// This only filters public presentation; original observations/discovery evidence are never mutated.
+const PUBLIC_RELATION = `NOT EXISTS (SELECT 1 FROM admin_relation_overrides hidden_link
+  WHERE hidden_link.source_post_id=l.source_post_id AND hidden_link.target_url_hash=SHA2(l.target_url,256)
+  AND BINARY hidden_link.target_url=BINARY l.target_url AND hidden_link.location=l.location AND hidden_link.hidden=TRUE)`;
+type RelationCache = { revision: number; entries: Map<number, { expires: number; dto: RelationDTO }> };
+const relationCaches = new WeakMap<Pool, RelationCache>();
+/** Admin mutation calls this after commit. Never cache an in-flight pre-mutation projection afterward. */
+export function invalidateRelationCache(pool: Pool) {
+  const cache = relationCaches.get(pool);
+  if (cache) {
+    cache.revision++;
+    cache.entries.clear();
+  }
+}
 const iso = (value: unknown): string | null => {
   if (!value) return null;
   const date = value instanceof Date ? value : new Date(String(value));
@@ -87,7 +102,7 @@ export async function loadRelationCoverage(
   );
   const [locationRows] = await pool.query<RowDataPacket[]>(
     `SELECT l.location,COUNT(*) count,COALESCE(SUM(l.target_blog_id IS NULL),0) unresolved
-    FROM relation_links l JOIN blogs b ON b.id=l.source_blog_id WHERE b.status='verified' ${blogId === undefined ? '' : 'AND l.source_blog_id=?'} GROUP BY l.location`,
+    FROM relation_links l JOIN blogs b ON b.id=l.source_blog_id WHERE ${PUBLIC_RELATION} AND b.status='verified' ${blogId === undefined ? '' : 'AND l.source_blog_id=?'} GROUP BY l.location`,
     blogId === undefined ? [] : [blogId],
   );
   const [[homeLinks]] = await pool.query<RowDataPacket[]>(
@@ -124,7 +139,7 @@ export async function loadRelations(pool: Pool, days = 90, now = new Date()): Pr
     MIN(p.published_at) firstMentionAt,MAX(p.published_at) lastMentionAt
     FROM relation_links l JOIN posts p ON p.id=l.source_post_id JOIN blogs a ON a.id=l.source_blog_id JOIN blogs b ON b.id=l.target_blog_id
     JOIN relation_observations o ON o.post_id=l.source_post_id
-    WHERE l.location='body' AND l.target_blog_id IS NOT NULL AND l.source_blog_id<>l.target_blog_id
+    WHERE ${PUBLIC_RELATION} AND l.location='body' AND l.target_blog_id IS NOT NULL AND l.source_blog_id<>l.target_blog_id
     AND a.status='verified' AND b.status='verified' AND o.last_success_at IS NOT NULL AND p.published_at>=? AND p.published_at<=?
     GROUP BY l.source_blog_id,l.target_blog_id ORDER BY count DESC,l.source_blog_id,l.target_blog_id LIMIT 10001`,
     [cutoff, now],
@@ -190,12 +205,14 @@ export async function loadRelations(pool: Pool, days = 90, now = new Date()): Pr
 }
 
 export async function registerRelationRoutes(app: FastifyInstance, pool: Pool) {
-  const cache = new Map<number, { expires: number; dto: RelationDTO }>();
+  const cache = relationCaches.get(pool) ?? { revision: 0, entries: new Map<number, { expires: number; dto: RelationDTO }>() };
+  relationCaches.set(pool, cache);
   const read = async (days: number) => {
-    const cached = cache.get(days);
+    const cached = cache.entries.get(days);
+    const revision = cache.revision;
     if (cached && cached.expires > Date.now()) return cached.dto;
     const dto = await loadRelations(pool, days);
-    cache.set(days, { expires: Date.now() + 60000, dto });
+    if (cache.revision === revision) cache.entries.set(days, { expires: Date.now() + 60000, dto });
     return dto;
   };
   app.get('/api/relations', async (request, reply) => {
@@ -218,7 +235,7 @@ export async function registerRelationRoutes(app: FastifyInstance, pool: Pool) {
       SELECT l.source_blog_id sourceBlogId,l.target_blog_id targetBlogId,COUNT(DISTINCT l.source_post_id) count,
         SUM(COUNT(DISTINCT l.source_post_id)) OVER (PARTITION BY l.source_blog_id) denominator,MIN(p.published_at) firstMentionAt,MAX(p.published_at) lastMentionAt
       FROM relation_links l JOIN posts p ON p.id=l.source_post_id JOIN blogs a ON a.id=l.source_blog_id JOIN blogs b ON b.id=l.target_blog_id
-      WHERE l.location='body' AND l.source_blog_id<>l.target_blog_id AND a.status='verified' AND b.status='verified' AND p.published_at>=? AND p.published_at<=?
+      WHERE ${PUBLIC_RELATION} AND l.location='body' AND l.source_blog_id<>l.target_blog_id AND a.status='verified' AND b.status='verified' AND p.published_at>=? AND p.published_at<=?
       GROUP BY l.source_blog_id,l.target_blog_id) e WHERE sourceBlogId=? OR targetBlogId=? ORDER BY count DESC,sourceBlogId,targetBlogId LIMIT 1001`,
       [cutoff, now, blog.id, blog.id],
     );
@@ -238,7 +255,7 @@ export async function registerRelationRoutes(app: FastifyInstance, pool: Pool) {
       `SELECT p.id postId,p.title postTitle,p.url postUrl,l.target_url targetUrl,l.anchor_text anchor,p.published_at publishedAt,
       l.source_blog_id sourceBlogId,l.target_blog_id targetBlogId,l.location
       FROM relation_links l JOIN posts p ON p.id=l.source_post_id JOIN blogs a ON a.id=l.source_blog_id JOIN blogs b ON b.id=l.target_blog_id
-      WHERE l.location='body' AND (l.source_blog_id=? OR l.target_blog_id=?) AND l.source_blog_id<>l.target_blog_id
+      WHERE ${PUBLIC_RELATION} AND l.location='body' AND (l.source_blog_id=? OR l.target_blog_id=?) AND l.source_blog_id<>l.target_blog_id
       AND a.status='verified' AND b.status='verified' AND p.published_at>=? AND p.published_at<=?
       ORDER BY p.published_at DESC,l.source_post_id,l.ordinal LIMIT 20`,
       [blog.id, blog.id, cutoff, now],

@@ -284,6 +284,7 @@ export const users = mysqlTable(
   {
     id: int('id').autoincrement().primaryKey(),
     googleSub: varchar('google_sub', { length: 255 }).notNull(),
+    role: varchar('role', { length: 16 }).notNull().default('reader'),
     email: varchar('email', { length: 255 }).notNull(),
     name: varchar('name', { length: 255 }),
     picture: varchar('picture', { length: 1024 }),
@@ -476,6 +477,7 @@ export const historyTasks = mysqlTable(
   ],
 );
 
+export * from '../admin/schema.ts';
 export * from '../ai/schema.ts';
 export * from '../jobs/schema.ts';
 export * from '../relations/schema.ts';
