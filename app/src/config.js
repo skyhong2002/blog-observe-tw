@@ -25,9 +25,8 @@ export function loadConfig(env = process.env) {
     crawlUserAgent: env.BLOG_CRAWL_USER_AGENT || 'blog.observe.tw/0.3 (+https://blog.observe.tw/about; mailto:b@blog.observe.tw)',
     crawlDelayMs: Math.max(1000, Number(env.BLOG_CRAWL_DELAY_MS || 1200)),
     similarWeb: {
-      // Only tag may contact the provider. Keep the local flag false until its
-      // API/authentication contract is implemented; ignore retired BLOG_SIMILARWEB_* settings.
-      enabled: false,
+      // Only the fixed loopback tag API may contact the provider.
+      enabled: env.BLOG_SIMILARWEB_ENABLED === 'true',
     },
     adminEmails: new Set(
       (env.BLOG_ADMIN_EMAILS || '')

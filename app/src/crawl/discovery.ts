@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import * as cheerio from 'cheerio';
 import type { Pool } from 'mysql2/promise';
 import { isAllowedCrawlUrl, politeFetch } from './feed.ts';
-import { discoverSimilarSites } from './similarweb.ts';
+import { type SyncOptions, syncSimilarweb } from './similarweb-sync.ts';
 
 const BLOGROLL_PAGES = ['https://blogblog.club/blogrollroll', 'https://blogblog.club/party', 'https://blogblog.club/random'];
 const normalize = (value: string, base: string) => {
@@ -52,17 +52,6 @@ export async function discoverBlogblog(pool: Pool, userAgent?: string) {
   return { source: 'blogblog-club', results };
 }
 
-export async function discoverSimilar(pool: Pool, domains: string[], options: Parameters<typeof discoverSimilarSites>[1] = {}) {
-  const results = [];
-  for (const domain of [...new Set(domains)].slice(0, 10)) {
-    const result = await discoverSimilarSites(domain, options);
-    let inserted = 0;
-    for (const host of result.candidates)
-      inserted += await saveCandidate(pool, `https://${host}`, host, 'similarweb-similar-sites', `similarweb://${domain}`, {
-        domain,
-        fetchedAt: new Date().toISOString(),
-      });
-    results.push({ ...result, domain, inserted });
-  }
-  return { source: 'similarweb-similar-sites', results };
+export async function discoverSimilar(pool: Pool, domains: string[], options: SyncOptions = {}) {
+  return syncSimilarweb(pool, domains, options);
 }

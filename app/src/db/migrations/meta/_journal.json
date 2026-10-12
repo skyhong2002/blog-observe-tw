@@ -15,6 +15,13 @@
       "when": 1791754741731,
       "tag": "0001_authors_tags_discovery_audits",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "5",
+      "when": 1791776735634,
+      "tag": "0002_similarweb_coordination",
+      "breakpoints": true
     }
   ]
 }

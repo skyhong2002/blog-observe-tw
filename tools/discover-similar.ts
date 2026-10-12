@@ -1,5 +1,6 @@
 import { loadConfig } from '../app/src/config.js';
 import { discoverSimilar } from '../app/src/crawl/discovery.ts';
+import { createTagSimilarSitesClient } from '../app/src/crawl/similarweb-client.ts';
 import { createDb } from '../app/src/db/client.ts';
 
 const config = loadConfig();
@@ -13,7 +14,7 @@ try {
       await discoverSimilar(
         store.pool,
         rows.map((row) => row.domain),
-        config.similarWeb,
+        { ...config.similarWeb, client: createTagSimilarSitesClient() },
       ),
       null,
       2,

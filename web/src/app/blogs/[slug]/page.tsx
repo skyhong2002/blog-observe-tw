@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
+import SimilarwebTraffic from '@/components/SimilarwebTraffic';
 import SourceProfile from '@/components/SourceProfile';
 import { getBlog } from '@/lib/api';
 export const dynamic = 'force-dynamic';
@@ -11,5 +12,10 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 export default async function BlogDetailPage({ params, searchParams }: Props) {
   const blog = await getBlog((await params).slug);
   if (!blog) notFound();
-  return <SourceProfile blog={blog} query={String((await searchParams).q ?? '').slice(0, 100)} />;
+  return (
+    <>
+      <SourceProfile blog={blog} query={String((await searchParams).q ?? '').slice(0, 100)} />
+      <SimilarwebTraffic slug={blog.slug} compact />
+    </>
+  );
 }

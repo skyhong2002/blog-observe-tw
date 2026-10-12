@@ -4,6 +4,7 @@ import pino from 'pino';
 import { loadConfig } from './config.js';
 import { discoverBlogblog, discoverSimilar } from './crawl/discovery.ts';
 import { crawlBlog } from './crawl/feed.ts';
+import { createTagSimilarSitesClient } from './crawl/similarweb-client.ts';
 import { createDb } from './db/client.ts';
 
 const config = loadConfig();
@@ -24,20 +25,30 @@ await queue.upsertJobScheduler(
   { name: 'blogs-discovery', data: {}, opts: { removeOnComplete: 10, removeOnFail: 10 } },
 );
 
+await queue.upsertJobScheduler(
+  'blogs-similarweb',
+  // Wake hourly; the database gate permits API polling only every six hours.
+  { every: 60 * 60_000 },
+  { name: 'blogs-similarweb', data: {}, opts: { removeOnComplete: 10, removeOnFail: 10 } },
+);
+const similarWeb = { ...config.similarWeb, client: createTagSimilarSitesClient() };
+
 const worker = new Worker(
   config.queueName,
   async (job) => {
     if (job.name === 'blogs-discovery') {
-      const blogblog = await discoverBlogblog(store.pool, config.crawlUserAgent);
+      return discoverBlogblog(store.pool, config.crawlUserAgent);
+    }
+    if (job.name === 'blogs-similarweb') {
       const [domains] = (await store.pool.query(
         'SELECT canonical_host AS domain FROM blogs WHERE status="verified" AND canonical_host IS NOT NULL',
       )) as [Array<{ domain: string }>, unknown];
       const similar = await discoverSimilar(
         store.pool,
         domains.map((row) => row.domain),
-        config.similarWeb,
+        similarWeb,
       );
-      return { blogblog, similar };
+      return similar;
     }
     if (job.name !== 'blogs-feed') return { skipped: job.name };
     const [rows] = (await store.pool.query('SELECT id,slug,url FROM blogs WHERE status="verified" AND url IS NOT NULL ORDER BY id')) as [

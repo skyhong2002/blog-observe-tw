@@ -363,3 +363,29 @@ export const blogLinks = mysqlTable(
   },
   (table) => [primaryKey({ columns: [table.fromBlogId, table.toBlogId, table.relation] })],
 );
+
+// Blog-side durable coordination only. tag remains the sole Similarweb requester.
+export const similarwebDomains = mysqlTable(
+  'similarweb_domains',
+  {
+    domain: varchar('domain', { length: 253 }).primaryKey(),
+    submittedKinds: json('submitted_kinds').$type<Partial<Record<'traffic' | 'similar_sites', string>>>().notNull(),
+    lastSubmittedAt: datetime('last_submitted_at'),
+    lastPolledAt: datetime('last_polled_at'),
+    nextPollAt: datetime('next_poll_at').notNull(),
+    lastResultFetchedAt: datetime('last_result_fetched_at'),
+    result: json('result').$type<Record<string, unknown>>(),
+    lastAppliedFingerprint: char('last_applied_fingerprint', { length: 64 }),
+    lastErrorCode: varchar('last_error_code', { length: 64 }),
+    updatedAt: datetime('updated_at').notNull(),
+  },
+  (table) => [index('similarweb_domains_poll').on(table.nextPollAt)],
+);
+
+export const similarwebControl = mysqlTable('similarweb_control', {
+  id: varchar('id', { length: 32 }).primaryKey(),
+  budgetDay: char('budget_day', { length: 10 }).notNull(),
+  submittedCount: int('submitted_count').notNull().default(0),
+  nextRoundAt: datetime('next_round_at').notNull(),
+  cooldownUntil: datetime('cooldown_until'),
+});

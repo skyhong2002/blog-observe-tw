@@ -1,32 +1,33 @@
-# Similarweb 跨服務協調方案
+# Similarweb 跨服務協調方案與已核准契約
 
-## 決策與目前狀態
+方案一已獲使用者核准；tag 的 `898f463` / migration `0035` 提供唯一供應商工作。blog 不直接請求 Similarweb、不持有供應商 cookie、不讀寫 tag DB 或 Redis。舊 provider client、模擬 extension headers、mkdir 鎖已移除。
 
-**方案一已獲使用者核准：tag 是唯一會向 Similarweb 發出請求的服務，blog 只透過 tag 提交探索需求及讀取結果。** 目前仍等待 tag 端的正式 API／認證與資料契約，尚未接通。blog 這次變更沒有修改 tag 的程式、排程、Redis 或資料庫。
+## tag API
 
-blog 的 `loadConfig().similarWeb.enabled` 固定為 `false`。原先直接請求 Similarweb 的 endpoint、User-Agent／headers、本機 mkdir 鎖與 budget 已刪除，所有舊 `BLOG_SIMILARWEB_*` 環境變數均忽略。即使直接呼叫 `discoverSimilarSites(domain, { enabled: true })`，也只會得到 `awaiting-contract` 與空候選；關閉時為 `disabled`。兩者都是零網路請求、零檔案系統操作，不會占用 tag 的供應商配額，也不會寫入發現結果。
+固定 `http://127.0.0.1:18130/internal/similarweb`，只能本機直連，不轉送 Cookie、CF 或 X-Forwarded-For。認證從 `~/.config/observe-similarweb/blog-token` 讀取 Bearer token，檔案須為本人持有的普通檔案、權限 0600、不是 symlink；密鑰不進日誌、Git 或 review packet。測試可使用獨立注入的 mock token。
 
-## tag 端待確認與實作範圍
+- `POST /requests`：`{domain,kind:"traffic"|"similar_sites"}`；202 新排入，200 既有工作，400 不合法，429 當日提交上限。
+- `GET /results?domain=…`：來源 `similarweb-extension`、抓取時間、各 kind 的 pending/ok/no-data/blocked、traffic 摘要與 similarSites。只有精確的 `404 not_requested` 可視為尚未提交；認證遮蔽的 404 會停止整輪。
+- 請求 10 秒逾時、回應最多 1 MiB、禁止 redirect；回應逐層驗證並重建欄位白名單，不保存不明欄位或 headers。
 
-下列是固定參考版本 `afe0a65` 的評估入口，不代表 blog 已修改這些檔案：
+Similar Sites 並無獨立可用的 `/api/v1/similar-sites` endpoint。資料來自 tag 已取得的 `Competitors.TopSimilarityCompetitors`，多數站可能為空。`no-data`、長時間 pending 均屬正常，不能補寫推測值。
 
-- `app/src/media-traffic/live.ts`：維持單一供應商請求入口、快取、保守的全域預算及 401／403／429 退避；先重用既存資料，避免為重疊網域重複請求。
-- `app/src/jobs/media-traffic-job.ts`：評估如何將 blog 獨有網域的需求排入既有工作、去重與限制批量，並維持 tag 既有流量更新優先順序。
-- `app/src/worker.ts`：評估既有 `MEDIA_TRAFFIC_CRON`（每小時 `:35`）與工作排程的整合。不得另開一組無協調的供應商請求。
-- tag gateway 與資料保存模組：提供探索需求提交、快取結果讀取及來源／時間資訊。實際路由、認證方式、資料表與檔案位置由 tag 端契約決定，blog 不預先假設。
+## blog 排程與資料
 
-啟用前需取得：服務位址與路由、認證及授權範圍、允許的網域／輸入格式、請求去重規則、同步或非同步回應模式、快取有效期、結果 schema、來源與時間欄位、配額／退避與重試契約、失敗狀態、觀測指標。密鑰只能放在獨立服務環境，不提交 Git。
+`BLOG_SIMILARWEB_ENABLED=true` 才啟用；預設 false。worker 的獨立 `blogs-similarweb` job 每小時喚醒，但資料庫限制最早六小時才呼叫 API（避免佇列延遲讓固定六小時 tick 跳成十二小時），不受每週 blogblog.club 工作影響。wrapper 沒有顯式 client 時仍零 I/O。
 
-## blog 後續接線與驗收
+目前只提交已核准（verified）、URL host 與 canonical host 一致的部落格；不把 1030 筆未審候選整批送出。每網域各 kind 最早 30 天後重新提交，pending/blocked 不重送。blog 本地每天最多 30 次 POST，包含失敗或結果不明的送出；台北時間換日。GET 最早每六小時一次。tag 另限制每輪最多 3 次外部請求、每天 30 次，tag 自身需求優先。
 
-契約明確後，才把 `app/src/crawl/similarweb.ts` 接成 tag client，並由 discovery 保存已驗證的候選、`similarweb-similar-sites` 來源、查詢網域、抓取時間及相似站關係 evidence。結果不是權威分類，未經審核不直接公開收錄。目前沒有可啟用的 adapter，也不接受測試注入的成功資料寫入正式候選。
+`similarweb_control` 與 `similarweb_domains` 位於獨立 `blog_observe` DB，保存配額、預留提交、下次輪詢、退避與快照。單一專用 MySQL connection 持有 blog 專屬 advisory lock；不在 HTTP 等待期間開 transaction。遇 blocked、401/403/429、認證或契約錯誤整輪停止，至少六小時冷卻，服務重啟不會重設配額。
 
-驗收需證明：重疊網域命中 tag 快取、不額外打供應商；blog 新需求受同一個全域配額和退避控制；401／403／429 不會被 blog 繞過重試；錯誤或不完整結果不寫候選；blog 不會讀寫 tag 私有資料表、共用 session 或佇列 namespace。部署後仍須確認 blog `/healthz` 與 tag／youtube 正式站正常。
+新的相似站只能進入候選清單，來源 `similarweb-similar-sites`。保存查詢網域、tag 抓取時間、本地發現時間、發現路徑、相似站邊與欄位白名單化的原始 **tag API 回應**（不是未提供的供應商原始 response）。同一快照重播不重複 audit；不同來源網域仍追加各自證據，不覆寫人工審核狀態，不當作權威分類。舊快照不覆蓋較新的資料。
 
-## 風險與回滾
+流量頁與來源頁只顯示核准部落格的網域估計、來源和抓取时间；共享平台根網域及多作者共用 host 不當成單一作者的流量。流量不是實際讀者人數，也不是文章品質指標。
 
-主要風險是共用對外 IP 配額互相消耗、供應商封鎖中斷 tag 流量更新、額外工作造成 CPU／網路尖峰、錯誤來源或過期結果被誤當成分類。由 tag 維持唯一供應商入口，並在接線前驗證契約與退避行為，才能降低這些風險。
+## 部署與回滾
 
-未來接線版本的回滾順序：先停用 blog 對 tag 的探索需求，再移除或停用 tag 新增的 blog 工作／API，保留已寫入的候選與 provenance；不得重設 tag 既有流量資料。blog 可回復目前的零 I/O placeholder，不能復活舊的直接 provider client。
+先關閉旗標，備份 blog DB 並在無網路的臨時 MariaDB 演練還原與 migration。`0002` 只新增兩張表；MySQL DDL 有 implicit commit，失敗需核對已建立的表，不可假設 transaction 能撤回 DDL。驗證 client、配額、重播、HTTP 契約後才開旗標。
 
-第二方案（兩個服務共同使用 `flock` 與主機級 token bucket）未採用，不在本次實作範圍。沒有另建本機鎖、補抓排程或獨立供應商 budget。
+回滾先設 `BLOG_SIMILARWEB_ENABLED=false` 並重啟 blog worker，再切回保留的 blog release。保留新增資料表、候選與稽核，不刪正式資料；不復活舊 provider client。tag 端任何停用或回滾由 tag thread 處理，blog 不修改其程式或排程。
+
+最初評估入口是 tag 的 `app/src/media-traffic/live.ts`、`app/src/jobs/media-traffic-job.ts`、worker 與 gateway。實際已上線的 API 契約以上述 898f463 為準。共用 flock/token bucket 的方案二未採用。
