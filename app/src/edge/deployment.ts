@@ -116,3 +116,12 @@ export async function pollReadiness(
     await wait(1000);
   }
 }
+/** Older releases contain public-visibility predicates that must never be restored. */
+export const PRIVACY_RELEASE_FLOOR = 'a45b06a8816e8388c463173f6b7c43da81aeb51b';
+export async function requirePrivacyRelease(commit: string, isAncestor: (floor: string, target: string) => Promise<unknown>) {
+  try {
+    await isAncestor(PRIVACY_RELEASE_FLOOR, commit);
+  } catch {
+    throw Error('release_before_privacy_fix');
+  }
+}

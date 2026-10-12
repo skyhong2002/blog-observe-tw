@@ -1,0 +1,11 @@
+[Unit]
+Description=Monthly blog favicon refresh from the active slot
+
+[Timer]
+OnCalendar=*-*-01 06:20:00
+RandomizedDelaySec=2h
+Persistent=true
+Unit=blog-observe-active-favicons.service
+
+[Install]
+WantedBy=timers.target

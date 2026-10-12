@@ -1,10 +1,33 @@
 import { describe, expect, it, vi } from 'vitest';
-import { acknowledgeEdge, confirmOrRestore, pollReadiness, ReadinessFailure, wrapperExitCode } from './deployment.ts';
+import {
+  acknowledgeEdge,
+  confirmOrRestore,
+  pollReadiness,
+  PRIVACY_RELEASE_FLOOR,
+  ReadinessFailure,
+  requirePrivacyRelease,
+  wrapperExitCode,
+} from './deployment.ts';
 import type { EdgeState } from './state.ts';
 
 const before: EdgeState = { active: 'blue', commit: 'a'.repeat(40), generation: 3 };
 const next: EdgeState = { active: 'green', commit: 'b'.repeat(40), generation: 4 };
 const restored = { ...before, generation: 5 };
+
+describe('security rollback floor', () => {
+  it('requires the visibility fix to be an ancestor of the target release', async () => {
+    const ancestry = vi.fn(async () => {});
+    await requirePrivacyRelease(next.commit, ancestry);
+    expect(ancestry).toHaveBeenCalledWith(PRIVACY_RELEASE_FLOOR, next.commit);
+  });
+  it('rejects old or unverifiable release ancestry without leaking command output', async () => {
+    await expect(
+      requirePrivacyRelease(before.commit, async () => {
+        throw Error('private command output');
+      }),
+    ).rejects.toThrow('release_before_privacy_fix');
+  });
+});
 
 describe('reviewed deployment failure handling', () => {
   it('leaves next in place when rollback target is unhealthy and preserves both reasons', async () => {

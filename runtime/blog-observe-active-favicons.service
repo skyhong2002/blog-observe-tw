@@ -1,0 +1,15 @@
+[Unit]
+Description=Refresh blog favicon cache using the active release
+After=network-online.target
+
+[Service]
+Type=oneshot
+EnvironmentFile=-%h/.config/blog-observe.env
+Environment=BLOG_FAVICON_ROOT=%h/.local/share/blog-observe/icons
+ExecStart=%h/.local/bin/node %h/.local/share/blog-observe/edge/code/app/src/edge/active-job-service.ts
+Nice=10
+CPUQuota=25%
+MemoryMax=512M
+TimeoutStartSec=8h
+NoNewPrivileges=true
+UMask=0077

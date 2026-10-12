@@ -4,7 +4,14 @@ import { basename, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 import { archiveAssets } from '../app/src/edge/assets.ts';
-import { acknowledgeEdge, confirmOrRestore, pollReadiness, ReadinessFailure, SwitchFailure } from '../app/src/edge/deployment.ts';
+import {
+  acknowledgeEdge,
+  confirmOrRestore,
+  pollReadiness,
+  ReadinessFailure,
+  requirePrivacyRelease,
+  SwitchFailure,
+} from '../app/src/edge/deployment.ts';
 import { verifyArchive } from '../app/src/edge/release-integrity.ts';
 import { readSlot, type SlotRelease, validateRelease } from '../app/src/edge/slot.ts';
 import { atomicJson, type EdgeState, parseState, SLOTS, type Slot, slotOf, stateRoot } from '../app/src/edge/state.ts';
@@ -193,6 +200,7 @@ async function checkPrepared(slot: Slot): Promise<SlotRelease & { source: string
     typeof record.source !== 'string'
   )
     throw Error('unverified_slot');
+  await requirePrivacyRelease(descriptor.commit, (floor, target) => git(record.source, 'merge-base', '--is-ancestor', floor, target));
   await ready(slot);
   return { ...descriptor, source: record.source };
 }
@@ -216,7 +224,9 @@ async function switchSlot(slot: Slot, bootstrap: boolean, rollback: boolean) {
       before: before!,
       next,
       acknowledge,
-      checkOld: () => ready(before!.active),
+      checkOld: async () => {
+        await checkPrepared(before!.active);
+      },
       publishRollback: async (restored) => {
         await atomicJson(join(root, 'transitions', `${restored.generation}.json`), {
           before: next,

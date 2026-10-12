@@ -65,7 +65,7 @@ bash tools/deploy-blue-green.sh switch blue
 
 切換不會停止舊 pair。正常請求在途排空與異常 timeout 的界線不同；至少留足 proxy 120 秒 request timeout／30 秒 graceful 邊界，並觀察流量。維運者可先延長回滾觀察時間，之後再停舊 pair。不要因 probe 200 就立即重啟／停止它。
 
-正式驗收還必須由操作者確認 `https://blog.observe.tw/`、`/healthz`、OAuth 起始、tag/youtube 200、首頁 cache MISS/HIT 及私人路徑不共享快取。工具不修改或觸發姊妹站服務。
+正式驗收還必須由操作者確認 `https://blog.observe.tw/`、`/healthz`、OAuth 起始、tag/youtube 200、公開 HTML／API 的 no-store、Cloudflare DYNAMIC／BYPASS（不得 HIT、不得有 Age）及私人路徑不共享快取。工具不修改或觸發姊妹站服務。
 
 ## 靜態檔與回滾
 
@@ -97,3 +97,16 @@ bash -n tools/deploy-blue-green.sh
 Opus 審查後另有 `app/src/edge/deployment.spec.ts`，測試舊 slot 已停止時不切回、原始與二次錯誤都保留、edge 首頁 HTML／release 驗證，以及 wrapper 只在本身已收到停止信號時，把子程序 SIGTERM／SIGINT 正常結束回報為 0；非預期信號或實際非零退出仍是失敗。執行兩份測試使用 `npx vitest run app/src/edge`。
 
 本輪採納上述 M1／M2／M3 與有限的 L4 啟動輪詢；L2 state TTL 暫不加入，以保持切檔立即生效，L3 公開 commit header 保留供切換驗證（不含秘密）。此階段僅完成程式與測試，正式遷移暫緩，不影響現有服務。
+
+
+## 2026-10-13：舊服務退役與安全回滾底線
+
+2026-10-12 18:39:21 UTC 核對 active blue 的 gateway/web 為 18174/18172、green 為 18175/18173，兩個 Next build rewrites 與實際子程序的 upstream 均不指向 18162；edge 只接受固定的 slot gateway。
+
+已 `disable --now` 舊 `blog-observe.service`、`blog-observe-web.service`、`blog-observe-favicons.timer`，並停止舊 `blog-observe-favicons.service`。所有 unit、drop-in、release、回滾檔案與備份保留。`127.0.0.1:18162` 不再監聽；`100.85.214.25:18162` 是 tag 的獨立預覽，未操作。slot wrapper 父程序仍可能繼承舊 PORT 值，但它沒有 listener，實際子程序已明確覆寫為 slot 的埠，不能只看父程序 env 判定 upstream。
+
+新的 `blog-observe-active-favicons.timer` 維持每月 1 日 06:20、最多兩小時抖動，呼叫 `blog-observe-active-favicons.service`。launcher 每次從 active.json 讀取並驗證 immutable release，確認 slot descriptor commit 一致且 state 未在讀取途中切換，只允許固定 favicon 命令。該次工作固定使用啟動時的 release，不在執行中換程式；下一次才跟隨新 active slot。既有圖示鎖仍負責互斥，不持有長時間部署鎖。可用 `node app/src/edge/active-job-service.ts --check` 唯讀檢查目標，不抓取、不寫資料。舊 timer 保持 disabled；新排程單獨啟用。
+
+**green 的 2379fba 早於公開資料隱私修正，不可視為安全回滾版本。** 保留它與歷史 release 供診斷，不刪檔、不切回。部署工具對手動切換、手動回滾與自動失敗回復，都要求目標是 `a45b06a8816e8388c463173f6b7c43da81aeb51b` 或其後代；查不到 Git 祖先關係也拒絕。下一版可安全回滾至 a45b06a，不能直接執行舊 release 內未含此檢查的部署工具。
+
+目前所有內容頁與資料 API 維持 no-store，Cloudflare 首頁與 API 兩條規則維持停用。恢復快取須先補齊 origin／Next／edge 撤銷驗證；不能以短 TTL 取代。

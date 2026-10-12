@@ -40,7 +40,7 @@ node --env-file=/home/deck/.config/blog-observe.env tools/fetch-favicons.ts --al
 
 正式圖示快取位於 `/home/deck/.local/share/blog-observe/icons`，不提交候選原始 catalog 至 Git。`/api/icons` 僅回傳識別碼、revision 與 dark 樣式，前端共用一次請求；`/favicons/<slug>.png` 只提供有 PNG signature 的本機圖檔，帶 ETag 與 5 分鐘快取。重新整理頁面即可取得每月的新 revision，不需重建 Next。設定 runtime root 時不回退到舊 release 的圖檔，避免網址搬家後冒用舊站圖示。
 
-每月刷新由 `blog-observe-favicons.timer` 在每月 1 日 06:20 加最多兩小時隨機延遲執行，單程序、低排程優先權、CPU 25%／記憶體 512 MiB。失敗保留同站先前圖示；網址身分變更則先移除旧圖。timer 只讀 blog DB、不操作 tag/youtube。回滾或暫停：停用該 timer 即可，保留快取與原始 evidence。
+每月刷新由 `blog-observe-active-favicons.timer` 在每月 1 日 06:20 加最多兩小時隨機延遲執行，單程序、低排程優先權、CPU 25%／記憶體 512 MiB。失敗保留同站先前圖示；網址身分變更則先移除旧圖。timer 只讀 blog DB、不操作 tag/youtube。回滾或暫停：停用該 timer 即可，保留快取與原始 evidence。
 
 影像解碼在獨立 Node 子程序進行，4 秒牆鐘到即終止；Sharp 另設 3 秒 timeout。原始圖只渲染一次，透明度分析只處理已縮成 192 px 的 PNG。ICO 圖層尺寸須與目錄一致，拒絕截斷與超大宣告。採用子程序是為了讓 native decoder 不配合逾時時仍能停止，避免占用同機服務資源。
 
@@ -66,4 +66,6 @@ node --env-file=/home/deck/.config/blog-observe.env tools/fetch-favicons.ts --al
 
 目錄等元件將回應的 `iconUrl` 傳給共用 `BlogIcon`，使 ISR HTML 在 JavaScript 執行前已有圖片。瀏覽器載入 `/api/icons` 後以最新 revision 更新；沒有圖示或載入失敗時顯示首字預設圖示，不留空白。這不影響文章沒有配圖時僅顯示文字的規則。私人追蹤回應仍要求登入且為 `no-store`。
 
-回歸驗證：`app/src/v1/runtime-icons.spec.ts` 使用獨立臨時 runtime 目錄，驗證空 bundled manifest、各 API DTO、版本更新與讀取失敗保留快照；`web/test/media-icons.test.ts` 驗證 SSR 選圖、版本優先與失敗回退。部署前以新 gateway 建置 ISR，確認 `/blogs/` 原始 HTML 含 `/favicons/` 的 `<img>`；同時驗證 `/api/v1/blogs?limit=50` 的已存圖示 URL 與 `/api/icons` revision 相符。
+回歸驗證：`app/src/v1/runtime-icons.spec.ts` 使用獨立臨時 runtime 目錄，驗證空 bundled manifest、各 API DTO、版本更新與讀取失敗保留快照；`web/test/media-icons.test.ts` 驗證 SSR 選圖、版本優先與失敗回退。舊版曾以新 gateway 建置 ISR；目前隱私止血已改 no-store 動態渲染，仍須確認 `/blogs/` 原始 HTML 含 `/favicons/` 的 `<img>`；同時驗證 `/api/v1/blogs?limit=50` 的已存圖示 URL 與 `/api/icons` revision 相符。
+
+藍綠部署後的 monthly launcher 每次啟動讀取 active slot，不依賴舊 release 的 WorkingDirectory。原 `blog-observe-favicons.timer`／service 保留但停用。詳見 [藍綠部署與舊服務退役](blue-green-deployment.md)。
