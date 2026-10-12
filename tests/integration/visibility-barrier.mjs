@@ -148,7 +148,8 @@ function surfaces(f, withWeb) {
       ])
         result.push({
           name: `${variant}-${name}`,
-          path: path + (variant === 'RSC' ? '?_rsc=b0-fixed-barrier' : ''),
+          // Next validates _rsc against router headers. With only RSC:1 the stable hash is empty.
+        path: path + (variant === 'RSC' ? '?_rsc=' : ''),
           matches,
           needle,
           unaffected,
