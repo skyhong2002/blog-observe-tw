@@ -29,3 +29,14 @@ Build and preview in the isolated worktree; the production `.next` directory is 
 Before switching, run TypeScript, Vitest, Biome and a production Next build and verify the isolated HTTP endpoints. The collaborative browser cannot reach the Steam Machine loopback, so capture the actual public desktop/mobile and light/dark screenshots after the reversible switch. After switching, verify `/`, `/blogs/`, `/blogs/kocpc/`, `/healthz`, OAuth's exact callback + S256, and sibling sites' HTTP status. Private UI uses client requests to gateway, because UI proxy must never forward session credentials wholesale.
 
 Runtime uses an immutable release folder and systemd drop-ins for gateway/web; removing those drop-ins restores the previous checkout and standalone web build. Worker remains on its existing release and isolated queue. Record exact release and screenshot evidence after acceptance.
+
+## Acceptance recorded 2026-10-12
+
+- Deployed code: `0638bfbe29d4c9c47132528b61d677d9be46fabc` (initial port `f59c7cf4a377f60e55d120b5d7974101a268e784`). Both pushed to main.
+- TypeScript, Biome, Vitest (25 tests / 5 files), production Next build passed.
+- Public home, directory, source profile, favicon, manifest, `/healthz`: HTTP 200. Google start: 302, S256, exact `https://blog.observe.tw/auth/google/callback`. Both sibling sites: HTTP 200 after each switch.
+- Raw `//127.0.0.1:18160/healthz` and encoded slash attack: HTTP 400.
+- Browser: directory status filter returned 4 verified sites; post count sorting worked; source search for Gemini returned one article; ECharts canvas rendered; mobile menu expanded with grouped links; author tab opened mobile sidebar; mobile viewport had no horizontal overflow; theme button changed appearance.
+- Native collaborative-browser screenshots were captured for five pairs: desktop home, directory, source profile, mobile home and dark home. Comparison artifact: `/home/deck/.cache/blog-frontend-parity/.reviews/visual/index.html` (local, ignored; raw captures also remain in T3 browser-artifacts).
+- Codex cross-review findings were adopted, including exact upstream article rows, distinct author counts, tag visibility, working tag suggestions, mobile sidebar opening and bounded discovery review batches. This UI stage used Codex only, as instructed.
+- Human Google consent/login and account-specific subscription/administration remain a user acceptance step. Favicon fetching is the next separately requested batch; the screenshot set above is its pre-change baseline.
