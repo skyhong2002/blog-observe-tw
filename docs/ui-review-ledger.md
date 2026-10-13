@@ -8,6 +8,22 @@
 
 精確viewport補證：captureJSON僅存width而沒有height；A runner `capture.mjs`設定1280×800／390×844，B `capture.cjs`設定1280×900／390×900；本次以既有PNG IHDR核對pass1/issues7全部相關截圖相符。各批次高度不同；使用者硬規格僅指定寬1280/390，沒有指定高度800，故高度不同不算違反要求；如實記錄、不誤標800。原始log只抽本agent/model/讀圖calls，不輸出raw全文或secret。
 
+## 2026-10-13 凍結批次：待重拍清單（原始碼 review 不算畫面通過）
+
+本輪 base `origin/main`＝`6f47dda9204656a7d291bbdb699dd7560b9a0b88`。仍為 **24 項，pass 0／fixed 3／issues 8／pending 11／n/a-ui 2**；本段沒有替任何 route 升級狀態。所有新增畫面只有實際 React SSR 與 source review，沒有當版 desktop/mobile 截圖或 BUILD_ID。正式版本沒有切換。缺少適用圖片的狀態一律 missing／待重拍，不能引用舊 SHA 圖片宣稱修正已驗。
+
+| route / state | 原始碼與離線證據 | 解凍後待重拍（1280／390、淺／深色） | 目前狀態 |
+|---|---|---|---|
+| `/tech/` | Opus 作者 `.reviews/f4-offline-ui/opus.jsonl`；獨立 Sol `.reviews/b0-f4/f4-independent-source-review.md`。後端 `1fe9ec8`；UI SHA `35780254df64ff396884263f28dd898f3802bf9a`（source review，非 build）。 | detected／unknown／failed／blocked／not-observed；旗標 off 404、gateway 503、過濾無結果、多／少筆、截斷與分頁；橫捲固定首欄／表頭與縮欄。 | pending，missing 新圖 |
+| `/blogs/[slug]/` 技術區 | 同 F4 reviewer；optional 錯誤不拖垮 profile，失敗後的最後成功分開顯示。 | 無觀測、上次成功＋本次失敗、unknown 版本、有明確版本；來源 Alina／Carol／timdream 需真實既有輸入，fixture 不能冒充。 | issues，待重拍 |
+| `/blogs/[slug]/` 引用區 | Opus 作者 `.reviews/f3-offline-ui/opus.jsonl`；獨立 Sol `.reviews/b0-f4/f3-independent-ui-source-review.md`；修訂另保留 `revision-opus.jsonl`／`final-opus.jsonl`；最後 source SHA `35780254df64ff396884263f28dd898f3802bf9a`。 | 正文與非正文各多／少／空，雙向不同日期；共標籤 off／unavailable／empty／ready；畸形回應局部錯誤；展開文章 ID／版本／脈絡。 | issues，待重拍 |
+| `/relations/` | 同一份 F3 source review；圖只畫正文連結，不畫共詞／相似。 | 多／少／空、graph error、雙向不同年代與方法收合；不得用 source review 推論 canvas/手機呈現。 | pending，待重拍 |
+| `/articles/` 搜尋 | 歷史正文 guarded recall `6f47dda`；18169 fixture 1,002 篇／15 checks，未測正式成本。 | 蛤蜊絲瓜真實文章／短片段／matchVersion；無結果、錯誤、舊文章召回。 | fixed 的舊範圍不擴大；新狀態待重拍 |
+| `/topics/[id]/` | 方法區移入 details 的 `ae5f5f3` 與 25 SSR tests；既有歷史 fallback 圖只證舊 SHA。 | 多／少／歷史 fallback／無證據／錯誤；方法預設收合、首屏文章優先。 | issues，待重拍 |
+| 其他既有 pending route / 重要狀態 | 權威主表的各自原始 log／缺圖原因保留。 | 導覽全頁回歸；登入／my／admin 僅既有合法帳號，無 session 即 missing；錯誤頁不以裸 429 代替。 | 維持原狀，沒有抽樣豁免 |
+
+原始 log 均位於 gitignore 私有目錄；獨立 reviewer 的 raw harness model receipt、UTC、讀取 calls 寫在上述 review 記錄，不以文件作者自述替代模型證據。截圖仍必須放 repo 外；本輪沒有 capture、正式 probe、合成 GA、建置或新增大檔。解除凍結後依 `docs/f3-f4-thaw-release-plan.md` 一次候選建置驗收；若未過，不切正式流量。
+
 ## 權威 route 主表
 
 |route|example URL / state|reviewer/model + UTC|viewport（實際）|原始reviewer log provenance|reviewedSHA|desktop1280 screenshotPath|mobile390 screenshotPath|state/log/referenceScreens|tag偏離/理由|issues/未驗狀態|fixCommit|retestSHA/screenshots|status|

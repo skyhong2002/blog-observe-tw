@@ -21,3 +21,5 @@ payload revision/asOf仍missing，未保存不存在的版本。public token只�
 上游schema/tag mismatch屬unavailable，不視為不存在；只有404或未發送的unsupported輸入是missing。既有純optionalSharedLabel helper未接線且新client不使用；不要用其missing結果替代client狀態。Retry-After保留完整可表示日期；超Date極值的數字安全defer到最大Date，不縮成7天提早重試。JSON串流fatal UTF-8 decoding拒非法序列。Caller必須重用同一client與共享beforeRequest budget，instance-local cooldown尚無跨實例協調；本輪沒有新鎖/新caller。
 
 追加mock覆蓋direct public token與tokenread rejection、fallback後持續public、HTTP-date及10天冷卻到期/極值、短retry sleep期間另一kind不計budget、200空body/204/null/array JSON、非法UTF8；client17＋既有transport12共29pass。其餘redirect任意exception與stream timeout/cap原transport suite涵蓋；未真HTTP/DB/build。
+
+最終獨立 review：Opus actual `claude-opus-5-5`、finish_reason=stop（`.reviews/f3-f4-independent/b3-client-opus.json`）；採納 B1 及 N1/N2，N3 以未接線及 caller reuse/budget 契約明列。Sol 非作者 instance 複審全部修訂無 blocker（`.reviews/b0-f4/b3-client-independent-review.md`）。client commit `ffe63cd`；正式資料與頁面接線仍未完成。
