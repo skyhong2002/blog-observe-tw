@@ -6,7 +6,7 @@ Created in [T3 Code](https://t3.codes).
 
 ## 目前版本
 
-目前服務使用 Steam Machine 上分離的 gateway、web、worker user services：gateway 對外監聽 `127.0.0.1:18160`，Next web 監聽 `127.0.0.1:18162`，由 Cloudflare Tunnel 提供 `https://blog.observe.tw`。目前版本提供：
+目前服務使用 Steam Machine 上分離的 edge、gateway、web、worker user services：edge 對外監聽 `127.0.0.1:18160`，指向 active blue/green slot；最後確認的 gen5 green 為 gateway `18175`、Next web `18173`，由 Cloudflare Tunnel 提供 `https://blog.observe.tw`。舊 `18162` blog web 已停用，不能當成部署來源。實際切換以 active.json／部署 receipt 為準。目前版本提供：
 
 - 前端直接移植新文易數的 Tailwind 4 版面、分組導覽、來源頁、文章列表、手機選單、深淺色與 PWA 元件；首頁顯示收錄排行、標籤與文章，詳見 [`docs/frontend-parity.md`](docs/frontend-parity.md)。
 - 135 個原始 seed 與通過 RSS 自動驗證的新收錄部落格，網址核對與收錄統計見 [種子處理紀錄](docs/seed-resolution-2026-10-12.md)；支援分類搜尋、個別網站頁與原站連結。
@@ -61,7 +61,9 @@ npm run blogs:merge -- old-slug new-slug --apply
 [關係、探索與話題設計](docs/blog-relationships.md)：文章正文的外連與 blogroll、側欄、留言分開保存；
 `/relations/` 看提及方向與互相引用，部落格頁可查看「提到誰／被誰提到」並回原文章核對。
 `/topics/` 採 7／30／90 天與同站遞減權重；本站 RSS 標籤和 tag 公開文章窗口的共同詞彙分開標示。
-詞庫保留來源、固定窗口、版本與同步時間，不宣稱尚未部署的完整匯出已可用。
+詞庫保留來源、固定窗口、版本與同步時間。依 tag thread 已交付的完整快照，tag 匯出已上線（版本與既有證據見[活躍子集 preview](docs/vocabulary-import-preview-2026-10-13.md)），但 blog 正式仍使用每十五分鐘文章窗口；活躍子集 preview 不等於完整池已匯入或完成切換。
+
+完整未完成項目與離線／名額／上游依賴見 [剩餘 scope](docs/remaining-scope-2026-10-13.md)。Source／mock 完成不代表正式功能或逐頁 UI 驗收完成。
 
 新工作以 `BLOG_RELATIONS_ENABLED`、`BLOG_AI_ENABLED`、`BLOG_TOPICS_ENABLED`、`BLOG_VOCABULARY_ENABLED`
 獨立啟用（程式預設關閉，正式部署審查後明確設定）。沿用 blog 原本的單一 worker／佇列。

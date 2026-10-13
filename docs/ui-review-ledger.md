@@ -1,5 +1,11 @@
 # UI 逐頁審查紀錄
 
+## F3 搜尋資訊補齊：仍待新產物畫面
+
+0a8e6f3之後的離線source補上歷史正文索引的partial／unavailable／short-query／off／未提供狀態、文章ID／比對版本／片段來源。UI仍只顯示240字內片段，不外送raw body/hash/token；metadata命中改為「公開資料相符」，不把blog名稱或tag誤稱title/summary。既有Opus作者與非作者Sol source複審原始證據在 `/home/deck/.t3/userdata/ui-review-blog-20261013/home-perf-independent/search-coverage-opus-independent-final-review.json`；212 web node／128 SSR只驗原始碼與合成資料，不升route。
+
+Mint重拍增加：`/articles/?q=蛤蜊絲瓜` 的indexed partial、off、short query、unavailable、舊gateway缺coverage／version、截斷與metadata／body分開，以及方法展開；新BUILD_ID與實際1280／390／dark圖仍missing。原24項權威狀態不變。其他source缺口與依賴見 [剩餘scope](remaining-scope-2026-10-13.md)。
+
 ## 最新 source 修正：待 Mint 重拍，既有狀態不提升
 
 基底 `b96ef9b` 的離線品質批次：話題／歷史頁、話題排行及 BlogTopics 深色次要文字已由既有 Opus 5.5 session 修正，Sol 獨立 source 複審；舊 gen5 指定色對比約 4.10:1，新 zinc-400 同底預估 7.55:1。這不是新版全頁 contrast 或 WCAG pass。首頁 compact／Suspense 的新畫面、晚失敗 error boundary、舊圖缺 DNT/GPC、F4 新觀測、F3 真正文與 B2 狀態都待同產物重拍。
