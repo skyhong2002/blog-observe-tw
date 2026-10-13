@@ -78,6 +78,7 @@ try {
     ['page-links', '../app/src/seo/page-links.integration.ts', 'runPageLinksIntegration'],
     ['indexability', '../app/src/seo/indexability.integration.ts', 'runIndexabilityIntegration'],
     ['topics-ranking', '../app/src/topics/ranking.integration.ts', 'runTopicRankingIntegration'],
+    ['home-ranking-freshness', '../app/src/topics/ranking-freshness.integration.ts', 'runRankingFreshnessIntegration'],
     ['topics-quality', '../app/src/topics/integration.ts', 'runTopicsQualityIntegration'],
     ['content-topics', '../app/src/topics/content.integration.ts', 'runContentTopicsIntegration'],
     ['content-feed', '../app/src/crawl/feed-content.integration.ts', 'runFeedContentIntegration'],
@@ -104,6 +105,7 @@ try {
             label === 'profile-evidence' ||
             label === 'shared-tags' ||
             label === 'text-similarity' ||
+            label === 'home-ranking-freshness' ||
             label.startsWith('tech-'),
         )
       : process.argv[5] === 'b3'
