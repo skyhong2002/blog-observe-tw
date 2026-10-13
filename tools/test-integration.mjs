@@ -17,7 +17,8 @@ try {
     ![4, 6].includes(process.argv.length) ||
     process.argv[2] !== '--env-file' ||
     (process.argv.length === 6 &&
-      (process.argv[4] !== '--suite' || !['f3-f4', 'b3', 'vocabulary-snapshot', 'staged-scan-v2'].includes(process.argv[5])))
+      (process.argv[4] !== '--suite' ||
+        !['f3-f4', 'b3', 'vocabulary-snapshot', 'staged-scan-v2', 'topic-body-owner'].includes(process.argv[5])))
   )
     throw Error('explicit_private_clone_env_required');
   const file = resolve(process.argv[3]);
@@ -61,6 +62,7 @@ try {
   }
   const suites = [
     ['staged-scan-v2', '../app/src/topics/staged-scan-v2.integration.ts', 'runStagedScanV2Integration'],
+    ['topic-body-owner', '../app/src/topics/body-owner.integration.ts', 'runTopicBodyOwnerIntegration'],
     ['budgets-ai', '../tests/integration/core.mjs', 'runCoreIntegration'],
     ['candidates', '../tests/integration/candidates.mjs', 'runCandidateIntegration'],
     ['relations', '../app/src/relations/integration.ts', 'runRelationIntegration'],
@@ -117,7 +119,9 @@ try {
           ? suites.filter(([label]) => label === 'snapshot-import')
           : process.argv[5] === 'staged-scan-v2'
             ? suites.filter(([label]) => label === 'staged-scan-v2')
-            : suites;
+            : process.argv[5] === 'topic-body-owner'
+              ? suites.filter(([label]) => label === 'topic-body-owner')
+              : suites;
   for (const [label, module, entry] of selected) {
     phase = label;
     const result = await (await import(module))[entry](store.pool);
