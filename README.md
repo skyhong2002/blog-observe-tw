@@ -40,7 +40,7 @@ npm run blogs:merge -- old-slug new-slug --apply
 
 完整的來源探索設計（`blogblog.club`、Similarweb Similar Sites、速率限制與和 tag 的協調方式）見 [`docs/discovery.md`](docs/discovery.md)。正式 Google 帳號登入仍需使用者本人在瀏覽器完成；Similarweb 方案一已接成 tag 的 loopback API client：只提交核准網域，每日最多 30 次、六小時輪詢、配額與退避持久化，預設 `BLOG_SIMILARWEB_ENABLED=false`。契約與回滾見 [`docs/similarweb-coordination-proposal.md`](docs/similarweb-coordination-proposal.md)。圖示抓取、私人 runtime catalog 與每月刷新見 [`docs/favicons.md`](docs/favicons.md)。
 
-最新部署與完整驗收、favicon 全批數量及真人驗收項目見 [2026-10-12 部署紀錄](docs/deployment-2026-10-12.md)。
+最新正式 release `4cc7bcd` 的同產物切換、首頁量測與 F3／F4 已審範圍見 [2026-10-13 部署紀錄](docs/deployment-2026-10-13-4cc7bcd.md)；完整 UI 尚未驗收完畢，依 [逐頁 ledger](docs/ui-review-ledger.md) 保留 pending。favicon 歷史全批數量及真人驗收項目見 [2026-10-12 部署紀錄](docs/deployment-2026-10-12.md)。
 
 ## 開發與發版
 

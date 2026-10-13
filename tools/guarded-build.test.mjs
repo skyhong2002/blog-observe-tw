@@ -69,7 +69,7 @@ function fixture(patch = {}) {
 test('fixed argv/priority/flock/green gateway; no arbitrary shell or active gateway', () => {
   const plan = buildPlan(approval);
   assert.equal(plan.command, '/usr/bin/nice');
-  assert.deepEqual(BUILD_LOCKS, ['/home/deck/.cache/observe-build-0.lock', '/home/deck/.cache/observe-build-1.lock']);
+  assert.deepEqual(BUILD_LOCKS, ['/home/deck/.cache/observe-build-0.lock']);
   assert.ok(plan.args.includes('19'));
   assert.ok(plan.args.includes('/usr/bin/ionice'));
   assert.equal(plan.args.at(-2), '--handshake-child');
@@ -101,7 +101,7 @@ test('start floor/reserved estimate and runtime floor are distinct; complete bod
   assert.equal(gateReason({ ...healthy, available: 47 * 1024 ** 3 }, homes, 8 * 1024 ** 3, 'start'), 'disk');
   assert.equal(gateReason({ ...healthy, available: 30 * 1024 ** 3 }, homes, 0, 'monitor'), null);
   assert.equal(gateReason({ ...healthy, available: 29 * 1024 ** 3 }, homes, 0, 'monitor'), 'disk');
-  assert.equal(gateReason(healthy, [{ ...homes[0], totalMs: 6001 }, ...homes.slice(1)], 0, 'start'), 'homepage');
+  assert.equal(gateReason(healthy, [{ ...homes[0], totalMs: 6171 }, ...homes.slice(1)], 0, 'start'), 'homepage');
   assert.equal(gateReason(healthy, [{ ...homes[0], status: 103 }, ...homes.slice(1)], 0, 'start'), 'homepage');
   assert.equal(gateReason(healthy, [{ ...homes[0], complete: false }, ...homes.slice(1)], 0, 'start'), 'homepage');
 });
@@ -117,12 +117,12 @@ test('initial bad resource does not probe or spawn; initial full homepage failur
   assert.equal((await guardedBuild(approval, f.deps)).status, 'blocked');
   assert.equal(probes, 0);
   assert.equal(f.calls.length, 0);
-  const g = fixture({ probes: async () => [{ ...homes[0], totalMs: 6001 }, ...homes.slice(1)] });
+  const g = fixture({ probes: async () => [{ ...homes[0], totalMs: 6171 }, ...homes.slice(1)] });
   assert.equal((await guardedBuild(approval, g.deps)).reason, 'homepage');
   assert.equal(g.calls.length, 0);
 });
 test('monitor low disk/load/other build pauses only its own detached group, no CONT and safe artifact', async () => {
-  for (const change of [{ available: 29 * 1024 ** 3 }, { load1: 13 }, { otherBuilds: 2 }]) {
+  for (const change of [{ available: 29 * 1024 ** 3 }, { load1: 13 }, { otherBuilds: 1 }]) {
     let count = 0;
     const f = fixture({ resources: async () => ({ ...healthy, ...(++count >= 4 ? change : {}) }) });
     const result = await guardedBuild(approval, f.deps);
@@ -137,7 +137,7 @@ test('monitor low disk/load/other build pauses only its own detached group, no C
   }
 });
 test('monitor slow/non200/incomplete homepage stops own group', async () => {
-  for (const change of [{ totalMs: 6001 }, { status: 503 }, { complete: false }]) {
+  for (const change of [{ totalMs: 6171 }, { status: 503 }, { complete: false }]) {
     let count = 0;
     const f = fixture({ probes: async () => (++count === 1 ? homes : [{ ...homes[0], ...change }, ...homes.slice(1)]) });
     assert.equal((await guardedBuild(approval, f.deps)).status, 'paused');
@@ -206,33 +206,55 @@ test('early ownership failure closes handshake without GO or builder initiation'
   assert.ok(f.calls.some((c) => c[0] === 'cancel'));
   assert.ok(!f.calls.some((c) => c[0] === 'GO' || c[0] === 'signal'));
 });
-test('two participant slots are atomic, retain winning FD and close losing FD', async () => {
+test('single participant slot retains its winning FD; conflict does not try a second slot', async () => {
   const closed = [],
     opened = [];
   const slot = await claimBuildSlot(
     async (path) => {
-      const fd = opened.length + 3;
       opened.push(path);
-      return { fd, close: async () => closed.push(fd) };
+      return { fd: 3, close: async () => closed.push(3) };
     },
-    async (fd) => (fd === 3 ? 73 : 0),
+    async () => 0,
   );
-  assert.equal(slot.slot, BUILD_LOCKS[1]);
-  assert.deepEqual(closed, [3]);
+  assert.equal(slot.slot, BUILD_LOCKS[0]);
   assert.deepEqual(opened, BUILD_LOCKS);
+  assert.deepEqual(closed, []);
   await slot.handle.close();
-  assert.deepEqual(closed, [3, 4]);
-});
-test('two slots busy refuse pipeline and PGID count gate allows one other but rejects two', async () => {
-  const slot = await claimBuildSlot(
-    async () => ({ fd: 3, close: async () => {} }),
+  assert.deepEqual(closed, [3]);
+  const rejected = await claimBuildSlot(
+    async (path) => {
+      opened.push(path);
+      return { fd: 4, close: async () => closed.push(4) };
+    },
     async () => 73,
   );
-  assert.equal(slot, null);
-  assert.equal(gateReason({ ...healthy, otherBuilds: 1 }, homes, 8 * 1024 ** 3, 'start'), null);
-  assert.equal(gateReason({ ...healthy, otherBuilds: 2 }, homes, 0, 'monitor'), 'other_build');
-  assert.equal(gateReason(healthy, [{ ...homes[0], totalMs: 6000 }, ...homes.slice(1)], 0, 'start'), null);
-  assert.equal(gateReason(healthy, [homes[0], { ...homes[1], totalMs: 2001 }, homes[2]], 0, 'start'), 'homepage');
+  assert.equal(rejected, null);
+  assert.deepEqual(opened, [BUILD_LOCKS[0], BUILD_LOCKS[0]]);
+  assert.deepEqual(closed, [3, 4]);
+});
+test('any other build closes start and runtime gates; homepage limits remain blog 6.17s and tag/youtube 2s', () => {
+  assert.equal(gateReason({ ...healthy, otherBuilds: 1 }, homes, 8 * 1024 ** 3, 'start'), 'other_build');
+  assert.equal(gateReason({ ...healthy, otherBuilds: 1 }, homes, 0, 'monitor'), 'other_build');
+  for (let index = 0; index < homes.length; index++) {
+    assert.equal(
+      gateReason(
+        healthy,
+        homes.map((home, i) => ({ ...home, totalMs: i === index ? HOMES[index].limitMs : 100 })),
+        0,
+        'start',
+      ),
+      null,
+    );
+    assert.equal(
+      gateReason(
+        healthy,
+        homes.map((home, i) => ({ ...home, totalMs: i === index ? HOMES[index].limitMs + 1 : 100 })),
+        0,
+        'start',
+      ),
+      'homepage',
+    );
+  }
 });
 
 test('paused detach unrefs child and control pipe without releasing a child-owned flock FD', () => {

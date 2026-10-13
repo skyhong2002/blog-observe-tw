@@ -1,3 +1,4 @@
+import { HOMEPAGE_BASELINE, HOMEPAGE_LIMIT_SECONDS } from './homepage-gate-baseline.mjs';
 import { execFile, spawn } from 'node:child_process';
 import { createHash, randomBytes } from 'node:crypto';
 import { createInterface } from 'node:readline';
@@ -73,29 +74,59 @@ export async function installGuards(context, origin, counters, network) {
   });
 }
 const exec = promisify(execFile);
+const isBrowserExecutable = name => /^(?:chrome|chromium|chromium-browser|chrome-headless-shell|headless_shell)$/.test(name);
+const safeProcessDiagnostics = rows => rows.slice(0, 128).map(row => ({
+  pid: Number.isSafeInteger(row.pid) ? row.pid : null,
+  ppid: Number.isSafeInteger(row.ppid) ? row.ppid : null,
+  executable: isBrowserExecutable(row.executable) ? row.executable : null,
+  comm: typeof row.comm === 'string' ? row.comm.replace(/[^A-Za-z0-9_.-]/g, '').slice(0, 32) : null,
+  hasType: Array.isArray(row.args) ? row.args.some(arg => /^--type(?:=|$)/.test(arg)) : row.hasType === true,
+  argCount: Array.isArray(row.args) ? row.args.length : Number.isSafeInteger(row.argCount) ? row.argCount : null,
+  startTicks: /^\d+$/.test(row.startTicks ?? '') ? row.startTicks : null,
+}));
 export function browserRootInventory(rows) {
-  const candidates = rows.filter(row => /^(?:chrome|chromium|chromium-browser|chrome-headless-shell)$/.test(row.executable));
-  const roots = candidates.filter(row => !row.args.some(arg => /^--type(?:=|$)/.test(arg)));
-  if (candidates.some(row => !Number.isSafeInteger(row.pid) || !Number.isSafeInteger(row.ppid))) throw Error('process_inventory_unavailable');
-  // Browser processes without --type are roots; subprocesses are never summed as browsers.
-  // Multiple no-type ancestors are ambiguous, so refuse rather than guess.
-  const rootIds = new Set(roots.map(row => row.pid));
-  if (roots.some(row => rootIds.has(row.ppid))) throw Error('ambiguous_browser_roots');
+  const candidates = rows.filter(row => isBrowserExecutable(row.executable));
+  const fail = reason => { throw Object.assign(Error(reason), { processDiagnostics: safeProcessDiagnostics(candidates), processDiagnosticsTruncated: candidates.length > 128 }); };
+  if (candidates.some(row => !Number.isSafeInteger(row.pid) || row.pid < 2 || !Number.isSafeInteger(row.ppid) || row.ppid < 0 || typeof row.startTicks !== 'string' || !/^\d{1,32}$/.test(row.startTicks))) fail('process_inventory_unavailable');
+  const byPid = new Map();
+  for (const row of candidates) {
+    if (byPid.has(row.pid)) fail('browser_pid_duplicate');
+    byPid.set(row.pid, row);
+  }
+  // This headless binary truncates cmdline to argv[0], including descendants.
+  // Count only topmost verified browser processes. Missing parents stay roots:
+  // even --type cannot prove an unseen/reparented process belongs to another tree.
+  for (const row of candidates) {
+    const seen = new Set(); let current = row;
+    while (current) {
+      if (seen.has(current.pid)) fail('browser_ancestry_cycle');
+      seen.add(current.pid);
+      const parent = byPid.get(current.ppid);
+      if (parent && BigInt(parent.startTicks) > BigInt(current.startTicks)) fail('browser_parent_identity_changed');
+      current = parent;
+    }
+  }
+  const roots = candidates.filter(row => !byPid.has(row.ppid));
   return { browserRoots: roots.length, rootPids: roots.map(row => row.pid), chromiumProcesses: candidates.length };
 }
-async function processInventory() {
+export async function processInventory(deps = { exec, readFile, readlink, readdir }) {
   let rawPgrepCount;
-  try { const { stdout } = await exec('pgrep', ['-fc', 'chrome|chromium|playwright']); rawPgrepCount = Number(stdout.trim()); }
+  try { const { stdout } = await deps.exec('pgrep', ['-fc', 'chrome|chromium|playwright|headless_shell']); rawPgrepCount = Number(stdout.trim()); }
   catch (error) { if (error.code === 1 && String(error.stdout).trim() === '0') rawPgrepCount = 0; else throw Error('process_count_unavailable'); }
   if (!Number.isSafeInteger(rawPgrepCount) || rawPgrepCount < 0) throw Error('process_count_unavailable');
   const rows = [];
-  for (const pid of (await readdir('/proc')).filter(name => /^\d+$/.test(name))) {
+  for (const pid of (await deps.readdir('/proc')).filter(name => /^\d+$/.test(name))) {
     try {
-      const args = (await readFile(`/proc/${pid}/cmdline`, 'utf8')).split('\0').filter(Boolean);
-      const executable = args[0]?.split('/').at(-1) ?? '';
-      if (!/^(?:chrome|chromium|chromium-browser|chrome-headless-shell)$/.test(executable)) continue;
-      const fields = (await readFile(`/proc/${pid}/stat`, 'utf8')).split(') ').at(-1).split(' ');
-      rows.push({ pid: Number(pid), ppid: Number(fields[1]), executable, args });
+      // comm is readable for ordinary non-owned processes; only suspicious browser
+      // names require privileged exe/cmdline reads. argv[0] may be /proc/self/exe.
+      const comm = (await deps.readFile(`/proc/${pid}/comm`, 'utf8')).trim();
+      if (!/^(?:chrome|chromium|headless)/.test(comm)) continue;
+      const executable = (await deps.readlink(`/proc/${pid}/exe`)).replace(/ \(deleted\)$/, '').split('/').at(-1);
+      if (!isBrowserExecutable(executable)) continue;
+      const args = (await deps.readFile(`/proc/${pid}/cmdline`, 'utf8')).split('\0').filter(Boolean);
+      const fields = (await deps.readFile(`/proc/${pid}/stat`, 'utf8')).split(') ').at(-1).split(' ');
+      if (['Z', 'X'].includes(fields[0])) continue;
+      rows.push({ pid: Number(pid), ppid: Number(fields[1]), executable, comm, args, startTicks: fields[19] });
     } catch (error) { if (!['ENOENT', 'ESRCH'].includes(error.code)) throw Error('process_inventory_unavailable'); }
   }
   return { rawPgrepCount, ...browserRootInventory(rows), quotaScope: 'participating-flock-clients-plus-point-in-time-root-inventory' };
@@ -245,7 +276,7 @@ export async function verifyArchiveIdentity(config) {
   if (!verifiedFiles) throw Error('source_tree_unverified');
   return { ...receipt, sha: config.expectedSHA, sourceTreeHash, sourceTreeHashAlgorithm: 'git-tree-sha1', verifiedFiles };
 }
-export const TTFB_LIMITS = Object.freeze({ 'blog.observe.tw': 6, 'tag.observe.tw': 2, 'youtube.observe.tw': 2 });
+export const TTFB_LIMITS = HOMEPAGE_LIMIT_SECONDS;
 export function verifyLatencyGate(rows) {
   if (!Array.isArray(rows) || rows.length !== 3 || new Set(rows.map(row => row.host)).size !== 3 || rows.some(row => !Object.hasOwn(TTFB_LIMITS, row.host) || row.status !== 200 || !Number.isFinite(row.totalSeconds) || row.totalSeconds < 0 || row.totalSeconds > TTFB_LIMITS[row.host])) throw Error('ttfb_gate');
 }
@@ -253,7 +284,7 @@ async function formalTTFB() {
   const rows = [];
   for (const host of ['blog.observe.tw', 'tag.observe.tw', 'youtube.observe.tw']) {
     const start = performance.now();
-    const response = await fetch(`https://${host}/`, { headers: { DNT: '1' }, redirect: 'error', signal: AbortSignal.timeout(TTFB_LIMITS[host] * 1000 + 500) });
+    const response = await fetch(`https://${host}/`, { headers: { DNT: '1', Accept: 'text/html' }, redirect: 'error', signal: AbortSignal.timeout(TTFB_LIMITS[host] * 1000 + 500) });
     const ttfbSeconds = (performance.now() - start) / 1000;
     let bytes = 0;
     const reader = response.body?.getReader();
@@ -265,8 +296,14 @@ async function formalTTFB() {
 }
 export async function capture(config, deps) {
   const batch = plan(config);
-  const report = { startedAt: deps.now(), endedAt: null, closeAt: null, closed: false, status: 'stopped', gates: [], pages: [], blocked: { analytics: 0, external: 0 }, network: { attempted: 0, ga: 0, gtm: 0, analytics: 0, blocked: 0, requests: [], truncated: false, limitation: 'External images/fonts/scripts are blocked by default; their absence is not evidence of a page defect.' }, authorization: typeof config.authorization === 'string' ? config.authorization.slice(0, 300) : 'explicit-user-thaw'  };
+  const report = { homepageBaseline: HOMEPAGE_BASELINE, startedAt: deps.now(), endedAt: null, closeAt: null, closed: false, status: 'stopped', gates: [], pages: [], blocked: { analytics: 0, external: 0 }, network: { attempted: 0, ga: 0, gtm: 0, analytics: 0, blocked: 0, requests: [], truncated: false, limitation: 'External images/fonts/scripts are blocked by default; their absence is not evidence of a page defect.' }, authorization: typeof config.authorization === 'string' ? config.authorization.slice(0, 300) : 'explicit-user-thaw'  };
   let browser, lease;
+  const noteProcessFailure = (error, phase) => {
+    if (Array.isArray(error?.processDiagnostics)) {
+      report.processDiagnostics ??= [];
+      report.processDiagnostics.push({ phase, utc: deps.now(), rows: safeProcessDiagnostics(error.processDiagnostics), truncated: error.processDiagnosticsTruncated === true });
+    }
+  };
   const proveQuota = async () => { if (await lease.assertHeld() !== true) throw Error('global_quota_unproven'); };
   try {
     const before = await deps.gate(); report.gates.push({ phase: 'before', ...before }); verifyGate(before, batch.estimatedBytes);
@@ -321,7 +358,7 @@ export async function capture(config, deps) {
       await page.close();
     }
     report.status = 'captured-unreviewed';
-  } catch (error) { report.error = error.message && /^[a-z_]+$/.test(error.message) ? error.message : 'capture_stopped'; }
+  } catch (error) { noteProcessFailure(error, report.currentPathname ? 'page' : 'initial'); report.error = error.message && /^[a-z_]+$/.test(error.message) ? error.message : 'capture_stopped'; }
   finally {
     try { if (browser) { await browser.close(); report.closed = true; report.closeAt = deps.now(); } }
     catch { report.closed = false; report.error = 'browser_close_failed'; }
@@ -333,7 +370,7 @@ export async function capture(config, deps) {
         catch { report.afterGateError = 'ttfb_gate'; report.error ??= 'after_ttfb_gate'; report.status = 'stopped'; }
       }
       else report.afterTTFBSkipped = 'no_completed_browser_or_load_gate';
-    } catch { report.afterGateError = 'gate_unavailable'; }
+    } catch (error) { noteProcessFailure(error, 'after'); report.afterGateError = 'gate_unavailable'; }
     report.endedAt = deps.now();
     await deps.saveReport(report);
   }

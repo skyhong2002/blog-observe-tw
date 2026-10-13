@@ -1,3 +1,4 @@
+import { HOMEPAGE_BASELINE, HOMEPAGE_LIMIT_SECONDS } from './homepage-gate-baseline.mjs';
 /** Root-approved web builds only. Import-safe: tests inject all I/O; no automatic resume or cleanup. */
 import { execFile, spawn } from 'node:child_process';
 import { constants } from 'node:fs';
@@ -10,12 +11,12 @@ import { promisify } from 'node:util';
 const exec = promisify(execFile);
 const GiB = 1024 ** 3;
 export const BUILD_LIMITS = Object.freeze({ startBytes: 40 * GiB, stopBytes: 30 * GiB, load1: 12, homepageMs: 2000, intervalMs: 1000 });
-export const BUILD_LOCKS = Object.freeze(['/home/deck/.cache/observe-build-0.lock', '/home/deck/.cache/observe-build-1.lock']);
+export const BUILD_LOCKS = Object.freeze(['/home/deck/.cache/observe-build-0.lock']);
 export const APPROVAL_ROOT = '/home/deck/.t3/projects/blog-observe-tw/.reviews/guarded-build';
 export const HOMES = Object.freeze([
-  { site: 'blog', url: 'https://blog.observe.tw/', limitMs: 6000 },
-  { site: 'tag', url: 'https://tag.observe.tw/', limitMs: 2000 },
-  { site: 'youtube', url: 'https://youtube.observe.tw/', limitMs: 2000 },
+  { site: 'blog', url: 'https://blog.observe.tw/', limitMs: HOMEPAGE_LIMIT_SECONDS['blog.observe.tw'] * 1000 },
+  { site: 'tag', url: 'https://tag.observe.tw/', limitMs: HOMEPAGE_LIMIT_SECONDS['tag.observe.tw'] * 1000 },
+  { site: 'youtube', url: 'https://youtube.observe.tw/', limitMs: HOMEPAGE_LIMIT_SECONDS['youtube.observe.tw'] * 1000 },
 ]);
 export function buildPlan(approval, now = Date.now()) {
   if (
@@ -53,7 +54,7 @@ export function resourceReason(resource, estimate, stage) {
     resource.otherBuilds < 0
   )
     return 'resource_unproven';
-  if (resource.otherBuilds >= 2) return 'other_build';
+  if (resource.otherBuilds >= 1) return 'other_build';
   if (resource.load1 > BUILD_LIMITS.load1) return 'load';
   if (
     stage === 'start'
@@ -143,7 +144,7 @@ async function probes() {
       response = await fetch(home.url, {
         redirect: 'manual',
         cache: 'no-store',
-        headers: { DNT: '1' },
+        headers: { DNT: '1', Accept: 'text/html' },
         signal: AbortSignal.timeout(home.limitMs),
       });
       let bytes = 0;
@@ -501,7 +502,7 @@ async function main() {
   const result = await guardedBuild(approval);
   const artifact = `${APPROVAL_ROOT}/run-${Date.now()}-${process.pid}.json`;
   await mkdir(dirname(artifact), { recursive: true, mode: 0o700 });
-  await writeFile(artifact, JSON.stringify(result, null, 2) + '\n', { flag: 'wx', mode: 0o600 });
+  await writeFile(artifact, JSON.stringify({ ...result, homepageBaseline: HOMEPAGE_BASELINE }, null, 2) + '\n', { flag: 'wx', mode: 0o600 });
   console.log(JSON.stringify({ status: result.status, reason: result.reason, artifact }));
   if (result.status !== 'complete') process.exitCode = 1;
 }
