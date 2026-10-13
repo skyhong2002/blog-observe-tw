@@ -13,7 +13,7 @@ tag 的473萬詞池只代表上游曾有標籤，**不是 blog SEO 話題頁的�
 | F4 被動輸入 | gen5 313站0detected／260unknown／53未觀測是舊正式結果；feed/history/favicon接線在64cbea3，未部署 | source／mock／已存HTML證據覆核已完成；可以補更多有真實證據的離線 fixture，不增加抓取 | Mint同產物candidate、被動既有正常回應寫入、Alina／Carol／timdream真實observedAt與版本證據，正式coverage與畫面 |
 | F4 coverage與UI | source已有detected／unknown／failed／blocked／not-observed、CMS與CDN區分，但全狀態不是全部pass | 檢查欄位／多筆少筆／失敗保留的契約；缺source時先修mock | 新SHA／BUILD_ID的/tech/與blog技術區1280／390、兩色、表格互動與正式Chrome驗收 |
 | F3 搜尋命中資訊 | 有界posting reader／producer在1af0b44；本輪已補前端歷史索引coverage與證據欄位，尚未部署 | **本輪source與mock已修**搜尋parser／coverage／articleId／matchVersion／contextSource，由既有Opus作者、Sol獨立review | 0023正式additive apply、同產物candidate隱私／成本、真文anise.tw/290726的『蛤蜊絲瓜』畫面；flag仍off |
-| F3 正文索引接線 | 現在僅manual最多10ID producer，沒有adopted-body worker hook／持續補索引 | 設計明確「正文已提交才排索引」的有界hook與失敗契約、mock／隔離SQL；不可先開正式批量 | candidate、正式可公開body選定回填與成本／版本驗證；索引覆蓋不是全站全文完整性 |
+| F3 正文索引接線 | 現在僅manual最多10ID producer；本輪已補default-off的committed adoption純契約，仍沒有worker caller／持續補索引 | [adoption契約](search-index-adoption.md)與26 mocks已完成；接續caller commit後發事件／有界queue consumer與repair的實際整合，不能以F4 URL callback替代正文ID | candidate、正式可公開body選定回填與成本／版本驗證；索引覆蓋不是全站全文完整性 |
 | F3 relations coverage | 舊185／18838與失敗分類已盤點；不代表目前coverage提升，未知target仍多 | 用已存完整正文與parser version契約準備有界reparse；預算deferred、badbody、blocked分組，不重建relations | 正式小批reparse、觀測進度／分母；額外抓取仍守robots/SSRF/每日預算，不能以fixture改寫真coverage |
 | F3 引用target／搬家 | 本地alias helper與原URL exact target ID不足以證明文章canonical或跨網域轉址；gojp→gogojp真證據仍待核 | canonical／alias trust規則與否定cases、target resolver的有界契約可先寫 | 正常許可抓取的逐跳redirect／ownership證據、gogojp↔bobowin兩方向原文章與各自日期；不猜alias，不包成同期間交流 |
 | B2 三類證據 | 直接引用／非正文／共同native tags已有UI；文字相似僅default-off單對API，profile仍not-analysed | 明確配對consumer／UI接線、ready／unavailable／insufficient states與source review；正文只計算、public preview只摘要 | 同產物candidate各類證據畫面／隱私，真資料驗收後才考慮enable；不得做無界NxN、不得叫抄襲或交流 |
@@ -71,6 +71,8 @@ Opus原始非自審review `.reviews/offline-quality/scope-vocabulary-nonself-opu
 - 全量checksum目前沒有跨批checkpoint；截止後從第0頁開始，9.5k頁可能永遠不能在單輪結束。這仍是**可離線修**的source項，必須先於warmup／cutover完成，且保持上游原始sha256整體驗證；不能拿另一種hash當相同checksum。
 - tiers/active/statistics/largePages目前是**未驗證的opaque原樣metadata**，會參與整個immutable manifest比較；不是可信active詞集合或已驗API欄位。暫不採猜測可變欄位而忽略身份差異／自行刪掉欄位的建議，先核版本化上游契約。後續consumer不得用cast把它當已驗資料。
 
-下一批離線順序：adopted-body index hook與mock → B2有界consumer → 完整池契約/checksum續跑/warmup與changes → target canonical/轉址trust契約。person/shared-label的網路同步等F1明確契約與readiness；所有新UI仍由既有Opus作者，另一個既有Sol review。這些不是Mint新build/capture許可。
+adopted-body純契約也已直接接續完成：只保留已提交事件的primitive ID metadata、cap10、dedup，default-off／未接caller。排隊ack≠indexed，未知queue結果需repair、不重播也不rollback原文。非作者review實測兩個P2（ack自訂iterator／event getter重讀），原作者改為一次擷取local值再驗，原21 mocks加5個回歸全部保留。三檔最終hash/rawmodel/UTC在 `/home/deck/.t3/userdata/ui-review-blog-20261013/home-perf-independent/search-index-adoption-independent-followup.json`。root同時跑adoption／producer／body-index測試与app no-emit，沒有DB/Redis/HTTP。不能把純helper當成durable queue、SQL commit proof或產品hook完成。
+
+下一批離線順序：adopted-body **實際caller/queue接線** → B2有界consumer → 完整池契約/checksum續跑/warmup與changes → target canonical/轉址trust契約。person/shared-label的網路同步等F1明確契約與readiness；所有新UI仍由既有Opus作者，另一個既有Sol review。這些不是Mint新build/capture許可。
 
 唯一handoff `/tmp/babysit/mint-queue/blog.md` 會引用本檔並釘每次提交後乾淨SHA。**目前有可離線source工作，不能標示「只剩等待名額／上游」**。每完成一小批commit/push、獨立review後更新source切點；是否併入第一份Mint候選由owner依完整契約及review決定，不為等功能擴張阻塞已安全可驗的首頁/F4修正。

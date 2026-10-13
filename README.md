@@ -44,7 +44,7 @@ npm run blogs:merge -- old-slug new-slug --apply
 
 ## 開發與發版
 
-以 GitHub `main` 為唯一整合與發版來源；主要工作目錄 `/home/deck/.t3/projects/blog-observe-tw` 的 main 已同步，`feat/tag-frontend-parity` 已完整納入。新工作先 fetch，再從遠端 main 開始；正式服務固定使用 commit SHA 的獨立 release，不從功能分支或 checkout 的舊 `.next` 發版。詳見 [藍綠部署與安全回滾流程](docs/blue-green-deployment.md)。
+以 GitHub `main` 為唯一整合與發版來源；`feat/tag-frontend-parity` 已完整納入。主要工作目錄以 fetch 後的 `origin/main` 為基準，目前離線工作使用 `work/blog-mint-queue`，每批審查後保留原SHA整合並push main，再更新唯一Mint交接檔。新工作先 fetch；不以可能落後的local main取代遠端來源，也不reset共享checkout。正式服務固定使用 commit SHA 的獨立 release，不從未整合功能分支或 checkout 的舊 `.next` 發版。詳見 [藍綠部署與安全回滾流程](docs/blue-green-deployment.md)。
 
 依使用者要求，自行搜尋並驗證 131 個缺網址 seed；唯一官方身份及有效 RSS／Atom／sitemap 通過後直接補入既有 seed，真正無法驗證者保留 unresolved 與證據。詳見 [種子網址驗證流程](docs/seed-url-matching-proposal.md)。
 
