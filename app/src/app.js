@@ -24,6 +24,7 @@ import { registerPageApi } from './seo/page-api.ts';
 import { registerPageLinks } from './seo/page-links.ts';
 import { createPublicPageRedirect } from './seo/redirects.ts';
 import { registerSeoRoutes } from './seo/routes.ts';
+import { registerTechRoutes } from './tech/routes.ts';
 import { registerTopicRoutes } from './topics/routes.ts';
 import { createUiProxy } from './ui-proxy.js';
 import { registerApiStatus } from './v1/api-status.ts';
@@ -93,6 +94,7 @@ export async function buildApp(config, { logger = false, store = null } = {}) {
   registerSearchRoutes(app, pool);
   registerSeoRoutes(app, pool);
   registerContentRoutes(app, pool);
+  registerTechRoutes(app, pool, { enabled: config.techPublicEnabled === true, publicOrigin: config.publicOrigin });
   for (const type of ['application/xml', 'text/xml', 'application/x-opml']) {
     app.addContentTypeParser(type, { parseAs: 'string', bodyLimit: 1024 * 1024 }, (_request, body, done) => done(null, body));
   }

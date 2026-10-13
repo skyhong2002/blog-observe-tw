@@ -141,6 +141,13 @@
       "when": 1791826753315,
       "tag": "0019_durable_topic_history",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "5",
+      "when": 1791831860686,
+      "tag": "0020_passive_blog_technology",
+      "breakpoints": true
     }
   ]
 }

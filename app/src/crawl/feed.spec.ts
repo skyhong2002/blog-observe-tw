@@ -135,6 +135,55 @@ describe('crawl request safety', () => {
     expect(calls).toEqual([`https://${host}/robots.txt`, `https://${host}/feed.xml`]);
   });
 
+  it.each(['relation_http_budget', 'relation_batch_stopped'])(
+    'preserves local %s from robots admission without recording a site observation',
+    async (reason) => {
+      const url = `https://observer-admission-${reason.replaceAll('_', '-')}.test/`;
+      const original = new Error(reason);
+      const fetcher = vi.fn(async (_input: Parameters<FeedFetcher>[0]) => {
+        throw original;
+      });
+      const observer = vi.fn();
+      await expect(politeFetch(url, {}, { fetcher, observer, resolveHost: async () => ['93.184.216.34'] })).rejects.toBe(original);
+      expect(fetcher).toHaveBeenCalledOnce();
+      expect(String(fetcher.mock.calls[0][0])).toBe(`${url}robots.txt`);
+      expect(observer).not.toHaveBeenCalled();
+    },
+  );
+  it.each(['connection reset', 'relation_http_budget_remote_text'])(
+    'keeps a real/unrecognized robots failure closed: %s',
+    async (reason) => {
+      const url = `https://observer-robots-failure-${reason === 'connection reset' ? 'network' : 'unrecognized'}.test/`;
+      const calls: string[] = [];
+      const fetcher: FeedFetcher = async (input) => {
+        calls.push(String(input));
+        throw new Error(reason);
+      };
+      const observer = vi.fn();
+      await expect(politeFetch(url, {}, { fetcher, observer, resolveHost: async () => ['93.184.216.34'] })).rejects.toThrow(
+        'robots disallow',
+      );
+      expect(calls).toEqual([`${url}robots.txt`]);
+      expect(observer).toHaveBeenCalledOnce();
+      expect(observer.mock.calls[0][0]).toMatchObject({ error: 'robots', requestedUrl: url });
+    },
+  );
+
+  it('does not treat a budget-like URL path as local admission when robots really failed', async () => {
+    const url = 'https://observer-budget-text-url.test/relation_http_budget';
+    const fetcher = vi.fn(async (_input: Parameters<FeedFetcher>[0]) => {
+      throw new Error('connection reset');
+    });
+    const observer = vi.fn();
+    await expect(politeFetch(url, {}, { fetcher, observer, resolveHost: async () => ['93.184.216.34'] })).rejects.toThrow(
+      'robots disallow',
+    );
+    expect(fetcher).toHaveBeenCalledOnce();
+    expect(String(fetcher.mock.calls[0][0])).toBe('https://observer-budget-text-url.test/robots.txt');
+    expect(observer).toHaveBeenCalledOnce();
+    expect(observer.mock.calls[0][0]).toMatchObject({ requestedUrl: url, url, error: 'robots' });
+  });
+
   it('honors a matching robots disallow rule before requesting the feed', async () => {
     const host = `robots-${Date.now()}.test`;
     const calls: string[] = [];

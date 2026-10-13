@@ -4,6 +4,7 @@ import { reserveBudget } from '../jobs/budget.ts';
 import type { BatchOptions, BatchResult } from '../jobs/contracts.ts';
 import { withJobLease } from '../jobs/lease.ts';
 import { budgetedRelationFetcher, relationBudgetAvailable, relationFailureCode } from '../relations/worker.ts';
+import { createTechObserver } from '../tech/observer.ts';
 import { inPublication, wordpressEvidence } from './article-content.ts';
 import { CONTENT_VERSION, type ContentEvidence, type ContentRule } from './contracts.ts';
 import { contentRequestPlan } from './registry.ts';
@@ -126,6 +127,10 @@ export async function runContentBatch(pool: Pool, options: BatchOptions & { blog
               ...options,
               fetcher,
               timeoutMs: Math.min(options.timeoutMs ?? 15000, 20000),
+              observer:
+                request.method === 'article-html'
+                  ? createTechObserver(pool, { blogId: post.blog_id, blogUrl: post.blog_url, sourcePostId: post.id })
+                  : undefined,
             });
             const final = response.url || request.url;
             if (request.method === 'article-html' && !inPublication(final, post.blog_url)) throw Error('content_identity_mismatch');

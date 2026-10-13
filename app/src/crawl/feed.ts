@@ -37,7 +37,41 @@ export type FeedEntry = {
 export type BlogToCrawl = { id: number; slug: string; url: string };
 export type HostResolver = (hostname: string) => Promise<string[]>;
 export type FeedFetcher = (input: Parameters<typeof fetch>[0], init?: RequestInit & { dispatcher?: Dispatcher }) => Promise<Response>;
+/** Opt-in passive tap on an existing fetch. It never owns/consumes the caller's Response. */
+export type PassiveFetchObservation = {
+  requestedUrl: string;
+  url: string;
+  status?: number;
+  headers: Record<string, string>;
+  html?: string;
+  htmlTruncated: boolean;
+  error?: 'robots' | 'timeout' | 'network' | 'invalid-response';
+  observedAt: Date;
+};
+export type PassiveFetchObserver = (event: PassiveFetchObservation) => void | Promise<void>;
+export const MAX_OBSERVER_HTML_BYTES = 512 * 1024;
+const observedResponseBodies = new WeakMap<Response, { html: string; htmlTruncated: boolean }>();
+function emitPassiveFetch(observer: PassiveFetchObserver | undefined, event: PassiveFetchObservation) {
+  if (!observer) return;
+  try {
+    // No await: even a faulty asynchronous observer cannot delay/fail crawling.
+    const pending = observer(event);
+    if (pending && typeof pending.catch === 'function') void pending.catch(() => undefined);
+  } catch {
+    /* Observations are optional; never alter crawl success/retry behavior. */
+  }
+}
+function passiveResponseHeaders(response: Response): Record<string, string> {
+  const values: Record<string, string> = {};
+  for (const name of ['content-type', 'server', 'x-powered-by', 'cf-mitigated']) {
+    const value = response.headers.get(name);
+    if (value) values[name] = value.slice(0, 256);
+  }
+  for (const name of ['cf-ray', 'x-vercel-id', 'x-nf-request-id']) if (response.headers.has(name)) values[name] = 'present';
+  return values;
+}
 export type FeedCrawlerOptions = {
+  observer?: PassiveFetchObserver;
   userAgent?: string;
   delayMs?: number;
   timeoutMs?: number;
@@ -270,7 +304,7 @@ function pinnedLookup(target: CrawlTarget): LookupFunction {
   };
 }
 
-async function pinnedFetch(target: CrawlTarget, headers: Record<string, string>, timeoutMs: number, fetcher: FeedFetcher) {
+async function pinnedFetch(target: CrawlTarget, headers: Record<string, string>, timeoutMs: number, fetcher: FeedFetcher, capture = false) {
   // A request-scoped dispatcher prevents pooled connections from crossing a
   // validation boundary. Keep the URL hostname for HTTP Host and TLS SNI/name
   // verification; only socket DNS lookup is replaced with the validated set.
@@ -282,7 +316,7 @@ async function pinnedFetch(target: CrawlTarget, headers: Record<string, string>,
       signal: AbortSignal.timeout(timeoutMs),
       dispatcher,
     });
-    return await limitedResponse(response, target.url.toString());
+    return await limitedResponse(response, target.url.toString(), capture);
   } finally {
     // limitedResponse consumes/cancels the body before this runs. Destroy
     // instead of graceful close so failures/aborts cannot leave idle sockets.
@@ -290,7 +324,7 @@ async function pinnedFetch(target: CrawlTarget, headers: Record<string, string>,
   }
 }
 
-async function limitedResponse(response: Response, requestedUrl: string): Promise<Response> {
+async function limitedResponse(response: Response, requestedUrl: string, capture = false): Promise<Response> {
   const declared = Number(response.headers.get('content-length'));
   if (Number.isFinite(declared) && declared > MAX_RESPONSE_BYTES) {
     await response.body?.cancel().catch(() => undefined);
@@ -333,6 +367,16 @@ async function limitedResponse(response: Response, requestedUrl: string): Promis
   });
   // Consumers resolve relative feed/icon links against the final response URL.
   Object.defineProperty(buffered, 'url', { value: response.url || requestedUrl });
+  if (capture && /^(?:text\/html|application\/xhtml\+xml)(?:[;\s]|$)/i.test(headers.get('content-type') || '')) {
+    // Invalid UTF-8 replacement can expand bytes; bound the decoded prefix too and never split a valid codepoint.
+    const prefix = Buffer.from(body.subarray(0, MAX_OBSERVER_HTML_BYTES).toString('utf8'));
+    let end = Math.min(prefix.length, MAX_OBSERVER_HTML_BYTES);
+    while (end < prefix.length && end > 0 && (prefix[end] & 0xc0) === 0x80) end--;
+    observedResponseBodies.set(buffered, {
+      html: prefix.subarray(0, end).toString('utf8'),
+      htmlTruncated: body.length > MAX_OBSERVER_HTML_BYTES || end < prefix.length,
+    });
+  }
   return buffered;
 }
 
@@ -361,6 +405,9 @@ function robotsRules(text: string, userAgent: string): string[] {
   }
   return [...new Set(rules)];
 }
+
+const localAdmissionFailure = (error: unknown): boolean =>
+  error instanceof Error && ['relation_http_budget', 'relation_batch_stopped'].includes(error.message);
 
 async function robotsAllows(
   url: string,
@@ -392,7 +439,10 @@ async function robotsAllows(
       else if (!response.ok) return false;
       else disallow = robotsRules(await response.text(), userAgent);
       robotsCache.set(origin, { expiresAt: Date.now() + 3_600_000, disallow });
-    } catch {
+    } catch (error) {
+      // Local admission never contacted the site. Preserve its identity so the
+      // outer passive tap does not misreport a site-side robots block.
+      if (localAdmissionFailure(error)) throw error;
       return false;
     }
   }
@@ -413,34 +463,73 @@ export async function politeFetch(
   // can use an older dispatcher handler protocol than the installed package.
   const fetcher = options.fetcher ?? (undiciFetch as FeedFetcher);
   let url = new URL(value);
-  for (let hop = 0; hop <= 5; hop += 1) {
-    const target = await resolveCrawlTarget(url.toString(), resolveHost);
-    // Check both the initial URL and every redirect target. This prevents a
-    // feed from bypassing robots by bouncing through an unrelated host.
-    const host = url.host;
-    // Reserve the slot before yielding: concurrent redirected requests to the
-    // same host must not wake together and overwrite each other's reservation.
-    const scheduled = Math.max(Date.now(), hostNextAt.get(host) ?? 0);
-    hostNextAt.set(host, scheduled + delayMs);
-    const wait = scheduled - Date.now();
-    if (wait > 0) await new Promise((resolve) => setTimeout(resolve, wait));
-    if (!(await robotsAllows(url.toString(), userAgent, timeoutMs, resolveHost, fetcher))) throw new Error(`robots disallow ${url}`);
-    const response = await pinnedFetch(
-      target,
-      {
-        'user-agent': userAgent,
-        accept: 'application/rss+xml, application/atom+xml, application/xml, text/xml, text/html;q=0.8',
-        ...headers,
-      },
-      timeoutMs,
-      fetcher,
-    );
-    if (![301, 302, 303, 307, 308].includes(response.status)) return response;
-    const location = response.headers.get('location');
-    if (!location) return response;
-    url = new URL(location, url);
+  try {
+    for (let hop = 0; hop <= 5; hop += 1) {
+      const target = await resolveCrawlTarget(url.toString(), resolveHost);
+      // Check both the initial URL and every redirect target. This prevents a
+      // feed from bypassing robots by bouncing through an unrelated host.
+      const host = url.host;
+      // Reserve the slot before yielding: concurrent redirected requests to the
+      // same host must not wake together and overwrite each other's reservation.
+      const scheduled = Math.max(Date.now(), hostNextAt.get(host) ?? 0);
+      hostNextAt.set(host, scheduled + delayMs);
+      const wait = scheduled - Date.now();
+      if (wait > 0) await new Promise((resolve) => setTimeout(resolve, wait));
+      if (!(await robotsAllows(url.toString(), userAgent, timeoutMs, resolveHost, fetcher))) throw new Error(`robots disallow ${url}`);
+      const response = await pinnedFetch(
+        target,
+        {
+          'user-agent': userAgent,
+          accept: 'application/rss+xml, application/atom+xml, application/xml, text/xml, text/html;q=0.8',
+          ...headers,
+        },
+        timeoutMs,
+        fetcher,
+        !!options.observer,
+      );
+      const location = response.headers.get('location');
+      if (![301, 302, 303, 307, 308].includes(response.status) || !location) {
+        if (options.observer) {
+          const body = observedResponseBodies.get(response);
+          observedResponseBodies.delete(response);
+          emitPassiveFetch(options.observer, {
+            requestedUrl: value,
+            url: response.url || url.href,
+            status: response.status,
+            headers: passiveResponseHeaders(response),
+            ...body,
+            htmlTruncated: body?.htmlTruncated ?? false,
+            observedAt: new Date(),
+          });
+        }
+        return response;
+      }
+      observedResponseBodies.delete(response);
+      url = new URL(location, url);
+    }
+    throw new Error(`too many redirects from ${value}`);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : '';
+    // Local budget admission is not a failed observation and must not overwrite successful metadata.
+    if (!localAdmissionFailure(error)) {
+      const reason = /robots disallow/.test(message)
+        ? 'robots'
+        : /timeout|abort/i.test(message)
+          ? 'timeout'
+          : /unsafe crawl|response exceeds|too many redirects/.test(message)
+            ? 'invalid-response'
+            : 'network';
+      emitPassiveFetch(options.observer, {
+        requestedUrl: value,
+        url: url.href,
+        headers: {},
+        htmlTruncated: false,
+        error: reason,
+        observedAt: new Date(),
+      });
+    }
+    throw error;
   }
-  throw new Error(`too many redirects from ${value}`);
 }
 
 /** oEmbed XML describes an embed, never an RSS/Atom publication. */

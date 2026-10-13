@@ -22,6 +22,9 @@ export function loadConfig(env = process.env) {
     redisUrl,
     queueName,
     queuePrefix,
+    // Collection and publication are separate switches: candidate review must
+    // complete before passive technology observations become public.
+    techPublicEnabled: env.BLOG_TECH_PUBLIC_ENABLED === 'true',
     logLevel: env.LOG_LEVEL || 'info',
     crawlUserAgent: env.BLOG_CRAWL_USER_AGENT || 'blog.observe.tw/0.3 (+https://blog.observe.tw/about; mailto:b@blog.observe.tw)',
     crawlDelayMs: Math.max(1000, Number(env.BLOG_CRAWL_DELAY_MS || 1200)),
