@@ -183,6 +183,13 @@
       "when": 1791900058934,
       "tag": "0025_staged_scan_v2",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "5",
+      "when": 1791907426669,
+      "tag": "0026_full_index_proof_sidecar",
+      "breakpoints": true
     }
   ]
 }

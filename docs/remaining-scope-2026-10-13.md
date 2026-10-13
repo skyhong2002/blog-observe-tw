@@ -173,3 +173,11 @@ UI ledger 維持 24 項：pass 0、fixed 3、issues 8、pending 11、n/a-ui 2。
 [provenance fingerprint](topic-provenance-fingerprints.md)，即使 helper／Oracle 通過也不能
 發布 full generation。下一切片先訂 generation-local sidecar 與 scanner adoption 契約；
 全部 reader／history／carry、fresh 公開條件與完整 writer barrier 尚未完成，維持 hold。
+
+下一個 D1 staging writer 切片也已接續完成：0026 只 additive 新表／FK，
+未公開 generation 的 marker 與 sidecar 跟 index／matches／cursor 同 Tx；
+44 mocks／5 suites、新 proof 140 checks／26 migrations、legacy 94 checks 通過。
+既有 Sol runtime review 與 Opus 設計 gate 已採納；兩個 RR case 有明確設定與
+舊 view 的 positive probes。M3 metadata 固定變更也由非作者核對，不是 runtime
+admission。[範圍與原 log](vocabulary-scan-proofs.md)明列 reader／history／carry
+尚未採用、正式 DDL 未套用。不是 full publication 或新的 B0／UI 驗收。

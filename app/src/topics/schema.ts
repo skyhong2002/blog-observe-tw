@@ -1,4 +1,17 @@
-import { bigint, char, datetime, double, index, int, json, longtext, mysqlTable, primaryKey, varchar } from 'drizzle-orm/mysql-core';
+import {
+  bigint,
+  char,
+  datetime,
+  double,
+  foreignKey,
+  index,
+  int,
+  json,
+  longtext,
+  mysqlTable,
+  primaryKey,
+  varchar,
+} from 'drizzle-orm/mysql-core';
 
 export const topicSnapshots = mysqlTable('topic_snapshots', {
   id: char('id', { length: 36 }).primaryKey(),
@@ -289,3 +302,66 @@ export const topicStagedScanOwner = mysqlTable('topic_staged_scan_owner', {
   source: varchar('source', { length: 128 }).primaryKey(),
   runId: char('run_id', { length: 36 }),
 });
+
+export const topicGenerationProofContracts = mysqlTable(
+  'topic_generation_proof_contracts',
+  {
+    snapshotId: char('snapshot_id', { length: 36 }).primaryKey(),
+    proofVersion: varchar('proof_version', { length: 64 }).notNull(),
+    fingerprintVersion: varchar('fingerprint_version', { length: 64 }).notNull(),
+    manifestSha256: char('manifest_sha256', { length: 64 }).notNull(),
+    policyVersion: varchar('policy_version', { length: 128 }).notNull(),
+    selectionId: char('selection_id', { length: 64 }).notNull(),
+    matcherVersion: varchar('matcher_version', { length: 128 }).notNull(),
+    cleanupVersion: varchar('cleanup_version', { length: 64 }).notNull(),
+    scanContractVersion: varchar('scan_contract_version', { length: 32 }).notNull(),
+    status: varchar('status', { length: 24 }).notNull(),
+    createdAt: datetime('created_at').notNull(),
+    updatedAt: datetime('updated_at').notNull(),
+  },
+  (t) => [
+    foreignKey({ name: 'topic_proof_contract_snapshot_fk', columns: [t.snapshotId], foreignColumns: [topicSnapshots.id] }).onDelete(
+      'restrict',
+    ),
+  ],
+);
+export const topicIndexProofs = mysqlTable(
+  'topic_index_proofs',
+  {
+    snapshotId: char('snapshot_id', { length: 36 }).notNull(),
+    postId: int('post_id').notNull(),
+    scanRunId: char('scan_run_id', { length: 36 }).notNull(),
+    proofVersion: varchar('proof_version', { length: 64 }).notNull(),
+    fingerprintVersion: varchar('fingerprint_version', { length: 64 }).notNull(),
+    policyVersion: varchar('policy_version', { length: 128 }).notNull(),
+    selectionId: char('selection_id', { length: 64 }).notNull(),
+    matcherVersion: varchar('matcher_version', { length: 128 }).notNull(),
+    cleanupVersion: varchar('cleanup_version', { length: 64 }).notNull(),
+    kind: varchar('kind', { length: 16 }).notNull(),
+    metadataFingerprint: char('metadata_fingerprint', { length: 64 }).notNull(),
+    bodyFingerprint: char('body_fingerprint', { length: 64 }),
+    bodyContentHash: char('body_content_hash', { length: 64 }),
+    bodyRevision: int('body_revision'),
+    sourceKind: varchar('source_kind', { length: 32 }),
+    bodyObtainedAt: datetime('body_obtained_at'),
+    observedAt: datetime('observed_at').notNull(),
+    checkedAt: datetime('checked_at').notNull(),
+    inputHash: char('input_hash', { length: 64 }).notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.snapshotId, t.postId] }),
+    foreignKey({
+      name: 'topic_index_proof_contract_fk',
+      columns: [t.snapshotId],
+      foreignColumns: [topicGenerationProofContracts.snapshotId],
+    }).onDelete('restrict'),
+    foreignKey({ name: 'topic_index_proof_run_fk', columns: [t.scanRunId], foreignColumns: [topicStagedScanRuns.runId] }).onDelete(
+      'restrict',
+    ),
+    foreignKey({
+      name: 'topic_index_proof_index_fk',
+      columns: [t.snapshotId, t.postId],
+      foreignColumns: [topicPostIndexesV3.snapshotId, topicPostIndexesV3.postId],
+    }).onDelete('cascade'),
+  ],
+);

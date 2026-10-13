@@ -396,3 +396,124 @@ it('terminal recovery releases only exact own owner, never another run', async (
   expect(w?.p[1]).toBe(id);
   expect(f.writes.some((x) => x.q.includes('topic_matches'))).toBe(false);
 });
+
+// Proof mode mocks use actual approved aliases/tuples; they do not execute MariaDB semantics.
+it('proof enrollment disabled zeroDB; nonempty target and unknown mode block', async () => {
+  const { enrollStagedScanProof } = await import('./staged-scan-v2.ts'),
+    { STAGED_PROOF_VERSION } = await import('./staged-scan-proof.ts');
+  const f = db();
+  expect(await enrollStagedScanProof(f.pool, pins)).toMatchObject({ status: 'disabled' });
+  expect(f.stats().acquires).toBe(0);
+  expect(await startStagedScan(f.pool, pins, { enabled: true, proofMode: 'unknown' as never })).toMatchObject({ reason: 'proof-mode' });
+  const proper = { ...pins, selectionId: 'a'.repeat(64) },
+    base = f.c.query.getMockImplementation()!;
+  f.c.query.mockImplementation(async (q, p) => {
+    if (q.includes('FROM topic_staged_scan_owner')) return [[]];
+    if (q.includes('FROM topic_generation_proof_contracts')) return [[]];
+    if (q.includes('FROM topic_snapshots')) {
+      const r = await base(q, p);
+      (r[0][0] as Record<string, unknown>).selection_id = proper.selectionId;
+      return r;
+    }
+    if (q.includes('SELECT post_id FROM topic_post_indexes_v3')) return [[{ post_id: 1 }]];
+    return base(q, p);
+  });
+  expect(await enrollStagedScanProof(f.pool, proper, { enabled: true, proofMode: STAGED_PROOF_VERSION, now })).toMatchObject({
+    status: 'blocked',
+    reason: 'proof-target-nonempty',
+  });
+});
+it('enrolled target rejects legacy mode and missing marker rejects explicit mode', async () => {
+  const { STAGED_PROOF_VERSION } = await import('./staged-scan-proof.ts');
+  const f = db(),
+    base = f.c.query.getMockImplementation()!;
+  f.c.query.mockImplementation(async (q, p) =>
+    q.includes('FROM topic_generation_proof_contracts') ? [[{ proof_version: 'enrolled' }]] : base(q, p),
+  );
+  expect(await runStagedScanBatch(f.pool, { runId: id, expectedCursor: 0 }, { enabled: true, now })).toMatchObject({
+    status: 'blocked',
+    reason: 'proof-mode-required',
+  });
+  const g = db();
+  expect(
+    await runStagedScanBatch(g.pool, { runId: id, expectedCursor: 0 }, { enabled: true, proofMode: STAGED_PROOF_VERSION, now }),
+  ).toMatchObject({ status: 'blocked', reason: 'missing-proof-marker' });
+});
+it('proof scan reads matcher input and fingerprints together; writes proof in index+cursor transaction', async () => {
+  const { STAGED_PROOF_VERSION } = await import('./staged-scan-proof.ts'),
+    { TOPIC_FINGERPRINT_VERSION } = await import('./provenance-fingerprint-sql.ts');
+  const f = db(),
+    base = f.c.query.getMockImplementation()!,
+    selection = 'a'.repeat(64);
+  f.c.query.mockImplementation(async (q, p) => {
+    if (q.includes('FROM topic_generation_proof_contracts'))
+      return [
+        [
+          {
+            proof_version: STAGED_PROOF_VERSION,
+            fingerprint_version: TOPIC_FINGERPRINT_VERSION,
+            status: 'staging',
+            scan_contract_version: 'scan-v2',
+            manifest_sha256: pins.manifestSha256,
+            policy_version: pins.policyVersion,
+            selection_id: selection,
+            matcher_version: pins.matcherVersion,
+            cleanup_version: pins.cleanupVersion,
+          },
+        ],
+      ];
+    if (q.includes('FROM topic_staged_scan_runs')) {
+      const s = JSON.parse(String((await base(q, p))[0][0].state_json));
+      s.selectionId = selection;
+      return [[{ state_json: JSON.stringify(s) }]];
+    }
+    if (q.includes('FROM topic_snapshots')) {
+      const r = await base(q, p);
+      r[0][0].selection_id = selection;
+      return r;
+    }
+    if (q.includes('metadata_fingerprint')) {
+      f.queries.push(q);
+      return [
+        [
+          {
+            id: 1,
+            blog_id: 1,
+            url: 'https://x.example/post',
+            title: 'safe',
+            title_bytes: 4,
+            summary_hash: null,
+            content_hash: 'b'.repeat(64),
+            published_at: null,
+            blog_url: 'https://x.example/',
+            blog_status: 'verified',
+            blog_owner_id: 1,
+            post_id: null,
+            body_blog_id: null,
+            metadata_fingerprint: 'c'.repeat(64),
+            body_fingerprint: 'd'.repeat(64),
+          },
+        ],
+      ];
+    }
+    return base(q, p);
+  });
+  const r = await runStagedScanBatch(f.pool, { runId: id, expectedCursor: 0 }, { enabled: true, proofMode: STAGED_PROOF_VERSION, now });
+  expect(r).toMatchObject({ status: 'scanned-as-of', titleOnly: 1, canVerify: false });
+  const proof = f.writes.find((x) => x.q.startsWith('INSERT INTO topic_index_proofs'));
+  expect(proof?.p[9]).toBe('title-only');
+  expect(proof?.p[11]).toBe(null);
+  expect(
+    f.queries
+      .filter((q) => q.includes('metadata_fingerprint'))
+      .every((q) => q.includes('CASE WHEN') && q.includes('body_text') && q.includes('topic-post-fingerprint-v1')),
+  ).toBe(true);
+  expect(f.queries.find((q) => q.includes('metadata_fingerprint') && q.includes('FOR UPDATE'))).toBeDefined();
+  expect(f.queries.some((q) => q.includes('SELECT source FROM topic_current') && q.includes('FOR UPDATE'))).toBe(true);
+  const deleteProof = f.writes.findIndex((x) => x.q.startsWith('DELETE FROM topic_index_proofs')),
+    deleteIndex = f.writes.findIndex((x) => x.q.startsWith('DELETE FROM topic_post_indexes_v3'));
+  expect(deleteProof).toBeLessThan(deleteIndex);
+  const insertProof = f.writes.findIndex((x) => x.q.startsWith('INSERT INTO topic_index_proofs')),
+    stateUpdate = f.writes.findIndex((x) => x.q.includes('SET state_json'));
+  expect(insertProof).toBeLessThan(stateUpdate);
+});
