@@ -3,7 +3,7 @@ export const SEARCH_STATEMENT_MS = 250;
 /** Algorithm version only: not a body revision/hash or an observation timestamp.
  * Current body evidence is reread in SQL; per-hit provenance needs a separate reviewed DTO contract.
  */
-export const SEARCH_MATCH_VERSION = 'literal-substring-current-body-v1';
+export const SEARCH_MATCH_VERSION = 'literal-metadata-ingestion-v2';
 export const PUBLIC_SEARCH_SQL = "b.status='verified' AND (p.published_at IS NULL OR p.published_at<=UTC_TIMESTAMP())";
 /** Read the current private body row, with matching article/publication ownership. */
 export const CURRENT_BODY_SQL = "c.status='ok' AND c.blog_id=p.blog_id";

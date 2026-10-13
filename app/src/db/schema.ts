@@ -483,9 +483,9 @@ export * from '../content/schema.ts';
 export * from '../jobs/schema.ts';
 export * from '../reader/schema.ts';
 export * from '../relations/schema.ts';
+export * from '../search-index-schema.ts';
 export * from '../seo/schema.ts';
 export * from '../tech/schema.ts';
 export * from '../topics/history-schema.ts';
 export * from '../topics/schema.ts';
-
 export * from '../topics/shared-label-schema.ts';
