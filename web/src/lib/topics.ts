@@ -1,3 +1,5 @@
+import type { SharedLabels } from './shared-labels.ts';
+
 export type VocabularyStatus = {
   status: 'unavailable' | 'ready';
   source: string;
@@ -121,6 +123,11 @@ export type TopicDetail = {
   truncated: boolean;
   /** Articles the topic was ever matched in (app/src/topics/history-contracts.ts); absent while history reads are off. */
   history?: TopicHistory;
+  /**
+   * The label's tag.observe.tw relations and visual, as the gateway stored them; absent on older gateways
+   * and while off. Optional metadata: re-checked by sharedLabelsView, never by public-contracts.ts.
+   */
+  sharedLabels?: SharedLabels;
 };
 /** A past match: title and original URL only, never the article text. */
 export type HistoryArticle = {

@@ -4,6 +4,7 @@
 
 import { VocabularyMethod } from '@/components/VocabularyNotice';
 import { taipei } from '@/lib/api';
+import { SHARED_LABEL_SHOWN, type SharedLabelsView } from '@/lib/shared-labels';
 import {
   formatPercent,
   liftExplanation,
@@ -31,6 +32,7 @@ export default function TopicMethod({
   matchingReason,
   coverage,
   ranking = false,
+  sharedLabels,
 }: {
   vocabulary: VocabularyStatus;
   matchingPolicy?: MatchingPolicy;
@@ -39,6 +41,8 @@ export default function TopicMethod({
   /** The ranking's period coverage. */
   coverage?: Topics['coverage'];
   ranking?: boolean;
+  /** The detail page's shared-label block, when it renders one (sharedLabelsView). */
+  sharedLabels?: SharedLabelsView | null;
 }) {
   return (
     <>
@@ -50,7 +54,8 @@ export default function TopicMethod({
       </p>
       {matchingReason ? (
         <p>
-          {matchingReasonLabel(matchingReason)}：這個詞在長期文章中出現得很普遍，排行與升溫倍率只計標題命中；正文命中仍留在頻率統計，詞也沒有從詞庫刪除。
+          {matchingReasonLabel(matchingReason)}
+          ：這個詞在長期文章中出現得很普遍，排行與升溫倍率只計標題命中；正文命中仍留在頻率統計，詞也沒有從詞庫刪除。
           {frequencyBasis(vocabulary, matchingPolicy)}
         </p>
       ) : null}
@@ -62,6 +67,27 @@ export default function TopicMethod({
       ) : null}
       <h3 className={methodHeading}>共同關鍵字詞庫</h3>
       <VocabularyMethod data={vocabulary} />
+      {sharedLabels ? <SharedLabelMethod view={sharedLabels} /> : null}
+    </>
+  );
+}
+
+/** Where the shared-label block's two snapshots came from; only on a page that shows the block. */
+function SharedLabelMethod({ view }: { view: SharedLabelsView }) {
+  const line = (name: string, s: SharedLabelsView['relations'] | SharedLabelsView['visual']) =>
+    `${name}：取得 ${s.fetchedAt ? taipei(s.fetchedAt) : '未提供'}，有效至 ${s.expiresAt ? taipei(s.expiresAt) : '未提供'}，` +
+    `解析契約 ${s.contractSha ?? '未提供'}；上游未提供資料版本。`;
+  return (
+    <>
+      <h3 className={methodHeading}>共用標籤</h3>
+      <p>
+        上位分類、相關詞與別名來自 {view.source}{' '}
+        已核准的關係，由本站閘道保存快照後隨話題資料提供，頁面不會另外向上游讀取關係或圖示資料（JSON）；若有代表圖片，則由瀏覽器直接向{' '}
+        {view.source} 載入圖片本身。別名只表示上游視為同義寫法，本站話題不因此合併；「繼承」與層數照上游標示。
+        {`每頁最多列出 ${SHARED_LABEL_SHOWN} 條。`}尚未取得、暫時無法使用與上游回覆為空各自標示，不代表沒有關係。
+      </p>
+      <p>{line('標籤關係', view.relations)}</p>
+      <p>{line('代表圖示', view.visual)}</p>
     </>
   );
 }

@@ -14,6 +14,7 @@ import { taipei } from '@/lib/api';
 import { externalHref } from '@/lib/images';
 import { blogLink, TOPIC_DETAIL_PERIOD, topicHref, topicLink } from '@/lib/page-links';
 import { isHistoryCursor, type Period, periodOf, topicApiPath } from '@/lib/public-query';
+import { sharedLabelsView } from '@/lib/shared-labels';
 import {
   evidenceLabel,
   exclusionReasonLabel,
@@ -27,6 +28,7 @@ import {
   topicArticleMode,
 } from '@/lib/topics';
 import { asIs, type PublicLoad, usePublicJson } from '@/lib/use-public-json';
+import SharedTopicLabels from './SharedTopicLabels';
 import TopicMethod from './TopicMethod';
 
 /** Source article count and last observed post, omitting whichever the payload did not record. */
@@ -189,6 +191,9 @@ export default function TopicDetailView({
   label?: string;
 }) {
   const data = load.status === 'ready' ? load.data : null;
+  // Only a matched topic shows the shared-label block, so only then do its notes join the method block.
+  const shared =
+    data?.topic && !data.topic.excludedReason && !data.topic.inactiveReason ? sharedLabelsView(data.sharedLabels, data.topic.label) : null;
   // Articles (or the history fallback) come first; how they were matched and the
   // vocabulary's full record sit in the page's 資料來源與計算方式, closed until asked for.
   return (
@@ -271,6 +276,7 @@ export default function TopicDetailView({
             </div>
           )}
           {data.truncated ? <p className="text-xs text-zinc-500">僅顯示部分來源與文章。</p> : null}
+          <SharedTopicLabels value={data.sharedLabels} tag={data.topic.label} />
           <VocabularySummary data={data.vocabulary} />
         </>
       ) : load.status === 'gone' ? (
@@ -290,7 +296,12 @@ export default function TopicDetailView({
         page
         notes={
           data ? (
-            <TopicMethod vocabulary={data.vocabulary} matchingPolicy={data.matchingPolicy} matchingReason={data.topic?.matchingReason} />
+            <TopicMethod
+              vocabulary={data.vocabulary}
+              matchingPolicy={data.matchingPolicy}
+              matchingReason={data.topic?.matchingReason}
+              sharedLabels={shared}
+            />
           ) : null
         }
       />
