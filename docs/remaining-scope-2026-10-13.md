@@ -25,7 +25,7 @@ tag 的473萬詞池只代表上游曾有標籤，**不是 blog SEO 話題頁的�
 
 | 項目 | 剩餘工作與現況 | 可離線做 | 一定要等的部分 |
 |---|---|---|---|
-| 完整詞庫初次匯入 | active preview44,852並非完整4,733,073匯入；舊完整validator上限2M | **已修10M安全閥、single-copy-v1單份2GiB計費、原SHA原子續跑checkpoint、compact及5000group adapter**；warmup／atomiccutover／實際caller仍需補完 | 上游版本化完整fixture相容確認；Mint容量／隔離DB／名額與實測量測後才stage正式，不整份進RAM |
+| 完整詞庫初次匯入 | active preview44,852並非完整4,733,073匯入；舊完整validator上限2M | **已修10M安全閥、single-copy-v1單份2GiB計費、原SHA原子續跑checkpoint、compact及5000group adapter**；手動full caller已接；SQLwarmup／atomiccutover／worker full排程仍需補完 | 上游版本化完整fixture相容確認；Mint容量／隔離DB／名額與實測量測後才stage正式，不整份進RAM |
 | 10分鐘changes／每日對帳 | 正式仍window15分鐘；full ready不切current，changes不是正式同步consumer | read-only changes validator/client已完成37 mocks；chain仍unverified，尚需上游chain catalog契約、watermark／overlay／冪等、409重full及atomic發布 | 上游changes實際契約／世代可用性、candidate及正式配額／耗時；之後10分鐘poll＋daily full reconciliation，不自行重排tag |
 | 話題品質／升溫 | NFKC／雜訊／高文件頻率title-only、365日baseline與recentShare/baselineShare/lift及UI已有source；完整詞庫切換後基準coverage仍需驗，文章本身tag的高頻命中通道也須核對 | corpus baseline／ratio契約與零分母／新站補收／缺資料測試，native category對應與人工來源優先；保留排除詞可查 | 同條件正式前後20名、基準coverage與版本、排行UI／候選驗收，不能用文章數冒稱比率 |
 | 歷史文章遍歷 | 可續跑RSS/Atom/WP/Blogger/sitemap游標已正式，完整全站遍歷仍背景低速進行 | 邊界／中斷／分片缺口fixtures與停機／續跑文件 | 正式後台實際遍歷進度；robots/403/無官方索引是外部限制，不能繞過，也不把有限批次叫完整 |
@@ -103,3 +103,26 @@ localvalidation＋policy/warmup；600/day與window共用，retry／中途resume�
 
 下一批正在做full caller／policy／warmup／atomic cutover的拆解與非作者review，接著實作source；
 changes跨世代catalog需上游明確契約，未取得以前保留read-only。仍有離線source工作，**不是只剩等待**。
+
+### 實際 full caller 與單世代 changes 接續
+
+`beb624c` 已接手動full source入口：explicit large5000＋single-copy-v1、CLI admission預設off，
+共用600/day wire counter的full上限504，不double-charge原500logicalpages。18caller／root合併72
+mocks、app no-emit、非作者Sol及Opus backend runtime通過；只是source，worker仍window15分鐘。
+ready-pending-publication零wire，不再自動開第二份base；採N1技術admission，不在正式env開旗標。
+詳見 [full staging限制與review取捨](vocabulary-full-staging.md)。
+
+`7da7ab5` 單世代changes verifier完成：只有target.previousId===after才驗target原catalog；
+after===target／零變更要明確empty ack，多代仍hold，fullbase transition需rebase。34選定mocks，
+包含Node子process序列化續跑；wire-complete不表示overlay已套用，cutover/applied/published皆false。
+[chain提案](vocabulary-changes-chain-proposal.md)仍待上游協調；可區分已驗full-image與本地base＋
+verified-deltas身份，不強求先新增tree，但後者仍需overlay/count/provenance／daily對帳契約。
+
+`cdb6151` 純publication v1完成9mocks；pins/highwater/keyset50/current/epoch/capped分離，
+永久canVerify=false／scanned-as-of，不提供SQLfreshproof或current切換。後續scan-v2 DAO設計
+將generation-local掃描與cutover predecessor分離，避免window每15分鐘前進使19k逐批掃描
+反覆conflict；**不放寬v1 strict契約或刪測試**。dirty hooks未齊前仍不能verified／publish。
+
+原scope仍34項，UI24項狀態不變。沒有新BUILD_ID/圖/正式probe、也沒有full4.733M容量實測。
+本批source commits均push main/work分支；正在接SQLwarmup與F3 canonical trust的離線方案，
+不把待Mint名額、上游契約與真人Google驗收混成已完成，也不標『只剩等待』。
