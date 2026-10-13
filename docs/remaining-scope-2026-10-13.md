@@ -181,3 +181,12 @@ UI ledger 維持 24 項：pass 0、fixed 3、issues 8、pending 11、n/a-ui 2。
 舊 view 的 positive probes。M3 metadata 固定變更也由非作者核對，不是 runtime
 admission。[範圍與原 log](vocabulary-scan-proofs.md)明列 reader／history／carry
 尚未採用、正式 DDL 未套用。不是 full publication 或新的 B0／UI 驗收。
+
+接續的 [private bounded proof inspector](vocabulary-proof-inspector.md) 已完成 source：
+default-off、explicit unpublished target／1–50 ID、單 pool retained admission、
+native cancellation cleanup、fresh 公開條件與標題／正文分開判定。25 mocks／3 suites、
+typecheck、Biome 通過，既有非作者 Sol 整批 review 的 I1／I2／I3 已採納。
+沒有放寬 NOT NULL、privacy／cap 或 fresh-read 測試。只批准 source commit；
+實際 18169 SQL／EXPLAIN 尚未執行，須先交 exact 命令與 fresh probe 核對。
+不能宣稱 manifest materialization／成本已驗，亦未接 public reader／history／carry／
+frequency／current batch／publisher，所有發布條件維持 hold。正式 gen5 與 UI ledger 不變。

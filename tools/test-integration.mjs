@@ -26,6 +26,7 @@ try {
           'topic-body-owner',
           'topic-fingerprint-sql',
           'staged-scan-proof',
+          'staged-proof-inspector',
         ].includes(process.argv[5])))
   )
     throw Error('explicit_private_clone_env_required');
@@ -71,6 +72,7 @@ try {
   const suites = [
     ['topic-fingerprint-sql', '../app/src/topics/provenance-fingerprint-sql.integration.ts', 'runProvenanceFingerprintSqlIntegration'],
     ['staged-scan-proof', '../app/src/topics/staged-scan-proof.integration.ts', 'runStagedScanProofIntegration'],
+    ['staged-proof-inspector', '../app/src/topics/staged-proof-inspector.integration.ts', 'runStagedProofInspectorIntegration'],
     ['staged-scan-v2', '../app/src/topics/staged-scan-v2.integration.ts', 'runStagedScanV2Integration'],
     ['topic-body-owner', '../app/src/topics/body-owner.integration.ts', 'runTopicBodyOwnerIntegration'],
     ['budgets-ai', '../tests/integration/core.mjs', 'runCoreIntegration'],
@@ -135,7 +137,9 @@ try {
                 ? suites.filter(([label]) => label === 'topic-fingerprint-sql')
                 : process.argv[5] === 'staged-scan-proof'
                   ? suites.filter(([label]) => label === 'staged-scan-proof')
-                  : suites;
+                  : process.argv[5] === 'staged-proof-inspector'
+                    ? suites.filter(([label]) => label === 'staged-proof-inspector')
+                    : suites;
   for (const [label, module, entry] of selected) {
     phase = label;
     const result = await (await import(module))[entry](store.pool);
