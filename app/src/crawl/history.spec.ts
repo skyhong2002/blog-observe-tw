@@ -1,4 +1,7 @@
+import type { Pool } from 'mysql2/promise';
 import { describe, expect, it, vi } from 'vitest';
+import { createTechFetchBatch } from '../tech/fetch-batch.ts';
+import { TechObservationQueue } from '../tech/observer.ts';
 import type { FeedEntry, FeedFetcher } from './feed.ts';
 import { historyFailureReason, runHistoryBatch } from './history.ts';
 import { historyTaskKey, storedEntry } from './history-parse.ts';
@@ -101,6 +104,65 @@ const input = (url: string, kind: HistoryTaskInput['kind']): HistoryTaskInput =>
 });
 const options = (fetcher: FeedFetcher) => ({ fetcher, resolveHost: async () => ['93.184.216.34'], delayMs: 250 });
 describe('resumable history batches', () => {
+  it.each([false, true])('passive HTML observation enabled=%s preserves fetches and runs only after import commit', async (enabled) => {
+    const runBlog = { ...blog, url: `https://history-passive-${enabled}.test/` };
+    const m = memory([{ ...input(`${runBlog.url}post`, 'article'), sourceUrl: runBlog.url }]);
+    let committed = false;
+    const original = m.store.commitTask;
+    m.store.commitTask = async (...args) => {
+      const result = await original(...args);
+      committed = true;
+      return result;
+    };
+    const query = vi.fn(async () => {
+      expect(committed).toBe(true);
+      return [[{ id: 12, url: `${runBlog.url}post` }]];
+    });
+    const writer = vi.fn(async () => {
+      expect(committed).toBe(true);
+      return { written: true, reason: 'stored' as const };
+    });
+    const queue = new TechObservationQueue(writer);
+    const batch = createTechFetchBatch({ query } as unknown as Pool, { blogId: runBlog.id, blogUrl: runBlog.url }, { enabled, queue });
+    const fetcher = vi.fn<FeedFetcher>(async (url) =>
+      String(url).endsWith('/robots.txt')
+        ? new Response('')
+        : new Response(
+            '<html><meta name="generator" content="WordPress"><meta property="og:type" content="article"><title>Existing article</title></html>',
+            { headers: { 'content-type': 'text/html' } },
+          ),
+    );
+    await runHistoryBatch(m.store, runBlog, { ...options(fetcher), passiveBatch: batch });
+    await queue.idle();
+    expect(fetcher.mock.calls.map(([url]) => String(url))).toEqual([`${runBlog.url}robots.txt`, `${runBlog.url}post`]);
+    expect(m.posts).toHaveLength(1);
+    expect(writer).toHaveBeenCalledTimes(Number(enabled));
+    expect(query).toHaveBeenCalledTimes(Number(enabled));
+  });
+  it('failed history commit discards observations and never queries for a post or writes technology', async () => {
+    const m = memory([input(`${blog.url}post`, 'article')]);
+    m.fail();
+    const query = vi.fn(),
+      writer = vi.fn();
+    const queue = new TechObservationQueue(writer);
+    const passiveBatch = createTechFetchBatch(
+      { query } as unknown as Pool,
+      { blogId: blog.id, blogUrl: blog.url },
+      { enabled: true, queue },
+    );
+    const fetcher: FeedFetcher = async (url) =>
+      String(url).endsWith('/robots.txt')
+        ? new Response('')
+        : new Response(
+            '<html><meta name="generator" content="WordPress"><meta property="og:type" content="article"><title>Article</title></html>',
+            { headers: { 'content-type': 'text/html' } },
+          );
+    await runHistoryBatch(m.store, blog, { ...options(fetcher), passiveBatch });
+    await passiveBatch?.commit([`${blog.url}post`]);
+    await queue.idle();
+    expect(query).not.toHaveBeenCalled();
+    expect(writer).not.toHaveBeenCalled();
+  });
   it('persists all child work and resumes across article budget boundaries without marking partial complete', async () => {
     const m = memory([input(`${blog.url}sitemap.xml`, 'sitemap')]);
     const fetcher = vi.fn<FeedFetcher>(async (url) =>

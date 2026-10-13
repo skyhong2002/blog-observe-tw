@@ -93,6 +93,7 @@ try {
     ['tech-store', '../app/src/tech/store.integration.ts', 'runTechStoreIntegration'],
     ['tech-routes', '../app/src/tech/routes.integration.ts', 'runTechRoutesIntegration'],
     ['tech-backfill', '../app/src/tech/backfill.integration.ts', 'runTechBackfillIntegration'],
+    ['tech-fetch-batch', '../app/src/tech/fetch-batch.integration.ts', 'runTechFetchBatchIntegration'],
   ];
   const selected =
     process.argv[5] === 'f3-f4'

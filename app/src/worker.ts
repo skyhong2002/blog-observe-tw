@@ -16,12 +16,13 @@ import { runPublicationDiscoveryBatch } from './relations/home.ts';
 import { runRelationSnapshotBatch } from './relations/routes.ts';
 import { runRelationBatch } from './relations/worker.ts';
 import { backfillPublicRoutes, backfillTopicRouteAliases } from './seo/page-routes.ts';
+import { createTechFetchBatch } from './tech/fetch-batch.ts';
 import { runTopicsBatch } from './topics/batch.ts';
 import { refreshTopicFrequencies } from './topics/frequency.ts';
-import { syncVocabulary } from './topics/sync.ts';
-import { historyWritesEnabled } from './topics/history-contracts.ts';
 import { backfillTopicHistory } from './topics/history-backfill.ts';
+import { historyWritesEnabled } from './topics/history-contracts.ts';
 import { revalidateTopicHistory } from './topics/history-worker.ts';
+import { syncVocabulary } from './topics/sync.ts';
 
 const config = loadConfig();
 const log = pino({ level: config.logLevel });
@@ -126,6 +127,7 @@ const worker = new Worker(
         if (closing) break;
         try {
           const result = await runHistoryBatch(history, blog, {
+            passiveBatch: createTechFetchBatch(store.pool, { blogId: blog.id, blogUrl: blog.url }),
             userAgent: config.crawlUserAgent,
             delayMs: config.crawlDelayMs,
             timeoutMs: 10000,
@@ -186,7 +188,13 @@ const worker = new Worker(
     for (const blog of rows) {
       if (closing) break;
       try {
-        results.push(await crawlBlog(store, blog, { userAgent: config.crawlUserAgent, delayMs: config.crawlDelayMs }));
+        results.push(
+          await crawlBlog(store, blog, {
+            userAgent: config.crawlUserAgent,
+            delayMs: config.crawlDelayMs,
+            passiveBatch: createTechFetchBatch(store.pool, { blogId: blog.id, blogUrl: blog.url }),
+          }),
+        );
       } catch (error) {
         log.warn({ blog: blog.slug, error: error instanceof Error ? error.message : String(error) }, 'blog crawl failed');
       }

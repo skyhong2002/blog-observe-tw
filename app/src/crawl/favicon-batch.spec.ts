@@ -3,8 +3,10 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { Pool } from 'mysql2/promise';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { techObservationQueue } from '../tech/observer.ts';
 import { refreshMissingBlogFavicons } from './favicon-batch.ts';
 import { type CatalogEntry, type FaviconState, loadFaviconState, refreshFavicon } from './favicons.ts';
+import { type FeedFetcher, politeFetch } from './feed.ts';
 
 vi.mock('./favicons.ts', () => ({ loadFaviconState: vi.fn(), refreshFavicon: vi.fn() }));
 const dirs: string[] = [];
@@ -20,12 +22,60 @@ async function setup() {
   return { root, state, now: () => stamp };
 }
 afterEach(async () => {
+  vi.unstubAllEnvs();
   vi.restoreAllMocks();
   vi.resetAllMocks();
   await Promise.all(dirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true })));
 });
 
 describe('automatic missing favicon batches', () => {
+  it.each([false, true])('preserves the original observer enabled=%s and isolates its rejected promise', async (enabled) => {
+    vi.stubEnv('BLOG_TECH_ENABLED', String(enabled));
+    const options = await setup();
+    vi.spyOn(techObservationQueue, 'enqueue').mockReturnValue(true);
+    const observer = vi.fn((): Promise<void> => Promise.reject(Error('optional-callback-failed')));
+    const id = enabled ? 82 : 81;
+    vi.mocked(refreshFavicon).mockImplementation(async (target, settings) => {
+      if (!enabled) expect(settings?.observer).toBe(observer);
+      await settings?.observer?.({
+        requestedUrl: target.url!,
+        url: target.url!,
+        status: 200,
+        headers: { 'content-type': 'text/html' },
+        html: '<meta name="generator" content="WordPress">',
+        htmlTruncated: false,
+        observedAt: stamp,
+      });
+      return { status: 'success', slug: target.slug, reason: undefined };
+    });
+    // Real politeFetch isolates callback rejection while disabled; the mocked entrypoint must do likewise.
+    if (!enabled) observer.mockImplementation(() => Promise.resolve());
+    await expect(refreshMissingBlogFavicons(pool([id]), { ...options, observer })).resolves.toMatchObject({ processed: 1 });
+    expect(observer).toHaveBeenCalledOnce();
+  });
+  it.each([false, true])('favicon observer enabled=%s preserves existing homepage fetch count', async (enabled) => {
+    vi.stubEnv('BLOG_TECH_ENABLED', String(enabled));
+    const options = await setup();
+    const enqueue = vi.spyOn(techObservationQueue, 'enqueue').mockReturnValue(true);
+    const fetcher = vi.fn<FeedFetcher>(async (url) =>
+      String(url).endsWith('/robots.txt')
+        ? new Response('')
+        : new Response('<html><meta name="generator" content="WordPress"></html>', { headers: { 'content-type': 'text/html' } }),
+    );
+    vi.mocked(refreshFavicon).mockImplementation(async (target, settings) => {
+      expect(Boolean(settings?.observer)).toBe(enabled);
+      await politeFetch(target.url!, {}, settings);
+      expect(enqueue).not.toHaveBeenCalled();
+      return { status: 'success', slug: target.slug, reason: undefined };
+    });
+    // Separate hosts avoid the existing process-wide robots cache masking request parity.
+    const id = enabled ? 72 : 71;
+    const db = pool([id]);
+    await refreshMissingBlogFavicons(db, { ...options, fetcher, resolveHost: async () => ['93.184.216.34'], delayMs: 250 });
+    expect(fetcher.mock.calls.map(([url]) => String(url))).toEqual([`https://blog-${id}.test/robots.txt`, `https://blog-${id}.test/`]);
+    expect(enqueue).toHaveBeenCalledTimes(Number(enabled));
+    expect(db.query).toHaveBeenCalledOnce();
+  });
   it('shares the CLI lock, does not take over an old owner, and performs no query while busy', async () => {
     const options = await setup();
     const lock = join(options.root, 'app/data/.favicon-refresh.lock');

@@ -49,6 +49,12 @@ export type PassiveFetchObservation = {
   observedAt: Date;
 };
 export type PassiveFetchObserver = (event: PassiveFetchObservation) => void | Promise<void>;
+/** Only sanitized DTOs may survive a fetch; articles are admitted after the existing import commits. */
+export type PassiveFetchBatch = {
+  observer: PassiveFetchObserver;
+  commit(articleUrls: string[]): Promise<void>;
+  discard(): void;
+};
 export const MAX_OBSERVER_HTML_BYTES = 512 * 1024;
 const observedResponseBodies = new WeakMap<Response, { html: string; htmlTruncated: boolean }>();
 function emitPassiveFetch(observer: PassiveFetchObserver | undefined, event: PassiveFetchObservation) {
@@ -72,6 +78,7 @@ function passiveResponseHeaders(response: Response): Record<string, string> {
 }
 export type FeedCrawlerOptions = {
   observer?: PassiveFetchObserver;
+  passiveBatch?: PassiveFetchBatch;
   userAgent?: string;
   delayMs?: number;
   timeoutMs?: number;
@@ -1016,6 +1023,7 @@ export async function crawlBlog(
   blog: BlogToCrawl,
   options: FeedCrawlerOptions = {},
 ): Promise<{ blog: string; sources: number; posts: number }> {
+  if (options.passiveBatch) options = { ...options, observer: options.passiveBatch.observer };
   const now = new Date();
   let links: FeedLink[];
   try {
@@ -1036,8 +1044,13 @@ export async function crawlBlog(
       ...valid.filter((source) => source.type !== 'sitemap'),
       ...rankedSitemapUrls([...sitemaps.keys()]).map((url) => sitemaps.get(url)!),
     ];
-    if (!links.length) links = await discoverFeedUrls(blog.url, options);
+    if (!links.length) {
+      links = await discoverFeedUrls(blog.url, options);
+      // Homepage observations need no article identity; the writer rechecks verified ownership.
+      await options.passiveBatch?.commit([]);
+    }
   } catch (error) {
+    options.passiveBatch?.discard();
     await pool.execute('UPDATE blogs SET last_crawled_at=? WHERE id=?', [now, blog.id]);
     throw error;
   }
@@ -1056,6 +1069,7 @@ export async function crawlBlog(
     try {
       response = await politeFetch(source.url, headers, options);
     } catch {
+      options.passiveBatch?.discard();
       await pool.execute(
         'INSERT INTO feed_sources (blog_id,url,type,last_error_at,consecutive_failures) VALUES (?,?,?,?,1) ON DUPLICATE KEY UPDATE last_error_at=VALUES(last_error_at),consecutive_failures=consecutive_failures+1',
         [blog.id, source.url, source.type, now],
@@ -1063,6 +1077,7 @@ export async function crawlBlog(
       continue;
     }
     if (response.status === 304 && !options.historyImport) {
+      options.passiveBatch?.discard();
       await pool.execute('UPDATE feed_sources SET last_success_at=?,last_error_at=NULL,consecutive_failures=0 WHERE url=?', [
         now,
         source.url,
@@ -1071,6 +1086,7 @@ export async function crawlBlog(
       continue;
     }
     if (!response.ok) {
+      options.passiveBatch?.discard();
       await pool.execute(
         'INSERT INTO feed_sources (blog_id,url,type,last_error_at,consecutive_failures) VALUES (?,?,?,?,1) ON DUPLICATE KEY UPDATE last_error_at=VALUES(last_error_at),consecutive_failures=consecutive_failures+1',
         [blog.id, source.url, source.type, now],
@@ -1081,6 +1097,7 @@ export async function crawlBlog(
     try {
       body = await readFeedBody(response);
     } catch {
+      options.passiveBatch?.discard();
       await pool.execute(
         'INSERT INTO feed_sources (blog_id,url,type,last_error_at,consecutive_failures) VALUES (?,?,?,?,1) ON DUPLICATE KEY UPDATE last_error_at=VALUES(last_error_at),consecutive_failures=consecutive_failures+1',
         [blog.id, source.url, source.type, now],
@@ -1093,6 +1110,7 @@ export async function crawlBlog(
     const expectedRoot =
       source.type === 'sitemap' ? objectOf(parsedRoot?.urlset) : objectOf(objectOf(parsedRoot?.rss)?.channel) || objectOf(parsedRoot?.feed);
     if (!expectedRoot) {
+      options.passiveBatch?.discard();
       await pool.execute('UPDATE feed_sources SET last_error_at=?,consecutive_failures=consecutive_failures+1 WHERE url=? AND blog_id=?', [
         now,
         source.url,
@@ -1135,11 +1153,13 @@ export async function crawlBlog(
       );
       if (connection) await connection.commit();
     } catch (error) {
+      options.passiveBatch?.discard();
       if (connection) await connection.rollback();
       throw error;
     } finally {
       connection?.release();
     }
+    await options.passiveBatch?.commit(entries.map((entry) => entry.url));
     sourceCount += 1;
   }
   await pool.execute(

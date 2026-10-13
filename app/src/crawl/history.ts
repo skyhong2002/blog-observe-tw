@@ -190,12 +190,14 @@ export async function runHistoryBatch(
       if (!task) break;
       try {
         await store.assertLease();
-        const result = await readTask(task, blog, options);
+        const result = await readTask(task, blog, options.passiveBatch ? { ...options, observer: options.passiveBatch.observer } : options);
         await store.assertLease();
         await store.commitTask(blog, task, result, caps, now());
+        await options.passiveBatch?.commit(result.entries.map((entry) => entry.url));
         if (task.kind === 'article' || task.kind === 'entry') articles++;
         else pages++;
       } catch (error) {
+        options.passiveBatch?.discard();
         const code = (error as { code?: string }).code;
         const limited = code === 'HISTORY_LIMIT';
         const reason = historyFailureReason(error);
@@ -212,6 +214,7 @@ export async function runHistoryBatch(
     }
     return await store.finish(blog.id, now());
   } finally {
+    options.passiveBatch?.discard();
     await store.release();
   }
 }
