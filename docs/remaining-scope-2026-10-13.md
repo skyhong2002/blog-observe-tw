@@ -1,6 +1,6 @@
 # 剩餘 scope 與可離線工作
 
-盤點基底：fetch 後 `origin/main` `0a8e6f3b357c27d21926d6fe7d009abb10167a00`。本文件依原使用者交辦、現有 source、既有 artifact 和 UI ledger；沒有新正式 HTTP／DB 查核，不把舊數量當即時數據。正式最後確認為 green／gen5 `4cc7bcd`。UTC10:10 起建置名額仍在 tag；SM 不新增建置或截圖，blog 不占 Mint 共用 DB／API 鎖。
+盤點基底：本次 fetch 後 `origin/main` `00d050198e46de658ffe0b75b253bacf450bfe83`；最新 source 進度見末段，正式版不變。本文件依原使用者交辦、現有 source、既有 artifact 和 UI ledger；沒有新正式 HTTP／DB 查核，不把舊數量當即時數據。正式最後確認為 green／gen5 `4cc7bcd`。UTC10:10 起建置名額仍在 tag；SM 不新增建置或截圖，blog 不占 Mint 共用 DB／API 鎖。
 
 **不是只剩等待。**完整詞庫切換、F3 搜尋資訊與正文索引接線、B2 consumer、引用解析與部分讀者功能仍有 source 缺口。下表的「可離線」是可以在沒有建置、capture、正式 probe 或 Mint 鎖時推進；最終畫面／正式資料驗收仍要依候選產物順序執行。
 
@@ -13,10 +13,10 @@ tag 的473萬詞池只代表上游曾有標籤，**不是 blog SEO 話題頁的�
 | F4 被動輸入 | gen5 313站0detected／260unknown／53未觀測是舊正式結果；feed/history/favicon接線在64cbea3，未部署 | source／mock／已存HTML證據覆核已完成；可以補更多有真實證據的離線 fixture，不增加抓取 | Mint同產物candidate、被動既有正常回應寫入、Alina／Carol／timdream真實observedAt與版本證據，正式coverage與畫面 |
 | F4 coverage與UI | source已有detected／unknown／failed／blocked／not-observed、CMS與CDN區分，但全狀態不是全部pass | 檢查欄位／多筆少筆／失敗保留的契約；缺source時先修mock | 新SHA／BUILD_ID的/tech/與blog技術區1280／390、兩色、表格互動與正式Chrome驗收 |
 | F3 搜尋命中資訊 | 有界posting reader／producer在1af0b44；本輪已補前端歷史索引coverage與證據欄位，尚未部署 | **本輪source與mock已修**搜尋parser／coverage／articleId／matchVersion／contextSource，由既有Opus作者、Sol獨立review | 0023正式additive apply、同產物candidate隱私／成本、真文anise.tw/290726的『蛤蜊絲瓜』畫面；flag仍off |
-| F3 正文索引接線 | 現在僅manual最多10ID producer；本輪已補default-off的committed adoption純契約，仍沒有worker caller／持續補索引 | [adoption契約](search-index-adoption.md)與26 mocks已完成；接續caller commit後發事件／有界queue consumer與repair的實際整合，不能以F4 URL callback替代正文ID | candidate、正式可公開body選定回填與成本／版本驗證；索引覆蓋不是全站全文完整性 |
+| F3 正文索引接線 | manual最多10ID producer，加上default-off的content/RSS/history/relations真實commit後hook與既有BullMQ consumer；尚未正式啟用／完整回填 | [adoption契約與實際caller](search-index-adoption.md)已完成106 mocks與獨立review；仍需scoped repair／crash gap的實際運維，不以queue ack冒稱indexed | candidate、正式可公開body選定回填與成本／版本驗證；索引覆蓋不是全站全文完整性 |
 | F3 relations coverage | 舊185／18838與失敗分類已盤點；不代表目前coverage提升，未知target仍多 | 用已存完整正文與parser version契約準備有界reparse；預算deferred、badbody、blocked分組，不重建relations | 正式小批reparse、觀測進度／分母；額外抓取仍守robots/SSRF/每日預算，不能以fixture改寫真coverage |
 | F3 引用target／搬家 | 本地alias helper與原URL exact target ID不足以證明文章canonical或跨網域轉址；gojp→gogojp真證據仍待核 | canonical／alias trust規則與否定cases、target resolver的有界契約可先寫 | 正常許可抓取的逐跳redirect／ownership證據、gogojp↔bobowin兩方向原文章與各自日期；不猜alias，不包成同期間交流 |
-| B2 三類證據 | 直接引用／非正文／共同native tags已有UI；文字相似僅default-off單對API，profile仍not-analysed | 明確配對consumer／UI接線、ready／unavailable／insufficient states與source review；正文只計算、public preview只摘要 | 同產物candidate各類證據畫面／隱私，真資料驗收後才考慮enable；不得做無界NxN、不得叫抄襲或交流 |
+| B2 三類證據 | 直接引用／非正文／共同native tags已有UI；文字相似default-off；profile已接最多3對／6篇的直接正文引用配對，非NxN | consumer與既有Opus UI完成47 backend／48 SSR和非作者source review；ready／unavailable／insufficient明列，preview只公開短摘要 | 同產物candidate各類證據畫面／隱私，真資料驗收後才考慮enable；不得做無界NxN、不得叫抄襲或交流 |
 | F3 作者／person／網站 | luckbear作者與anise站點ID分離已保存；不是完整person／網站各自tags與文章證據bridge | 原生作者／站點tag契約與來源／版本／文章ID整合可以mock；不凭筆名跨站合併 | tag F1版本化person／共用標籤契約的實際可用範圍，candidate真資料映射與畫面；不等於新增人物圖像功能 |
 | B3 / F1標籤consumer | client／store／manualsync／topic UI已有；0021–22已套，雙flag仍off且未同步 | 使用既有版本化契約mock补缺失／授權／canonicallabel cases，source修訂可做 | **上游tag F1 relations/visual正式版與契約確認**、隔離readiness、10標籤小批sync與ready/missing/unavailable畫面。完整詞庫端點不是F1替代品 |
 | F2 | 本thread不是F2 owner | 如共同契約改動只修blog consumer | tag／YT owner完成其功能；不在blog重做另一站功能 |
@@ -25,8 +25,8 @@ tag 的473萬詞池只代表上游曾有標籤，**不是 blog SEO 話題頁的�
 
 | 項目 | 剩餘工作與現況 | 可離線做 | 一定要等的部分 |
 |---|---|---|---|
-| 完整詞庫初次匯入 | active preview44,852並非完整4,733,073匯入；舊完整validator上限2M | **本輪已修10M完整池安全閥與4MB manifest/2MB page回歸**；逐頁staging、checksum可續跑、generation／warmup／atomiccutover仍需source補完 | 上游版本化完整fixture相容確認；Mint容量／隔離DB／名額與實測量測後才stage正式，不整份進RAM |
-| 10分鐘changes／每日對帳 | 正式仍window15分鐘；full ready不切current，changes不是正式同步consumer | changes validator／可續跑watermark／冪等、409重full、recent補配、最終checksum checkpoint與atomic發布source | 上游changes實際契約／世代可用性、candidate及正式配額／耗時；之後10分鐘poll＋daily full reconciliation，不自行重排tag |
+| 完整詞庫初次匯入 | active preview44,852並非完整4,733,073匯入；舊完整validator上限2M | **已修10M安全閥、single-copy-v1單份2GiB計費、原SHA原子續跑checkpoint、compact及5000group adapter**；warmup／atomiccutover／實際caller仍需補完 | 上游版本化完整fixture相容確認；Mint容量／隔離DB／名額與實測量測後才stage正式，不整份進RAM |
+| 10分鐘changes／每日對帳 | 正式仍window15分鐘；full ready不切current，changes不是正式同步consumer | read-only changes validator/client已完成37 mocks；chain仍unverified，尚需上游chain catalog契約、watermark／overlay／冪等、409重full及atomic發布 | 上游changes實際契約／世代可用性、candidate及正式配額／耗時；之後10分鐘poll＋daily full reconciliation，不自行重排tag |
 | 話題品質／升溫 | NFKC／雜訊／高文件頻率title-only、365日baseline與recentShare/baselineShare/lift及UI已有source；完整詞庫切換後基準coverage仍需驗，文章本身tag的高頻命中通道也須核對 | corpus baseline／ratio契約與零分母／新站補收／缺資料測試，native category對應與人工來源優先；保留排除詞可查 | 同條件正式前後20名、基準coverage與版本、排行UI／候選驗收，不能用文章數冒稱比率 |
 | 歷史文章遍歷 | 可續跑RSS/Atom/WP/Blogger/sitemap游標已正式，完整全站遍歷仍背景低速進行 | 邊界／中斷／分片缺口fixtures與停機／續跑文件 | 正式後台實際遍歷進度；robots/403/無官方索引是外部限制，不能繞過，也不把有限批次叫完整 |
 | discovery循環 | blogblog/blogroll/正文候選、深度3、預算、自動驗證已做；所有低信心候選不是已收錄 | 去重／新來源／身份與台灣繁中優先規則／AI輔助契約可測，不變相交整批給使用者人工 | 真候選低頻驗證／收錄再探索、RSS/robots與daily budget；有證據才升格，不猜來源 |
@@ -66,9 +66,9 @@ tag 的473萬詞池只代表上游曾有標籤，**不是 blog SEO 話題頁的�
 
 Opus原始非自審review `.reviews/offline-quality/scope-vocabulary-nonself-opus.jsonl` 為actual `claude-opus-5-5`、success／end_turn，沒有審它自己寫的搜尋UI。採納以下風險說明／排程順序，未把推論當實測：
 
-- stagedbytes同時計入term JSON與page receipt；4.733M×雙份JSON可能先超2GiB。10M只放寬詞數validator，**不是已能stage完整池的容量承諾**。用上游版本化isolated fixture實測字節／DB大小後決定策略，不盲放寬磁碟上限。
+- 早期legacy stagedbytes同時計入term JSON與page receipt；4.733M×雙份JSON可能先超2GiB（single-copy-v1已另解，legacy未改）。10M只放寬詞數validator，**不是已能stage完整池的容量承諾**。用上游版本化isolated fixture實測字節／DB大小後決定策略，不盲放寬磁碟上限。
 - 每頁驗證目前要求帶完整manifest；pages/changePages與tier等額外欄位可能先超page2MB或manifest4MB。完整page實際契約（含label60限制／日期／origin／checksum）仍待對照，active preview不能證明完整page相容。若需改上游契約交tag owner，不自行修改tag。
-- 全量checksum目前沒有跨批checkpoint；截止後從第0頁開始，9.5k頁可能永遠不能在單輪結束。這仍是**可離線修**的source項，必須先於warmup／cutover完成，且保持上游原始sha256整體驗證；不能拿另一種hash當相同checksum。
+- 早期全量checksum沒有跨批checkpoint；此缺口已由ce0a1a1的single-copy-v1原子標準SHA续跑修正，legacy契約保留。warmup與cutover仍是**可離線做**的source項，必須先於warmup／cutover完成，且保持上游原始sha256整體驗證；不能拿另一種hash當相同checksum。
 - tiers/active/statistics/largePages目前是**未驗證的opaque原樣metadata**，會參與整個immutable manifest比較；不是可信active詞集合或已驗API欄位。暫不採猜測可變欄位而忽略身份差異／自行刪掉欄位的建議，先核版本化上游契約。後續consumer不得用cast把它當已驗資料。
 
 adopted-body純契約也已直接接續完成：只保留已提交事件的primitive ID metadata、cap10、dedup，default-off／未接caller。排隊ack≠indexed，未知queue結果需repair、不重播也不rollback原文。非作者review實測兩個P2（ack自訂iterator／event getter重讀），原作者改為一次擷取local值再驗，原21 mocks加5個回歸全部保留。三檔最終hash/rawmodel/UTC在 `/home/deck/.t3/userdata/ui-review-blog-20261013/home-perf-independent/search-index-adoption-independent-followup.json`。root同時跑adoption／producer／body-index測試与app no-emit，沒有DB/Redis/HTTP。不能把純helper當成durable queue、SQL commit proof或產品hook完成。
@@ -76,3 +76,30 @@ adopted-body純契約也已直接接續完成：只保留已提交事件的primi
 下一批離線順序：adopted-body **實際caller/queue接線** → B2有界consumer → 完整池契約/checksum續跑/warmup與changes → target canonical/轉址trust契約。person/shared-label的網路同步等F1明確契約與readiness；所有新UI仍由既有Opus作者，另一個既有Sol review。這些不是Mint新build/capture許可。
 
 唯一handoff `/tmp/babysit/mint-queue/blog.md` 會引用本檔並釘每次提交後乾淨SHA。**目前有可離線source工作，不能標示「只剩等待名額／上游」**。每完成一小批commit/push、獨立review後更新source切點；是否併入第一份Mint候選由owner依完整契約及review決定，不為等功能擴張阻塞已安全可驗的首頁/F4修正。
+
+## 最新離線批次：接線與續跑已做，正式仍未切換
+
+這段取代上面保留的早期缺口描述。source commits均已push main及work/blog-mint-queue：
+
+- `7c63f7d`：content commit/release後索引通知、既有BullMQ consumer／NX claim；預設off。
+- `7e2817d`：RSS每source／history每task／relations批次的真實transaction staging與flush。
+  root與非作者各106 mocks，另9 suites／24 migrations既有18169小型SQL通過。不是outbox；
+  crash gap、partial cap與unknown結果需operator選定IDs repair，未驗nativeRedis。
+- `8edbf12`：B2有界profile／Opus前端consumer，47backend＋48SSR；target owner freshcheck。
+  source與SQL通過，不是candidate圖或正式全文命中。
+- `9d8bfe0`、`ce0a1a1`：compact原manifest pin、可序列化標準SHA、single-copy-v1單份
+  logical2GiB＋receipt8MiB，checkpoint/cursor原子commit。67mocks及1001詞小型SQL通過。
+  0024 additive尚未正式apply，ready不切current；合作writer immutable，不宣稱hostileDB/TOCTOU。
+- `8b77956`：read-only changes client，37mocks；after/target pin、409保留current，chain未驗
+  不發布；不是已實作delta overlay或10分鐘scheduler。
+- `80fa61c`：strip-Cf/NFKC/case alias，原raw labels不刪；full policy非ready時禁止hotpath重建。
+- `c6822aa`：default-off 5000compact SOURCE；原500chunk checksum、2MB cap不變，bytecaponly
+  有界fallback。45mocks／非作者review；P5 caller尚未接。總wire另含large attempt，不是只10。
+
+throughput與保留期仍是正式stage阻擋項：nominal947large wire，scan約47.5小時，再另47.5小時
+localvalidation＋policy/warmup；600/day與window共用，retry／中途resume／fallback會加成本。
+現階段沒有full4.733M preview、RAM實測、上游已部署fixture或cutover，不以小fixture假裝容量通過。
+原始model/transcript/hash/test paths見各功能文件與私有review索引。UI ledger狀態不提升。
+
+下一批正在做full caller／policy／warmup／atomic cutover的拆解與非作者review，接著實作source；
+changes跨世代catalog需上游明確契約，未取得以前保留read-only。仍有離線source工作，**不是只剩等待**。
