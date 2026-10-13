@@ -138,6 +138,72 @@ describe('raw links and distinct article counts', () => {
     ]);
     expect(parsed.links).toHaveLength(4);
   });
+  it('keeps synthetic gogojp/bobowin directions, original URLs, dates and blogroll evidence distinct', () => {
+    // The known URL shapes are regression inputs only. HTML, dates and redirect
+    // verification below are invented fixtures, not publisher captures/proof.
+    const legacyUrl = 'https://gojp.tw/2017-08-07-252';
+    const redirect = aliasesFromStoredEvidence(
+      [
+        record({
+          from: legacyUrl,
+          to: 'https://gogojp.tw/2017-08-07-252',
+          sourceUrl: legacyUrl,
+        }),
+      ],
+      aliases,
+      now,
+    );
+    const resolver = compilePublicationAliases([...aliases, ...redirect]);
+    expect(resolver.resolve(legacyUrl + '?utm_source=fixture#detail')).toBe(39);
+    expect(resolver.resolve('https://gojp.tw/2017-08-07-253')).toBeNull();
+    const fixtures = [
+      {
+        postId: 501,
+        blogId: 39,
+        publishedAt: '2026-10-12T00:00:00.000Z',
+        url: 'https://gogojp.tw/jrkyushu',
+        target: 40,
+        html: '<article><p>合成九州段落<a href="https://bobowin.blog/asoboy">第一文章</a><a href="https://bobowin.blog/another-synthetic-target">第二文章</a></p></article><aside class="blogroll"><a href="https://bobowin.blog/">友站</a></aside>',
+      },
+      {
+        postId: 502,
+        blogId: 40,
+        publishedAt: '2017-08-07T01:00:00.000Z',
+        url: 'https://bobowin.blog/asoboy',
+        target: 39,
+        html: `<article><p>合成歷史段落<a href="${legacyUrl}?utm_source=fixture#detail">歷史網址</a><a href="https://gogojp.tw/another-synthetic-target">其他文章</a></p></article><aside class="blogroll"><a href="https://gogojp.tw/">友站</a></aside>`,
+      },
+    ];
+    const raw = fixtures.flatMap((f) =>
+      parseArticleLinks(f.html, f.url, f.blogId, [...aliases, ...redirect]).links.map((link) => ({
+        ...link,
+        sourcePostId: f.postId,
+        sourceBlogId: f.blogId,
+        sourceUrl: f.url,
+        publishedAt: f.publishedAt,
+      })),
+    );
+    expect(raw).toHaveLength(6);
+    for (const f of fixtures) {
+      const body = raw.filter((r) => r.sourcePostId === f.postId && r.location === 'body');
+      expect(body).toHaveLength(2);
+      expect(new Set(body.map((r) => r.targetUrl)).size).toBe(2);
+      expect(body.every((r) => r.targetBlogId === f.target && r.sourceUrl === f.url && r.publishedAt === f.publishedAt)).toBe(true);
+    }
+    expect(raw.some((r) => r.sourcePostId === 502 && r.targetUrl === legacyUrl)).toBe(true);
+    const counts = countDirectMentionEvidence(raw);
+    expect(counts).toHaveLength(4);
+    expect(counts).toEqual(
+      expect.arrayContaining([
+        { sourceBlogId: 39, targetBlogId: 40, location: 'body', count: 1 },
+        { sourceBlogId: 40, targetBlogId: 39, location: 'body', count: 1 },
+        { sourceBlogId: 39, targetBlogId: 40, location: 'blogroll', count: 1 },
+        { sourceBlogId: 40, targetBlogId: 39, location: 'blogroll', count: 1 },
+      ]),
+    );
+    expect(new Set(raw.map((r) => r.publishedAt)).size).toBe(2);
+  });
+
   it('unresolved and self-targets never become confirmed counts', () => {
     expect(
       countDirectMentionEvidence([
