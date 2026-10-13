@@ -1,7 +1,17 @@
 import type { Pool } from 'mysql2/promise';
 import { describe, expect, it, vi } from 'vitest';
 import { blogContribution, digest, normalizeTerm, TopicMatcher, withinWindow } from './matcher.ts';
-import { type ExportManifest, type ExportTerm, HttpSnapshotSource, SOURCE, validateManifest, validatePage } from './snapshot-client.ts';
+import {
+  type ExportManifest,
+  type ExportTerm,
+  HttpSnapshotSource,
+  MAX_SNAPSHOT_MANIFEST_BYTES,
+  MAX_SNAPSHOT_PAGE_BYTES,
+  MAX_SNAPSHOT_TERMS,
+  SOURCE,
+  validateManifest,
+  validatePage,
+} from './snapshot-client.ts';
 import { importSnapshot, syncVocabulary } from './sync.ts';
 import { TagArticleSource } from './tag-source.ts';
 import { validateWindow } from './window-contract.ts';
@@ -108,18 +118,36 @@ describe('published immutable export contract', () => {
       'changed',
     );
   });
-  it('bounds the complete pool at two million without requiring all terms in RAM', () => {
+  it('bounds the complete pool independently of the in-memory matching set', () => {
     const { manifest } = fixture();
     const large = {
       ...manifest,
-      total: 2_000_000,
-      pages: Array(4000).fill('a'.repeat(64)),
-      changeCount: 4_000_000,
-      changePages: Array(8000).fill('b'.repeat(64)),
+      total: MAX_SNAPSHOT_TERMS,
+      pages: Array(Math.ceil(MAX_SNAPSHOT_TERMS / 500)).fill('a'.repeat(64)),
+      changeCount: MAX_SNAPSHOT_TERMS * 2,
+      changePages: Array(Math.ceil((MAX_SNAPSHOT_TERMS * 2) / 500)).fill('b'.repeat(64)),
     };
-    expect(validateManifest(large).total).toBe(2_000_000);
-    expect(() => validateManifest({ ...large, total: 2_000_001 })).toThrow();
-    expect(() => validateManifest({ ...large, changeCount: 4_000_001 })).toThrow();
+    expect(validateManifest(large).total).toBe(MAX_SNAPSHOT_TERMS);
+    expect(() => validateManifest({ ...large, total: MAX_SNAPSHOT_TERMS + 1 })).toThrow();
+    expect(() => validateManifest({ ...large, changeCount: MAX_SNAPSHOT_TERMS * 2 + 1 })).toThrow();
+  });
+  it('accepts the published multi-million manifest and preserves additive tier metadata without importing terms', async () => {
+    const { manifest } = fixture();
+    const published = {
+      ...manifest,
+      total: 4_733_073,
+      pages: Array(Math.ceil(4_733_073 / 500)).fill('a'.repeat(64)),
+      tiers: { full: { total: 4_733_073 } },
+      active: { total: 44_852, pages: Array(90).fill('b'.repeat(64)) },
+      statistics: { noise: 3542, noEqual: 297 },
+      largePages: { pageSize: 5000 },
+    };
+    expect(validateManifest(published)).toEqual(published);
+    const request = vi.fn<typeof fetch>(async () => new Response(JSON.stringify(published), { status: 200 }));
+    expect(await new HttpSnapshotSource(request).current()).toEqual(published);
+    expect(request).toHaveBeenCalledTimes(1);
+    expect(String(request.mock.calls[0][0])).toContain('/snapshots/current');
+    expect(() => validateManifest({ ...published, pages: published.pages.slice(1) })).toThrow();
   });
   it('uses fixed public origin without credentials, rejects HTTP/oversize and redirects', async () => {
     const request = vi.fn<typeof fetch>(async () => new Response('missing', { status: 404 }));
@@ -128,7 +156,13 @@ describe('published immutable export contract', () => {
     const options = request.mock.calls[0][1] as RequestInit;
     expect(options.redirect).toBe('error');
     expect(options.headers).not.toHaveProperty('Authorization');
-    await expect(new HttpSnapshotSource(async () => new Response('x'.repeat(2_000_001))).current()).rejects.toThrow('byte cap');
+    await expect(new HttpSnapshotSource(async () => new Response('x'.repeat(MAX_SNAPSHOT_MANIFEST_BYTES + 1))).current()).rejects.toThrow(
+      'byte cap',
+    );
+    const { manifest } = fixture();
+    await expect(
+      new HttpSnapshotSource(async () => new Response('x'.repeat(MAX_SNAPSHOT_PAGE_BYTES + 1))).page(manifest, 0),
+    ).rejects.toThrow('byte cap');
   });
 });
 describe('window vocabulary public article API', () => {

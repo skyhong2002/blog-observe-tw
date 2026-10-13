@@ -2,8 +2,13 @@
 import { createHash } from 'node:crypto';
 import { isDeepStrictEqual } from 'node:util';
 import { TagApiTransport, type TagTransportOptions } from './transport.ts';
-export const MAX_SNAPSHOT_TERMS = 2_000_000;
+// Safety ceiling for the complete pool, not the in-memory matching set.
+// The published pool already contains 4,733,073 terms; imports remain paged and staged.
+export const MAX_SNAPSHOT_TERMS = 10_000_000;
 export const MAX_SNAPSHOT_BYTES = 2 * 1024 ** 3;
+// Keep the existing transport's hard 4 MB ceiling; page payloads retain their smaller cap.
+export const MAX_SNAPSHOT_MANIFEST_BYTES = 4_000_000;
+export const MAX_SNAPSHOT_PAGE_BYTES = 2_000_000;
 export const SOURCE = 'https://tag.observe.tw' as const;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 const SHA = /^[0-9a-f]{64}$/;
@@ -142,11 +147,11 @@ export class HttpSnapshotSource implements SnapshotSource {
   get diagnostics() {
     return this.transport.diagnostics;
   }
-  private async json(path: string): Promise<unknown> {
-    return this.transport.json(`/api/v1/vocabulary/${path}`, 2_000_000, 'Vocabulary export');
+  private async json(path: string, maxBytes = MAX_SNAPSHOT_PAGE_BYTES): Promise<unknown> {
+    return this.transport.json(`/api/v1/vocabulary/${path}`, maxBytes, 'Vocabulary export');
   }
   async current() {
-    return validateManifest(await this.json('snapshots/current'));
+    return validateManifest(await this.json('snapshots/current', MAX_SNAPSHOT_MANIFEST_BYTES));
   }
   async page(manifest: ExportManifest, index: number) {
     return validatePage(await this.json(`snapshots/${manifest.id}?cursor=${index}`), manifest, index);
