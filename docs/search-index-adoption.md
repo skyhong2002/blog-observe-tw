@@ -1,4 +1,4 @@
-# 正文已提交之後的索引排程契約（尚未接 caller）
+# 正文已提交之後的索引排程契約
 
 基底：fetch 後 HEAD／origin/main `8edeae7ee681f987111f80336ea6d108705830bc`。
 本批只新增 `search-index-adoption.ts`、純 mock 與本文。不改 worker、feed、history、
@@ -117,3 +117,31 @@ repair 必須核實既存正文、SQL postings 與 queue／claim 狀態，另以
 `/home/deck/.t3/userdata/ui-review-blog-20261013/home-perf-independent/search-index-queue-wiring-independent-review.json`。
 app no-emit 與5檔Biome通過。沒有 native Redis／正式DB／HTTP／新build或capture，
 所以不是正式索引coverage、worker運行或「蛤蜊絲瓜」產品驗收。
+
+## RSS／歷史匯入／relations 已接線（本次 source 進度）
+
+此節取代上文「只接 content」的現況；純 helper 的早期描述保留為時序。
+RSS 每個 source、history 每個 commitTask、relations 每個有界批次各有自己的
+staging collector。真實 ingest 的 primitive post／blog／owner metadata 只 capture一次；
+每個 SQL transaction 的未提交暫存彼此隔離。只有 commit resolved 且 connection
+release 成功才採用；沒有 native transaction、commit／release 結果不明時只記
+unproven repair scope，不捏造 committed、不排 queue。
+
+relations 最外層 finally 仍會 flush 先前已提交 IDs，不因後續 observation／lease／
+cache／abort 出錯而丟掉通知。queue 或 best-effort reporter 失敗，不 rollback 正文、
+不把成功的 history task 改成失敗。原回傳介面保留；history 的 queued 仍指 child
+history tasks，不能誤解為索引 job 數量。
+
+每個 collector 最多10個 unique ID，超額只保留 overflowEvents／有限 numeric blog
+repair scope，結果明列 partial／needs-repair。overflowEvents 不是全批 unique 數量；
+也沒有保存 raw body、URL、hash、任務 payload 或無界 ID。正文 commit 到 enqueue
+之間的 process crash gap 仍存在，reporter 不是 durable audit／outbox；需 operator
+選定 IDs reconcile，沒有自動全站回填或不明結果重播。所有背景 hook 仍由 worker
+明確注入 default-off adoption provider；CLI 直接使用低階 writer 不造 commit 證明。
+
+root 與非作者 Sol 各跑9 suites／106 mocks；root 另在既有18169 disposable schema
+跑 F3/F4 9 suites／24 migrations，未碰正式DB。app no-emit 通過。
+原始 root log `.reviews/offline-quality/all-callers-root-final-units.log`、
+`all-callers-f3-f4-isolated.log`；非作者 receipt：
+`/home/deck/.t3/userdata/ui-review-blog-20261013/home-perf-independent/search-index-all-callers-independent-runtime-review.json`。
+没有 native Redis／HTTP／新BUILD_ID／正式flag enable或全文coverage驗收。

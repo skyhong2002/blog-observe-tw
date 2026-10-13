@@ -1,4 +1,5 @@
 import type { Pool, PoolConnection, RowDataPacket } from 'mysql2/promise';
+import { type BodyIndexOptions, createBodyIndexStages } from '../search-index-staging.ts';
 import { type BlogToCrawl, isAllowedCrawlUrl, isNonSyndicationSource, writeFeedEntries } from './feed.ts';
 import { historyInPublication, historySourceInScope, historyTaskKey } from './history-parse.ts';
 import type { HistoryRun, HistoryStore, HistoryTask, HistoryTaskInput } from './history-types.ts';
@@ -122,7 +123,7 @@ async function enqueue(connection: PoolConnection, blog: BlogToCrawl, tasks: His
 }
 
 /** Dedicated global lease + one transaction connection: poolSize=2 is sufficient. No HTTP runs inside transactions. */
-export function createHistoryStore(pool: Pool): HistoryStore {
+export function createHistoryStore(pool: Pool, indexOptions: BodyIndexOptions = {}): HistoryStore {
   if ((pool as unknown as { pool?: { config?: { connectionLimit?: number } } }).pool?.config?.connectionLimit === 1)
     throw new Error('history requires poolSize >= 2');
   let lease: PoolConnection | null = null;
@@ -139,13 +140,14 @@ export function createHistoryStore(pool: Pool): HistoryStore {
       throw error;
     }
   }
-  async function transaction<T>(work: (connection: PoolConnection) => Promise<T>): Promise<T> {
+  async function transaction<T>(work: (connection: PoolConnection) => Promise<T>, beforeCommit?: () => void): Promise<T> {
     await assertLease();
     const connection = await pool.getConnection();
     try {
       await connection.beginTransaction();
       const result = await work(connection);
       await assertLease();
+      beforeCommit?.();
       await connection.commit();
       return result;
     } catch (error) {
@@ -241,54 +243,88 @@ export function createHistoryStore(pool: Pool): HistoryStore {
       return rows[0] ? taskOf(rows[0]) : null;
     },
     async commitTask(blog, task, result, caps, now) {
-      return transaction(async (connection) => {
-        await lockBlog(connection, blog);
-        await sourceOwned(connection, blog, task.sourceUrl);
-        const [[saved]] = await connection.query<RowDataPacket[]>('SELECT * FROM history_tasks WHERE id=? AND blog_id=? FOR UPDATE', [
-          task.id,
-          blog.id,
-        ]);
-        if (!saved) throw new Error('history_task_missing');
-        if (saved.status === 'done' || saved.status === 'failed') return { written: 0, queued: 0 };
-        if (saved.url !== task.url || saved.source_url !== task.sourceUrl || saved.kind !== task.kind)
-          throw new Error('history_task_changed');
-        const [[run]] = await connection.query<RowDataPacket[]>('SELECT * FROM history_runs WHERE blog_id=? FOR UPDATE', [blog.id]);
-        if (Number(run.pages_fetched) + Number(result.fetched) > caps.maxTotalPages) throw historyLimit('history_page_limit');
-        if (Number(run.articles_written) + result.entries.length > caps.maxTotalArticles) throw historyLimit('history_article_limit');
-        let tasks = result.tasks;
-        const warnings = new Set<string>([...(parseJson(run.warnings) as string[]), ...(result.warnings || [])]);
-        if (result.fingerprint && ['feed', 'wordpress'].includes(task.kind)) {
-          const [same] = await connection.query<RowDataPacket[]>(
-            "SELECT id FROM history_tasks WHERE blog_id=? AND source_url=? AND response_hash=? AND kind=? AND status='done' AND id<>? LIMIT 1",
-            [blog.id, task.sourceUrl, result.fingerprint, task.kind, task.id],
-          );
-          if (same.length) {
-            tasks = [];
-            warnings.add('pagination-repeated-content');
-          }
-        }
-        for (const child of tasks) if (child.sourceUrl !== task.sourceUrl) throw new Error('history_child_source_changed');
-        const queued = await enqueue(connection, blog, tasks, caps.maxTasks, now);
-        for (const entry of result.entries)
-          if (!historyInPublication(entry.url, blog.url)) throw new Error('history_entry_outside_publication');
-        const written = await writeFeedEntries(connection, blog, { url: task.url, type: task.sourceType }, result.entries, now);
-        // Cursor completion is atomic with all post/author/tag writes and durable child work.
-        await connection.execute("UPDATE history_tasks SET status='done',response_hash=?,completed_at=? WHERE id=? AND status='pending'", [
-          result.fingerprint || null,
-          now,
-          task.id,
-        ]);
-        await connection.execute(
-          "UPDATE history_runs SET pages_fetched=pages_fetched+?,articles_written=articles_written+?,tasks_total=tasks_total+?,tasks_done=tasks_done+1,archive_seen=archive_seen OR ?,warnings=?,status='partial',last_error=NULL,next_attempt_at=NULL,updated_at=? WHERE blog_id=?",
-          [Number(result.fetched), written, queued, Boolean(result.archiveSeen), JSON.stringify([...warnings].slice(0, 100)), now, blog.id],
+      const stages = createBodyIndexStages(indexOptions, 'history');
+      const staged = stages.transaction();
+      let committed: { written: number; queued: number };
+      let commitAttempted = false;
+      try {
+        committed = await transaction(
+          async (connection) => {
+            await lockBlog(connection, blog);
+            await sourceOwned(connection, blog, task.sourceUrl);
+            const [[saved]] = await connection.query<RowDataPacket[]>('SELECT * FROM history_tasks WHERE id=? AND blog_id=? FOR UPDATE', [
+              task.id,
+              blog.id,
+            ]);
+            if (!saved) throw new Error('history_task_missing');
+            if (saved.status === 'done' || saved.status === 'failed') return { written: 0, queued: 0 };
+            if (saved.url !== task.url || saved.source_url !== task.sourceUrl || saved.kind !== task.kind)
+              throw new Error('history_task_changed');
+            const [[run]] = await connection.query<RowDataPacket[]>('SELECT * FROM history_runs WHERE blog_id=? FOR UPDATE', [blog.id]);
+            if (Number(run.pages_fetched) + Number(result.fetched) > caps.maxTotalPages) throw historyLimit('history_page_limit');
+            if (Number(run.articles_written) + result.entries.length > caps.maxTotalArticles) throw historyLimit('history_article_limit');
+            let tasks = result.tasks;
+            const warnings = new Set<string>([...(parseJson(run.warnings) as string[]), ...(result.warnings || [])]);
+            if (result.fingerprint && ['feed', 'wordpress'].includes(task.kind)) {
+              const [same] = await connection.query<RowDataPacket[]>(
+                "SELECT id FROM history_tasks WHERE blog_id=? AND source_url=? AND response_hash=? AND kind=? AND status='done' AND id<>? LIMIT 1",
+                [blog.id, task.sourceUrl, result.fingerprint, task.kind, task.id],
+              );
+              if (same.length) {
+                tasks = [];
+                warnings.add('pagination-repeated-content');
+              }
+            }
+            for (const child of tasks) if (child.sourceUrl !== task.sourceUrl) throw new Error('history_child_source_changed');
+            const queued = await enqueue(connection, blog, tasks, caps.maxTasks, now);
+            for (const entry of result.entries)
+              if (!historyInPublication(entry.url, blog.url)) throw new Error('history_entry_outside_publication');
+            const written = await writeFeedEntries(
+              connection,
+              blog,
+              { url: task.url, type: task.sourceType },
+              result.entries,
+              now,
+              staged.stage,
+            );
+            // Cursor completion is atomic with all post/author/tag writes and durable child work.
+            await connection.execute(
+              "UPDATE history_tasks SET status='done',response_hash=?,completed_at=? WHERE id=? AND status='pending'",
+              [result.fingerprint || null, now, task.id],
+            );
+            await connection.execute(
+              "UPDATE history_runs SET pages_fetched=pages_fetched+?,articles_written=articles_written+?,tasks_total=tasks_total+?,tasks_done=tasks_done+1,archive_seen=archive_seen OR ?,warnings=?,status='partial',last_error=NULL,next_attempt_at=NULL,updated_at=? WHERE blog_id=?",
+              [
+                Number(result.fetched),
+                written,
+                queued,
+                Boolean(result.archiveSeen),
+                JSON.stringify([...warnings].slice(0, 100)),
+                now,
+                blog.id,
+              ],
+            );
+            if (written)
+              await connection.execute(
+                'UPDATE blogs SET last_crawl_success_at=?,last_published_at=COALESCE((SELECT MAX(published_at) FROM posts WHERE blog_id=?),last_published_at) WHERE id=?',
+                [now, blog.id, blog.id],
+              );
+            return { written, queued };
+          },
+          () => {
+            commitAttempted = true;
+          },
         );
-        if (written)
-          await connection.execute(
-            'UPDATE blogs SET last_crawl_success_at=?,last_published_at=COALESCE((SELECT MAX(published_at) FROM posts WHERE blog_id=?),last_published_at) WHERE id=?',
-            [now, blog.id, blog.id],
-          );
-        return { written, queued };
-      });
+      } catch (error) {
+        if (commitAttempted) staged.unproven();
+        else staged.discard();
+        await stages.flush();
+        throw error;
+      }
+      // transaction() returned only after COMMIT and finally release; enqueue cannot failTask.
+      staged.committed();
+      await stages.flush();
+      return committed;
     },
     async failTask(blog, task, reason, now) {
       return transaction(async (connection) => {

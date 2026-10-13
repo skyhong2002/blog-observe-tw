@@ -212,3 +212,144 @@ it('splits large durable body rows into bounded SQL packets', async () => {
   expect(f.connection.commit).toHaveBeenCalledOnce();
   await store.release();
 });
+
+// Actual shared writer / history commit caller. Only ingest SQL is injected; no network/native queue.
+it('adopts RSS body only after history commit/release and never changes history child queued count', async () => {
+  const contentStore = await import('../content/store.ts');
+  const ingest = vi
+    .spyOn(contentStore, 'ingestContentEvidence')
+    .mockResolvedValue({ postId: 20875, status: 'ok', changed: true, hash: 'private' });
+  try {
+    const f = fixture(),
+      events: string[] = [];
+    f.connection.commit.mockImplementation(async () => {
+      events.push('commit');
+    });
+    f.connection.release.mockImplementation(() => {
+      events.push('release');
+    });
+    const enqueue = vi.fn(async (ids: readonly number[]) => {
+      events.push('enqueue');
+      return { acceptedPostIds: ids };
+    });
+    const store = createHistoryStore(f.pool, { indexAdoptionEnabled: true, enqueueIndex: enqueue });
+    await store.acquire();
+    const bodyResult = {
+      ...result,
+      entries: [
+        {
+          ...result.entries[0],
+          content: {
+            html: '<article>RSS full text</article>',
+            kind: 'rss-content' as const,
+            completeness: 'full' as const,
+            sourceUrl: blog.url,
+          },
+        },
+      ],
+    };
+    expect(await store.commitTask(blog, task, bodyResult, caps, new Date())).toEqual({ written: 1, queued: 0 });
+    expect(events).toEqual(['commit', 'release', 'enqueue']);
+    expect(enqueue).toHaveBeenCalledWith([20875]);
+    await store.release();
+  } finally {
+    ingest.mockRestore();
+  }
+});
+it('queue failure after history commit cannot reject commitTask/failTask or roll back content', async () => {
+  const contentStore = await import('../content/store.ts');
+  const ingest = vi
+    .spyOn(contentStore, 'ingestContentEvidence')
+    .mockResolvedValue({ postId: 20875, status: 'ok', changed: true, hash: null });
+  try {
+    const f = fixture(),
+      report = vi.fn();
+    const store = createHistoryStore(f.pool, {
+      indexAdoptionEnabled: true,
+      enqueueIndex: async () => {
+        throw Error('secret');
+      },
+      onIndexAdoptionReport: report,
+    });
+    await store.acquire();
+    const bodyResult = {
+      ...result,
+      entries: [
+        {
+          ...result.entries[0],
+          content: { html: 'body', kind: 'rss-content' as const, completeness: 'full' as const, sourceUrl: blog.url },
+        },
+      ],
+    };
+    expect(await store.commitTask(blog, task, bodyResult, caps, new Date())).toEqual({ written: 1, queued: 0 });
+    expect(f.connection.rollback).not.toHaveBeenCalled();
+    expect(report).toHaveBeenCalledWith(expect.objectContaining({ state: 'needs-repair', pendingPostIds: [20875], scopeRepair: [7] }));
+    expect(f.queries.some((q) => q.startsWith('UPDATE history_tasks SET attempts'))).toBe(false);
+    await store.release();
+  } finally {
+    ingest.mockRestore();
+  }
+});
+it('history author write failure rolls back already staged body and queues nothing', async () => {
+  const contentStore = await import('../content/store.ts');
+  const ingest = vi
+    .spyOn(contentStore, 'ingestContentEvidence')
+    .mockResolvedValue({ postId: 20875, status: 'ok', changed: true, hash: null });
+  try {
+    const f = fixture(),
+      enqueue = vi.fn();
+    const execute = f.connection.execute.getMockImplementation()!;
+    f.connection.execute.mockImplementation(async (sql: string) => {
+      if (sql.startsWith('SELECT a.id')) throw Error('author failed');
+      return execute(sql);
+    });
+    const store = createHistoryStore(f.pool, { indexAdoptionEnabled: true, enqueueIndex: enqueue });
+    await store.acquire();
+    const bodyResult = {
+      ...result,
+      entries: [
+        {
+          ...result.entries[0],
+          content: { html: 'body', kind: 'rss-content' as const, completeness: 'full' as const, sourceUrl: blog.url },
+        },
+      ],
+    };
+    await expect(store.commitTask(blog, task, bodyResult, caps, new Date())).rejects.toThrow('author failed');
+    expect(f.connection.rollback).toHaveBeenCalledOnce();
+    expect(enqueue).not.toHaveBeenCalled();
+    await store.release();
+  } finally {
+    ingest.mockRestore();
+  }
+});
+it('history uncertain COMMIT emits scope repair without indexing or pretending rollback undid a possible commit', async () => {
+  const contentStore = await import('../content/store.ts');
+  const ingest = vi
+    .spyOn(contentStore, 'ingestContentEvidence')
+    .mockResolvedValue({ postId: 20875, status: 'ok', changed: true, hash: null });
+  try {
+    const f = fixture(),
+      enqueue = vi.fn(),
+      report = vi.fn();
+    f.connection.commit.mockRejectedValue(Error('commit outcome unknown'));
+    const store = createHistoryStore(f.pool, { indexAdoptionEnabled: true, enqueueIndex: enqueue, onIndexAdoptionReport: report });
+    await store.acquire();
+    const bodyResult = {
+      ...result,
+      entries: [
+        {
+          ...result.entries[0],
+          content: { html: 'body', kind: 'rss-content' as const, completeness: 'full' as const, sourceUrl: blog.url },
+        },
+      ],
+    };
+    await expect(store.commitTask(blog, task, bodyResult, caps, new Date())).rejects.toThrow('commit outcome unknown');
+    expect(enqueue).not.toHaveBeenCalled();
+    expect(report).toHaveBeenCalledWith(
+      expect.objectContaining({ state: 'needs-repair', reason: 'unproven-transaction', scopeRepair: [7] }),
+    );
+    await store.release();
+  } finally {
+    ingest.mockRestore();
+  }
+});

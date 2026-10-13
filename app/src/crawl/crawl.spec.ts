@@ -366,3 +366,49 @@ it('does not write another author from a shared platform feed', async () => {
   expect(result.posts).toBe(0);
   expect(f.execute.mock.calls.some(([sql]) => sql.startsWith('INSERT INTO posts'))).toBe(false);
 });
+
+it.each([false, true])('RSS body queues after commit/release; queue failure=%s cannot poison body or F4 callbacks', async (queueFails) => {
+  const contentStore = await import('../content/store.ts');
+  const ingest = vi
+    .spyOn(contentStore, 'ingestContentEvidence')
+    .mockResolvedValue({ postId: 20875, status: 'ok', changed: true, hash: 'private' });
+  try {
+    const home = 'https://index-rss.test/',
+      source = { url: home + 'feed', type: 'rss' as const };
+    const rss = `<rss xmlns:content="http://purl.org/rss/1.0/modules/content/"><channel><item><guid>1</guid><link>${home}post</link><title>Body</title><content:encoded><![CDATA[<article>正文</article>]]></content:encoded></item></channel></rss>`;
+    const f = setup([source], { [source.url]: rss }),
+      events: string[] = [];
+    const connection = {
+      beginTransaction: vi.fn(async () => {}),
+      commit: vi.fn(async () => {
+        events.push('commit');
+      }),
+      rollback: vi.fn(async () => {}),
+      release: vi.fn(() => {
+        events.push('release');
+      }),
+      execute: vi.fn(async (sql: string) =>
+        sql.startsWith('SELECT id,url,status') ? [[{ id: 7, url: home, status: 'verified' }], []] : [[], []],
+      ),
+    };
+    const pool = { ...f.pool, getConnection: async () => connection } as unknown as Pool;
+    const enqueue = vi.fn(async (ids: readonly number[]) => {
+      events.push('enqueue');
+      if (queueFails) throw Error('queue offline');
+      return { acceptedPostIds: ids };
+    });
+    const report = vi.fn();
+    const outcome = await crawlBlog(
+      { pool },
+      { id: 7, slug: 'index-rss', url: home },
+      { ...f.options, indexAdoptionEnabled: true, enqueueIndex: enqueue, onIndexAdoptionReport: report },
+    );
+    expect(outcome.posts).toBe(1);
+    expect(events).toEqual(['commit', 'release', 'enqueue']);
+    expect(enqueue).toHaveBeenCalledWith([20875]);
+    expect(connection.rollback).not.toHaveBeenCalled();
+    expect(report).toHaveBeenCalledWith(expect.objectContaining({ state: queueFails ? 'needs-repair' : 'queued' }));
+  } finally {
+    ingest.mockRestore();
+  }
+});

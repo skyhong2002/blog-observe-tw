@@ -58,6 +58,13 @@ const vocabularyEnabled = process.env.BLOG_VOCABULARY_ENABLED === 'true';
 const indexAdoptionEnabled = process.env.BLOG_SEARCH_INDEX_ADOPTION_ENABLED === 'true';
 const enqueueIndex = createIndexJobEnqueue((name, data, options) => queue.add(name, data, options));
 const claimIndex = createIndexJobClaim(async (key) => (await connection.set(key, 'claimed-not-indexed', 'NX')) === 'OK');
+const indexOptions = {
+  indexAdoptionEnabled,
+  enqueueIndex,
+  onIndexAdoptionReport: (report: import('./search-index-staging.ts').IndexAdoptionReport) => {
+    if (indexAdoptionEnabled) log.info({ indexAdoption: report }, 'body index adoption outcome');
+  },
+};
 const contentEnabled = process.env.BLOG_CONTENT_ENABLED === 'true';
 const shutdown = new AbortController();
 const missingIconsEnabled = process.env.BLOG_MISSING_FAVICONS_ENABLED !== 'false';
@@ -114,7 +121,8 @@ const worker = new Worker(
     if (job.name === 'blogs-relation-snapshots') return runRelationSnapshotBatch(store.pool, batchOptions);
     if (job.name === 'blogs-publication-discovery')
       return relationsEnabled ? runPublicationDiscoveryBatch(store.pool, batchOptions) : { skipped: 'disabled' };
-    if (job.name === 'blogs-relations') return relationsEnabled ? runRelationBatch(store.pool, batchOptions) : { skipped: 'disabled' };
+    if (job.name === 'blogs-relations')
+      return relationsEnabled ? runRelationBatch(store.pool, { ...batchOptions, ...indexOptions }) : { skipped: 'disabled' };
     if (job.name === 'blogs-ai') return aiEnabled ? runAiBatch(store.pool, { ...batchOptions, limit: 3 }) : { skipped: 'disabled' };
     if (job.name === 'blogs-topics') {
       if (!topicsEnabled) return { skipped: 'disabled' };
@@ -136,7 +144,7 @@ const worker = new Worker(
     if (job.name === 'blogs-history') {
       if (!historyEnabled) return { skipped: 'disabled' };
       const blogs = await selectHistoryBlogs(store.pool, 5);
-      const history = createHistoryStore(store.pool);
+      const history = createHistoryStore(store.pool, indexOptions);
       const results = [];
       for (const blog of blogs) {
         if (closing) break;
@@ -205,6 +213,7 @@ const worker = new Worker(
       try {
         results.push(
           await crawlBlog(store, blog, {
+            ...indexOptions,
             userAgent: config.crawlUserAgent,
             delayMs: config.crawlDelayMs,
             passiveBatch: createTechFetchBatch(store.pool, { blogId: blog.id, blogUrl: blog.url }),

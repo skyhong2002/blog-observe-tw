@@ -9,6 +9,7 @@ import { Agent, type Dispatcher, fetch as undiciFetch } from 'undici';
 import { type Completeness, type ContentKind, MAX_CONTENT_HTML_BYTES } from '../content/contracts.ts';
 import { ingestContentEvidence } from '../content/store.ts';
 import { identityKey, publicationDecision } from '../relations/identity.ts';
+import { type BodyIndexOptions, createBodyIndexStages } from '../search-index-staging.ts';
 
 export type FeedSourceType = 'rss' | 'atom' | 'sitemap' | 'wordpress';
 export type FeedLink = { url: string; type: FeedSourceType };
@@ -76,7 +77,7 @@ function passiveResponseHeaders(response: Response): Record<string, string> {
   for (const name of ['cf-ray', 'x-vercel-id', 'x-nf-request-id']) if (response.headers.has(name)) values[name] = 'present';
   return values;
 }
-export type FeedCrawlerOptions = {
+export type FeedCrawlerOptions = BodyIndexOptions & {
   observer?: PassiveFetchObserver;
   passiveBatch?: PassiveFetchBatch;
   userAgent?: string;
@@ -900,6 +901,7 @@ export async function writeFeedEntries(
   source: FeedLink,
   entries: FeedEntry[],
   now = new Date(),
+  stageBodyIndex?: (event: unknown) => void,
 ): Promise<number> {
   let written = 0;
   for (const original of entries) {
@@ -935,7 +937,7 @@ export async function writeFeedEntries(
     );
     if (entry.content?.html) {
       const content = boundedFeedContent(entry.content);
-      await ingestContentEvidence(
+      const body = await ingestContentEvidence(
         pool,
         {
           ...content,
@@ -947,6 +949,20 @@ export async function writeFeedEntries(
         },
         now,
       );
+      // Transaction-local staging only. SQL caller owns commit/release proof.
+      try {
+        stageBodyIndex?.({
+          postId: body.postId,
+          blogId: blog.id,
+          postOwnerBlogId: blog.id,
+          bodyOwnerBlogId: blog.id,
+          publicationStatus: 'verified',
+          status: body.status,
+          changed: body.changed,
+        });
+      } catch {
+        /* staging must not mutate ingestion success */
+      }
     }
     // A pen name is resolved within this blog only. Matching names on two
     // sites therefore create two author identities until a human explicitly
@@ -1128,6 +1144,10 @@ export async function crawlBlog(
     // in its task transaction, so both paths serialize on the blog row.
     const connection = 'getConnection' in pool ? await (pool as Pool).getConnection() : null;
     const writer = connection ?? pool;
+    const indexStages = createBodyIndexStages(options, 'feed');
+    const staged = indexStages.transaction();
+    let commitAttempted = false,
+      committed = false;
     try {
       if (connection) {
         await connection.beginTransaction();
@@ -1135,7 +1155,7 @@ export async function crawlBlog(
         const row = Array.isArray(current) ? (current[0] as { url?: string; status?: string } | undefined) : undefined;
         if (row?.url !== blog.url || row?.status !== 'verified') throw new Error('crawl_blog_identity_changed');
       }
-      total += await writeFeedEntries(writer, blog, source, entries, now);
+      total += await writeFeedEntries(writer, blog, source, entries, now, staged.stage);
       // A validator acknowledges durable import of the entire source, including
       // author/tag links. Persist it last so a failed write is replayable.
       const etag = response.headers.get('etag');
@@ -1151,13 +1171,29 @@ export async function crawlBlog(
           now,
         ],
       );
-      if (connection) await connection.commit();
+      if (connection) {
+        commitAttempted = true;
+        await connection.commit();
+        committed = true;
+      }
     } catch (error) {
+      if (commitAttempted || !connection) staged.unproven();
+      else staged.discard();
       options.passiveBatch?.discard();
       if (connection) await connection.rollback();
       throw error;
     } finally {
-      connection?.release();
+      try {
+        connection?.release();
+      } catch (error) {
+        staged.unproven();
+        // biome-ignore lint/correctness/noUnsafeFinally: Preserve the existing release exception; do not assert successful release.
+        throw error;
+      } finally {
+        if (committed) staged.committed();
+        else if (!connection) staged.unproven();
+        await indexStages.flush();
+      }
     }
     await options.passiveBatch?.commit(entries.map((entry) => entry.url));
     sourceCount += 1;
