@@ -487,3 +487,5 @@ export * from '../seo/schema.ts';
 export * from '../tech/schema.ts';
 export * from '../topics/history-schema.ts';
 export * from '../topics/schema.ts';
+
+export * from '../topics/shared-label-schema.ts';

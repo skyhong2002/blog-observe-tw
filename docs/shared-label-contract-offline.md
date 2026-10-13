@@ -23,3 +23,19 @@ payload revision/asOf仍missing，未保存不存在的版本。public token只�
 追加mock覆蓋direct public token與tokenread rejection、fallback後持續public、HTTP-date及10天冷卻到期/極值、短retry sleep期間另一kind不計budget、200空body/204/null/array JSON、非法UTF8；client17＋既有transport12共29pass。其餘redirect任意exception與stream timeout/cap原transport suite涵蓋；未真HTTP/DB/build。
 
 最終獨立 review：Opus actual `claude-opus-5-5`、finish_reason=stop（`.reviews/f3-f4-independent/b3-client-opus.json`）；採納 B1 及 N1/N2，N3 以未接線及 caller reuse/budget 契約明列。Sol 非作者 instance 複審全部修訂無 blocker（`.reviews/b0-f4/b3-client-independent-review.md`）。client commit `ffe63cd`；正式資料與頁面接線仍未完成。
+
+## 本地快照與手動 producer（基底 104da1f；未部署）
+
+頁面只能呼叫 `loadSharedLabelSnapshot(pool,label,kind,now?)`，兩 kind 各自 fresh SQL，不呼叫 tag。DTO：status ready/missing/unavailable、fetchedAt/expiresAt、sourceContractSha、payloadVersion=null；ready 才有重新驗證的 data。Exact UTF-8 label SHA＋kind 為 key，SQL BINARY exact label 再核身分；不正規化詞，不存 token、raw payload、account 或虛構 payload revision。Source contract SHA 是 parser 契約版本，不是上游 runtime/data SHA。
+
+0021 新增快照表，0022 新增 singleton tag cooldown。兩份 migration/meta 僅離線產生，未套 DB。快照24小時到期，失效／版本不符／parser失敗一律 unavailable，不回舊 ready。UTC 日期依既有 createDb timezone Z/dateStrings:false，store只接受 Date driver 結果，不猜字串時區。fetchedAt 在非ready資料代表 producer 本地狀態取得／失敗嘗試完成時間，不宣稱成功上游觀測時間。expiresAt 是消費期限，不是上游資料版本。
+
+`syncSharedLabels` 預設 dry-run 或 disabled。最多10個 root 提供的 exact labels，每 label/kind wire前與外送後以 root `isPublicSharedLabelTopic` 核當下公開 blog-topic evidence；選字檔本身不構成授權。不掃來源473萬詞、不建新頁。每kind在I/O前先持久化 unavailable/null DTO，故 crash或最後寫入失敗不會復活舊ready；失敗不拖其他kind，但任何429先持久化 MAX retryAt 再停止整批。控制表用 BIGINT epoch，可存最大JS Date，不受MySQL DATETIME截短；每新batch及wire前重讀，因此重開client/CLI無法繞過冷卻。
+
+每 wire/fallback/retry 先 reserve 既有 work_budgets 的 shared-label:wire，UTC每日預設40次；同名DB GET_LOCK保證一個producer。producer lease整批30秒、DB普通操作1500ms、data SQL MariaDB250ms＋driver500ms。兩個 admission包含未settle的pool acquisition，caller timeout不釋槽；晚到connection不做SQL，poison connection不回pool。交易控制語句使用driver/整體deadline，資料DML/SELECT另有server250ms。
+
+手動CLI `node tools/shared-label-sync.ts --selection <small-json>` 預設dry-run（零DB/HTTP）；`--apply` 還須 BLOG_SHARED_LABEL_SYNC_ENABLED exact true 才開producer，root validator不能省略。此輪從未執行CLI、真HTTP、DB或build。mock測試與typecheck由實作者執行；SQL entry `runSharedLabelStoreIntegration(pool)` 只供既有18169 disposable runner，未由實作者執行。公開讀取旗標、route/privacy gate由root接線，本文不宣稱已live。
+
+最後producer小修：store lease與sync/transport共用30秒常數，batch開始固定epoch deadline；開始每kind與preinvalidate/prewire重驗，deadline標stopped/stopReason=deadline，未開始kind保留原快照。不新增timer，沿既有lease timer。CLI store/lease/deadline停止為exit1，rate-limit/cooldown/budget預期停批仍明列result。
+
+控制表成功持久化才有跨batch冷卻保證：若cooldown寫入失敗，當批立即停止、CLI非零；不能宣稱跨batch已可靠defer。尚無scheduler且預設off，operator應停止重跑並先修復store/control寫入。兩個admission是低併發安全取捨；canonical label與upstream exact label相符仍待實際資料驗證，公開/同步旗標先defaultoff。

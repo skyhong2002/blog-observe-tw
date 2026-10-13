@@ -15,7 +15,7 @@ try {
   if (
     ![4, 6].includes(process.argv.length) ||
     process.argv[2] !== '--env-file' ||
-    (process.argv.length === 6 && (process.argv[4] !== '--suite' || process.argv[5] !== 'f3-f4'))
+    (process.argv.length === 6 && (process.argv[4] !== '--suite' || !['f3-f4', 'b3'].includes(process.argv[5])))
   )
     throw Error('explicit_private_clone_env_required');
   const file = resolve(process.argv[3]);
@@ -88,6 +88,8 @@ try {
     ['search-recall', '../app/src/search.integration.ts', 'runSearchIntegration'],
     ['profile-evidence', '../app/src/relations/profile-evidence.integration.ts', 'runProfileEvidenceIntegration'],
     ['shared-tags', '../app/src/relations/shared-tags.integration.ts', 'runSharedTagsIntegration'],
+    ['shared-label-selection', '../app/src/topics/shared-label-selection.integration.ts', 'runSharedLabelSelectionIntegration'],
+    ['shared-label-store', '../app/src/topics/shared-label-store.integration.ts', 'runSharedLabelStoreIntegration'],
     ['tech-store', '../app/src/tech/store.integration.ts', 'runTechStoreIntegration'],
     ['tech-routes', '../app/src/tech/routes.integration.ts', 'runTechRoutesIntegration'],
     ['tech-backfill', '../app/src/tech/backfill.integration.ts', 'runTechBackfillIntegration'],
@@ -97,7 +99,9 @@ try {
       ? suites.filter(
           ([label]) => label === 'search-recall' || label === 'profile-evidence' || label === 'shared-tags' || label.startsWith('tech-'),
         )
-      : suites;
+      : process.argv[5] === 'b3'
+        ? suites.filter(([label]) => label.startsWith('shared-label-'))
+        : suites;
   for (const [label, module, entry] of selected) {
     phase = label;
     const result = await (await import(module))[entry](store.pool);

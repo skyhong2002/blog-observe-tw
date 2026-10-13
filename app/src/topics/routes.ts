@@ -7,6 +7,7 @@ import { historyReadsEnabled } from './history-contracts.ts';
 import { durableTopicDetail } from './history-read.ts';
 import { digest, MATCHER_VERSION, normalizeTerm, POLICY_VERSION } from './policy.ts';
 import { PUBLICATION_NOISE_VERSION, publicationExclusionReason, publicationLabelSql } from './publication-noise.ts';
+import { enrichTopicSharedLabels } from './shared-label-enrichment.ts';
 import { SOURCE } from './snapshot-client.ts';
 
 export const matchingPolicy = {
@@ -316,7 +317,12 @@ export function registerTopicRoutes(app: FastifyInstance, pool: Pool) {
         // The detail's authoritative disposition decides status; no earlier preflight can go stale.
         const detail = await topicEvidenceDetail(pool, id, days, true, new Date(), req.query.historyCursor);
         if (!detail) return reply.code(404).send({ error: 'topic_not_found' });
-        return reply.send({ ...metadata(), days, vocabulary: await vocabularyStatus(pool), ...detail });
+        return reply.send({
+          ...metadata(),
+          days,
+          vocabulary: await vocabularyStatus(pool),
+          ...(await enrichTopicSharedLabels(pool, detail)),
+        });
       } catch (error) {
         if (error instanceof Error && error.message === 'topic_gone') return reply.code(410).send({ error: 'topic_gone' });
         throw error;
@@ -324,7 +330,9 @@ export function registerTopicRoutes(app: FastifyInstance, pool: Pool) {
     }
     const result = await cache.get(`detail:${days}:${id}`, async () => {
       const detail = await topicEvidenceDetail(pool, id, days);
-      return detail ? { ...metadata(), days, vocabulary: await vocabularyStatus(pool), ...detail } : null;
+      return detail
+        ? { ...metadata(), days, vocabulary: await vocabularyStatus(pool), ...(await enrichTopicSharedLabels(pool, detail)) }
+        : null;
     });
     return result ?? reply.code(404).send({ error: 'topic_not_found' });
   });

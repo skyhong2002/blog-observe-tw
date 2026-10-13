@@ -148,6 +148,20 @@
       "when": 1791831860686,
       "tag": "0020_passive_blog_technology",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "5",
+      "when": 1791865611400,
+      "tag": "0021_shared_label_snapshots",
+      "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "5",
+      "when": 1791865896108,
+      "tag": "0022_shared_label_sync_cooldown",
+      "breakpoints": true
     }
   ]
 }
