@@ -135,28 +135,42 @@ const item = (r: RowDataPacket) => {
     matchingReason: Number(r.high_frequency) ? 'high-document-frequency-title-only' : null,
   };
 };
-export async function ranking(pool: Pool, days: number, slug?: string, verifiedOnly = true, limit = 100, now = new Date()) {
+export async function ranking(
+  pool: Pool,
+  days: number,
+  slug?: string,
+  verifiedOnly = true,
+  limit = 100,
+  now = new Date(),
+  includeMatchedPosts = false,
+) {
   const args: unknown[] = [...range(days, now)];
   if (slug) args.push(slug);
   const boundedLimit = Math.min(200, Math.max(1, Math.floor(limit)));
   const [rows] = await pool.query<RowDataPacket[]>(
-    `WITH ${evidence(Boolean(slug), verifiedOnly)}, per_blog AS (
-    SELECT r.topic_id,r.label,r.source,r.blog_id,COUNT(*) n,SUM(title_hit) title_n,SUM(1-title_hit) body_n FROM recent r
+    `WITH ${evidence(Boolean(slug), verifiedOnly)},
+    ${includeMatchedPosts ? 'marked AS (SELECT recent.*,ROW_NUMBER() OVER (PARTITION BY post_id ORDER BY topic_id)=1 first_match FROM recent),' : ''}
+    per_blog AS (
+    SELECT r.topic_id,r.label,r.source,r.blog_id,COUNT(*) n,SUM(title_hit) title_n,SUM(1-title_hit) body_n${includeMatchedPosts ? ',SUM(first_match) matched_n' : ''} FROM ${includeMatchedPosts ? 'marked' : 'recent'} r
     GROUP BY r.topic_id,r.label,r.source,r.blog_id)
-    SELECT ranked.*,(SELECT COUNT(*) FROM scoped_posts) recent_total,
+    SELECT ranked.*${includeMatchedPosts ? ',SUM(ranked.matched_n) OVER () matched_posts' : ''},(SELECT COUNT(*) FROM scoped_posts) recent_total,
       fr.total_posts baseline_total,IF(fr.snapshot_id IS NOT NULL,COALESCE(f.high_frequency,0),0) high_frequency,
       IF(f.high_frequency=1,f.title_posts,f.matched_posts) baseline_matched
-    FROM (SELECT topic_id,label,source,SUM(${weightedScore('title_n', 'body_n')}) score,SUM(n) posts,COUNT(*) blogs,SUM(title_n) title_posts,SUM(body_n) body_posts FROM per_blog
-    GROUP BY topic_id,label,source HAVING COUNT(*)>=${slug ? 1 : 2}) ranked
+    FROM (SELECT topic_id,label,source,SUM(${weightedScore('title_n', 'body_n')}) score,SUM(n) posts,COUNT(*) blogs,SUM(title_n) title_posts,SUM(body_n) body_posts${includeMatchedPosts ? ',SUM(matched_n) matched_n' : ''} FROM per_blog
+    GROUP BY topic_id,label,source ${includeMatchedPosts ? '' : `HAVING COUNT(*)>=${slug ? 1 : 2}`}) ranked
     LEFT JOIN topic_current tc ON tc.source=${literal(SOURCE)}
     LEFT JOIN topic_frequency_runs fr ON fr.snapshot_id=tc.snapshot_id AND fr.policy_version=${literal(FREQUENCY_POLICY.version)}
     LEFT JOIN topic_term_frequencies f ON f.snapshot_id=fr.snapshot_id AND f.term_id=SUBSTRING(ranked.topic_id,5)
-    ORDER BY score DESC,blogs DESC,posts DESC,topic_id LIMIT ${boundedLimit + 1}`,
+    ORDER BY ${includeMatchedPosts ? `(blogs>=${slug ? 1 : 2}) DESC,` : ''}score DESC,blogs DESC,posts DESC,topic_id LIMIT ${boundedLimit + 1}`,
     args,
   );
+  // Count each evidence article exactly once before the minimum-blog filter.
+  // Ineligible topic rows remain last so an empty ranking still carries coverage.
+  const eligible = includeMatchedPosts ? rows.filter((row) => Number(row.blogs) >= (slug ? 1 : 2)) : rows;
   return {
-    items: rows.slice(0, boundedLimit).map((row) => ({ ...item(row), ...(slug || !verifiedOnly ? { lift: null } : {}) })),
-    truncated: rows.length > boundedLimit,
+    ...(includeMatchedPosts ? { matchedPosts: Number(rows[0]?.matched_posts ?? 0) } : {}),
+    items: eligible.slice(0, boundedLimit).map((row) => ({ ...item(row), ...(slug || !verifiedOnly ? { lift: null } : {}) })),
+    truncated: eligible.length > boundedLimit,
   };
 }
 /** Resolve retained source IDs without allowing native feed categories to extend the tag dictionary. */
@@ -268,10 +282,11 @@ export function registerTopicRoutes(app: FastifyInstance, pool: Pool) {
   const metadata = () => ({ generatedAt: new Date().toISOString(), cacheSeconds: cache.ttlMs / 1000, matchingPolicy });
   app.get<{ Querystring: { days?: string } }>('/api/topics', async (req, reply) => {
     const days = daysValue(req.query.days);
+    reply.header('cache-control', 'no-store');
     if (!days) return reply.code(400).send({ error: 'invalid_days' });
     return cache.get(`rank:${days}`, async () => {
       const now = new Date();
-      const results = await ranking(pool, days, undefined, true, 100, now);
+      const [results, vocabulary] = await Promise.all([ranking(pool, days, undefined, true, 100, now, true), vocabularyStatus(pool)]);
       const dates = range(days, now);
       const [[coverage]] = await pool.query<RowDataPacket[]>(
         `SELECT COUNT(*) datedPosts,COALESCE(SUM(cb.status='ok' OR o.status='ok'),0) bodyObservedPosts FROM posts p JOIN blogs b ON b.id=p.blog_id ${topicBodyJoins} WHERE p.published_at>=? AND p.published_at<=? AND b.status='verified'`,
@@ -279,10 +294,6 @@ export function registerTopicRoutes(app: FastifyInstance, pool: Pool) {
       );
       const [[undated]] = await pool.query<RowDataPacket[]>(
         "SELECT COUNT(*) unknownDatePosts FROM posts p JOIN blogs b ON b.id=p.blog_id WHERE p.published_at IS NULL AND b.status='verified'",
-      );
-      const [[matched]] = await pool.query<RowDataPacket[]>(
-        `WITH ${evidence()} SELECT COUNT(DISTINCT post_id) matchedPosts FROM recent`,
-        dates,
       );
       const [[capped]] = await pool.query<RowDataPacket[]>(
         "SELECT COUNT(*) n FROM topic_post_indexes_v3 i JOIN topic_current c ON c.snapshot_id=i.snapshot_id AND c.source=? WHERE i.status='capped' AND i.matcher_version=?",
@@ -292,15 +303,16 @@ export function registerTopicRoutes(app: FastifyInstance, pool: Pool) {
         ...metadata(),
         days,
         source: 'tag-vocabulary',
-        vocabulary: await vocabularyStatus(pool),
+        vocabulary,
         coverage: {
           datedPosts: Number(coverage.datedPosts ?? 0),
           unknownDatePosts: Number(undated.unknownDatePosts ?? 0),
           bodyObservedPosts: Number(coverage.bodyObservedPosts ?? 0),
-          matchedPosts: Number(matched.matchedPosts),
+          matchedPosts: results.matchedPosts ?? 0,
           cappedPosts: Number(capped.n),
         },
-        ...results,
+        items: results.items,
+        truncated: results.truncated,
         minimumBlogs: 2,
         limit: 100,
       };

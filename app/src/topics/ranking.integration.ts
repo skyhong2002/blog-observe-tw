@@ -110,6 +110,31 @@ export async function runTopicRankingIntegration(pool: Pool) {
       matchingRule: 'title-and-body',
       matchingReason: null,
     });
+    const withCoverage = await ranking(pool, 30, undefined, true, 100, now, true);
+    assert.equal(withCoverage.matchedPosts, 6, 'title/body overlap counts one distinct article');
+    assert.deepEqual(withCoverage.items, result.items);
+    await pool.execute("UPDATE blogs SET status='seed' WHERE id=?", [blogs[1]]);
+    const singleBlog = await ranking(pool, 30, undefined, true, 100, now, true);
+    assert.equal(singleBlog.matchedPosts, 3, 'no eligible ranking still retains public article coverage');
+    assert.deepEqual(singleBlog.items, []);
+    await pool.execute("UPDATE blogs SET status='verified' WHERE id=?", [blogs[1]]);
+    const extraId = digest('旅行');
+    await pool.execute(
+      'INSERT INTO topic_canonical_terms_v3(snapshot_id,id,normalized_label,label,occurrences,policy_version) VALUES (?,?,?,?,?,?)',
+      [snapshot, extraId, '旅行', '旅行', 10, POLICY_VERSION],
+    );
+    for (const postId of [posts[0], posts[3]])
+      await pool.execute("INSERT INTO topic_matches_v3(post_id,term_id,snapshot_id,source) VALUES (?,?,?,'body')", [
+        postId,
+        extraId,
+        snapshot,
+      ]);
+    const limited = await ranking(pool, 30, undefined, true, 1, now, true);
+    assert.equal(limited.matchedPosts, 6, 'multiple topics and outer LIMIT never inflate or truncate coverage');
+    assert.equal(limited.items.length, 1);
+    assert.equal(limited.truncated, true);
+    await pool.execute('DELETE FROM topic_matches_v3 WHERE snapshot_id=? AND term_id=?', [snapshot, extraId]);
+    await pool.execute('DELETE FROM topic_canonical_terms_v3 WHERE snapshot_id=? AND id=?', [snapshot, extraId]);
     const perBlog = await topicEvidenceDetail(pool, `tag:${digest('AI')}`, 30, true, now);
     assert.ok(perBlog);
     assert.equal(perBlog.topic.canonicalId, `tag:${digest('ai')}`);
