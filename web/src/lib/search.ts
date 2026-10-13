@@ -1,21 +1,67 @@
 /**
- * Full-text search over recently collected posts via the gateway's /api/search.
- * The page shows the API's short snippet (≤240 characters) and never any
- * further body text. Pure helpers only (node --test imports this file); the
- * gateway call lives in search-api.ts.
+ * Search via the gateway's /api/search (app/src/search.ts): a metadata match over
+ * the latest ingested posts, plus, when the gateway enables it, a partial index
+ * of collected article bodies (app/src/search-body-index.ts). The page shows the
+ * API's short snippet (≤240 characters) and never any further body text.
+ * normalizeSearch keeps an explicit allowlist: no input key reaches the view
+ * unless it is listed and typed here. Pure helpers only (node --test imports
+ * this file).
  */
-import type { Post } from './api';
+import type { Post, Tag } from './api';
 
 export const SEARCH_LIMIT = 20;
 export const SNIPPET_MAX = 240;
 export const QUERY_MAX = 100;
 export type MatchSource = 'body' | 'metadata';
-export type SearchItem = Post & { snippet: string | null; matchSource: MatchSource | null };
+/** Where the shown snippet was taken from (app/src/search.ts contextSource, search-body-index.ts). */
+export const CONTEXT_SOURCES = ['title', 'summary', 'blog-name', 'tag', 'body', 'metadata'] as const;
+export type ContextSource = (typeof CONTEXT_SOURCES)[number];
+/** Per-hit evidence; null is "not provided" (older gateways, or a value this page does not accept). */
+export type SearchEvidence = {
+  articleId: number | null;
+  matchVersion: string | null;
+  contextSource: ContextSource | null;
+  snippetNormalization: string | null;
+};
+export type SearchItem = Post & { snippet: string | null; matchSource: MatchSource | null } & SearchEvidence;
+export const HISTORICAL_STATUSES = ['not-enabled', 'short-query', 'partial', 'unavailable'] as const;
+/** coverage.historicalBody; `unrecognized` is a status this page does not know, shown as not provided. */
+export type HistoricalBodyCoverage = {
+  status: (typeof HISTORICAL_STATUSES)[number] | 'unrecognized';
+  indexVersion: string | null;
+  normalization: string | null;
+  scope: string | null;
+  prefixCodepoints: number | null;
+  rawBodyByteLimit: number | null;
+  candidateLimit: number | null;
+  candidates: number | null;
+  candidateTruncated: boolean | null;
+  staleOrIneligible: number | null;
+  invalidUtf8: number | null;
+  overcap: number | null;
+  prefixTruncatedCandidates: number | null;
+  /** The gateway says 'unknown': it does not know how many articles have no index entry. */
+  unindexed: number | 'unknown' | null;
+  /** Only `false` is kept: a claimed exhaustive search is not something this page repeats. */
+  exhaustive: false | null;
+};
+export type SearchCoverage = {
+  type: string | null;
+  /** The metadata scope: the latest `limit` ingested posts. null: not provided, never assumed. */
+  limit: number | null;
+  scannedPosts: number | null;
+  truncated: boolean | null;
+  metadataFields: string[] | null;
+  /** null: an older gateway that sends no historical-body coverage at all. */
+  historicalBody: HistoricalBodyCoverage | null;
+  statementTimeoutMs: number | null;
+  maximumStatements: number | null;
+};
 export type SearchResult = {
   items: SearchItem[];
   page: number;
   hasMore: boolean;
-  coverage: { limit: number; scannedPosts: number | null; truncated: boolean };
+  coverage: SearchCoverage;
   query: string;
   generatedAt: string | null;
 };
@@ -64,34 +110,142 @@ export function clampSnippet(value: unknown): string | null {
   return chars.length > SNIPPET_MAX ? `${chars.slice(0, SNIPPET_MAX - 1).join('')}…` : text;
 }
 
+const positive = (value: unknown) => (Number.isSafeInteger(value) && (value as number) > 0 ? (value as number) : null);
+const flag = (value: unknown) => (typeof value === 'boolean' ? value : null);
+/** A short identifier (version, scope, normalization name); anything else is not provided. */
+const label = (value: unknown) => (typeof value === 'string' && /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/.test(value) ? value : null);
+const shortText = (value: unknown, max: number) => (typeof value === 'string' ? value.slice(0, max) : undefined);
+const nullableText = (value: unknown, max: number) => (value === null ? null : shortText(value, max));
+/** Only http(s) links leave the page; anything else is dropped (the item shows no link). */
+const webUrl = (value: unknown) => {
+  if (typeof value !== 'string' || value.length > 2048) return null;
+  try {
+    const url = new URL(value);
+    return (url.protocol === 'http:' || url.protocol === 'https:') && !url.username && !url.password ? value : null;
+  } catch {
+    return null;
+  }
+};
+const isoDate = (value: unknown) => (typeof value === 'string' && Number.isFinite(Date.parse(value)) ? value : null);
+const METADATA_FIELDS = ['title', 'summary', 'blog-name', 'public-tags'];
+
+/** The public post keys a list row renders (app/src/public-post.ts PUBLIC_POST_FIELDS and Post); nothing else is copied. */
+function postOf(item: Record<string, unknown>, title: string): Post {
+  const post: Post = { title: title.slice(0, 500) };
+  const id = positive(item.id);
+  if (id !== null) post.id = id;
+  const guid = shortText(item.guid, 500);
+  if (guid !== undefined) post.guid = guid;
+  if (item.url !== undefined) post.url = webUrl(item.url);
+  const summary = nullableText(item.summary, 2000);
+  if (summary !== undefined) post.summary = summary;
+  const author = nullableText(item.author, 200);
+  if (author !== undefined) post.author = author;
+  if (item.publishedAt !== undefined) post.publishedAt = isoDate(item.publishedAt);
+  if (item.imageUrl !== undefined) post.imageUrl = webUrl(item.imageUrl);
+  if (typeof item.blogSlug === 'string' && /^[\p{L}\p{N}_.-]{1,255}$/u.test(item.blogSlug)) post.blogSlug = item.blogSlug;
+  const blogName = shortText(item.blogName, 200);
+  if (blogName !== undefined) post.blogName = blogName;
+  if (typeof item.blogCanonicalPath === 'string' && /^\/blogs\/[^/?#\s\\]{1,765}\/$/.test(item.blogCanonicalPath))
+    post.blogCanonicalPath = item.blogCanonicalPath;
+  if (Array.isArray(item.tags)) {
+    const tags = item.tags
+      .filter((tag): tag is Record<string, unknown> => record(tag) && typeof tag.slug === 'string' && typeof tag.label === 'string')
+      .slice(0, 20)
+      .map((tag) => ({ slug: (tag.slug as string).slice(0, 255), label: (tag.label as string).slice(0, 255) }) as Tag);
+    if (tags.length) post.tags = tags;
+  }
+  return post;
+}
+
+function historicalBodyOf(value: unknown): HistoricalBodyCoverage | null {
+  if (!record(value)) return null;
+  const status = HISTORICAL_STATUSES.find((known) => known === value.status) ?? 'unrecognized';
+  return {
+    status,
+    indexVersion: label(value.indexVersion),
+    normalization: label(value.normalization),
+    scope: label(value.scope),
+    prefixCodepoints: positive(value.prefixCodepoints),
+    rawBodyByteLimit: positive(value.rawBodyByteLimit),
+    candidateLimit: positive(value.candidateLimit),
+    candidates: count(value.candidates),
+    candidateTruncated: flag(value.candidateTruncated),
+    staleOrIneligible: count(value.staleOrIneligible),
+    invalidUtf8: count(value.invalidUtf8),
+    overcap: count(value.overcap),
+    prefixTruncatedCandidates: count(value.prefixTruncatedCandidates),
+    unindexed: value.unindexed === 'unknown' ? 'unknown' : count(value.unindexed),
+    exhaustive: value.exhaustive === false ? false : null,
+  };
+}
+
+function coverageOf(value: unknown): SearchCoverage {
+  const coverage = record(value) ? value : {};
+  const metadata = record(coverage.metadata) ? coverage.metadata : null;
+  const fields =
+    metadata && Array.isArray(metadata.fields)
+      ? metadata.fields.filter((field): field is string => METADATA_FIELDS.includes(field as string))
+      : null;
+  return {
+    type: label(coverage.type),
+    limit: positive(coverage.limit),
+    scannedPosts: count(coverage.scannedPosts),
+    truncated: flag(coverage.truncated),
+    metadataFields: fields,
+    historicalBody: historicalBodyOf(coverage.historicalBody),
+    statementTimeoutMs: positive(coverage.statementTimeoutMs),
+    maximumStatements: positive(coverage.maximumStatements),
+  };
+}
+
 export function normalizeSearch(raw: unknown, asked: SearchParams): SearchResult | null {
   if (!record(raw) || !Array.isArray(raw.items)) return null;
   const pagination = record(raw.pagination) ? raw.pagination : {};
-  const coverage = record(raw.coverage) ? raw.coverage : {};
   const items = raw.items.filter(record).flatMap((item): SearchItem[] => {
     if (typeof item.title !== 'string') return [];
-    const { snippet, matchSource, body: _body, content: _content, ...post } = item;
+    const matchSource = item.matchSource === 'body' || item.matchSource === 'metadata' ? item.matchSource : null;
     return [
       {
-        ...(post as Post),
-        snippet: clampSnippet(snippet),
-        matchSource: matchSource === 'body' || matchSource === 'metadata' ? matchSource : null,
+        ...postOf(item, item.title),
+        snippet: clampSnippet(item.snippet),
+        matchSource,
+        articleId: positive(item.articleId),
+        matchVersion: label(item.matchVersion),
+        contextSource: CONTEXT_SOURCES.find((source) => source === item.contextSource) ?? null,
+        snippetNormalization: label(item.snippetNormalization),
       },
     ];
   });
   return {
     items: items.slice(0, SEARCH_LIMIT),
-    page: count(pagination.page) || asked.page,
+    page: positive(pagination.page) ?? asked.page,
     hasMore: pagination.hasMore === true,
-    coverage: {
-      limit: count(coverage.limit) || 1000,
-      scannedPosts: count(coverage.scannedPosts),
-      truncated: coverage.truncated === true,
-    },
+    coverage: coverageOf(raw.coverage),
     query: typeof raw.query === 'string' ? raw.query.slice(0, QUERY_MAX) : asked.q,
-    generatedAt: typeof raw.generatedAt === 'string' && Number.isFinite(Date.parse(raw.generatedAt)) ? raw.generatedAt : null,
+    generatedAt: isoDate(raw.generatedAt),
   };
 }
+
+export const MISSING = '未提供';
+const CONTEXT_LABELS: Record<ContextSource, string> = {
+  title: '標題',
+  summary: '公開摘要',
+  'blog-name': '部落格名稱',
+  tag: '公開標籤',
+  body: '已建索引的正文前段',
+  metadata: '標題或摘要',
+};
+/** Where the snippet came from, as the gateway said; never inferred from matchSource. */
+export const contextSourceText = (source: ContextSource | null) => (source ? CONTEXT_LABELS[source] : MISSING);
+export const countText = (value: number | null) => (value === null ? MISSING : value.toLocaleString('zh-TW'));
+/** A byte limit as the gateway sent it: whole KiB when exact, bytes otherwise. */
+export const bytesText = (value: number | null) =>
+  value === null
+    ? MISSING
+    : value % 1024 === 0
+      ? `${(value / 1024).toLocaleString('zh-TW')} KiB`
+      : `${value.toLocaleString('zh-TW')} bytes`;
 
 /** Gateway path for one search page. */
 export function searchPath(asked: SearchParams): string {

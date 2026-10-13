@@ -4,6 +4,7 @@ import Link from '@/components/NoPrefetchLink';
 import SourceLink from '@/components/SourceLink';
 import { type Post, plainText, taipei } from '@/lib/api';
 import { blogLink } from '@/lib/page-links';
+import { contextSourceText, MISSING, type SearchEvidence } from '@/lib/search';
 
 /** Markup copied from tag.observe.tw ArticleListItem, commit afe0a65.
  * Blog data keeps source links and tags; news-only discovery/attribution is omitted. */
@@ -11,12 +12,15 @@ export default function ArticleListItem({
   post,
   snippet,
   matchSource,
+  evidence,
 }: {
   post: Post;
   /** Search hit context from /api/search, already plain text and ≤240 characters. */
   snippet?: string | null;
   /** Where the search matched; shown as a small label beside the snippet. */
   matchSource?: 'body' | 'metadata' | null;
+  /** Search hits only: the gateway's article id, match version and snippet source, each 未提供 when not sent. */
+  evidence?: SearchEvidence;
 }) {
   const article = {
     ...post,
@@ -55,10 +59,21 @@ export default function ArticleListItem({
             <p className="mt-1 line-clamp-3 text-xs leading-5 text-zinc-600 dark:text-zinc-400">
               {matchSource && (
                 <span className="mr-1.5 rounded bg-brand-50 px-1 text-[10px] text-brand-800 dark:bg-brand-950 dark:text-brand-300">
-                  {matchSource === 'body' ? '內文相符' : '標題或摘要相符'}
+                  {matchSource === 'body' ? '內文相符' : '公開資料相符'}
                 </span>
               )}
               {snippet}
+            </p>
+          )}
+          {evidence && (
+            <p data-search-evidence="" className="mt-0.5 text-[11px] leading-5 text-zinc-500 dark:text-zinc-400">
+              {evidence.articleId === null ? `文章 ID ${MISSING}` : `文章 #${evidence.articleId}`} · 比對版本{' '}
+              {evidence.matchVersion ?? MISSING} · 片段來源 {contextSourceText(evidence.contextSource)}
+              {evidence.snippetNormalization === 'NFKC-then-lowercase'
+                ? ' · 片段經 NFKC 與小寫正規化，大小寫可能與原文不同'
+                : evidence.snippetNormalization
+                  ? ` · 片段正規化 ${evidence.snippetNormalization}`
+                  : ''}
             </p>
           )}
           {!snippet && article.description && (

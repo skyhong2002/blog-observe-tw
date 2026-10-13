@@ -8,7 +8,19 @@ import Link from '@/components/NoPrefetchLink';
 import SectionTabs from '@/components/SectionTabs';
 import { type Post, taipei } from '@/lib/api';
 import { blogHref } from '@/lib/page-links';
-import { normalizeSearch, QUERY_MAX, type SearchParams, type SearchResult, searchHref, searchParamsOf, searchPath } from '@/lib/search';
+import {
+  bytesText,
+  countText,
+  type HistoricalBodyCoverage,
+  MISSING,
+  normalizeSearch,
+  QUERY_MAX,
+  type SearchParams,
+  type SearchResult,
+  searchHref,
+  searchParamsOf,
+  searchPath,
+} from '@/lib/search';
 import { type PublicLoad, usePublicJson } from '@/lib/use-public-json';
 
 function Pager({ asked, result }: { asked: SearchParams; result: SearchResult }) {
@@ -34,15 +46,55 @@ function Pager({ asked, result }: { asked: SearchParams; result: SearchResult })
   );
 }
 
+/** The historical-body part of the scope, in the gateway's own terms; no state is read as "none found" or "everything". */
+function historicalBodyText(body: HistoricalBodyCoverage | null) {
+  if (!body) return '歷史正文搜尋：此搜尋服務未提供正文索引的範圍，無法說明是否查過較早文章的正文。';
+  switch (body.status) {
+    case 'not-enabled':
+      return '歷史正文搜尋目前未開啟：較早文章的正文沒有被搜尋。';
+    case 'short-query':
+      return '關鍵字少於 3 個字，這次沒有使用歷史正文索引；這不代表較早文章的正文沒有提到它。';
+    case 'unavailable':
+      return '歷史正文索引這次無法使用；這不代表較早文章的正文沒有提到它。';
+    case 'partial':
+      return `歷史正文搜尋只比對已建索引文章的正文前 ${countText(body.prefixCodepoints)} 個字（原始正文上限 ${bytesText(body.rawBodyByteLimit)}），最多取 ${countText(body.candidateLimit)} 篇候選${body.candidateTruncated === true ? '，本次候選已達上限，可能還有未列出的文章' : ''}；未建索引的文章與正文後段不在範圍內，並非全站全文搜尋。`;
+    default:
+      return `歷史正文搜尋：範圍${MISSING}。`;
+  }
+}
+
 function Coverage({ result }: { result: SearchResult }) {
-  const { limit, scannedPosts, truncated } = result.coverage;
+  const { limit, scannedPosts, truncated, historicalBody: body } = result.coverage;
   return (
-    <p className="text-xs leading-5 text-zinc-500 dark:text-zinc-400">
-      搜尋範圍是最近收錄的最多 {limit.toLocaleString('zh-TW')} 篇文章
-      {scannedPosts !== null && `（本次查找 ${scannedPosts.toLocaleString('zh-TW')} 篇）`}，
-      {truncated ? '更早的文章不在範圍內' : '可能不是全部歷史文章'}。結果只顯示片段，全文請至原站閱讀。
-      {result.generatedAt && ` ${taipei(result.generatedAt)} 更新。`}
-    </p>
+    <div className="space-y-1 text-xs leading-5 text-zinc-500 dark:text-zinc-400" data-search-coverage="">
+      <p>
+        標題、摘要、部落格名稱與公開標籤：
+        {limit === null ? `查找範圍${MISSING}` : `只查最近收錄的最多 ${limit.toLocaleString('zh-TW')} 篇`}
+        （本次查找 {countText(scannedPosts)} 篇）
+        {truncated === true ? '，更早收錄的文章不在這部分的範圍內' : ''}。
+      </p>
+      <p>{historicalBodyText(body)}</p>
+      <p>
+        結果只顯示短片段，全文請至原站閱讀。
+        {result.generatedAt && ` ${taipei(result.generatedAt)} 更新。`}
+      </p>
+      {body?.status === 'partial' ? (
+        <details className="group">
+          <summary className="cursor-pointer text-brand-700 hover:underline dark:text-brand-400">正文索引的比對細節</summary>
+          <ul className="mt-1 space-y-0.5">
+            <li>
+              索引版本 {body.indexVersion ?? MISSING} · 正規化 {body.normalization ?? MISSING} · 範圍 {body.scope ?? MISSING}
+            </li>
+            <li>
+              本次候選 {countText(body.candidates)} 篇；過期或不符資格 {countText(body.staleOrIneligible)}、超過大小上限{' '}
+              {countText(body.overcap)}、編碼無效 {countText(body.invalidUtf8)}、正文超過索引前段{' '}
+              {countText(body.prefixTruncatedCandidates)} 篇。
+            </li>
+            <li>未建索引的文章數：{body.unindexed === 'unknown' ? '未知' : countText(body.unindexed)}。</li>
+          </ul>
+        </details>
+      ) : null}
+    </div>
   );
 }
 
@@ -71,7 +123,13 @@ function SearchResults({ asked, search }: { asked: SearchParams; search: PublicL
         <>
           <ul className="divide-y divide-zinc-200 dark:divide-zinc-800" aria-label={`「${asked.q}」的搜尋結果`}>
             {result.items.map((item) => (
-              <ArticleListItem key={item.id ?? item.url ?? item.title} post={item} snippet={item.snippet} matchSource={item.matchSource} />
+              <ArticleListItem
+                key={item.articleId ?? item.id ?? item.url ?? item.title}
+                post={item}
+                snippet={item.snippet}
+                matchSource={item.matchSource}
+                evidence={item}
+              />
             ))}
           </ul>
           <Pager asked={asked} result={result} />
@@ -79,7 +137,9 @@ function SearchResults({ asked, search }: { asked: SearchParams; search: PublicL
       ) : (
         <div role="status" className="py-8 text-sm text-zinc-600 dark:text-zinc-400">
           <p>{result.page > 1 ? `「${asked.q}」沒有更多結果了。` : `在搜尋範圍內找不到「${asked.q}」。`}</p>
-          <p className="mt-2 text-xs text-zinc-500 dark:text-zinc-400">較早的文章可能不在範圍內；可以換個關鍵字，或到部落格頁面瀏覽。</p>
+          <p className="mt-2 text-xs text-zinc-500 dark:text-zinc-400">
+            只查了上方說明的範圍，找不到不代表其他文章沒有提到它；可以換個關鍵字，或到部落格頁面瀏覽。
+          </p>
           {result.page > 1 && (
             <Link className="mt-3 inline-block text-brand-700 dark:text-brand-400" href={searchHref({ ...asked, page: 1 })}>
               ← 回到第 1 頁
