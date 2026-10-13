@@ -1,29 +1,47 @@
 'use client';
 
 import { usePathname } from 'next/navigation';
+import { shareExplanation } from '@/lib/relations';
 import { METHOD_HREF } from '@/lib/site-nav';
 import Link from './NoPrefetchLink';
 
 const inlineLink = 'text-brand-700 underline underline-offset-2 dark:text-brand-400';
+const heading = 'font-medium text-zinc-900 dark:text-zinc-100';
+
+// Pages that show relations: one blog's profile (BlogRelations links here) and the
+// site-wide map. Not the /blogs/ directory, nor anything under a profile.
+export const RELATIONS_METHOD = /^\/(blogs\/[^/]+|relations)\/?$/;
 
 // Which method blocks explain which pages; anything unlisted gets 資料來源.
-function sectionsFor(_pathname: string) {
+function sectionsFor(pathname: string) {
   return (
     <>
-      <h3 className="font-medium text-zinc-900 dark:text-zinc-100">資料來源</h3>
+      <h3 className={heading}>資料來源</h3>
       <p>
         從部落格公開的 RSS、Atom 與 sitemap 收錄文章標題、摘要及原文連結，保留來源與發現路徑。部落格更新頻率不同，不以最近發文日期判定失效。
       </p>
       <p>標籤保留原站、社群與人工整理的來源；同名作者不會自動跨站合併。候選站經確認後才納入追蹤。</p>
+      {RELATIONS_METHOD.test(pathname) ? (
+        <>
+          <h3 className={heading}>引用與交流</h3>
+          <p>
+            正文直接引用：同一篇對同一站重複連結只算 1 篇；兩個方向的提及各自保留文章日期，相隔多久都只表示雙方都曾提及，不代表同時互動。
+          </p>
+          <p>{shareExplanation}</p>
+          <p>非正文連結來自 Blogroll、側欄與留言，與正文分開保存，不進入篇數、排行或全站關係圖。</p>
+          <p>共同標籤比的是發布者自己替文章加的原始標籤，不是本站的標籤詞庫；標籤相同不代表引用、交流或內容相似。</p>
+          <p>文字相似目前沒有計算，因此不顯示任何百分比或相似文章。</p>
+        </>
+      ) : null}
     </>
   );
 }
 
-// Topic pages render this block themselves, after their content, with the payload's
-// vocabulary and coverage notes (components/public/TopicMethod.tsx); the layout's
-// footer leaves it out there so a page never has two. When the topic page never
+// Topic pages and /tech/ render this block themselves, after their content, with the
+// payload's notes (components/public/TopicMethod.tsx, TechStats.tsx); the layout's
+// footer leaves it out there so a page never has two. When that page never
 // mounts (app/error.tsx, app/not-found.tsx), TopicMethodFallback renders it instead.
-export const OWN_METHOD = /^\/topics(\/|$)/;
+export const OWN_METHOD = /^\/(topics|tech)(\/|$)/;
 
 // The footer's collapsible 資料來源與計算方式: the blocks for this page, the page's
 // own notes, then a link to the full write-up. Hidden on that page itself.

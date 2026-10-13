@@ -6,7 +6,7 @@
  *
  * Shapes follow the gateway routes (app/src/overview.js, catalog.js,
  * catalog-authors.js, search.ts, topics/routes.ts, relations/routes.ts,
- * v1/similarweb-routes.ts, ai/routes.ts, content/routes.ts and app.js). Only
+ * v1/similarweb-routes.ts, ai/routes.ts, content/routes.ts, tech/routes.ts and app.js). Only
  * containers and the keys the pages index into are required, never that a
  * list is non-empty: an empty list, a null profile or "unavailable" vocabulary
  * are valid answers. Pure: node --test imports this file.
@@ -30,6 +30,173 @@ const rows = (value: unknown, checks: Record<string, (value: unknown) => boolean
 const pagination = (value: unknown) => shape(value, { page: number, pages: number, pageSize: number, total: number });
 const topicItems = (value: unknown) => rows(value, { id: text, label: text });
 const relationCoverage = (value: unknown) => shape(value, { nonBodyLinks: object });
+const boolean = (value: unknown) => typeof value === 'boolean';
+const count = (value: unknown) => Number.isSafeInteger(value) && (value as number) >= 0;
+const oneOf =
+  (...values: string[]) =>
+  (value: unknown) =>
+    values.includes(value as string);
+
+/**
+ * One link row of readBlogRelations (projectEvidence). The five keys every gateway sent (postTitle, postUrl,
+ * targetUrl, anchor, publishedAt) are required; anchor may be null although the column is NOT NULL, read
+ * leniently. The newer ones, postId included, may be absent (shown as 未提供) but, when sent, must be what
+ * BlogRelations renders: an object or array there would pass `rows` and then fail in React, outside the
+ * section's own error handling.
+ */
+const relationEvidence = {
+  postTitle: text,
+  postUrl: text,
+  targetUrl: text,
+  anchor: nullable(text),
+  publishedAt: nullable(text),
+  postId: optional(count),
+  sourceBlogId: optional(count),
+  targetBlogId: optional(nullable(count)),
+  location: optional(nullable(text)),
+  context: optional(nullable(text)),
+  observedAt: optional(nullable(text)),
+  matchVersion: optional(nullable(text)),
+  evidenceType: optional(text),
+  contextSource: optional(nullable(text)),
+};
+/**
+ * app/src/relations/shared-tags.ts and readBlogRelations: off, unavailable, or ready with every key the rows show.
+ * A ready answer is a list (possibly empty) whose truncation is stated; another status is not this contract.
+ * The tag provenance keys are newer than the hit itself: absent is 未提供, sent is text.
+ */
+const sharedTagHit = {
+  sourceArticleId: count,
+  sourceArticleUrl: text,
+  sourceArticleTitle: text,
+  sourceArticlePublishedAt: text,
+  targetArticleId: count,
+  targetArticleUrl: text,
+  targetArticleTitle: text,
+  targetArticlePublishedAt: text,
+  targetBlogId: count,
+  targetBlogSlug: optional(text),
+  targetBlogName: text,
+  tagId: count,
+  label: text,
+  sourceType: optional(text),
+  lastSeenAt: optional(text),
+  targetSourceType: optional(text),
+  targetLastSeenAt: optional(text),
+  tagSourceType: optional(text),
+  tagLastSeenAt: optional(text),
+  matchVersion: text,
+};
+const sharedTags = (value: unknown) => {
+  if (!shape(value, { status: oneOf('not-enabled', 'unavailable', 'ready') })) return false;
+  if (value.status === 'not-enabled') return true;
+  if (value.status === 'unavailable') return text(value.matchVersion);
+  return shape(value, {
+    days: count,
+    items: (items) => rows(items, sharedTagHit),
+    truncated: boolean,
+    sourceTagsTruncated: boolean,
+    matchVersion: text,
+    interpretation: text,
+  });
+};
+
+const techStatus = oneOf('detected', 'unknown', 'failed', 'blocked', 'not-observed');
+const techCategory = oneOf('cms', 'framework', 'theme', 'plugin', 'analytics', 'hosting', 'cdn');
+const techErrorCode = oneOf('robots', 'waf', 'rate-limit', 'http-error', 'timeout', 'network', 'invalid-response');
+/** app/src/tech/contracts.ts TechCoverage, as projectTechScan copies it: the views read sourceType and htmlTruncated. */
+const techScanCoverage = (value: unknown) =>
+  shape(value, {
+    partial: (v) => v === true,
+    method: (v) => v === 'passive-existing-response',
+    sourceType: oneOf('html', 'body-fragment', 'header'),
+    htmlTruncated: boolean,
+    inspectedNodes: count,
+  });
+const techDetections = (value: unknown) =>
+  rows(value, {
+    id: text,
+    name: text,
+    category: techCategory,
+    version: text,
+    confidence: number,
+    ruleId: text,
+    ruleVersion: text,
+    observedAt: text,
+    evidence: (items) => rows(items, { kind: oneOf('generator', 'asset', 'marker', 'header'), value: text }),
+  });
+/**
+ * One blog of app/src/tech/routes.ts: the views read every one of these keys.
+ * projectTechScan's invariants hold too, so no impossible row is shown as a
+ * state: a success snapshot (observedAt) always carries its coverage; without
+ * one there are no detections; `detected` has detections and `unknown` none;
+ * `not-observed` has no attempt at all.
+ */
+const techBlog = (value: unknown) => {
+  if (
+    !shape(value, {
+      id: count,
+      slug: text,
+      name: text,
+      url: nullable(text),
+      sourceUrl: nullable(text),
+      iconUrl: nullable(text),
+      status: techStatus,
+      observedAt: nullable(text),
+      lastAttemptAt: nullable(text),
+      errorCode: nullable(techErrorCode),
+      evidenceSourceUrl: nullable(text),
+      coverage: nullable(techScanCoverage),
+      detections: techDetections,
+    })
+  )
+    return false;
+  const { status, observedAt, lastAttemptAt, coverage, detections } = value as {
+    status: string;
+    observedAt: string | null;
+    lastAttemptAt: string | null;
+    coverage: unknown;
+    detections: unknown[];
+  };
+  if ((observedAt === null) !== (coverage === null)) return false;
+  if (observedAt === null && detections.length) return false;
+  if (status === 'not-observed') return lastAttemptAt === null && observedAt === null;
+  if (lastAttemptAt === null) return false;
+  if (status === 'detected') return observedAt !== null && detections.length > 0;
+  if (status === 'unknown') return observedAt !== null && detections.length === 0;
+  return true;
+};
+// The page says no extra request is made and the result is partial; a gateway saying otherwise is not this method.
+const techMethod = (value: unknown) =>
+  shape(value, { id: text, partial: (v) => v === true, additionalRequests: (v) => v === false, description: text });
+/**
+ * Status counts are of the scanned blogs (they sum to scannedBlogs), scanned is
+ * at most the public total, and `truncated` says exactly whether some were left
+ * out. A missing or inconsistent count is a failure, never shown as 0.
+ */
+const techCoverage = (value: unknown) => {
+  if (
+    !shape(value, {
+      totalBlogs: count,
+      scannedBlogs: count,
+      truncated: boolean,
+      detected: count,
+      unknown: count,
+      failed: count,
+      blocked: count,
+      notObserved: count,
+    })
+  )
+    return false;
+  const c = value as Record<'totalBlogs' | 'scannedBlogs' | 'detected' | 'unknown' | 'failed' | 'blocked' | 'notObserved', number> & {
+    truncated: boolean;
+  };
+  return (
+    c.scannedBlogs <= c.totalBlogs &&
+    c.truncated === c.totalBlogs > c.scannedBlogs &&
+    c.detected + c.unknown + c.failed + c.blocked + c.notObserved === c.scannedBlogs
+  );
+};
 
 export const PUBLIC_CONTRACTS: Record<PublicKind, (raw: unknown) => boolean> = {
   overview: (raw) =>
@@ -84,7 +251,20 @@ export const PUBLIC_CONTRACTS: Record<PublicKind, (raw: unknown) => boolean> = {
       blog: (value) => shape(value, { slug: text, name: text, authors: optional(rows), tags: optional(rows) }),
       posts: rows,
     }),
-  blogRelations: (raw) => shape(raw, { nodes: rows, outgoing: rows, incoming: rows, evidence: optional(rows), coverage: object }),
+  // The evidence, shared-tag and text-similarity keys are newer than some gateways: absent is "not provided" in the view.
+  blogRelations: (raw) =>
+    shape(raw, {
+      nodes: rows,
+      outgoing: rows,
+      incoming: rows,
+      evidence: optional((items) => rows(items, relationEvidence)),
+      evidenceTruncated: optional(boolean),
+      nonBodyEvidence: optional((items) => rows(items, relationEvidence)),
+      nonBodyEvidenceTruncated: optional(boolean),
+      sharedTags: optional(sharedTags),
+      textSimilarity: optional((value) => shape(value, { status: text })),
+      coverage: object,
+    }),
   blogTopics: (raw) => shape(raw, { items: topicItems, vocabulary: object }),
   blogInference: (raw) =>
     shape(raw, {
@@ -95,6 +275,42 @@ export const PUBLIC_CONTRACTS: Record<PublicKind, (raw: unknown) => boolean> = {
       topics: rows,
     }),
   blogContent: (raw) => shape(raw, { blog: object, sources: rows }),
+  tech: (raw) => {
+    if (
+      !shape(raw, {
+        generatedAt: text,
+        method: techMethod,
+        coverage: techCoverage,
+        technologies: (value) =>
+          rows(value, {
+            id: text,
+            name: text,
+            category: techCategory,
+            blogs: count,
+            versions: (items) => rows(items, { version: text, blogs: count }),
+          }),
+        items: (value) => list(value) && value.every(techBlog),
+        pagination: (value) => shape(value, { limit: count, nextCursor: nullable(text), total: count }),
+        // app/src/tech/routes.ts echoes techFilters: always all three, '' when unset; the view renders them as text.
+        filters: (value) => shape(value, { q: text, technology: text, status: (v) => v === '' || techStatus(v) }),
+      })
+    )
+      return false;
+    const { coverage, technologies, items, pagination } = raw as {
+      coverage: { scannedBlogs: number };
+      technologies: Array<{ blogs: number }>;
+      items: unknown[];
+      pagination: { limit: number; total: number };
+    };
+    // Aggregates and matches come from the scanned cohort only; a page never holds more than it asked for.
+    return (
+      technologies.every((t) => t.blogs <= coverage.scannedBlogs) &&
+      pagination.total <= coverage.scannedBlogs &&
+      items.length <= pagination.limit &&
+      items.length <= pagination.total
+    );
+  },
+  blogTech: (raw) => shape(raw, { generatedAt: text, method: techMethod, blog: techBlog }),
   // Every field: the page's canonical, robots and the stable id of its API reads come from here.
   blogPage: (raw) => pageInfoOf('blog', raw) !== null,
   topicPage: (raw) => pageInfoOf('topic', raw) !== null,

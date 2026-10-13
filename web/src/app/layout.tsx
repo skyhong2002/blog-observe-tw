@@ -6,6 +6,7 @@ import SiteHeader from '@/components/SiteHeader';
 import ThemeSync from '@/components/ThemeSync';
 import TouchTitleHint from '@/components/TouchTitleHint';
 import { SITE_DESCRIPTION, SITE_NAME, SITE_ORIGIN, SITE_TITLE } from '@/lib/seo';
+import { techPublicEnabled } from '@/lib/tech-flag';
 import './globals.css';
 
 // No canonical here: each public page sets its own (lib/seo.ts), so a page
@@ -48,7 +49,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         >
           跳至文章內容
         </a>
-        <SiteHeader />
+        {/* Only this boolean reaches the client; the env itself stays on the server. */}
+        <SiteHeader techEnabled={techPublicEnabled()} />
         <main id="blog-main" className="mx-auto max-w-6xl px-4 py-6">
           {children}
         </main>

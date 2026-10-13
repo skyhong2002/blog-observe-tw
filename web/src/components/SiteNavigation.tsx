@@ -2,14 +2,17 @@
 
 import { usePathname } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
-import { NAV_GROUPS } from '@/lib/site-nav';
+import { navGroupsFor } from '@/lib/site-nav';
 import NavPending from './NavPending';
 import Link from './NoPrefetchLink';
 
-export default function SiteNavigation() {
+/** `techEnabled` comes from the server layout (lib/tech-flag.ts); this client file never reads the env. */
+export default function SiteNavigation({ techEnabled = false }: { techEnabled?: boolean }) {
   const pathname = usePathname();
+  const groups = navGroupsFor({ tech: techEnabled });
   // Nested sections (/media/traffic/ under /media/) light only the deepest match.
-  const section = NAV_GROUPS.flatMap((group) => group.links.map((link) => link.href))
+  const section = groups
+    .flatMap((group) => group.links.map((link) => link.href))
     .filter((href) => `${pathname}/`.startsWith(href))
     .sort((a, b) => b.length - a.length)[0];
   const [open, setOpen] = useState(false);
@@ -69,7 +72,7 @@ export default function SiteNavigation() {
         className={`${open ? 'flex' : 'hidden'} absolute inset-x-0 top-full flex-col gap-3 border-b border-zinc-200 bg-white p-3 text-sm shadow-lg dark:border-zinc-800 dark:bg-zinc-950 lg:static lg:flex lg:flex-row lg:items-center lg:gap-0 lg:border-0 lg:bg-transparent lg:p-0 lg:shadow-none lg:dark:bg-transparent`}
         aria-label="主要導覽"
       >
-        {NAV_GROUPS.map((group) => (
+        {groups.map((group) => (
           <div
             key={group.label}
             className="flex items-start gap-2 lg:items-center lg:gap-0 lg:border-l lg:border-zinc-200 lg:pl-1 lg:not-first:ml-1 lg:first:border-l-0 lg:first:pl-0 dark:lg:border-zinc-800"

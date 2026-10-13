@@ -230,6 +230,7 @@ const PUBLIC_DATA_PAGES = [
   'app/page.tsx',
   'app/ranking/page.tsx',
   'app/traffic/page.tsx',
+  'app/tech/page.tsx',
   'app/blogs/page.tsx',
   'app/blogs/[slug]/page.tsx',
   'app/authors/page.tsx',
@@ -256,7 +257,10 @@ test('route contract: every page that reads the gateway is a force-dynamic publi
   const pages = files('app').filter((path) => /\/page\.tsx$/.test(path));
   const reading = pages.filter((page) => {
     const source = read(page);
-    return /from '@\/lib\/public-api'/.test(source) || components.some((name) => name !== 'SiteFooter' && source.includes(`@/components/${name}'`));
+    return (
+      /from '@\/lib\/public-api'/.test(source) ||
+      components.some((name) => name !== 'SiteFooter' && source.includes(`@/components/${name}'`))
+    );
   });
   assert.deepEqual(reading.sort(), [...PUBLIC_DATA_PAGES, 'app/topics/[id]/page.tsx'].sort());
 });

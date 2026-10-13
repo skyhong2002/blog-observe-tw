@@ -1,6 +1,6 @@
 import { taipei } from '@/lib/api';
 import { blogLink } from '@/lib/page-links';
-import { type RelationEdge, type RelationNode, shareExplanation, shareLabel, sharePercent } from '@/lib/relations';
+import { dayText, type RelationEdge, type RelationNode, shareExplanation, shareLabel, sharePercent } from '@/lib/relations';
 import BlogIcon from './BlogIcon';
 import Link from './NoPrefetchLink';
 export default function RelationLists({
@@ -17,7 +17,7 @@ export default function RelationLists({
   const index = new Map(nodes.map((n) => [n.id, n]));
   return (
     <section className="min-w-0 rounded-xl border border-zinc-300 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">
-      <h2 className="font-semibold">{title}</h2>
+      <h4 className="font-semibold">{title}</h4>
       {edges.length ? (
         <ul className="mt-3 divide-y divide-zinc-200 dark:divide-zinc-800">
           {edges.map((e) => {
@@ -42,11 +42,18 @@ export default function RelationLists({
                     {shareLabel} {sharePercent(e.share)}
                   </small>
                   {e.lastMentionAt ? (
-                    <small className="block text-xs text-zinc-500">
-                      最近 {new Date(e.lastMentionAt).toLocaleDateString('zh-TW', { timeZone: 'Asia/Taipei' })}
+                    <small className="block whitespace-nowrap text-xs text-zinc-500">
+                      {e.firstMentionAt && dayText(e.firstMentionAt) !== dayText(e.lastMentionAt)
+                        ? `${dayText(e.firstMentionAt)}–${dayText(e.lastMentionAt)}`
+                        : `最近 ${dayText(e.lastMentionAt)}`}
                     </small>
                   ) : null}
-                  {e.mutual ? <small className="block text-zinc-500">互相提及</small> : null}
+                  {/* Each direction keeps its own article dates; years apart is still "both ways", never a same-time exchange. */}
+                  {e.mutual ? (
+                    <small className="block text-xs text-zinc-500" title="兩個方向各有提及的文章，日期各自不同，不代表同時期互相回應。">
+                      對方也曾提及
+                    </small>
+                  ) : null}
                 </span>
               </li>
             );

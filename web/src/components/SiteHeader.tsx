@@ -42,7 +42,8 @@ function HomeLink({ searchOpen, revealed }: { searchOpen: boolean; revealed: boo
   );
 }
 
-export default function SiteHeader() {
+/** `techEnabled`: the server layout's feature switch, passed down as a plain boolean. */
+export default function SiteHeader({ techEnabled = false }: { techEnabled?: boolean }) {
   const pathname = usePathname();
   const mastheadId = pathname === '/' ? 'masthead' : undefined;
   const [navPending, setNavPending] = useState(false);
@@ -89,7 +90,7 @@ export default function SiteHeader() {
         <div className="mx-auto flex max-w-6xl items-center gap-2 px-4 py-2 lg:gap-3">
           <HomeLink searchOpen={searchOpen} revealed={revealed} />
           <div className="order-3 lg:order-none">
-            <SiteNavigation />
+            <SiteNavigation techEnabled={techEnabled} />
           </div>
           <div className={`ml-auto flex min-w-0 items-center gap-1 lg:w-44 lg:flex-none ${searchOpen || autoSearch ? 'flex-1' : ''}`}>
             <button

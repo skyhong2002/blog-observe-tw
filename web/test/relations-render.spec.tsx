@@ -1,0 +1,725 @@
+/**
+ * The profile's 引用與交流 and the site-wide relation map, rendered for real
+ * (react-dom/server) and read back with cheerio. Next's hooks, links and images,
+ * usePublicJson and the chart (BlogRelationGraph, echarts) are mocked. The
+ * profile's server read keeps the real readPublic and public-contracts.ts over a
+ * fake fetch, so every fixture below passes the same check a gateway 200 does;
+ * nothing leaves the process. Every payload is a synthetic fixture (no real
+ * blog, article or link). Server markup only: layout on phones, opening
+ * <details> and the chart's own drawing are not exercised.
+ */
+import { type CheerioAPI, load } from 'cheerio';
+import { renderToString } from 'react-dom/server';
+import { beforeEach, describe, expect, test, vi } from 'vitest';
+import BlogRelations, { distinctEvidence, evidenceKey } from '@/components/BlogRelations';
+import FooterMethod from '@/components/FooterMethod';
+import RelationMapView from '@/components/public/RelationMap';
+import { dayText, type RelationEvidence, type Relations, type SharedTagHit, type SharedTags, shareExplanation } from '@/lib/relations';
+
+const gateway = vi.hoisted(() => ({
+  // The gateway's HTTP answer for each attempt, read by the real readPublic.
+  response: (_url: string): Response => new Response(null, { status: 404 }),
+  // When set, publicJsonOrNull answers with it directly and nothing is checked: for errors readPublic never throws.
+  answer: null as null | ((path: string) => Promise<unknown>),
+  paths: [] as string[],
+}));
+const graph = vi.hoisted(() => ({ calls: [] as Array<{ nodes: unknown[]; edges: unknown[] }> }));
+const nav = vi.hoisted(() => ({ pathname: '/blogs/a/' }));
+
+vi.mock('next/navigation', () => ({
+  usePathname: () => nav.pathname,
+  useSearchParams: () => new URLSearchParams(),
+  notFound: () => {
+    throw new Error('NEXT_NOT_FOUND');
+  },
+}));
+// The prefetch value NoPrefetchLink passes is kept as data-prefetch, so the markup shows it.
+vi.mock('next/link', async () => {
+  const { createElement } = await import('react');
+  return {
+    default: ({ prefetch, scroll: _scroll, ...props }: Record<string, unknown>) =>
+      createElement('a', { ...props, 'data-prefetch': String(prefetch) }),
+    useLinkStatus: () => ({ pending: false }),
+  };
+});
+vi.mock('next/image', async () => {
+  const { createElement } = await import('react');
+  return { default: ({ unoptimized: _unoptimized, ...props }: Record<string, unknown>) => createElement('img', props) };
+});
+vi.mock('@/lib/use-public-json', () => ({ usePublicJson: () => null, asIs: (raw: unknown) => raw }));
+// public-api.ts without `server-only` and the gateway origin: the same readPublic call, a fake fetch, no retry wait.
+vi.mock('@/lib/public-api', async () => {
+  const { readPublic } = await import('@/lib/public-read');
+  return {
+    publicJsonOrNull: async (path: string) => {
+      gateway.paths.push(path);
+      if (gateway.answer) return gateway.answer(path);
+      const result = await readPublic(
+        'https://gateway.invalid',
+        path,
+        async (url) => gateway.response(url),
+        () => Promise.resolve(),
+      );
+      return result.found ? result.body : null;
+    },
+  };
+});
+// The shared chart is the original component; here it only records what it was given.
+vi.mock('@/components/BlogRelationGraph', async () => {
+  const { createElement } = await import('react');
+  return {
+    default: (props: { nodes: unknown[]; edges: unknown[] }) => {
+      graph.calls.push(props);
+      return createElement('div', { 'data-graph': props.edges.length });
+    },
+  };
+});
+
+beforeEach(() => {
+  gateway.response = () => new Response(null, { status: 404 });
+  gateway.answer = null;
+  gateway.paths = [];
+  graph.calls = [];
+  nav.pathname = '/blogs/a/';
+});
+
+/** The gateway answers `answer` as a 200 JSON body, or 404 for null; the contract then decides. */
+const renderProfile = async (answer: unknown) => {
+  gateway.response = () =>
+    answer === null
+      ? new Response(null, { status: 404 })
+      : new Response(JSON.stringify(answer), { status: 200, headers: { 'content-type': 'application/json' } });
+  return load(renderToString(await BlogRelations({ slug: 'a' })));
+};
+/** Text a reader sees before opening anything. */
+function outsideText($: CheerioAPI) {
+  const copy = load($.html());
+  copy('details').remove();
+  return copy('body').text();
+}
+const part = ($: CheerioAPI, id: string) => $(`section[aria-labelledby="${id}"]`);
+function expectNoPrefetch($: CheerioAPI) {
+  const internal = $('a[href^="/"]');
+  expect(internal.length).toBeGreaterThan(0);
+  internal.each((_, el) => {
+    expect($(el).attr('data-prefetch'), $(el).attr('href')).toBe('false');
+  });
+}
+
+/* Synthetic fixtures ------------------------------------------------------- */
+
+const OLD = '2019-03-05T04:00:00.000Z';
+const NEW = '2026-10-01T04:00:00.000Z';
+const SEEN = '2026-10-02T04:00:00.000Z';
+const coverage = {
+  observedPosts: 12,
+  totalPosts: 20,
+  failedPosts: 1,
+  unknownDatePosts: 2,
+  unresolvedLinks: 3,
+  truncatedPosts: 0,
+  graphTruncated: false,
+  aggregationTruncated: false,
+  noBodyPosts: 4,
+  nonBodyLinks: { sidebar: 1, blogroll: 5, comment: 2 },
+};
+const nodes = [
+  { id: 1, slug: 'a', name: '測試站甲' },
+  { id: 2, slug: 'b-blog', name: '測試站乙' },
+  { id: 3, slug: 'c-blog', name: '測試站丙' },
+];
+const evidence = (patch: Partial<RelationEvidence>): RelationEvidence => ({
+  postId: 101,
+  postTitle: '甲的一篇文章',
+  postUrl: 'https://a.example/p/101',
+  targetUrl: 'https://b.example/x',
+  anchor: '乙的文章 X',
+  publishedAt: NEW,
+  sourceBlogId: 1,
+  targetBlogId: 2,
+  location: 'body',
+  context: '這裡提到乙的文章 X 作為延伸閱讀。',
+  observedAt: SEEN,
+  matchVersion: 'relations-v3',
+  evidenceType: 'direct-link',
+  contextSource: 'body',
+  ...patch,
+});
+// One post (101) links to two URLs of 乙: two rows of evidence, still one article in the count.
+const bodyEvidence = [
+  evidence({}),
+  evidence({ targetUrl: 'https://b.example/y', anchor: '乙的文章 Y', context: '另一段也連到乙的文章 Y。' }),
+  // 丙 mentioned 甲 in 2019; 甲 mentioned 丙 in 2026: both ways, years apart.
+  evidence({
+    postId: 301,
+    postTitle: '丙的舊文',
+    postUrl: 'https://c.example/p/301',
+    targetUrl: 'https://a.example/',
+    anchor: '甲',
+    publishedAt: OLD,
+    sourceBlogId: 3,
+    targetBlogId: 1,
+    context: '推薦甲這個部落格。',
+    matchVersion: 'relations-v2',
+  }),
+  evidence({
+    postId: 102,
+    postTitle: '甲的新文',
+    postUrl: 'https://a.example/p/102',
+    targetUrl: 'https://c.example/',
+    anchor: '丙',
+    targetBlogId: 3,
+  }),
+];
+const nonBodyEvidence = [
+  evidence({
+    postId: 103,
+    postTitle: '甲的側欄頁',
+    location: 'blogroll',
+    contextSource: 'blogroll',
+    targetUrl: 'https://b.example/',
+    anchor: '乙（友站）',
+    context: '友站連結',
+  }),
+  evidence({
+    postId: 104,
+    postTitle: '甲的留言頁',
+    location: 'comment',
+    contextSource: 'comment',
+    targetUrl: 'https://c.example/me',
+    anchor: '丙的留言',
+    context: null,
+  }),
+];
+const hit = (patch: Partial<SharedTagHit> = {}): SharedTagHit => ({
+  sourceArticleId: 11,
+  sourceArticleUrl: 'https://a.example/p/11',
+  sourceArticleTitle: '甲寫旅行',
+  sourceArticlePublishedAt: NEW,
+  targetArticleId: 22,
+  targetArticleUrl: 'https://b.example/p/22',
+  targetArticleTitle: '乙也寫旅行',
+  targetArticlePublishedAt: OLD,
+  targetBlogId: 2,
+  targetBlogSlug: 'b-blog',
+  targetBlogName: '測試站乙',
+  tagId: 9,
+  label: '旅行',
+  sourceType: 'rss-category',
+  lastSeenAt: SEEN,
+  targetSourceType: 'manual',
+  targetLastSeenAt: SEEN,
+  tagSourceType: 'rss-category',
+  tagLastSeenAt: SEEN,
+  matchVersion: 'native-post-tags-v1',
+  ...patch,
+});
+const INTERPRETATION = '共同標籤僅表示原始文章標籤相同，不代表引用、交流或正文相似；日期未知文章不列入期間。';
+const sharedReady = (items: SharedTagHit[], patch: object = {}): SharedTags => ({
+  status: 'ready',
+  days: 90,
+  items,
+  truncated: false,
+  sourceTagsTruncated: false,
+  matchVersion: 'native-post-tags-v1',
+  interpretation: INTERPRETATION,
+  ...patch,
+});
+const profile = (patch: Partial<Relations> = {}): Relations => ({
+  days: 90,
+  generatedAt: SEEN,
+  mostMentioned: [],
+  mutual: [],
+  coverage,
+  blogId: 1,
+  nodes,
+  edges: [],
+  outgoing: [
+    { sourceBlogId: 1, targetBlogId: 2, count: 1, share: 0.5, firstMentionAt: NEW, lastMentionAt: NEW, mutual: false },
+    { sourceBlogId: 1, targetBlogId: 3, count: 1, share: 0.5, firstMentionAt: NEW, lastMentionAt: NEW, mutual: true },
+  ],
+  incoming: [{ sourceBlogId: 3, targetBlogId: 1, count: 1, share: 1, firstMentionAt: OLD, lastMentionAt: OLD, mutual: true }],
+  evidence: bodyEvidence,
+  evidenceTruncated: false,
+  nonBodyEvidence,
+  nonBodyEvidenceTruncated: false,
+  sharedTags: { status: 'not-enabled' },
+  textSimilarity: { status: 'not-analysed' },
+  profileTruncated: false,
+  ...patch,
+});
+
+/* Profile -------------------------------------------------------------------- */
+
+describe('profile 引用與交流', () => {
+  test('four parts in order, read from the no-store profile path; the summaries are readable before opening anything', async () => {
+    const $ = await renderProfile(profile());
+    expect(gateway.paths).toEqual(['/api/blogs/a/relations?days=90']);
+    expect(
+      $('h3')
+        .map((_, el) => $(el).text())
+        .get(),
+    ).toEqual(['正文直接引用', '非正文連結（Blogroll、側欄、留言）', '共同標籤（不是引用）', '文字相似（尚未分析）']);
+    const outside = outsideText($);
+    for (const text of ['提到誰', '被誰提到', '測試站乙', '測試站丙', '已分析 12 篇', '未知目標連結 3 條'])
+      expect(outside, text).toContain(text);
+    // Evidence waits behind closed <details>; the method is not in the section at all, only linked (FooterMethod).
+    expect($('details[open]').length).toBe(0);
+    expect(outside).not.toContain('這裡提到乙的文章 X');
+    expect($('body').text()).not.toContain('引用占比的分母');
+    expect($('summary').text()).not.toContain('計算方式');
+    expect($('#method').length).toBe(0);
+    expect($('a[href="#method"]').text()).toBe('計算方式見頁尾的方法說明 ↓');
+    expect($('body').text()).not.toContain('這些關係怎麼算');
+    expect($('a[href="/relations/"]').text()).toBe('全站關係圖 →');
+    expectNoPrefetch($);
+  });
+
+  test('body and non-body links stay apart; several URLs in one post are rows of evidence, not more articles', async () => {
+    const $ = await renderProfile(profile());
+    const body = part($, 'relations-body');
+    const nonBody = part($, 'relations-non-body');
+    // The count is the gateway's: 1 article to 乙, although post 101 links to two of its URLs.
+    const toB = body.find('li').filter((_, el) => $(el).find('a').first().text().includes('測試站乙'));
+    expect(toB.text()).toContain('1 篇');
+    expect(toB.text()).not.toContain('2 篇');
+    expect(body.find('summary').text()).toBe('核對正文連結（列出 4 筆連結）');
+    expect(body.find('details').text()).toContain('同一篇文章連到多個網址會列成多筆，篇數以上方統計為準');
+    expect(body.find('details a[href="https://b.example/x"]').length).toBe(1);
+    expect(body.find('details a[href="https://b.example/y"]').length).toBe(1);
+    expect(body.text()).not.toContain('友站連結');
+    expect(body.text()).not.toContain('丙的留言');
+
+    expect(nonBody.text()).toContain('不計入上方篇數');
+    expect(nonBody.text()).toContain('本站另記 Blogroll 5、側欄 1、留言 2 條');
+    expect(nonBody.find('summary').text()).toBe('核對非正文連結（列出 2 筆連結）');
+    expect(nonBody.text()).toContain('位置 Blogroll');
+    expect(nonBody.text()).toContain('位置 留言');
+    expect(nonBody.text()).toContain('上下文摘要未提供');
+    expect(nonBody.find('a[href="https://b.example/x"]').length).toBe(0);
+  });
+
+  test('each link keeps its article id, date, location, summary source and match version', async () => {
+    const $ = await renderProfile(profile());
+    const items = part($, 'relations-body').find('details li');
+    const first = items.eq(0).text();
+    expect(first).toContain('提到 測試站乙：');
+    expect(first).toContain('「這裡提到乙的文章 X 作為延伸閱讀。」');
+    expect(first).toContain(`文章 #101 · 發表 ${dayText(NEW)} · 位置 正文 · 摘要取自正文 · 比對版本 relations-v3 · 觀測 ${dayText(SEEN)}`);
+    const old = items.eq(2).text();
+    expect(old).toContain('測試站丙 提到本站：');
+    expect(old).toContain(`文章 #301 · 發表 ${dayText(OLD)}`);
+    expect(old).toContain('比對版本 relations-v2');
+    expect(items.eq(0).find('a').first().attr('href')).toBe('https://a.example/p/101');
+    expect(items.eq(0).find('a').first().attr('target')).toBe('_blank');
+  });
+
+  test('mentions years apart are "both ways" with their own dates, never a same-time exchange', async () => {
+    const $ = await renderProfile(profile());
+    const body = part($, 'relations-body');
+    const mutual = body.find('small').filter((_, el) => $(el).text() === '對方也曾提及');
+    expect(mutual.length).toBe(2);
+    expect(mutual.first().attr('title')).toContain('不代表同時期互相回應');
+    // The incoming edge from 丙 carries its 2019 date; the outgoing one its 2026 date.
+    expect(body.text()).toContain(`最近 ${dayText(OLD)}`);
+    expect(body.text()).toContain(`最近 ${dayText(NEW)}`);
+    for (const word of ['互惠', '互相提及', '同時互動']) expect(outsideText($), word).not.toContain(word);
+  });
+
+  test('truncated evidence says only the latest 20 are listed', async () => {
+    const $ = await renderProfile(profile({ evidenceTruncated: true, nonBodyEvidenceTruncated: true }));
+    expect(part($, 'relations-body').find('summary').text()).toContain('僅最近 20 筆');
+    expect(part($, 'relations-non-body').find('summary').text()).toContain('僅最近 20 筆');
+  });
+
+  test('empty lists are said as empty for this period', async () => {
+    const $ = await renderProfile(profile({ outgoing: [], incoming: [], evidence: [], nonBodyEvidence: [] }));
+    expect(part($, 'relations-body').text()).toContain('這段期間尚未觀察到可確認的正文提及。');
+    expect(part($, 'relations-body').text()).toContain('這段期間沒有可列出的正文連結。');
+    expect(part($, 'relations-non-body').text()).toContain('這段期間沒有可列出的非正文連結。');
+    expect($('details').length).toBe(0);
+  });
+
+  test('an older payload: every missing key or count is 未提供, never 0 or an empty success', async () => {
+    const old = profile({ coverage: { nonBodyLinks: {} } as unknown as Relations['coverage'] }) as Partial<Relations>;
+    for (const key of [
+      'evidence',
+      'evidenceTruncated',
+      'nonBodyEvidence',
+      'nonBodyEvidenceTruncated',
+      'sharedTags',
+      'textSimilarity',
+    ] as const)
+      delete old[key];
+    const $ = await renderProfile(old);
+    const text = $('body').text();
+    expect(text).toContain('核對正文連結：資料未提供。');
+    expect(text).toContain('核對非正文連結：資料未提供。');
+    expect(text).toContain('已分析 未提供 篇；未知目標連結 未提供 條');
+    expect(text).toContain('本站另記 Blogroll 未提供、側欄 未提供、留言 未提供 條');
+    expect(part($, 'relations-tags').text()).toBe('共同標籤（不是引用）共同標籤資料未提供。');
+    expect(part($, 'relations-text').text()).toBe('文字相似（尚未分析）文字相似資料未提供。');
+    expect(text).not.toMatch(/已分析 0|未知目標連結 0|Blogroll 0|側欄 0|留言 0/);
+
+    // Rows from a gateway that sent only the five original keys (no postId), through the real readPublic and
+    // contract: a null anchor and date are accepted and said, not rejected.
+    const bare = { postTitle: '舊文', postUrl: 'https://a.example/old', targetUrl: 'https://b.example/', anchor: null, publishedAt: null };
+    const $old = await renderProfile({ ...old, evidence: [bare], nonBodyEvidence: [{ ...bare, anchor: '' }] });
+    expect($old('[role="alert"]').length).toBe(0);
+    for (const id of ['relations-body', 'relations-non-body']) {
+      const row = part($old, id).find('details li').text();
+      expect(row, id).toContain('舊文');
+      expect(row, id).toContain('原始連結');
+      expect(row, id).toContain('上下文摘要未提供');
+      expect(row, id).toContain('文章 ID 未提供 · 發表 日期未知 · 位置 未提供 · 比對版本 未提供 · 觀測 未提供');
+      expect(row, id).not.toContain('#');
+      expect(row, id).not.toContain('null');
+    }
+  });
+
+  test("row keys are each row's whole identity: no position, the same under any order, apart when anchor or context differs", () => {
+    const first = evidence({});
+    const otherAnchor = evidence({ anchor: '同一網址的另一個錨文字' });
+    const otherContext = evidence({ context: '同一網址出現在另一段。' });
+    const keys = [first, otherAnchor, otherContext].map(evidenceKey);
+    expect(new Set(keys).size).toBe(3);
+    // A copy built separately, with the newer keys left out instead of null, is the same row.
+    expect(evidenceKey(structuredClone(first))).toBe(keys[0]);
+    expect(evidenceKey({ ...first, context: undefined })).toBe(evidenceKey({ ...first, context: null }));
+    expect(distinctEvidence([otherContext, first, otherAnchor]).map(([key]) => key)).toEqual([keys[2], keys[0], keys[1]]);
+    expect(distinctEvidence([first, structuredClone(first), otherAnchor]).map(([key]) => key)).toEqual([keys[0], keys[1]]);
+  });
+
+  test('an identical row sent twice is listed once and adds nothing; different anchors and contexts stay separate', async () => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      const rows = [
+        evidence({}),
+        evidence({}),
+        evidence({ anchor: '同一網址的另一個錨文字' }),
+        evidence({ context: '同一網址出現在另一段。' }),
+      ];
+      for (const order of [rows, [...rows].reverse()]) {
+        const $ = await renderProfile(profile({ evidence: order }));
+        const body = part($, 'relations-body');
+        expect(body.find('summary').text()).toBe('核對正文連結（列出 3 筆連結）');
+        expect(body.find('details li').length).toBe(3);
+        expect(body.text()).toContain('「這裡提到乙的文章 X 作為延伸閱讀。」');
+        expect(body.text()).toContain('同一網址的另一個錨文字');
+        expect(body.text()).toContain('「同一網址出現在另一段。」');
+        // The article count is still the gateway's own.
+        const toB = body.find('li').filter((_, el) => $(el).find('a').first().text().includes('測試站乙'));
+        expect(toB.text()).toContain('1 篇');
+      }
+      expect(error.mock.calls.flat().join(' ')).not.toMatch(/same key/);
+    } finally {
+      error.mockRestore();
+    }
+  });
+
+  test('a link that is not http(s) is shown as text, not followed', async () => {
+    const $ = await renderProfile(profile({ evidence: [evidence({ postUrl: 'javascript:alert(1)' })] }));
+    const row = part($, 'relations-body').find('details li');
+    expect(row.find('a[href^="javascript"]').length).toBe(0);
+    expect(row.text()).toContain('甲的一篇文章');
+  });
+});
+
+describe('shared tags (not citation)', () => {
+  test('ready: the tag in brand green, both original articles linked out, ids/sources/version to check', async () => {
+    const items = [
+      hit(),
+      hit({
+        targetArticleId: 23,
+        targetArticleUrl: 'https://c.example/p/23',
+        targetArticleTitle: '丙的旅行',
+        targetBlogId: 3,
+        targetBlogSlug: 'c-blog',
+        targetBlogName: '測試站丙',
+      }),
+      hit({ tagId: 10, label: '咖啡', targetArticleId: 24 }),
+    ];
+    const $ = await renderProfile(profile({ sharedTags: sharedReady(items) }));
+    const tags = part($, 'relations-tags');
+    expect(tags.text()).toContain(INTERPRETATION);
+    const chips = tags.find('ul[aria-label="共同標籤"] > li');
+    expect(chips.map((_, el) => $(el).text()).get()).toEqual(['#旅行2 組文章', '#咖啡1 組文章']);
+    expect(chips.first().find('span').first().hasClass('text-brand-700')).toBe(true);
+    expect(tags.find('summary').text()).toBe('核對共同標籤的文章（3 組）');
+    const row = tags.find('details li li').first();
+    expect(
+      row
+        .find('a')
+        .map((_, el) => $(el).attr('href'))
+        .get(),
+    ).toEqual(['https://a.example/p/11', 'https://b.example/p/22']);
+    expect(row.text()).toContain(`甲寫旅行${dayText(NEW)}`);
+    expect(row.text()).toContain(`測試站乙：乙也寫旅行${dayText(OLD)}`);
+    expect(row.text()).toContain('文章 #11／#22 · 標籤 #9（rss-category');
+    expect(row.text()).toContain('標籤來源 rss-category／manual');
+    expect(row.text()).toContain('比對版本 native-post-tags-v1');
+    // No blog page is guessed from the gateway slug, and nothing here is counted as a mention.
+    expect(tags.find('a[href^="/"]').length).toBe(0);
+    expect(tags.text()).not.toContain('篇');
+    expect(part($, 'relations-body').text()).not.toContain('旅行');
+  });
+
+  test('ready with truncation says which limit was reached', async () => {
+    const $ = await renderProfile(profile({ sharedTags: sharedReady([hit()], { truncated: true, sourceTagsTruncated: true }) }));
+    const text = part($, 'relations-tags').text();
+    expect(text).toContain('只比對其中一部分');
+    expect(text).toContain('只列出部分文章組合');
+  });
+
+  test('ready and empty: no shared tags in the period, with the interpretation', async () => {
+    const $ = await renderProfile(profile({ sharedTags: sharedReady([]) }));
+    const tags = part($, 'relations-tags');
+    expect(tags.text()).toContain('近 90 天沒有找到與其他部落格相同的原始文章標籤。');
+    expect(tags.text()).toContain(INTERPRETATION);
+    expect(tags.find('details').length).toBe(0);
+  });
+
+  test('unavailable: said with its version, never "none"', async () => {
+    const $ = await renderProfile(profile({ sharedTags: { status: 'unavailable', matchVersion: 'native-post-tags-v1' } }));
+    const tags = part($, 'relations-tags');
+    expect(tags.find('[role="status"]').text()).toBe('共同標籤暫時無法讀取（比對版本 native-post-tags-v1）；不代表沒有共同標籤。');
+    expect(tags.text()).not.toContain('沒有找到');
+  });
+
+  test('not enabled (the default): no result, and not a claim that there are none', async () => {
+    const $ = await renderProfile(profile());
+    const tags = part($, 'relations-tags');
+    expect(tags.text()).toContain('共同標籤比對目前未開啟，這裡沒有結果；不代表沒有共同標籤。');
+    expect(tags.text()).not.toContain('沒有找到');
+    expect(tags.find('li').length).toBe(0);
+  });
+});
+
+describe('text similarity', () => {
+  test('not analysed: said so, no percentage and no articles', async () => {
+    const $ = await renderProfile(profile());
+    const text = part($, 'relations-text');
+    expect(text.text()).toBe('文字相似（尚未分析）尚未分析：目前沒有文字相似的計算結果，這裡不列任何相似文章。');
+    expect(text.find('a, li').length).toBe(0);
+    expect(text.text()).not.toMatch(/\d/);
+  });
+
+  test('a status this page does not know is not shown as analysed', async () => {
+    const $ = await renderProfile(profile({ textSimilarity: { status: 'ready' } }));
+    expect(part($, 'relations-text').text()).toContain('文字相似資料未提供。');
+  });
+});
+
+describe('optional section', () => {
+  test("a gateway failure stays in the section with a retry; the profile's other parts are not touched", async () => {
+    // 503 twice: readPublic retries once, then throws its PublicGatewayError.
+    gateway.response = () => new Response('busy', { status: 503 });
+    const $ = load(renderToString(await BlogRelations({ slug: 'a' })));
+    expect($('section#relations h2').text()).toBe('引用與交流');
+    expect($('[role="alert"]').text()).toContain('關係資料暫時無法讀取');
+    expect($('[role="alert"]').text()).toContain('不代表沒有引用或交流');
+    expect($('button').text()).toBe('重新載入');
+    expect($('h3').length).toBe(0);
+    expect($('body').text()).not.toMatch(/\d+ 篇/);
+  });
+
+  test("anything that is not the gateway's failure is not swallowed", async () => {
+    gateway.answer = () => Promise.reject(new Error('bug'));
+    await expect(BlogRelations({ slug: 'a' })).rejects.toThrow('bug');
+  });
+
+  test("the gateway's 404 is no data offered, not an empty relation list", async () => {
+    const $ = await renderProfile(null);
+    expect($('[role="status"]').text()).toBe('目前沒有提供這個部落格的關係資料。');
+    expect($('h3').length).toBe(0);
+  });
+});
+
+describe('a malformed 200 (real readPublic and public-contracts.ts)', () => {
+  const row = evidence({});
+  const { postUrl: _postUrl, ...rowWithoutUrl } = row;
+  const { publishedAt: _publishedAt, ...rowWithoutDate } = row;
+  const malformed: Array<[string, Record<string, unknown>]> = [
+    ['evidence context is an object', { evidence: [{ ...row, context: {} }] }],
+    ['evidence location is an array', { evidence: [{ ...row, location: ['body'] }] }],
+    ['evidence matchVersion is an object', { evidence: [{ ...row, matchVersion: { v: 3 } }] }],
+    ['evidence row without postUrl', { evidence: [rowWithoutUrl] }],
+    // publishedAt is one of the five original keys: null is allowed, absent is not.
+    ['evidence row without publishedAt', { evidence: [rowWithoutDate] }],
+    ['evidence anchor is a number', { evidence: [{ ...row, anchor: 7 }] }],
+    // postId may be absent (older rows), but when sent it is a count.
+    ['evidence postId as text', { evidence: [{ ...row, postId: '101' }] }],
+    ['evidence postId is null', { evidence: [{ ...row, postId: null }] }],
+    ['evidence postId is negative', { evidence: [{ ...row, postId: -1 }] }],
+    ['non-body observedAt is an array', { nonBodyEvidence: [{ ...nonBodyEvidence[0], observedAt: [SEEN] }] }],
+    ['non-body contextSource is an object', { nonBodyEvidence: [{ ...nonBodyEvidence[0], contextSource: {} }] }],
+    ['shared-tag tagSourceType is an object', { sharedTags: sharedReady([{ ...hit(), tagSourceType: {} } as unknown as SharedTagHit]) }],
+    ['shared-tag sourceType is an array', { sharedTags: sharedReady([{ ...hit(), sourceType: ['rss'] } as unknown as SharedTagHit]) }],
+  ];
+  for (const [name, patch] of malformed)
+    test(`${name}: the section says unavailable with a retry instead of crashing the profile`, async () => {
+      const $ = await renderProfile({ ...profile(), ...patch });
+      expect(gateway.paths).toEqual(['/api/blogs/a/relations?days=90']);
+      expect($('section#relations h2').text()).toBe('引用與交流');
+      expect($('[role="alert"]').text()).toContain('關係資料暫時無法讀取');
+      expect($('button').text()).toBe('重新載入');
+      expect($('h3').length).toBe(0);
+    });
+
+  test('the control: the same row handed to the view without the contract crashes React outside the section', async () => {
+    gateway.answer = () => Promise.resolve({ ...profile(), evidence: [{ ...row, context: {} }] });
+    const element = await BlogRelations({ slug: 'a' });
+    expect(() => renderToString(element)).toThrow(/not valid as a React child/);
+  });
+
+  test('older rows and hits without the newer keys pass the contract and say 未提供', async () => {
+    const oldHit = hit() as Partial<SharedTagHit>;
+    for (const key of [
+      'targetBlogSlug',
+      'sourceType',
+      'lastSeenAt',
+      'targetSourceType',
+      'targetLastSeenAt',
+      'tagSourceType',
+      'tagLastSeenAt',
+    ] as const)
+      delete oldHit[key];
+    const $ = await renderProfile(profile({ sharedTags: sharedReady([oldHit as SharedTagHit]) }));
+    expect($('[role="alert"]').length).toBe(0);
+    const text = part($, 'relations-tags').find('details li li').text();
+    expect(text).toContain('標籤 #9（未提供，確認於 未提供）');
+    expect(text).toContain('標籤來源 未提供／未提供 · 最後看到 未提供／未提供');
+  });
+});
+
+/* The page's one method block -------------------------------------------------- */
+
+describe("F3's method lives in the footer's one 本頁的資料來源與計算方式", () => {
+  const SUMMARY = '本頁的資料來源與計算方式';
+  const methodBlocks = ($: CheerioAPI) => $('details').filter((_, el) => $(el).children('summary').text().includes(SUMMARY));
+  // app/layout.tsx: the profile's content, then SiteFooter, whose only method piece is <FooterMethod />.
+  const renderPage = async (answer: unknown) => {
+    gateway.response = () => new Response(JSON.stringify(answer), { status: 200, headers: { 'content-type': 'application/json' } });
+    const relations = await BlogRelations({ slug: 'a' });
+    return load(
+      renderToString(
+        <>
+          <main>
+            <h1>測試站甲</h1>
+            {relations}
+          </main>
+          <footer>
+            <FooterMethod />
+          </footer>
+        </>,
+      ),
+    );
+  };
+  const footerOnly = (pathname: string, page = false) => {
+    nav.pathname = pathname;
+    return load(renderToString(<FooterMethod page={page} />));
+  };
+
+  test('a profile has exactly one method block, closed, after the content; the section only links to it', async () => {
+    const $ = await renderPage(profile());
+    expect(methodBlocks($).length).toBe(1);
+    expect($('summary').filter((_, el) => $(el).text().includes('計算方式')).length).toBe(1);
+    expect($('details[open]').length).toBe(0);
+    expect($('#method').length).toBe(1);
+    expect(methodBlocks($).find('#method').length).toBe(1);
+    expect($('main #method').length).toBe(0);
+    // The section's own parts come first and stay free of method text; the link points at the one block.
+    const main = $('main');
+    expect(main.find('section#relations h3').first().text()).toBe('正文直接引用');
+    expect(main.text()).not.toContain('引用占比的分母');
+    expect(main.text()).not.toContain('非正文連結來自 Blogroll、側欄與留言');
+    expect(main.find('a[href="#method"]').length).toBe(1);
+    const html = $.html();
+    expect(html.indexOf('id="relations"')).toBeLessThan(html.indexOf('id="method"'));
+    // The F3 paragraphs are in the footer block, under their own heading, after 資料來源.
+    expect(
+      $('#method h3')
+        .map((_, el) => $(el).text())
+        .get(),
+    ).toEqual(['資料來源', '引用與交流']);
+    const method = $('#method').text();
+    expect(method).toContain(shareExplanation);
+    for (const text of [
+      '同一篇對同一站重複連結只算 1 篇',
+      '不代表同時互動',
+      '非正文連結來自 Blogroll、側欄與留言，與正文分開保存',
+      '共同標籤比的是發布者自己替文章加的原始標籤',
+      '文字相似目前沒有計算',
+    ])
+      expect(method, text).toContain(text);
+  });
+
+  test('the F3 paragraphs are on one profile and the site-wide map only', () => {
+    for (const pathname of ['/blogs/a/', '/blogs/b-blog', '/relations/', '/relations']) {
+      const $ = footerOnly(pathname);
+      expect(methodBlocks($).length, pathname).toBe(1);
+      expect($('#method h3').last().text(), pathname).toBe('引用與交流');
+      expect($('#method').text(), pathname).toContain(shareExplanation);
+    }
+    for (const pathname of ['/', '/blogs/', '/blogs', '/blogs/a/feed/', '/tags/x/', '/relations/extra/']) {
+      const $ = footerOnly(pathname);
+      expect(methodBlocks($).length, pathname).toBe(1);
+      expect(
+        $('#method h3')
+          .map((_, el) => $(el).text())
+          .get(),
+        pathname,
+      ).toEqual(['資料來源']);
+      expect($('#method').text(), pathname).not.toContain('引用占比');
+    }
+  });
+
+  test('/tech/ and topic pages keep their own block: none from the footer, and no F3 paragraphs in theirs', () => {
+    for (const pathname of ['/tech/', '/topics/', '/topics/rss%3A1/']) {
+      expect(footerOnly(pathname)('details').length, pathname).toBe(0);
+      const $ = footerOnly(pathname, true);
+      expect(methodBlocks($).length, pathname).toBe(1);
+      expect($('#method').text(), pathname).not.toContain('引用占比');
+    }
+  });
+});
+
+/* Site-wide map ---------------------------------------------------------------- */
+
+describe('site-wide relation map', () => {
+  const map = (patch: Partial<Relations> = {}): Relations => ({
+    days: 90,
+    generatedAt: SEEN,
+    nodes,
+    edges: [
+      { sourceBlogId: 1, targetBlogId: 2, count: 1, share: 0.5, firstMentionAt: NEW, lastMentionAt: NEW, mutual: false },
+      { sourceBlogId: 3, targetBlogId: 1, count: 1, share: 1, firstMentionAt: OLD, lastMentionAt: OLD, mutual: true },
+    ],
+    mostMentioned: [{ blogId: 1, mentions: 1, incomingBlogs: 1 }],
+    mutual: [{ sourceBlogId: 1, targetBlogId: 3, forwardCount: 1, reverseCount: 1 }],
+    coverage,
+    ...patch,
+  });
+
+  test('the shared chart draws the body edges only; the lines are explained as direct body links', () => {
+    const data = map();
+    const $ = load(renderToString(<RelationMapView days="90" load={{ status: 'ready', data }} />));
+    expect(graph.calls.length).toBe(1);
+    expect(graph.calls[0].edges).toBe(data.edges);
+    expect($('[data-graph]').attr('data-graph')).toBe('2');
+    const text = $('body').text();
+    expect(text).toContain('每條線都是正文裡的直接連結');
+    expect(text).toContain('共同標籤與文字相似也不畫成線');
+    expect(text).toContain('不代表同時期互相回應');
+    expect(text).toContain('另記 blogroll 5、側欄 1、留言 2 條，與正文分開');
+  });
+
+  test('missing coverage counts are 未提供, never 0', () => {
+    const data = map({ coverage: { nonBodyLinks: {} } as unknown as Relations['coverage'] });
+    const $ = load(renderToString(<RelationMapView days="90" load={{ status: 'ready', data }} />));
+    const footer = $('footer').text();
+    expect(footer).toContain('未辨識正文 未提供 篇。另記 blogroll 未提供、側欄 未提供、留言 未提供 條');
+    expect(footer).toContain('已分析 未提供／未提供 篇');
+    expect(footer).not.toMatch(/(^|\D)0 (篇|條)/);
+  });
+});

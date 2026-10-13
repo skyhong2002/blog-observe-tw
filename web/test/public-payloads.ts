@@ -22,6 +22,29 @@ const relationCoverage = {
   aggregationTruncated: false,
 };
 const pagination = { page: 1, pages: 1, pageSize: 50, total: 0 };
+/** app/src/tech/routes.ts METHOD (synthetic wording). */
+export const techMethod = {
+  id: 'passive-existing-response',
+  partial: true,
+  additionalRequests: false,
+  description: '僅辨識既有公開回應中的部分線索（synthetic fixture）。',
+};
+/** A public blog with no technology observation yet (the gateway's not-observed row). Synthetic. */
+export const notObservedBlog = {
+  id: 1,
+  slug: 'a',
+  name: '甲',
+  url: 'https://blog.observe.tw/blogs/a/',
+  sourceUrl: 'https://a.example/',
+  iconUrl: null,
+  status: 'not-observed',
+  observedAt: null,
+  lastAttemptAt: null,
+  errorCode: null,
+  evidenceSourceUrl: null,
+  coverage: null,
+  detections: [],
+};
 
 /** Valid answers with no rows. One per public kind. */
 export const EMPTY: Record<PublicKind, unknown> = {
@@ -83,6 +106,17 @@ export const EMPTY: Record<PublicKind, unknown> = {
     sources: [],
     publicContent: 'summary-only',
   },
+  // app/src/tech/routes.ts: zero counts and no rows are a valid answer, never shown as an error.
+  tech: {
+    generatedAt: '2026-10-12T00:00:00.000Z',
+    method: techMethod,
+    coverage: { totalBlogs: 0, scannedBlogs: 0, truncated: false, detected: 0, unknown: 0, failed: 0, blocked: 0, notObserved: 0 },
+    technologies: [],
+    items: [],
+    pagination: { limit: 50, nextCursor: null, total: 0 },
+    filters: { q: '', technology: '', status: '' },
+  },
+  blogTech: { generatedAt: '2026-10-12T00:00:00.000Z', method: techMethod, blog: notObservedBlog },
   // app/src/seo/page-api.ts: zero counts are a valid registered page (counts never gate indexing).
   blogPage: {
     page: {
@@ -126,6 +160,8 @@ export const PATHS: Record<PublicKind, string> = {
   blogTopics: '/api/blogs/a/topics?days=90',
   blogInference: '/api/blogs/a/inference',
   blogContent: '/api/blogs/a/content',
+  tech: '/api/tech?technology=wp-plugin%3Aelementor&status=detected&cursor=12',
+  blogTech: '/api/blogs/a/tech',
   blogPage: '/api/pages/blogs/example.com',
   topicPage: '/api/pages/topics/%E6%97%85%E8%A1%8C',
 };

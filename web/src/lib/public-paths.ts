@@ -30,6 +30,8 @@ export const PUBLIC_KINDS = [
   'blogTopics',
   'blogInference',
   'blogContent',
+  'tech',
+  'blogTech',
   'blogPage',
   'topicPage',
 ] as const;
@@ -52,6 +54,9 @@ const RULES: readonly Rule[] = [
   { kind: 'blogTopics', path: blogPath('/topics'), query: ['days'] },
   { kind: 'blogInference', path: blogPath('/inference'), query: [] },
   { kind: 'blogContent', path: blogPath('/content'), query: [] },
+  // Passive technology observations (app/src/tech/routes.ts); the gateway answers 404 while they are off.
+  { kind: 'tech', path: /^\/api\/tech$/, query: ['q', 'technology', 'status', 'limit', 'cursor'] },
+  { kind: 'blogTech', path: blogPath('/tech'), query: [] },
   // Page registry reads (app/src/seo/page-api.ts): one encoded key, no query.
   { kind: 'blogPage', path: new RegExp(`^/api/pages/blogs/${SEGMENT}$`), query: [] },
   { kind: 'topicPage', path: new RegExp(`^/api/pages/topics/${SEGMENT}$`), query: [] },

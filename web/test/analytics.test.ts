@@ -141,12 +141,15 @@ test('known paths match with or without the trailing slash; hits carry the canon
     [`/topics/tag%3a${HASH}`, 'topic', `/topics/tag%3A${HASH}/`],
     ['/topics/rss:42', 'topic', '/topics/rss%3A42/'],
     ['/traffic', 'traffic', '/traffic/'],
+    ['/tech', 'tech', '/tech/'],
+    ['/tech/', 'tech', '/tech/'],
   ];
   for (const [href, type, path] of cases) {
     assert.deepEqual(publicPage(href, ORIGIN), { type, path }, href);
     assert.equal(pageFields(ORIGIN, publicPage(href, ORIGIN)!, '').page_location, ORIGIN + path);
   }
-  for (const href of ['/my', '/login', '/admin', '/observe/opt-out', '/api/v1/posts', '/auth/me'])
+  // /tech/'s filters and pages are query strings: only the bare page is measured, like every static page.
+  for (const href of ['/my', '/login', '/admin', '/observe/opt-out', '/api/v1/posts', '/auth/me', '/tech/?status=failed', '/tech/x/'])
     assert.equal(publicPage(href, ORIGIN), null, href);
 });
 

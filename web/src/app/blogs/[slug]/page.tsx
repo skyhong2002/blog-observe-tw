@@ -1,14 +1,17 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
+import { Suspense } from 'react';
 import BlogContentSources from '@/components/BlogContentSources';
 import BlogInference from '@/components/BlogInference';
 import BlogRelations from '@/components/BlogRelations';
+import BlogTech, { BlogTechPending } from '@/components/BlogTech';
 import BlogTopics from '@/components/BlogTopics';
 import SimilarwebTraffic from '@/components/SimilarwebTraffic';
 import SourceProfile from '@/components/SourceProfile';
 import { plainText } from '@/lib/api';
 import { getBlog, getPublicPage } from '@/lib/public-api';
 import { breadcrumbSchema, pageMetadata, serializeJsonLd, shortText } from '@/lib/seo';
+import { techPublicEnabled } from '@/lib/tech-flag';
 
 // Rendered on every request, never cached or built: the blog's posts are the gateway's answer to this
 // request (no-store reads, public-read.ts), so a post it has since hidden never lives on in a stored page.
@@ -49,6 +52,12 @@ export default async function BlogDetailPage({ params }: Props) {
         sidebar={
           <>
             <BlogContentSources slug={blog.slug} />
+            {/* Off unless BLOG_TECH_PUBLIC_ENABLED is 'true': no request, no section. Optional: streamed on its own. */}
+            {techPublicEnabled() && (
+              <Suspense fallback={<BlogTechPending />}>
+                <BlogTech slug={blog.slug} />
+              </Suspense>
+            )}
             <SimilarwebTraffic slug={blog.slug} compact />
           </>
         }

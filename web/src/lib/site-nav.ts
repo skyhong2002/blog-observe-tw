@@ -1,5 +1,6 @@
 // Adapted from tag.observe.tw afe0a65: same grouped navigation, blog entities.
-export type NavLink = { href: string; label: string; short: string };
+/** `feature` links show only when the server turns that feature on (navGroupsFor). */
+export type NavLink = { href: string; label: string; short: string; feature?: 'tech' };
 export const NAV_GROUPS: Array<{ label: string; links: NavLink[] }> = [
   {
     label: '看文章',
@@ -16,6 +17,7 @@ export const NAV_GROUPS: Array<{ label: string; links: NavLink[] }> = [
       { href: '/blogs/', label: '部落格目錄', short: '部落格' },
       { href: '/authors/', label: '文章作者', short: '作者' },
       { href: '/traffic/', label: '部落格流量', short: '流量' },
+      { href: '/tech/', label: '使用的技術', short: '技術', feature: 'tech' },
     ],
   },
   {
@@ -28,3 +30,8 @@ export const NAV_GROUPS: Array<{ label: string; links: NavLink[] }> = [
   },
 ];
 export const METHOD_HREF = '/about/';
+
+/** NAV_GROUPS without the links of features the server has not turned on (all off unless asked for). */
+export function navGroupsFor(features: { tech?: boolean } = {}) {
+  return NAV_GROUPS.map((group) => ({ ...group, links: group.links.filter((link) => !link.feature || features[link.feature] === true) }));
+}
