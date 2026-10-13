@@ -56,6 +56,6 @@
 
 本批每四張預算 1–8MiB，先拍優先狀態再補全部模板；全清單估算沿 ledger 保留 384MiB 截圖／文字餘裕，不含 node_modules、build 或 release。超過就停止重估，不刪既有任何版本、圖或備份。
 
-先由非作者看實際 candidate 圖，通過後使用同一份產物部署，再交正式瀏覽器驗收。首頁排行晚失敗時，Suspense 可能已送出 HTTP 200 主體，之後交 error boundary；必須驗錯誤 UI，不拿狀態碼當「空結果成功」。
+依使用者最新決定，首頁及本批主要新功能頁先由非作者看實際 candidate 圖、確認沒有 blocker，再使用同一份產物部署；其餘頁面部署後繼續逐頁 review，ledger保留 pending、不宣稱完整scope通過。技術／B0／native／資源閘門不放寬，詳見 [下一批release](next-release-candidate.md)。首頁排行晚失敗時，Suspense 可能已送出 HTTP 200 主體，之後交 error boundary；必須驗錯誤 UI，不拿狀態碼當「空結果成功」。
 
 B2 profile新增狀態：`/blogs/<known-pair>/` outgoing已知target多筆與cap3、少筆、雙方各自文章日期／ID／版本；disabled、no-selected-pairs、insufficient-text、unavailable／撤下；展开方法與原文連結。1280/390各兩色，使用mock/candidate，不新增正式抓取或登入權限；計入原22UI模板與384MiB預算，未產生新圖。

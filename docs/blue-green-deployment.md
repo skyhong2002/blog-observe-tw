@@ -1,5 +1,11 @@
 # Blue/green 部署前置（尚未代表正式站已切換）
 
+**最新發版規則：**Mint一次建置、技術/B0與主要candidate頁面非作者看圖後，
+用 `record-built`／`prepare-built`／`switch` 部署同一份產物；SM不執行會重建的
+`prepare`。其餘頁面部署後逐頁review、ledger保留pending。備份須先於additive
+migration，完整閘門與立即回滾見 [下一批release](next-release-candidate.md)。
+下方含早期引入程序及歷史建置方式，不應當作本輪SM建置許可。
+
 本方案新增固定 loopback edge，不修改 Cloudflare／Tunnel、tag、youtube、既有 blog units、資料表或 worker。正式啟用前必須經整合審查。既有 gateway 直接監聽 18160 的發版流程仍有 restart 空窗，不能稱為零停機。
 
 | 角色 | blue | green |
