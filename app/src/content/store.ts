@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import type { RowDataPacket } from 'mysql2/promise';
 import { canonicalArticleUrl } from '../crawl/feed.ts';
 import { normalizeLink, type PublicationAlias, resolvePublication } from '../relations/identity.ts';
-import { type ParsedArticle, type ParsedLink, parseArticleLinks } from '../relations/parser.ts';
+import { PARSER_VERSION, type ParsedArticle, type ParsedLink, parseArticleLinks } from '../relations/parser.ts';
 import { discoverWordpressApi, extractContent, inPublication } from './article-content.ts';
 import { CONTENT_VERSION, type ContentEvidence, type ContentRule, type ContentSql, type ExtractedContent } from './contracts.ts';
 import { inferredRule, validateRules } from './registry.ts';
@@ -238,7 +238,8 @@ export async function ingestContentEvidence(
       extracted.imageOnly,
       extracted.truncated || bodyLinks.length + pageLinks.length > 100,
       extracted.coverage,
-      JSON.stringify(links),
+      // Per-entry version preserves the existing array shape for rollback readers.
+      JSON.stringify(links.map((link) => ({ ...link, parserVersion: PARSER_VERSION }))),
     ],
   );
   return { postId, status: extracted.status, changed: old?.content_hash !== extracted.hash, hash: extracted.hash };
@@ -257,13 +258,13 @@ export async function storedRelationContent(
   const r = rows[0];
   if (!r) return null;
   const parsed = parseArticleLinks(`<article>${r.body_html || ''}</article>`, r.article_url, blogId, aliases);
-  let links: ParsedLink[] | null = null;
+  let links: (ParsedLink & { parserVersion?: string })[] | null = null;
   try {
     links = typeof r.page_links === 'string' ? JSON.parse(r.page_links) : (r.page_links ?? null);
   } catch {
     /* Preserve body extraction even with an older malformed metadata row. */
   }
-  if (
+  const validSnapshot =
     Array.isArray(links) &&
     links.length <= 100 &&
     links.every(
@@ -272,21 +273,40 @@ export async function storedRelationContent(
         typeof l.targetUrl === 'string' &&
         typeof l.anchorText === 'string' &&
         typeof l.context === 'string' &&
+        [...l.anchorText].length <= 255 &&
+        [...l.context].length <= 320 &&
         ['body', 'blogroll', 'sidebar', 'comment'].includes(l.location),
-    )
-  )
-    parsed.links = links
-      .filter((l) => normalizeLink(l.targetUrl))
-      .map((l) => ({ ...l, targetBlogId: resolvePublication(l.targetUrl, aliases) }))
-      .filter((l) => l.targetBlogId !== blogId)
-      .slice(0, 100)
-      .map((l, ordinal) => ({ ...l, ordinal }));
+    );
+  // Current normalized body HTML is authoritative. Old page_links must never
+  // resurrect obsolete body links or override current structural classification.
+  const currentSnapshot = validSnapshot && links!.every((link) => link.parserVersion === PARSER_VERSION);
+  parsed.nonBodySnapshotState = r.page_links == null ? 'none' : currentSnapshot ? 'current-parser' : 'unverified';
+  if (currentSnapshot) {
+    const nonBodyLinks = links!
+      .filter((l) => l.location !== 'body' && normalizeLink(l.targetUrl))
+      .map((l) => ({
+        targetUrl: normalizeLink(l.targetUrl)!,
+        anchorText: l.anchorText,
+        context: l.context,
+        location: l.location,
+        ordinal: 0,
+        targetBlogId: resolvePublication(l.targetUrl, aliases),
+      }))
+      .filter((l) => l.targetBlogId !== blogId);
+    const merged = [...parsed.links, ...nonBodyLinks];
+    parsed.links = merged.slice(0, 100).map((l, ordinal) => ({ ...l, ordinal }));
+    parsed.truncated ||= merged.length > 100;
+  } else if (r.page_links != null) {
+    // The full old page is unavailable. Keep original DB JSON unchanged, and
+    // disclose missing non-body revalidation rather than claiming a full reparse.
+    parsed.truncated = true;
+  }
   parsed.extraction = `content:${r.source_kind}:${String(r.content_hash).slice(0, 24)}`;
   parsed.truncated ||= Boolean(r.truncated);
   parsed.externalLinks = Math.max(parsed.externalLinks, parsed.links.length);
   // Hash includes link generation and content source; topic freshness also reads the private body hash directly.
   parsed.contentHash = createHash('sha256')
-    .update(JSON.stringify([r.content_hash, parsed.links, CONTENT_VERSION]))
+    .update(JSON.stringify([r.content_hash, parsed.links, CONTENT_VERSION, PARSER_VERSION, parsed.nonBodySnapshotState]))
     .digest('hex');
   return { parsed, hash: r.content_hash, sourceUrl: r.source_url, obtainedAt: new Date(r.obtained_at) };
 }

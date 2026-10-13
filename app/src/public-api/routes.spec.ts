@@ -111,24 +111,44 @@ describe('public v1 route privacy and input bounds', () => {
     }
     for (const call of query.mock.calls) expect(call[0]).toContain("b.status='verified'");
   });
-  it('single-flights concurrent public reads but refreshes subsequent HEAD', async () => {
+  it('reads concurrent public requests independently, bounds capacity and refreshes subsequent HEAD', async () => {
+    let release!: () => void;
+    let allStarted!: () => void;
+    let started = 0;
+    const barrier = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const ready = new Promise<void>((resolve) => {
+      allStarted = resolve;
+    });
     const { app, query } = setup(
       vi.fn(async () => {
-        await new Promise((resolve) => setTimeout(resolve, 5));
+        if (++started === 8) allStarted();
+        await barrier;
         return [[]];
       }),
     );
-    const responses = await Promise.all(
-      Array.from({ length: 20 }, (_, i) => app.inject(i % 2 ? '/api/v1/articles?limit=50&hours=720' : '/api/v1/articles')),
+    await app.ready();
+    const pending = Array.from({ length: 8 }, (_, i) =>
+      Promise.resolve(app.inject(i % 2 ? '/api/v1/articles?limit=50&hours=720' : '/api/v1/articles')),
     );
-    expect(responses.every((r) => r.statusCode === 200)).toBe(true);
-    expect(query).toHaveBeenCalledTimes(1);
-    const window = responses[0].json().window;
-    expect(responses.every((r) => JSON.stringify(r.json().window) === JSON.stringify(window))).toBe(true);
+    try {
+      await ready;
+      expect(query).toHaveBeenCalledTimes(8);
+      const overflow = await app.inject('/api/v1/articles');
+      expect(overflow.statusCode).toBe(503);
+      expect(overflow.headers['cache-control']).toContain('no-store');
+      expect(query).toHaveBeenCalledTimes(8);
+    } finally {
+      release();
+    }
+    const responses = await Promise.all(pending);
+    expect(responses.every((r) => r.statusCode === 200 && r.headers['cache-control'] === 'no-store')).toBe(true);
+    for (const response of responses) expect(response.json().window).toHaveProperty('until');
     const head = await app.inject({ method: 'HEAD', url: '/api/v1/articles' });
     expect(head.statusCode).toBe(200);
     expect(head.body).toBe('');
-    expect(query).toHaveBeenCalledTimes(2);
+    expect(query).toHaveBeenCalledTimes(9);
   });
   it('normalizes unexpected SQL errors without disclosing database text', async () => {
     const { app } = setup(vi.fn().mockRejectedValue(new Error('SQL password SELECT secret')));

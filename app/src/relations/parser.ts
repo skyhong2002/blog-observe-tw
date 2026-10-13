@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import * as cheerio from 'cheerio';
 import type { Element } from 'domhandler';
 import { identityKey, normalizeLink, type PublicationAlias, publicationHome, resolvePublication } from './identity.ts';
-export const PARSER_VERSION = 'semantic-links-v2';
+export const PARSER_VERSION = 'semantic-links-v3';
 export type LinkLocation = 'body' | 'sidebar' | 'blogroll' | 'comment';
 export type ParsedLink = {
   targetUrl: string;
@@ -19,6 +19,7 @@ export type ParsedArticle = {
   truncated: boolean;
   externalLinks: number;
   links: ParsedLink[];
+  nonBodySnapshotState?: 'current-parser' | 'unverified' | 'none';
 };
 const clean = (s: string) => s.replace(/\s+/g, ' ').trim();
 const clip = (s: string, n: number) => Array.from(s).slice(0, n).join('');
@@ -134,8 +135,11 @@ export function parseArticleLinks(
       if (!home || (sourceHome && identityKey(home) === identityKey(sourceHome)) || resolvePublication(home, aliases) === sourceBlogId)
         return;
     }
-    const anchorText = clip(clean(anchor.text()), 255),
-      key = `${location}\n${targetUrl}\n${anchorText}`;
+    const anchorText = clip(clean(anchor.text()), 255);
+    const surrounding = clean(anchor.parent().text()),
+      at = surrounding.indexOf(anchorText),
+      context = clip(at > 100 ? surrounding.slice(at - 100) : surrounding, 320);
+    const key = `${location}\n${targetUrl}\n${anchorText}\n${context}`;
     if (seen.has(key)) return;
     seen.add(key);
     externalLinks++;
@@ -143,9 +147,6 @@ export function parseArticleLinks(
       truncated = true;
       return;
     }
-    const surrounding = clean(anchor.parent().text()),
-      at = surrounding.indexOf(anchorText),
-      context = clip(at > 100 ? surrounding.slice(at - 100) : surrounding, 320);
     links.push({ targetUrl, targetBlogId, anchorText, context, location, ordinal: links.length });
   });
   const priority = { body: 0, blogroll: 1, sidebar: 2, comment: 3 };

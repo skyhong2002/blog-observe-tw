@@ -2,8 +2,10 @@ import type { FastifyInstance, FastifyReply } from 'fastify';
 import type { Pool, RowDataPacket } from 'mysql2/promise';
 import type { BatchOptions, BatchResult } from '../jobs/contracts.ts';
 import { withJobLease } from '../jobs/lease.ts';
+import { publicSummary } from '../public-post.ts';
 import { iconManifest } from '../v1/favicon-routes.ts';
 import { iconUrl } from '../v1/icons.ts';
+import { loadSharedTags } from './shared-tags.ts';
 
 export type RelationEdge = {
   sourceBlogId: number;
@@ -342,14 +344,42 @@ export function readBlogRelations(pool: Pool, blog: { id: number }, days: number
     const ids = [...new Set([Number(blog.id), ...edges.flatMap((e) => [e.sourceBlogId, e.targetBlogId])])];
     const [nodes] = await pool.query<RowDataPacket[]>("SELECT id,slug,name FROM blogs WHERE id IN (?) AND status='verified'", [ids]);
     const [evidence] = await pool.query<RowDataPacket[]>(
-      `SELECT p.id postId,p.title postTitle,p.url postUrl,l.target_url targetUrl,l.anchor_text anchor,p.published_at publishedAt,
-      l.source_blog_id sourceBlogId,l.target_blog_id targetBlogId,l.location
+      `SET STATEMENT max_statement_time=0.25 FOR SELECT p.id postId,p.title postTitle,p.url postUrl,l.target_url targetUrl,l.anchor_text anchor,p.published_at publishedAt,
+      l.source_blog_id sourceBlogId,l.target_blog_id targetBlogId,l.location,l.context,
+      l.observed_at observedAt,o.parser_version matchVersion
       FROM relation_links l JOIN posts p ON p.id=l.source_post_id JOIN blogs a ON a.id=l.source_blog_id JOIN blogs b ON b.id=l.target_blog_id
+      JOIN relation_observations o ON o.post_id=l.source_post_id
       WHERE ${PUBLIC_RELATION} AND l.location='body' AND (l.source_blog_id=? OR l.target_blog_id=?) AND l.source_blog_id<>l.target_blog_id
       AND a.status='verified' AND b.status='verified' AND p.published_at>=? AND p.published_at<=?
-      ORDER BY p.published_at DESC,l.source_post_id,l.ordinal LIMIT 20`,
+      ORDER BY p.published_at DESC,l.source_post_id,l.ordinal LIMIT 21`,
       [blog.id, blog.id, cutoff, now],
     );
+    const [nonBodyEvidence] = await pool.query<RowDataPacket[]>(
+      `SET STATEMENT max_statement_time=0.25 FOR SELECT p.id postId,p.title postTitle,p.url postUrl,l.target_url targetUrl,l.anchor_text anchor,p.published_at publishedAt,
+      l.source_blog_id sourceBlogId,l.target_blog_id targetBlogId,l.location,l.context,l.observed_at observedAt,o.parser_version matchVersion
+      FROM relation_links l JOIN posts p ON p.id=l.source_post_id JOIN blogs a ON a.id=l.source_blog_id JOIN blogs b ON b.id=l.target_blog_id
+      JOIN relation_observations o ON o.post_id=l.source_post_id
+      WHERE ${PUBLIC_RELATION} AND l.location IN ('blogroll','sidebar','comment') AND (l.source_blog_id=? OR l.target_blog_id=?)
+      AND l.source_blog_id<>l.target_blog_id AND a.status='verified' AND b.status='verified' AND p.published_at>=? AND p.published_at<=?
+      ORDER BY p.published_at DESC,l.source_post_id,l.ordinal LIMIT 21`,
+      [blog.id, blog.id, cutoff, now],
+    );
+    const projectEvidence = (r: RowDataPacket) => ({
+      postId: Number(r.postId),
+      postTitle: r.postTitle,
+      postUrl: r.postUrl,
+      targetUrl: r.targetUrl,
+      anchor: r.anchor,
+      publishedAt: iso(r.publishedAt),
+      sourceBlogId: Number(r.sourceBlogId),
+      targetBlogId: Number(r.targetBlogId),
+      location: r.location,
+      context: publicSummary(r.context, 240),
+      observedAt: iso(r.observedAt),
+      matchVersion: r.matchVersion,
+      evidenceType: 'direct-link' as const,
+      contextSource: r.location,
+    });
     const icons = await iconManifest();
     const coverage = await loadRelationCoverage(pool, Number(blog.id));
     return {
@@ -363,7 +393,15 @@ export function readBlogRelations(pool: Pool, blog: { id: number }, days: number
       edges,
       outgoing: edges.filter((e) => e.sourceBlogId === blog.id),
       incoming: edges.filter((e) => e.targetBlogId === blog.id),
-      evidence: evidence.map((r) => ({ ...r, publishedAt: iso(r.publishedAt) })),
+      evidence: evidence.slice(0, 20).map(projectEvidence),
+      evidenceTruncated: evidence.length > 20,
+      nonBodyEvidence: nonBodyEvidence.slice(0, 20).map(projectEvidence),
+      nonBodyEvidenceTruncated: nonBodyEvidence.length > 20,
+      sharedTags:
+        process.env.BLOG_SHARED_TAGS_ENABLED === 'true'
+          ? await loadSharedTags(pool, { sourceBlogId: blog.id, days: days as 7 | 30 | 90 })
+          : { status: 'not-enabled' as const },
+      textSimilarity: { status: 'not-analysed' as const },
       profileTruncated: rows.length > 1000,
     };
   });

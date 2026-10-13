@@ -12,7 +12,12 @@ let created = false;
 let phase = 'configuration';
 const name = `blog_observe_integration_${randomBytes(12).toString('hex')}`;
 try {
-  if (process.argv.length !== 4 || process.argv[2] !== '--env-file') throw Error('explicit_private_clone_env_required');
+  if (
+    ![4, 6].includes(process.argv.length) ||
+    process.argv[2] !== '--env-file' ||
+    (process.argv.length === 6 && (process.argv[4] !== '--suite' || process.argv[5] !== 'f3-f4'))
+  )
+    throw Error('explicit_private_clone_env_required');
   const file = resolve(process.argv[3]);
   if (basename(file) === '.env' || basename(file) === '.env.production') throw Error('production_env_prohibited');
   const stat = await lstat(file);
@@ -80,13 +85,25 @@ try {
     ['public-api', '../app/src/public-api/integration.ts', 'runPublicApiIntegration'],
     ['api-keys', '../app/src/reader/api-keys.integration.ts', 'runApiKeyIntegration'],
     ['admin', '../tests/integration/admin.mjs', 'runAdminIntegration'],
+    ['search-recall', '../app/src/search.integration.ts', 'runSearchIntegration'],
+    ['profile-evidence', '../app/src/relations/profile-evidence.integration.ts', 'runProfileEvidenceIntegration'],
+    ['shared-tags', '../app/src/relations/shared-tags.integration.ts', 'runSharedTagsIntegration'],
+    ['tech-store', '../app/src/tech/store.integration.ts', 'runTechStoreIntegration'],
+    ['tech-routes', '../app/src/tech/routes.integration.ts', 'runTechRoutesIntegration'],
+    ['tech-backfill', '../app/src/tech/backfill.integration.ts', 'runTechBackfillIntegration'],
   ];
-  for (const [label, module, entry] of suites) {
+  const selected =
+    process.argv[5] === 'f3-f4'
+      ? suites.filter(
+          ([label]) => label === 'search-recall' || label === 'profile-evidence' || label === 'shared-tags' || label.startsWith('tech-'),
+        )
+      : suites;
+  for (const [label, module, entry] of selected) {
     phase = label;
     const result = await (await import(module))[entry](store.pool);
     console.log(JSON.stringify({ suite: label, passed: true, result }));
   }
-  console.log(JSON.stringify({ passed: true, suites: suites.length, migrations: files.length, isolatedPort: 18169 }));
+  console.log(JSON.stringify({ passed: true, suites: selected.length, migrations: files.length, isolatedPort: 18169 }));
 } catch (error) {
   // Database driver errors can contain SQL or connection credentials. Only a fixed phase and bounded error code leave this process.
   const code =

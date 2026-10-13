@@ -3,14 +3,28 @@ import { buildApp } from './app.js';
 import { loadOverview } from './overview.js';
 
 describe('read-only frontend projection', () => {
-  it('coalesces concurrent homepage queries without retaining completed content', async () => {
-    const query = vi.fn(async (sql: string) => [sql.includes('AS blogs,') ? [{ blogs: 1, posts: 1, updatedAt: null }] : []]);
+  it('reads each homepage independently and rejects overflow without retaining completed content', async () => {
+    let release!: () => void;
+    const barrier = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const query = vi.fn(async (sql: string) => {
+      await barrier;
+      return [sql.includes('AS blogs,') ? [{ blogs: 1, posts: 1, updatedAt: null }] : []];
+    });
     const pool = { query };
-    const results = await Promise.all(Array.from({ length: 12 }, () => loadOverview(pool)));
-    expect(query).toHaveBeenCalledTimes(6);
-    expect(results[0].cacheSeconds).toBe(0);
+    const pending = Array.from({ length: 8 }, () => loadOverview(pool));
+    try {
+      expect(query).toHaveBeenCalledTimes(48);
+      await expect(loadOverview(pool)).rejects.toThrow('topic_cache_busy');
+      expect(query).toHaveBeenCalledTimes(48);
+    } finally {
+      release();
+    }
+    const results = await Promise.all(pending);
+    expect(results.every((r) => r.cacheSeconds === 0)).toBe(true);
     await loadOverview(pool);
-    expect(query).toHaveBeenCalledTimes(12);
+    expect(query).toHaveBeenCalledTimes(54);
   });
   it('returns separate indexed counts and the actual collection timestamp', async () => {
     const responses = [

@@ -18,9 +18,12 @@ export type ArticleRow = {
   parser_version?: string;
 };
 export async function loadAliases(pool: Pool): Promise<PublicationAlias[]> {
-  const [rows] = await pool.query<RowDataPacket[]>(`SELECT b.id blogId,b.url FROM blogs b WHERE b.status='verified' AND b.url IS NOT NULL
-    UNION SELECT u.blog_id blogId,u.url FROM blog_urls u JOIN blogs b ON b.id=u.blog_id WHERE b.status='verified'`);
-  return rows.map((r) => ({ blogId: Number(r.blogId), url: r.url }));
+  const [rows] = await pool.query<
+    RowDataPacket[]
+  >(`SELECT b.id blogId,b.url,'publication-prefix' scope FROM blogs b WHERE b.status='verified' AND b.url IS NOT NULL
+    UNION SELECT u.blog_id blogId,u.url,CASE WHEN u.kind IN ('primary','canonical','alternate','moved','ownership') THEN 'publication-prefix' ELSE 'exact-url' END scope
+    FROM blog_urls u JOIN blogs b ON b.id=u.blog_id WHERE b.status='verified'`);
+  return rows.map((r) => ({ blogId: Number(r.blogId), url: r.url, scope: r.scope === 'exact-url' ? 'exact-url' : 'publication-prefix' }));
 }
 
 /** SQL generation replacement is atomic; failed network refresh never deletes last successful links/text. */

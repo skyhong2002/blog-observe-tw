@@ -225,12 +225,23 @@ export function publicationDecision(value: string): PublicationDecision {
 export function publicationHome(value: string): string | null {
   return publicationDecision(value).home;
 }
-export type PublicationAlias = { blogId: number; url: string };
+export type PublicationAlias = { blogId: number; url: string; scope?: 'exact-url' | 'publication-prefix' };
 export type PublicationResolver = { resolve: (value: string) => number | null };
 /** Compile URL/host/path keys once per crawl batch, not once per anchor × alias. */
 export function compilePublicationAliases(aliases: PublicationAlias[]): PublicationResolver {
   const hosts = new Map<string, Map<string, number | null>>();
+  const exact = new Map<string, number | null>();
   for (const alias of aliases) {
+    if (!Number.isSafeInteger(alias.blogId) || alias.blogId < 1) continue;
+    if (alias.scope === 'exact-url') {
+      // A redirect proves one URL, not its publication owner. identityKey may
+      // intentionally collapse article paths/IDs on owner-based platforms.
+      const key = normalizeLink(alias.url);
+      if (!key) continue;
+      if (!exact.has(key)) exact.set(key, alias.blogId);
+      else if (exact.get(key) !== alias.blogId) exact.set(key, null);
+      continue;
+    }
     const key = identityKey(alias.url);
     if (!key || key.includes('?') || !publicationHome(alias.url)) continue;
     const slash = key.indexOf('/'),
@@ -244,23 +255,33 @@ export function compilePublicationAliases(aliases: PublicationAlias[]): Publicat
     if (!paths.has(path)) paths.set(path, alias.blogId);
     else if (paths.get(path) !== alias.blogId) paths.set(path, null);
   }
+  const prefix = (key: string): { matched: boolean; blogId: number | null } => {
+    const q = key.indexOf('?'),
+      clean = q < 0 ? key : key.slice(0, q),
+      slash = clean.indexOf('/'),
+      host = slash < 0 ? clean : clean.slice(0, slash);
+    let path = slash < 0 ? '' : clean.slice(slash);
+    const paths = hosts.get(host);
+    if (!paths) return { matched: false, blogId: null };
+    while (true) {
+      if (paths.has(path)) return { matched: true, blogId: paths.get(path) ?? null };
+      if (!path) return { matched: false, blogId: null };
+      const at = path.lastIndexOf('/');
+      path = at <= 0 ? '' : path.slice(0, at);
+    }
+  };
   return {
     resolve(value) {
-      const key = identityKey(value);
+      const exactKey = normalizeLink(value);
+      if (!exactKey) return null;
+      const key = identityKey(exactKey);
       if (!key) return null;
-      const q = key.indexOf('?'),
-        clean = q < 0 ? key : key.slice(0, q),
-        slash = clean.indexOf('/'),
-        host = slash < 0 ? clean : clean.slice(0, slash);
-      let path = slash < 0 ? '' : clean.slice(slash);
-      const paths = hosts.get(host);
-      if (!paths) return null;
-      while (true) {
-        if (paths.has(path)) return paths.get(path) ?? null;
-        if (!path) return null;
-        const at = path.lastIndexOf('/');
-        path = at <= 0 ? '' : path.slice(0, at);
+      const owner = prefix(key);
+      if (exact.has(exactKey)) {
+        const blogId = exact.get(exactKey) ?? null;
+        return owner.matched && owner.blogId !== blogId ? null : blogId;
       }
+      return owner.blogId;
     },
   };
 }
