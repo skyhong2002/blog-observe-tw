@@ -8,7 +8,7 @@ export const TEXT_SIMILARITY_LIMITS = Object.freeze({
   minimumGrams: 8,
   excerptCodepoints: 240,
 });
-export type SimilarityPair = { sourceArticleId: number; targetArticleId: number };
+export type SimilarityPair = { sourceArticleId: number; targetArticleId: number; expectedTargetBlogId?: number };
 export type SimilaritySelection = { pairs: SimilarityPair[]; sourceBlogId?: number };
 export function textSimilaritySelection(input: SimilaritySelection) {
   const validId = (v: unknown) => Number.isSafeInteger(v) && Number(v) > 0;
@@ -23,7 +23,13 @@ export function textSimilaritySelection(input: SimilaritySelection) {
   const ids = new Set<number>(),
     pairs = new Set<string>();
   for (const pair of input.pairs) {
-    if (!pair || !validId(pair.sourceArticleId) || !validId(pair.targetArticleId) || pair.sourceArticleId === pair.targetArticleId)
+    if (
+      !pair ||
+      !validId(pair.sourceArticleId) ||
+      !validId(pair.targetArticleId) ||
+      pair.sourceArticleId === pair.targetArticleId ||
+      (pair.expectedTargetBlogId !== undefined && !validId(pair.expectedTargetBlogId))
+    )
       throw Error('invalid_text_similarity_selection');
     const key = [pair.sourceArticleId, pair.targetArticleId].sort((a, b) => a - b).join(':');
     if (pairs.has(key)) throw Error('invalid_text_similarity_selection');

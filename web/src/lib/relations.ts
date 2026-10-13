@@ -76,7 +76,195 @@ export type SharedTags =
       matchVersion: string;
       interpretation: string;
     };
+/** The raw key as sent; read it only through parseTextSimilarity. Older gateways send { status: 'not-analysed' }. */
 export type TextSimilarity = { status: 'not-analysed' } | { status: string };
+
+/* Text similarity (app/src/relations/text-similarity-profile.ts, text-similarity-reader.ts) ------------------- */
+
+/** The profile compares at most this many pairs (PROFILE_SIMILARITY_PAIRS); more rows are not shown. */
+export const SIMILARITY_PAIRS_MAX = 3;
+const SIMILARITY_REASONS = ['evidence-unavailable', 'overcap', 'invalid-utf8', 'stale-or-unavailable', 'same-publication'] as const;
+export type SimilarityReason = (typeof SIMILARITY_REASONS)[number];
+/** One article of a compared pair: public fields only. The preview is the post's public summary, never body text. */
+export type SimilaritySide = {
+  articleId: number;
+  title: string | null;
+  url: string | null;
+  publishedAt: string | null;
+  observedAt: string | null;
+  excerpt: string | null;
+  prefixCodepoints: number | null;
+  truncated: boolean | null;
+};
+export type SimilarityItem =
+  | {
+      status: 'ready';
+      sourceArticleId: number;
+      targetArticleId: number;
+      lexicalSimilarity: number;
+      matchVersion: string | null;
+      source: SimilaritySide;
+      target: SimilaritySide;
+    }
+  | {
+      status: 'insufficient-text';
+      sourceArticleId: number;
+      targetArticleId: number;
+      matchVersion: string | null;
+      source: SimilaritySide | null;
+      target: SimilaritySide | null;
+    }
+  /** No score and no preview: a withdrawn or changed article must not be shown from a stale read. */
+  | { status: 'unavailable'; sourceArticleId: number; targetArticleId: number; reason: SimilarityReason | null };
+/** How the pairs were picked; null is 未提供. exhaustive is never repeated as true. */
+export type SimilaritySelection = {
+  selectionOrigin: 'observed-outgoing-body-links' | null;
+  selectionLimit: number | null;
+  selectedPairs: number | null;
+  selectionTruncated: boolean | null;
+};
+export type TextSimilarityView =
+  | { status: 'missing' }
+  | { status: 'not-analysed' }
+  | { status: 'not-enabled' }
+  | { status: 'no-selected-pairs'; selection: SimilaritySelection }
+  | { status: 'unavailable'; selection: SimilaritySelection }
+  | { status: 'ready'; selection: SimilaritySelection; matchVersion: string | null; items: SimilarityItem[]; omittedItems: number };
+
+const plainRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null && !Array.isArray(value);
+const articleId = (value: unknown) => (Number.isSafeInteger(value) && (value as number) > 0 ? (value as number) : null);
+const versionLabel = (value: unknown) => (typeof value === 'string' && /^[a-z0-9][a-z0-9._-]{0,63}$/.test(value) ? value : null);
+const dateValue = (value: unknown) => (typeof value === 'string' && Number.isFinite(Date.parse(value)) ? value : null);
+/** Plain text cut to `max` code points; anything that is not a string is not provided. */
+const boundedText = (value: unknown, max: number) => {
+  if (typeof value !== 'string') return null;
+  const text = value
+    .replace(/[\p{Cc}\p{Cf}]+/gu, ' ')
+    .replace(/\s+/gu, ' ')
+    .trim();
+  if (!text) return null;
+  const chars = Array.from(text);
+  return chars.length > max ? `${chars.slice(0, max - 1).join('')}…` : text;
+};
+
+/**
+ * A compared article's original link: http(s) with no username or password, kept exactly as sent (its query is part
+ * of the article address). Anything else is null and the title stays plain text. Stricter than externalHref, which
+ * the citation and shared-tag rows keep using unchanged.
+ */
+export function similarityHref(value: unknown): string | null {
+  if (typeof value !== 'string' || value.length > 2048) return null;
+  try {
+    const url = new URL(value);
+    return (url.protocol === 'http:' || url.protocol === 'https:') && !url.username && !url.password ? value : null;
+  } catch {
+    return null;
+  }
+}
+
+function sideOf(value: unknown, expectedId: number): SimilaritySide | null {
+  // The preview must be the public summary and the comparison the private body prefix, as the reader says.
+  if (
+    !plainRecord(value) ||
+    articleId(value.articleId) !== expectedId ||
+    value.contextSource !== 'post-summary' ||
+    value.comparedContextSource !== 'body-prefix'
+  )
+    return null;
+  const prefix = articleId(value.prefixCodepoints);
+  return {
+    articleId: expectedId,
+    title: boundedText(value.title, 160),
+    url: similarityHref(value.url),
+    publishedAt: dateValue(value.publishedAt),
+    observedAt: dateValue(value.observedAt),
+    excerpt: boundedText(value.excerpt, 240),
+    prefixCodepoints: prefix !== null && prefix <= 4096 ? prefix : null,
+    truncated: typeof value.truncated === 'boolean' ? value.truncated : null,
+  };
+}
+
+function itemOf(value: unknown): SimilarityItem | null {
+  if (!plainRecord(value)) return null;
+  const sourceArticleId = articleId(value.sourceArticleId),
+    targetArticleId = articleId(value.targetArticleId);
+  if (sourceArticleId === null || targetArticleId === null || sourceArticleId === targetArticleId) return null;
+  const unavailable = (reason: unknown): SimilarityItem => ({
+    status: 'unavailable',
+    sourceArticleId,
+    targetArticleId,
+    reason: SIMILARITY_REASONS.find((known) => known === reason) ?? null,
+  });
+  const matchVersion = versionLabel(value.matchVersion);
+  if (value.status === 'ready') {
+    const source = sideOf(value.source, sourceArticleId),
+      target = sideOf(value.target, targetArticleId);
+    const score = value.lexicalSimilarity;
+    // A score is shown only with both public sides and a ratio in [0, 1]; anything else reads as unavailable.
+    if (!source || !target || typeof score !== 'number' || !Number.isFinite(score) || score < 0 || score > 1) return unavailable(null);
+    return { status: 'ready', sourceArticleId, targetArticleId, lexicalSimilarity: score, matchVersion, source, target };
+  }
+  if (value.status === 'insufficient-text') {
+    if (value.lexicalSimilarity !== null) return unavailable(null);
+    return {
+      status: 'insufficient-text',
+      sourceArticleId,
+      targetArticleId,
+      matchVersion,
+      source: sideOf(value.source, sourceArticleId),
+      target: sideOf(value.target, targetArticleId),
+    };
+  }
+  // unavailable, or a status this page does not know: no score, no preview.
+  return unavailable(value.status === 'unavailable' ? value.reason : null);
+}
+
+function selectionOf(value: Record<string, unknown>): SimilaritySelection {
+  const count = (raw: unknown) => (Number.isSafeInteger(raw) && (raw as number) >= 0 ? (raw as number) : null);
+  return {
+    selectionOrigin: value.selectionOrigin === 'observed-outgoing-body-links' ? 'observed-outgoing-body-links' : null,
+    selectionLimit: count(value.selectionLimit),
+    selectedPairs: count(value.selectedPairs),
+    selectionTruncated: typeof value.selectionTruncated === 'boolean' ? value.selectionTruncated : null,
+  };
+}
+
+/**
+ * The profile's textSimilarity key, read through an allowlist: nothing from the raw object is spread into the view.
+ * Unknown or malformed states are 未提供; a pair that cannot be shown safely is unavailable, never a 0% score.
+ */
+export function parseTextSimilarity(raw: unknown): TextSimilarityView {
+  if (!plainRecord(raw)) return { status: 'missing' };
+  switch (raw.status) {
+    case 'not-analysed':
+      return { status: 'not-analysed' };
+    case 'not-enabled':
+      return { status: 'not-enabled' };
+    case 'no-selected-pairs':
+      return { status: 'no-selected-pairs', selection: selectionOf(raw) };
+    case 'unavailable':
+      return { status: 'unavailable', selection: selectionOf(raw) };
+    case 'ready': {
+      if (!Array.isArray(raw.items)) return { status: 'missing' };
+      const items = raw.items
+        .slice(0, SIMILARITY_PAIRS_MAX)
+        .map(itemOf)
+        .filter((item): item is SimilarityItem => item !== null);
+      return {
+        status: 'ready',
+        selection: selectionOf(raw),
+        matchVersion: versionLabel(raw.matchVersion),
+        items,
+        omittedItems: raw.items.length - items.length,
+      };
+    }
+    default:
+      return { status: 'missing' };
+  }
+}
+/** A computed overlap ratio as a percentage; only ever called on a ready item. */
+export const overlapPercent = (ratio: number) => `${(ratio * 100).toFixed(1)}%`;
 export type Relations = {
   days: number;
   generatedAt: string;

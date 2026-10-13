@@ -259,7 +259,7 @@ describe('profile 引用與交流', () => {
       $('h3')
         .map((_, el) => $(el).text())
         .get(),
-    ).toEqual(['正文直接引用', '非正文連結（Blogroll、側欄、留言）', '共同標籤（不是引用）', '文字相似（尚未分析）']);
+    ).toEqual(['正文直接引用', '非正文連結（Blogroll、側欄、留言）', '共同標籤（不是引用）', '文字相似（不是引用）']);
     const outside = outsideText($);
     for (const text of ['提到誰', '被誰提到', '測試站乙', '測試站丙', '已分析 12 篇', '未知目標連結 3 條'])
       expect(outside, text).toContain(text);
@@ -358,7 +358,7 @@ describe('profile 引用與交流', () => {
     expect(text).toContain('已分析 未提供 篇；未知目標連結 未提供 條');
     expect(text).toContain('本站另記 Blogroll 未提供、側欄 未提供、留言 未提供 條');
     expect(part($, 'relations-tags').text()).toBe('共同標籤（不是引用）共同標籤資料未提供。');
-    expect(part($, 'relations-text').text()).toBe('文字相似（尚未分析）文字相似資料未提供。');
+    expect(part($, 'relations-text').text()).toBe('文字相似（不是引用）文字相似資料未提供。');
     expect(text).not.toMatch(/已分析 0|未知目標連結 0|Blogroll 0|側欄 0|留言 0/);
 
     // Rows from a gateway that sent only the five original keys (no postId), through the real readPublic and
@@ -499,14 +499,227 @@ describe('text similarity', () => {
   test('not analysed: said so, no percentage and no articles', async () => {
     const $ = await renderProfile(profile());
     const text = part($, 'relations-text');
-    expect(text.text()).toBe('文字相似（尚未分析）尚未分析：目前沒有文字相似的計算結果，這裡不列任何相似文章。');
+    expect(text.text()).toBe('文字相似（不是引用）尚未分析：目前沒有文字相似的計算結果，這裡不列任何相似文章。');
     expect(text.find('a, li').length).toBe(0);
     expect(text.text()).not.toMatch(/\d/);
   });
 
   test('a status this page does not know is not shown as analysed', async () => {
-    const $ = await renderProfile(profile({ textSimilarity: { status: 'ready' } }));
-    expect(part($, 'relations-text').text()).toContain('文字相似資料未提供。');
+    for (const value of [{ status: 'ready' }, { status: 'complete', items: [] }, { status: 'ready', items: {} }]) {
+      const $ = await renderProfile(profile({ textSimilarity: value }));
+      expect(part($, 'relations-text').text(), JSON.stringify(value)).toContain('文字相似資料未提供。');
+      expect(part($, 'relations-text').text()).not.toContain('%');
+    }
+  });
+
+  // Synthetic pair (app/src/relations/text-similarity-reader.ts item shape); no real article.
+  const SELECTION = {
+    selectionOrigin: 'observed-outgoing-body-links',
+    selectionLimit: 3,
+    selectedPairs: 2,
+    selectionTruncated: true,
+    exhaustive: false,
+  };
+  const side = (articleId: number, patch: object = {}) => ({
+    articleId,
+    url: `https://${articleId === 101 ? 'a' : 'b'}.example/p/${articleId}`,
+    title: articleId === 101 ? '甲的夏日湯品' : '乙的絲瓜筆記',
+    publishedAt: articleId === 101 ? NEW : OLD,
+    observedAt: SEEN,
+    contextSource: 'post-summary',
+    previewSource: 'post-summary',
+    comparedContextSource: 'body-prefix',
+    excerpt: articleId === 101 ? '甲的公開摘要。' : '乙的公開摘要。',
+    prefixCodepoints: 4096,
+    uniqueGrams: 900,
+    truncated: articleId === 101,
+    ...patch,
+  });
+  const readyItem = (patch: object = {}) => ({
+    sourceArticleId: 101,
+    targetArticleId: 202,
+    status: 'ready',
+    lexicalSimilarity: 0.1234,
+    matchVersion: 'body-prefix-dice-trigram-v1',
+    method: 'set-sorensen-dice-trigram',
+    scope: 'normalized-body-prefix-only',
+    exhaustive: false,
+    source: side(101),
+    target: side(202),
+    observedAt: SEEN,
+    analysedAt: SEEN,
+    ...patch,
+  });
+  const ready = (items: unknown[], patch: object = {}) => ({
+    status: 'ready',
+    matchVersion: 'body-prefix-dice-trigram-v1',
+    scope: 'explicit-pairs-only',
+    notCitation: true,
+    notSemanticSimilarity: true,
+    items,
+    // SELECTION carries exhaustive: false, as the profile's coverage does.
+    ...SELECTION,
+    ...patch,
+  });
+  const renderText = async (textSimilarity: unknown) => {
+    const $ = await renderProfile(profile({ textSimilarity: textSimilarity as Relations['textSimilarity'] }));
+    return { $, block: part($, 'relations-text') };
+  };
+
+  test('not enabled (the default flag): no result, and not a claim that nothing is similar', async () => {
+    const { block } = await renderText({ status: 'not-enabled' });
+    expect(block.text()).toBe('文字相似（不是引用）文字相似比對目前未開啟，這裡沒有結果；不代表沒有文字相近的文章。');
+    expect(block.find('li, a, details').length).toBe(0);
+  });
+
+  test('no selected pairs: not "no similar articles"; the selection is disclosed after the content', async () => {
+    const { block } = await renderText({ status: 'no-selected-pairs', ...SELECTION, selectedPairs: 0, selectionTruncated: false });
+    expect(block.find('p').first().text()).toContain('這不代表沒有文字相近的文章');
+    expect(block.text()).not.toContain('%');
+    const method = block.find('details[data-method="text-similarity"]');
+    expect(method.length).toBe(1);
+    expect(method.attr('open')).toBeUndefined();
+    expect(method.text()).toContain('本次選了 0 組（上限 3 組）。這不是全面比對');
+    expect(method.text()).not.toContain('還有符合條件的連結沒有選入');
+  });
+
+  test('unavailable: a status, no score, no preview, no 0%', async () => {
+    const { block } = await renderText({ status: 'unavailable', ...SELECTION });
+    expect(block.find('[role="status"]').text()).toBe('文字相似暫時無法讀取；不代表沒有文字相近的文章。');
+    expect(block.text()).not.toMatch(/0%|0\.0%|摘要：/);
+    expect(block.find('li').length).toBe(0);
+  });
+
+  test('ready: both public articles linked out with both dates, ids, version, the summary preview and a bounded score', async () => {
+    const { $, block } = await renderText(ready([readyItem()]));
+    const row = block.find('ul[aria-label="文字相似配對"] > li');
+    expect(row.length).toBe(1);
+    expect(
+      row
+        .find('a')
+        .map((_, el) => $(el).attr('href'))
+        .get(),
+    ).toEqual(['https://a.example/p/101', 'https://b.example/p/202']);
+    row.find('a').each((_, el) => {
+      expect($(el).attr('target')).toBe('_blank');
+      expect($(el).attr('rel')).toBe('noopener noreferrer');
+    });
+    const text = row.text();
+    expect(text).toContain(`發表 ${dayText(NEW)}`);
+    expect(text).toContain(`發表 ${dayText(OLD)}`);
+    expect(text).toContain('摘要：「甲的公開摘要。」');
+    expect(text).toContain('字面重疊 12.3%');
+    expect(text).toContain('不是引用、語意相似、抄襲或交流');
+    expect(text).toContain(`文章 #101／#202 · 觀測 ${dayText(SEEN)}／${dayText(SEEN)} · 比對字數 4,096／4,096（正文較長，只比前段）`);
+    expect(text).toContain('比對版本 body-prefix-dice-trigram-v1');
+    expect(
+      row
+        .find('span')
+        .filter((_, el) => $(el).text().startsWith('字面重疊'))
+        .hasClass('text-brand-700'),
+    ).toBe(true);
+    expect(block.find('details[data-method="text-similarity"]').text()).toContain('本次選了 2 組（上限 3 組），還有符合條件的連結沒有選入');
+    // Text similarity is its own kind: nothing joins the body citations or shared tags.
+    expect(part($, 'relations-body').text()).not.toContain('字面重疊');
+    expect(part($, 'relations-tags').text()).not.toContain('字面重疊');
+    expect(block.find('a[href^="/"]').length).toBe(0);
+  });
+
+  test('ready with partial rows: insufficient text and unavailable pairs show no score and no private preview', async () => {
+    const { block } = await renderText(
+      ready([
+        readyItem(),
+        readyItem({
+          targetArticleId: 203,
+          status: 'insufficient-text',
+          lexicalSimilarity: null,
+          target: side(203, { prefixCodepoints: 20 }),
+        }),
+        { sourceArticleId: 101, targetArticleId: 204, status: 'unavailable', lexicalSimilarity: null, reason: 'stale-or-unavailable' },
+      ]),
+    );
+    const rows = block.find('ul[aria-label="文字相似配對"] > li');
+    expect(rows.length).toBe(3);
+    expect(rows.eq(1).text()).toContain('正文前段太短，無法比對，不顯示分數。');
+    expect(rows.eq(1).text()).not.toContain('%');
+    expect(rows.eq(2).text()).toBe('文章 #101／#204：目前無法比對（文章已變更或不再公開）；不顯示分數或預覽，也不代表兩篇不相近。');
+    expect(rows.eq(2).find('a').length).toBe(0);
+  });
+
+  test('malformed rows: no score without both public sides, unsafe links stay text, at most three pairs, tokens never rendered', async () => {
+    const PRIVATE = {
+      bodyBytes: 'PRIVATE_BODY_PREFIX',
+      bodyTextHash: 'e'.repeat(64),
+      token: 'PRIVATE_TOKEN',
+      sourceUrl: 'https://a.example/private',
+    };
+    const { $, block } = await renderText(
+      ready([
+        readyItem({ ...PRIVATE, source: { ...side(101), ...PRIVATE, url: 'javascript:alert(1)', excerpt: { html: '<b>x</b>' } } }),
+        readyItem({ targetArticleId: 205, lexicalSimilarity: 1.5 }),
+        readyItem({ targetArticleId: 206, target: side(999) }),
+        readyItem({ targetArticleId: 207, source: { ...side(101), contextSource: 'body-prefix' } }),
+        readyItem({ targetArticleId: 208 }),
+      ]),
+    );
+    const rows = block.find('ul[aria-label="文字相似配對"] > li');
+    expect(rows.length).toBe(3);
+    expect(rows.eq(0).find('a[href^="javascript"]').length).toBe(0);
+    expect(rows.eq(0).text()).toContain('公開摘要未提供');
+    expect(rows.eq(0).text()).toContain('字面重疊 12.3%');
+    // Out of range score and a side that is not the asked article: unavailable, never a number.
+    for (const index of [1, 2]) {
+      expect(rows.eq(index).text()).toContain('目前無法比對；不顯示分數或預覽');
+      expect(rows.eq(index).text()).not.toMatch(/%/);
+    }
+    expect(block.text()).not.toContain('#101／#208');
+    const html = $.html();
+    for (const secret of ['PRIVATE_BODY_PREFIX', 'e'.repeat(64), 'PRIVATE_TOKEN', 'a.example/private'])
+      expect(html, secret).not.toContain(secret);
+  });
+
+  test('a compared article URL with credentials is never a link; its title stays as text, a query URL stays exact', async () => {
+    const QUERY_URL = 'https://b.example/post.php?id=202&lang=zh-TW';
+    const { $, block } = await renderText(
+      ready([
+        readyItem({
+          source: side(101, { url: 'https://user:PRIVATE_PASS@a.example/p/101' }),
+          target: side(202, { url: 'https://PRIVATE_USER@b.example/p/202' }),
+        }),
+        readyItem({ targetArticleId: 203, target: side(203, { url: QUERY_URL, title: '乙的查詢網址文章' }) }),
+        readyItem({ targetArticleId: 204, target: side(204, { url: 'https://:PRIVATE_ONLY_PASS@b.example/p/204', title: '乙的另一篇' }) }),
+      ]),
+    );
+    const rows = block.find('ul[aria-label="文字相似配對"] > li');
+    expect(rows.length).toBe(3);
+    // Both sides of the first pair: no anchor, the titles as plain text, the score still shown.
+    expect(rows.eq(0).find('a').length).toBe(0);
+    expect(rows.eq(0).text()).toContain('甲的夏日湯品');
+    expect(rows.eq(0).text()).toContain('乙的絲瓜筆記');
+    expect(rows.eq(0).text()).toContain('字面重疊 12.3%');
+    // A legitimate query is part of the article address and is kept exactly.
+    const query = rows
+      .eq(1)
+      .find('a')
+      .filter((_, el) => $(el).text() === '乙的查詢網址文章');
+    expect(query.attr('href')).toBe(QUERY_URL);
+    expect(rows.eq(1).find('a').first().attr('href')).toBe('https://a.example/p/101');
+    // Password only: still not a link.
+    expect(
+      rows
+        .eq(2)
+        .find('a')
+        .filter((_, el) => $(el).text() === '乙的另一篇').length,
+    ).toBe(0);
+    expect(rows.eq(2).text()).toContain('乙的另一篇');
+    const html = $.html();
+    for (const secret of ['PRIVATE_PASS', 'PRIVATE_USER', 'PRIVATE_ONLY_PASS', 'user:', '@a.example', '@b.example'])
+      expect(html, secret).not.toContain(secret);
+  });
+
+  test('an older gateway ready answer without selection keys says 未提供, never a count', async () => {
+    const { block } = await renderText({ status: 'ready', items: [readyItem()] });
+    expect(block.find('details[data-method="text-similarity"]').text()).toContain('選取來源未提供。本次選了 未提供 組（上限 未提供 組）');
   });
 });
 

@@ -12,10 +12,16 @@ import {
   hitsByTag,
   locationOf,
   MISSING,
+  overlapPercent,
+  parseTextSimilarity,
   type RelationEvidence,
   type Relations,
   type SharedTagHit,
   type SharedTags,
+  type SimilarityItem,
+  type SimilarityReason,
+  type SimilaritySelection,
+  type SimilaritySide,
   type TextSimilarity,
 } from '@/lib/relations';
 import Link from './NoPrefetchLink';
@@ -215,10 +221,133 @@ function SharedTagsBlock({ value, days }: { value: SharedTags | undefined; days:
   );
 }
 
+const REASON_TEXT: Record<SimilarityReason, string> = {
+  'evidence-unavailable': '來源證據無法確認',
+  overcap: '正文超過比對上限',
+  'invalid-utf8': '正文編碼無效',
+  'stale-or-unavailable': '文章已變更或不再公開',
+  'same-publication': '兩篇屬於同一個網站',
+};
+const NOT_PROOF = '只是正規化正文前段的字面重疊，不是引用、語意相似、抄襲或交流。';
+
+/** One article of a pair: public title link, publish date and the public summary preview. */
+function SimilaritySideRow({ label, side, id }: { label: string; side: SimilaritySide | null; id: number }) {
+  if (!side)
+    return (
+      <p>
+        <span className={muted}>{label}：</span>文章 #{id}（公開資料{MISSING}）
+      </p>
+    );
+  return (
+    <div>
+      <p>
+        <span className={muted}>{label}：</span>
+        <Outbound href={side.url}>{side.title || '（無標題）'}</Outbound>
+        <span className={`ml-1 text-xs ${muted}`}>發表 {dayText(side.publishedAt)}</span>
+      </p>
+      {side.excerpt ? (
+        <p className="mt-0.5 text-xs text-zinc-700 dark:text-zinc-300">摘要：「{side.excerpt}」</p>
+      ) : (
+        <p className={`mt-0.5 text-xs ${muted}`}>公開摘要{MISSING}</p>
+      )}
+    </div>
+  );
+}
+
+function SimilarityRow({ item }: { item: SimilarityItem }) {
+  if (item.status === 'unavailable')
+    return (
+      <li className={`min-w-0 break-words ${muted}`}>
+        文章 #{item.sourceArticleId}／#{item.targetArticleId}：目前無法比對{item.reason ? `（${REASON_TEXT[item.reason]}）` : ''}
+        ；不顯示分數或預覽，也不代表兩篇不相近。
+      </li>
+    );
+  const sides = [item.source, item.target];
+  const prefix = sides.map((side) => countText(side?.prefixCodepoints)).join('／');
+  return (
+    <li className="min-w-0 break-words space-y-1">
+      <SimilaritySideRow label="本站" side={item.source} id={item.sourceArticleId} />
+      <SimilaritySideRow label="連到的文章" side={item.target} id={item.targetArticleId} />
+      {item.status === 'ready' ? (
+        <p>
+          <span className={tag}>字面重疊 {overlapPercent(item.lexicalSimilarity)}</span>
+          <span className={`ml-2 text-xs ${muted}`}>{NOT_PROOF}</span>
+        </p>
+      ) : (
+        <p className={`text-xs ${muted}`}>正文前段太短，無法比對，不顯示分數。</p>
+      )}
+      <p className={`text-xs ${muted}`}>
+        文章 #{item.sourceArticleId}／#{item.targetArticleId} · 觀測 {dayText(item.source?.observedAt, MISSING)}／
+        {dayText(item.target?.observedAt, MISSING)} · 比對字數 {prefix}
+        {sides.some((side) => side?.truncated) ? '（正文較長，只比前段）' : ''} · 比對版本 {item.matchVersion ?? MISSING} ·{' '}
+        預覽取自公開摘要，比對用的正文不公開
+      </p>
+    </li>
+  );
+}
+
+/** How the pairs were picked, after the results: the gateway's numbers, never a claim of a complete comparison. */
+function SimilaritySelectionNote({ selection }: { selection: SimilaritySelection }) {
+  return (
+    <details data-method="text-similarity" className={`text-xs ${muted}`}>
+      <summary className="cursor-pointer">選取方式與範圍</summary>
+      <p className="mt-1">
+        {selection.selectionOrigin === 'observed-outgoing-body-links'
+          ? '只從本站近期已觀測、且知道目標文章的正文直接連結裡選取配對，不另外搜尋或兩兩比對。'
+          : `選取來源${MISSING}。`}
+        本次選了 {countText(selection.selectedPairs)} 組（上限 {countText(selection.selectionLimit)} 組）
+        {selection.selectionTruncated === true ? '，還有符合條件的連結沒有選入' : ''}。這不是全面比對：沒有列出的文章不代表不相近。
+      </p>
+    </details>
+  );
+}
+
+/** Text-prefix overlap for a few known body-link pairs; every state says what it does not prove. */
 function TextSimilarityBlock({ value }: { value: TextSimilarity | undefined }) {
-  if (value?.status === 'not-analysed')
-    return <p className={`text-sm ${muted}`}>尚未分析：目前沒有文字相似的計算結果，這裡不列任何相似文章。</p>;
-  return <p className={`text-sm ${muted}`}>文字相似資料{MISSING}。</p>;
+  const view = parseTextSimilarity(value);
+  switch (view.status) {
+    case 'not-analysed':
+      return <p className={`text-sm ${muted}`}>尚未分析：目前沒有文字相似的計算結果，這裡不列任何相似文章。</p>;
+    case 'not-enabled':
+      return <p className={`text-sm ${muted}`}>文字相似比對目前未開啟，這裡沒有結果；不代表沒有文字相近的文章。</p>;
+    case 'no-selected-pairs':
+      return (
+        <>
+          <p className={`text-sm ${muted}`}>
+            這段期間沒有可比對的配對：近期正文直接連結裡沒有已知目標文章的連結。這不代表沒有文字相近的文章。
+          </p>
+          <SimilaritySelectionNote selection={view.selection} />
+        </>
+      );
+    case 'unavailable':
+      return (
+        <>
+          <p role="status" className={`text-sm ${muted}`}>
+            文字相似暫時無法讀取；不代表沒有文字相近的文章。
+          </p>
+          <SimilaritySelectionNote selection={view.selection} />
+        </>
+      );
+    case 'ready':
+      return (
+        <div className="space-y-2 text-sm">
+          <p className={`text-xs ${muted}`}>只比對本站文章與它在正文裡直接連到的文章。{NOT_PROOF}</p>
+          {view.items.length ? (
+            <ul aria-label="文字相似配對" className="space-y-3">
+              {view.items.map((item) => (
+                <SimilarityRow key={`${item.sourceArticleId}:${item.targetArticleId}`} item={item} />
+              ))}
+            </ul>
+          ) : (
+            <p className={muted}>沒有可列出的配對結果。</p>
+          )}
+          {view.omittedItems > 0 ? <p className={`text-xs ${muted}`}>另有 {view.omittedItems} 組資料無法顯示。</p> : null}
+          <SimilaritySelectionNote selection={view.selection} />
+        </div>
+      );
+    default:
+      return <p className={`text-sm ${muted}`}>文字相似資料{MISSING}。</p>;
+  }
 }
 
 /** The section's frame: the heading and the link to the site-wide map stay whatever the read returned. */
@@ -320,7 +449,7 @@ export default async function BlogRelations({ slug }: { slug: string }) {
 
       <section aria-labelledby="relations-text" className={block}>
         <h3 id="relations-text" className="font-semibold">
-          文字相似（尚未分析）
+          文字相似（不是引用）
         </h3>
         <TextSimilarityBlock value={data.textSimilarity} />
       </section>

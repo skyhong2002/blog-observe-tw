@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import type { Pool, ResultSetHeader } from 'mysql2/promise';
 import { assertEphemeralDatabase } from '../../../tests/integration/guard.mjs';
+import { loadProfileTextSimilarity } from './text-similarity-profile.ts';
 import { loadTextSimilarity } from './text-similarity-reader.ts';
 
 /** Small synthetic bodies on the existing isolated DB. No HTTP, writer, crawler or new service. */
@@ -50,6 +51,23 @@ export async function runTextSimilarityIntegration(pool: Pool) {
     check(ready.status === 'ready' && ready.items[0].status === 'ready' && ready.items[0].lexicalSimilarity === 1);
     check(!JSON.stringify(ready).includes('contentHash') && !JSON.stringify(ready).includes('bodyTextHash'));
     check(JSON.stringify(ready).includes(summary) && !JSON.stringify(ready).includes(privateMarker));
+    const profileLinks = [{ postId: ids[0], targetPostId: ids[1], sourceBlogId: blogs[0], targetBlogId: blogs[1], location: 'body' }];
+    const profileReady = await loadProfileTextSimilarity(pool, blogs[0], [...profileLinks, ...profileLinks], { enabled: true });
+    check(profileReady.status === 'ready' && profileReady.selectedPairs === 1 && profileReady.items[0].status === 'ready');
+    check(JSON.stringify(profileReady).includes(summary) && !JSON.stringify(profileReady).includes(privateMarker));
+    // Both body reads may agree on a new public owner. Still reject the selected link's old target owner.
+    const [replacementOwner] = await pool.execute<ResultSetHeader>(
+      "INSERT INTO blogs(slug,name,url,status,discovered_at) SELECT ?,?,url,'verified',? FROM blogs WHERE id=?",
+      [key + '-replacement', 'Replacement public fixture', now, blogs[1]],
+    );
+    blogs.push(replacementOwner.insertId);
+    await pool.execute('UPDATE posts SET blog_id=? WHERE id=?', [replacementOwner.insertId, ids[1]]);
+    await pool.execute('UPDATE content_post_bodies SET blog_id=? WHERE post_id=?', [replacementOwner.insertId, ids[1]]);
+    const movedOwner = await loadProfileTextSimilarity(pool, blogs[0], profileLinks, { enabled: true });
+    check(movedOwner.status === 'ready' && movedOwner.items[0].status === 'unavailable');
+    check(!JSON.stringify(movedOwner).includes(summary) && !JSON.stringify(movedOwner).includes(privateMarker));
+    await pool.execute('UPDATE posts SET blog_id=? WHERE id=?', [blogs[1], ids[1]]);
+    await pool.execute('UPDATE content_post_bodies SET blog_id=? WHERE post_id=?', [blogs[1], ids[1]]);
     if (ready.status === 'ready' && 'source' in ready.items[0] && ready.items[0].source && ready.items[0].target) {
       check(ready.items[0].source.previewSource === 'post-summary' && ready.items[0].source.comparedContextSource === 'body-prefix');
       check(ready.items[0].target.previewSource === 'post-summary' && ready.items[0].target.comparedContextSource === 'body-prefix');
@@ -65,6 +83,8 @@ export async function runTextSimilarityIntegration(pool: Pool) {
       await pool.execute('UPDATE blogs SET status=? WHERE id=?', [status, blogs[1]]);
       const result = await read();
       check(result.status === 'ready' && result.items[0].status === 'unavailable' && result.items[0].lexicalSimilarity === null);
+      const profile = await loadProfileTextSimilarity(pool, blogs[0], profileLinks, { enabled: true });
+      check(profile.status === 'ready' && profile.items[0].status === 'unavailable' && !JSON.stringify(profile).includes(summary));
     }
     await pool.execute("UPDATE blogs SET status='verified' WHERE id=?", [blogs[1]]);
     await pool.execute('UPDATE posts SET published_at=? WHERE id=?', [new Date('2099-01-01'), ids[1]]);

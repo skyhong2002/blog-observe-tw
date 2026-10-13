@@ -111,6 +111,25 @@ describe('read-only fresh public evidence forexplicitpairs', () => {
     const r = await loadTextSimilarity(f.pool, { ...selection, sourceBlogId: 99 }, { enabled: true });
     expect(r.status === 'ready' && r.items[0]).toMatchObject({ status: 'unavailable', lexicalSimilarity: null });
   });
+  it('rejects a profile target moved to another public owner before both body reads', async () => {
+    const f = fixture();
+    const r = await loadTextSimilarity(
+      f.pool,
+      {
+        sourceBlogId: 5,
+        pairs: [{ sourceArticleId: 1, targetArticleId: 2, expectedTargetBlogId: 7 }],
+      },
+      { enabled: true },
+    );
+    expect(r.status === 'ready' && r.items[0]).toEqual({
+      sourceArticleId: 1,
+      targetArticleId: 2,
+      status: 'unavailable',
+      lexicalSimilarity: null,
+      reason: 'stale-or-unavailable',
+    });
+    expect(JSON.stringify(r)).not.toContain('公開 RSS');
+  });
   it('each request rereads; SQL errors reject rather than return emptyor0', async () => {
     const f = fixture();
     f.connection.query.mockReset().mockRejectedValueOnce({ code: 'ER_STATEMENT_TIMEOUT' });

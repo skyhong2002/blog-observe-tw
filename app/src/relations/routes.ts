@@ -6,6 +6,7 @@ import { publicSummary } from '../public-post.ts';
 import { iconManifest } from '../v1/favicon-routes.ts';
 import { iconUrl } from '../v1/icons.ts';
 import { loadSharedTags } from './shared-tags.ts';
+import { loadProfileTextSimilarity } from './text-similarity-profile.ts';
 import { registerTextSimilarityRoute } from './text-similarity-routes.ts';
 
 export type RelationEdge = {
@@ -348,9 +349,12 @@ export function readBlogRelations(pool: Pool, blog: { id: number }, days: number
     const [evidence] = await pool.query<RowDataPacket[]>(
       `SET STATEMENT max_statement_time=0.25 FOR SELECT p.id postId,p.title postTitle,p.url postUrl,l.target_url targetUrl,l.anchor_text anchor,p.published_at publishedAt,
       l.source_blog_id sourceBlogId,l.target_blog_id targetBlogId,l.location,l.context,
+      target_post.id targetPostId,
       l.observed_at observedAt,o.parser_version matchVersion
       FROM relation_links l JOIN posts p ON p.id=l.source_post_id JOIN blogs a ON a.id=l.source_blog_id JOIN blogs b ON b.id=l.target_blog_id
       JOIN relation_observations o ON o.post_id=l.source_post_id
+      LEFT JOIN posts target_post ON target_post.id=l.target_post_id AND target_post.blog_id=l.target_blog_id
+        AND (target_post.published_at IS NULL OR target_post.published_at<=UTC_TIMESTAMP())
       WHERE ${PUBLIC_RELATION} AND l.location='body' AND (l.source_blog_id=? OR l.target_blog_id=?) AND l.source_blog_id<>l.target_blog_id
       AND a.status='verified' AND b.status='verified' AND p.published_at>=? AND p.published_at<=?
       ORDER BY p.published_at DESC,l.source_post_id,l.ordinal LIMIT 21`,
@@ -403,7 +407,18 @@ export function readBlogRelations(pool: Pool, blog: { id: number }, days: number
         process.env.BLOG_SHARED_TAGS_ENABLED === 'true'
           ? await loadSharedTags(pool, { sourceBlogId: blog.id, days: days as 7 | 30 | 90 })
           : { status: 'not-enabled' as const },
-      textSimilarity: { status: 'not-analysed' as const },
+      textSimilarity: await loadProfileTextSimilarity(
+        pool,
+        blog.id,
+        evidence.map((r) => ({
+          postId: Number(r.postId),
+          targetPostId: r.targetPostId == null ? null : Number(r.targetPostId),
+          sourceBlogId: Number(r.sourceBlogId),
+          targetBlogId: Number(r.targetBlogId),
+          location: r.location,
+        })),
+        { enabled: process.env.BLOG_TEXT_SIMILARITY_ENABLED === 'true' },
+      ),
       profileTruncated: rows.length > 1000,
     };
   });

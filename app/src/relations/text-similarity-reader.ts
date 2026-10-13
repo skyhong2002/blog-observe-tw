@@ -165,7 +165,12 @@ export async function loadTextSimilarity(pool: Pool, input: SimilaritySelection,
     const items = input.pairs.map((pair) => {
       const source = bodies.get(pair.sourceArticleId),
         target = bodies.get(pair.targetArticleId);
-      if (!valid(source) || !valid(target) || (input.sourceBlogId !== undefined && Number(source!.row.blogId) !== input.sourceBlogId))
+      if (
+        !valid(source) ||
+        !valid(target) ||
+        (input.sourceBlogId !== undefined && Number(source!.row.blogId) !== input.sourceBlogId) ||
+        (pair.expectedTargetBlogId !== undefined && Number(target!.row.blogId) !== pair.expectedTargetBlogId)
+      )
         return {
           sourceArticleId: pair.sourceArticleId,
           targetArticleId: pair.targetArticleId,

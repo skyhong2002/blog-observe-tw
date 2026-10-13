@@ -458,3 +458,7 @@ GPT-6.1 Sol 再逐張讀取36張既有blog/tag圖，九個畫面狀態：authors
 | /tech/ | missing | 實作候選SHA與正常/少筆/空/錯誤/未知版本；觀測scope、歷史failed、partial2000scan、flags false及profile可選tech失敗；現行 SHA 桌機／手機與對應 tag 參考 | pending |
 
 本批另修復歷史附錄曾遭主表更新程式跨區改寫的欄位，還原為 `e2929a8` 的 superseded 附錄；現行主表與原始 review artifacts 保留，不補造歷史紀錄。
+
+## 新 B2 source 批次（待重拍，不升 UI pass）
+
+`/blogs/<slug>/` 的引用與交流新增有界文字配對consumer。作者為既有Opus5.5；另一既有Sol的source／48 SSR複審紀錄：`/home/deck/.t3/userdata/ui-review-blog-20261013/home-perf-independent/b2-opus-ui-independent-followup.json`。這不是看圖review；尚缺該新SHA／BUILD_ID在1280／390、深淺色的實際圖與tag對照。ready兩邊日期、disabled、無已知target、insufficient、unavailable／withdrawn、截斷都在Mint重拍清單。主表計數不變：24項，pass0/fixed3/issues8/pending11/n-a2。沒有從source通過推成整頁通過。
