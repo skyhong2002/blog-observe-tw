@@ -142,7 +142,7 @@ verified-deltas身份，不強求先新增tree，但後者仍需overlay/count/pr
   barrier 通過；實際 500001-byte sentinel、window A→B→C、游標／命中原子性已驗。
   首三份失敗 artifact 保留，fixture 的 prepared `execute` array `IN (?)` 清理錯誤改用
   driver `query` 展開，新增真正空 corpus 斷言，未放寬 runtime／counter。
-- `ba201fc`：纯 cutover intent，55 項 mocks／非作者 Sol；固定 predecessor、版本、
+- `ba201fc`：純 cutover intent，55 項 mocks／非作者 Sol；固定 predecessor、版本、
   TTL 與 retention claims。相符仍 hold、canPublish／canVerify 永遠 false，沒有 SQL
   CAS、dirty hooks 或 worker full 排程。採納 Opus M1–M4，但依賴仍不能以 metadata 代替。
 - `8ccf284`：writer source drift 檢查，16 項 mocks／非作者 Sol，161 references／127
@@ -161,3 +161,11 @@ barrier 接線；先釐清 title-only／legacy fallback hash、owner/provenance 
 版本，不能放寬 freshness 來讓 warmup 過關。完整池 preview、changes 跨世代 catalog、
 overlay／watermark／daily reconciliation 及 candidate／UI／正式驗收仍 pending。
 UI ledger 維持 24 項：pass 0、fixed 3、issues 8、pending 11、n/a-ui 2。
+
+`ac8c04b` 的 M0 owner guard 已接續：共用 CB／relations body JOIN 核目前 post owner，
+只收窄 legacy/window，沒有放寬 NULL hash freshness。Sol／Opus 非自審、18169 disposable
+28 checks／25 migrations，另 F3/F4 9 suites 通過。N2 body-only history／N3 empty fixture
+已採納；N1 共用 frequency predicate／N4 其他 caller 完整驗證明列 deferred。
+[owner 診斷草稿](topic-body-ownership.md)未正式執行，不宣稱正式 affected 數或任何新 UI
+已通過。下一個 D1 離線切片是純 versioned SQL fingerprint helper／Oracle，沒有 marker、
+sidecar 或 reader/DAO/current 接線；即使 helper／Oracle 通過也不能發布 full generation。
