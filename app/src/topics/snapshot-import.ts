@@ -20,6 +20,14 @@ type Controls = {
   beforeStart?: () => Promise<boolean>;
   beforeRequest?: () => Promise<void>;
 };
+/** Fixed transport contract failures will not improve by fetching the same immutable page again.
+ * Match only the transport's known messages; never save an upstream/error message as a reason. */
+export function snapshotWireFailureCode(error: unknown): 'wire-byte-cap' | 'wire-invalid-json' | null {
+  if (!(error instanceof Error)) return null;
+  if (error.message === 'Vocabulary export exceeds byte cap') return 'wire-byte-cap';
+  if (error.message === 'Vocabulary export invalid JSON') return 'wire-invalid-json';
+  return null;
+}
 /** Page receipts preserve JSON.stringify(entries), the upstream checksum representation, not wire whitespace.
  * No current pointer changes here: a ready full pool needs a separately reviewed matching warmup/cutover. */
 export async function importSnapshot(
@@ -251,9 +259,11 @@ export async function importSnapshot(
     return { status: 'ready', version: manifest.id, total: manifest.total, becameCurrent: false, coverage: manifest.coverage };
   } catch (error) {
     const message = error instanceof Error ? error.message : '';
+    const wireFailure = snapshotWireFailureCode(error);
     const expired = /HTTP (404|410)\b/.test(message);
     const invalid =
       error instanceof InvalidSnapshot ||
+      wireFailure !== null ||
       /^(Invalid (upstream vocabulary|vocabulary)|Vocabulary (page|snapshot))/.test(message) ||
       (error as { code?: string })?.code === 'ER_DUP_ENTRY';
     const budget = message === 'topic_upstream_budget';
@@ -261,15 +271,17 @@ export async function importSnapshot(
       ? 'snapshot-expired'
       : error instanceof InvalidSnapshot
         ? error.code
-        : invalid
-          ? 'invalid-snapshot'
-          : budget
-            ? 'request-budget'
-            : error instanceof TagRateLimitError
-              ? 'rate-limit'
-              : control.signal?.aborted || message.includes('deadline')
-                ? 'deadline'
-                : 'upstream-unavailable';
+        : wireFailure
+          ? wireFailure
+          : invalid
+            ? 'invalid-snapshot'
+            : budget
+              ? 'request-budget'
+              : error instanceof TagRateLimitError
+                ? 'rate-limit'
+                : control.signal?.aborted || message.includes('deadline')
+                  ? 'deadline'
+                  : 'upstream-unavailable';
     const retryAt = error instanceof TagRateLimitError ? error.retryAt : new Date(now.getTime() + (budget ? 3600_000 : 300_000));
     if (run && manifest) {
       await assertLease();

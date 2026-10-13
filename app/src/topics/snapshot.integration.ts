@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import type { Pool, RowDataPacket } from 'mysql2/promise';
+import { assertEphemeralDatabase } from '../../../tests/integration/guard.mjs';
 import { digest } from './matcher.ts';
 import { type ExportManifest, type ExportTerm, MAX_SNAPSHOT_BYTES, type SnapshotSource, SOURCE } from './snapshot-client.ts';
 import { importSnapshot } from './snapshot-import.ts';
@@ -49,7 +50,7 @@ function fixture(size = 1001) {
 }
 /** Actual DB receipts/transactions; the caller owns a disposable schema on the isolated server. */
 export async function runSnapshotImportIntegration(pool: Pool) {
-  assert.equal((pool as unknown as { pool: { config: { connectionConfig: { port: number } } } }).pool.config.connectionConfig.port, 18169);
+  assertEphemeralDatabase(pool);
   const [[original]] = await pool.query<RowDataPacket[]>('SELECT snapshot_id FROM topic_current WHERE source=?', [SOURCE]);
   const lastGood = original?.snapshot_id ?? randomUUID();
   const ids: string[] = [];
@@ -113,7 +114,7 @@ export async function runSnapshotImportIntegration(pool: Pool) {
     assert.equal(payload.noise, false);
     assert.equal(payload.noEqual, false);
     assert.equal(payload.recentArticleCount, 2);
-    for (const mode of ['duplicate', 'bad-hash', 'changed', 'expired', 'budget', 'cap', 'receipt'] as const) {
+    for (const mode of ['duplicate', 'bad-hash', 'changed', 'expired', 'budget', 'cap', 'receipt', 'wire-cap', 'wire-json'] as const) {
       const bad = fixture(501);
       ids.push(bad.manifest.id);
       if (mode === 'duplicate') {
@@ -126,6 +127,8 @@ export async function runSnapshotImportIntegration(pool: Pool) {
         page: async (_manifest, index) => {
           if (index === 1 && mode === 'expired') throw Error('Vocabulary export HTTP 410');
           if (index === 1 && mode === 'budget') throw Error('topic_upstream_budget');
+          if (index === 1 && mode === 'wire-cap') throw Error('Vocabulary export exceeds byte cap');
+          if (index === 1 && mode === 'wire-json') throw Error('Vocabulary export invalid JSON');
           if (index === 1 && mode === 'changed')
             return { ...bad.page(index), snapshot: { ...bad.manifest, generatedAt: '2026-10-13T00:00:00.000Z' } };
           return bad.page(index);
@@ -140,10 +143,16 @@ export async function runSnapshotImportIntegration(pool: Pool) {
         ]);
       const result = await importSnapshot(pool, source, later, async () => {}, 1);
       assert.equal(result.status, mode === 'budget' ? 'deferred' : 'failed', JSON.stringify(result));
-      const [[run]] = await pool.query<RowDataPacket[]>('SELECT status,next_page FROM topic_snapshot_runs WHERE snapshot_id=?', [
-        bad.manifest.id,
-      ]);
+      const [[run]] = await pool.query<RowDataPacket[]>(
+        'SELECT status,next_page,next_attempt_at,error_code FROM topic_snapshot_runs WHERE snapshot_id=?',
+        [bad.manifest.id],
+      );
       assert.equal(Number(run.next_page), ['bad-hash', 'receipt'].includes(mode) ? 2 : 1, 'bad page does not partially commit');
+      if (mode === 'wire-cap' || mode === 'wire-json') {
+        assert.equal(run.status, 'failed');
+        assert.equal(run.next_attempt_at, null, 'permanent payload failure must not queue another download');
+        assert.equal(run.error_code, mode === 'wire-cap' ? 'wire-byte-cap' : 'wire-invalid-json');
+      }
       if (mode === 'budget') await pool.execute("UPDATE topic_snapshot_runs SET status='failed' WHERE snapshot_id=?", [bad.manifest.id]);
       await stillCurrent();
     }
@@ -160,6 +169,7 @@ export async function runSnapshotImportIntegration(pool: Pool) {
       budgetDeferred: true,
       lastGoodPreserved: true,
       readyNotPublished: true,
+      wireFailuresPermanent: true,
     };
   } finally {
     if (!original) await pool.execute('DELETE FROM topic_current WHERE source=?', [SOURCE]);

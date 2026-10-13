@@ -15,7 +15,7 @@ try {
   if (
     ![4, 6].includes(process.argv.length) ||
     process.argv[2] !== '--env-file' ||
-    (process.argv.length === 6 && (process.argv[4] !== '--suite' || !['f3-f4', 'b3'].includes(process.argv[5])))
+    (process.argv.length === 6 && (process.argv[4] !== '--suite' || !['f3-f4', 'b3', 'vocabulary-snapshot'].includes(process.argv[5])))
   )
     throw Error('explicit_private_clone_env_required');
   const file = resolve(process.argv[3]);
@@ -110,7 +110,9 @@ try {
         )
       : process.argv[5] === 'b3'
         ? suites.filter(([label]) => label.startsWith('shared-label-'))
-        : suites;
+        : process.argv[5] === 'vocabulary-snapshot'
+          ? suites.filter(([label]) => label === 'snapshot-import')
+          : suites;
   for (const [label, module, entry] of selected) {
     phase = label;
     const result = await (await import(module))[entry](store.pool);
