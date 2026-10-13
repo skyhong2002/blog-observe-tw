@@ -18,7 +18,7 @@ try {
     process.argv[2] !== '--env-file' ||
     (process.argv.length === 6 &&
       (process.argv[4] !== '--suite' ||
-        !['f3-f4', 'b3', 'vocabulary-snapshot', 'staged-scan-v2', 'topic-body-owner'].includes(process.argv[5])))
+        !['f3-f4', 'b3', 'vocabulary-snapshot', 'staged-scan-v2', 'topic-body-owner', 'topic-fingerprint-sql'].includes(process.argv[5])))
   )
     throw Error('explicit_private_clone_env_required');
   const file = resolve(process.argv[3]);
@@ -61,6 +61,7 @@ try {
       await store.pool.query(sql);
   }
   const suites = [
+    ['topic-fingerprint-sql', '../app/src/topics/provenance-fingerprint-sql.integration.ts', 'runProvenanceFingerprintSqlIntegration'],
     ['staged-scan-v2', '../app/src/topics/staged-scan-v2.integration.ts', 'runStagedScanV2Integration'],
     ['topic-body-owner', '../app/src/topics/body-owner.integration.ts', 'runTopicBodyOwnerIntegration'],
     ['budgets-ai', '../tests/integration/core.mjs', 'runCoreIntegration'],
@@ -121,7 +122,9 @@ try {
             ? suites.filter(([label]) => label === 'staged-scan-v2')
             : process.argv[5] === 'topic-body-owner'
               ? suites.filter(([label]) => label === 'topic-body-owner')
-              : suites;
+              : process.argv[5] === 'topic-fingerprint-sql'
+                ? suites.filter(([label]) => label === 'topic-fingerprint-sql')
+                : suites;
   for (const [label, module, entry] of selected) {
     phase = label;
     const result = await (await import(module))[entry](store.pool);

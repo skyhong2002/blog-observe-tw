@@ -167,5 +167,9 @@ UI ledger 維持 24 項：pass 0、fixed 3、issues 8、pending 11、n/a-ui 2。
 28 checks／25 migrations，另 F3/F4 9 suites 通過。N2 body-only history／N3 empty fixture
 已採納；N1 共用 frequency predicate／N4 其他 caller 完整驗證明列 deferred。
 [owner 診斷草稿](topic-body-ownership.md)未正式執行，不宣稱正式 affected 數或任何新 UI
-已通過。下一個 D1 離線切片是純 versioned SQL fingerprint helper／Oracle，沒有 marker、
-sidecar 或 reader/DAO/current 接線；即使 helper／Oracle 通過也不能發布 full generation。
+已通過。接續的 D1 純 versioned SQL fingerprint helper／Oracle 已完成：root
+23 mocks／3 suites、58 tiny SQL checks／25 migrations 通過，Sol 非作者 source review；
+沒有 marker、sidecar 或 reader/DAO/current 接線。限制與原 log 見
+[provenance fingerprint](topic-provenance-fingerprints.md)，即使 helper／Oracle 通過也不能
+發布 full generation。下一切片先訂 generation-local sidecar 與 scanner adoption 契約；
+全部 reader／history／carry、fresh 公開條件與完整 writer barrier 尚未完成，維持 hold。
