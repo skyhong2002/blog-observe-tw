@@ -4,12 +4,13 @@ import { reserveBudget } from '../jobs/budget.ts';
 import type { BatchOptions } from '../jobs/contracts.ts';
 import { withJobLease } from '../jobs/lease.ts';
 import { topicDeferredReason } from './deferred-reason.ts';
-import { carryTopicIndexes } from './index-carry.ts';
 import { historyWritesEnabled } from './history-contracts.ts';
+import { carryTopicIndexes } from './index-carry.ts';
 import { digest } from './matcher.ts';
 import { storedNormalizedLabel } from './policy.ts';
 import { writeTopicPolicy } from './policy-store.ts';
 import { type ExportManifest, HttpSnapshotSource, type SnapshotSource, SOURCE } from './snapshot-client.ts';
+import { type FullSnapshotOptions, inheritFullControls, runFullSnapshot } from './snapshot-full-caller.ts';
 import { importSnapshot } from './snapshot-import.ts';
 import { canStartWindowSnapshot, cleanupTopicSnapshots } from './snapshot-retention.ts';
 import { cleanupWindowCache, LOOKBACK_MS, startWindowRun, WINDOW_REQUEST_LIMIT, WINDOW_START_LIMIT } from './window-incremental.ts';
@@ -24,7 +25,8 @@ import type { ArticleSource, SourceArticle, Window } from './window-contract.ts'
 const json = <T>(raw: unknown): T => (typeof raw === 'string' ? JSON.parse(raw) : raw) as T;
 export type SyncOptions = BatchOptions & {
   enabled?: boolean;
-  mode?: 'window' | 'snapshot';
+  mode?: 'window' | 'snapshot' | 'full';
+  full?: FullSnapshotOptions;
   window?: Window;
   source?: ArticleSource;
   snapshotSource?: SnapshotSource;
@@ -110,6 +112,10 @@ async function publish(
   }
 }
 export async function syncVocabulary(pool: Pool, options: SyncOptions = {}) {
+  if (options.mode === 'full' && options.snapshotSource)
+    return { status: 'blocked', reason: 'full-source-factory-required', becameCurrent: false };
+  if (options.mode === 'full')
+    return runFullSnapshot(pool, { ...inheritFullControls(options.full, options), enabled: options.enabled === true });
   if (!(options.enabled ?? process.env.BLOG_TOPICS_SYNC_ENABLED === 'true')) return { status: 'disabled' };
   const now = options.now?.() ?? new Date();
   const started = Date.now();
@@ -119,10 +125,12 @@ export async function syncVocabulary(pool: Pool, options: SyncOptions = {}) {
       const timeout = Math.max(1, Math.min(600_000, options.maxDurationMs ?? 120_000));
       const signal = AbortSignal.any([AbortSignal.timeout(timeout), ...(options.signal ? [options.signal] : [])]);
       // Never retire the only source of historical observations before durable capture finishes.
-      const [uncaptured] = historyWritesEnabled() ? await pool.query<RowDataPacket[]>(
-        `SELECT s.id FROM topic_snapshots s LEFT JOIN topic_history_backfill_runs h ON h.id=CONCAT('snapshot:',s.id)
+      const [uncaptured] = historyWritesEnabled()
+        ? await pool.query<RowDataPacket[]>(
+            `SELECT s.id FROM topic_snapshots s LEFT JOIN topic_history_backfill_runs h ON h.id=CONCAT('snapshot:',s.id)
          WHERE s.status IN ('published','retiring') AND (h.status IS NULL OR h.status<>'complete')`,
-      ) : [[]];
+          )
+        : [[]];
       const snapshotCleanup = await cleanupTopicSnapshots(pool, assertLease, { pinnedSnapshotIds: uncaptured.map((r) => String(r.id)) });
       const beforeRequest = async () => {
         await assertLease();
