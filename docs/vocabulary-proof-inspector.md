@@ -37,9 +37,20 @@ SQL 從明確文章 ID 開始，以 PK join 讀取，沒有全 corpus／詞彙�
 只接受 owned mode-0600 clone env、loopback DB 18169 與新建 disposable schema；
 外部 fetch 禁止，結束只移除自己新建的 schema，不接正式資料庫。
 
-**實際 oracle 尚未執行。**執行前必須將 exact 命令、受測 SHA／tree、fresh probe、
-估算用量與預期 artifact 交 babysit 核對。GET_LOCK、SQL／EXPLAIN、建置、candidate、
-capture 與部署均不能以 source pass 代替這道核對。
+實際 oracle 已由 babysit 核對放行，在 `34c1a7359ca191e75d4cd547b2716673df231b01`
+（tree `011eaac2178b337463258aa4b7a1d1c22bd26965`）通過 69 項檢查、26 個
+migrations，隔離 DB port 18169。EXPLAIN 確認這份 query 的 generation derived
+table materialized；這不等於正式效能、完整池容量或 public B0 驗收。
+
+原始 log：
+`/home/deck/.t3/projects/blog-observe-tw/.reviews/offline-quality/d1-inspector-root-isolated-approved-1.log`。
+執行收據：同目錄 `d1-inspector-root-isolated-approved-1.receipt.json`，UTC
+`2026-10-13T18:14:18.636751+00:00`，記錄前後相同 SHA／tree、fresh local probe、
+命令交核檔雜湊與隔離執行界線。沒有 HTTP、正式 DB、建置、capture 或部署。
+
+後續每個執行步驟仍須將 exact 命令、受測 SHA／tree、fresh probe、估算用量與
+預期 artifact 交 babysit 核對。本次放行只限上述隔離測試，不延伸授權其他 SQL、
+GET_LOCK、建置、candidate、capture 或部署。
 
 目前 public reader、history、carry、frequency、current batch、publisher 都未採用
 此檢查器；no-store、隱私條件與 Cloudflare Disabled 狀態不變。
