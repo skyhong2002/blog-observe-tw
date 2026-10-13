@@ -104,7 +104,7 @@ describe('tag transport isolation and wire budget', () => {
     expect(persisted).toHaveBeenCalledWith(new Date(120000));
     expect(time.sleeps).toEqual([]);
     expect(retryAfterMs('Thu, 01 Jan 1970 00:00:05 GMT', 0, 1000)).toBe(4000);
-    expect(retryAfterMs('999999999999999999', 0, 0)).toBe(7 * 86400_000);
+    expect(retryAfterMs('999999999999999999', 0, 0)).toBe(8_640_000_000_000_000);
   });
   it('falls back once only for connection failure and charges fallback before public wire', async () => {
     const time = clock();

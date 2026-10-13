@@ -21,14 +21,16 @@ export function tagApiOrigin(value = process.env.BLOG_TAG_API_ORIGIN ?? LOCAL_TA
   if (value !== PUBLIC_TAG_ORIGIN && value !== LOCAL_TAG_ORIGIN) throw Error('Invalid BLOG_TAG_API_ORIGIN');
   return value;
 }
-/** Retry-After greater than the bound is respected by deferring the batch, never shortened. */
+/** Keep the full representable Retry-After; extreme numeric values defer to Date's maximum, never a shorter 7-day retry. */
 export function retryAfterMs(header: string | null, attempt: number, now: number): number {
-  if (header && /^\d+$/.test(header.trim())) return Math.min(7 * 86400_000, Math.max(1000, Number(header.trim()) * 1000));
+  const maximum = Math.max(0, 8_640_000_000_000_000 - now);
+  const bounded = (ms: number) => Math.min(maximum, Math.max(1000, ms));
+  if (header && /^\d+$/.test(header.trim())) return bounded(Number(header.trim()) * 1000);
   if (header) {
     const date = Date.parse(header);
-    if (Number.isFinite(date)) return Math.min(7 * 86400_000, Math.max(1000, date - now));
+    if (Number.isFinite(date)) return bounded(date - now);
   }
-  return Math.min(30_000, 1000 * 2 ** attempt);
+  return Math.min(maximum, 30_000, 1000 * 2 ** attempt);
 }
 export class TagRateLimitError extends Error {
   readonly retryAt: Date;
@@ -41,7 +43,32 @@ const connectionFailure = (error: unknown) => {
   const e = error as { code?: string; cause?: { code?: string } } | null;
   return ['ECONNREFUSED', 'ENETUNREACH', 'EHOSTUNREACH', 'ETIMEDOUT', 'UND_ERR_CONNECT_TIMEOUT'].includes(e?.cause?.code ?? e?.code ?? '');
 };
+export class TagHttpError extends Error {
+  readonly status: number;
+  constructor(status: number, label: string) {
+    super(`${label} HTTP ${status}`);
+    this.status = status;
+  }
+}
+const sharedLabelPath = (path: string) => {
+  const match = /^\/api\/v1\/tags\/([^/?#]+)\/(relations|visual)$/.exec(path);
+  if (!match) return false;
+  try {
+    const tag = decodeURIComponent(match[1]);
+    return (
+      !!tag &&
+      tag === tag.trim() &&
+      [...tag].length <= 60 &&
+      !/[\p{Cc}\p{Cs}]/u.test(tag) &&
+      encodeURIComponent(tag) === match[1] &&
+      new URL(path, PUBLIC_TAG_ORIGIN).pathname === path
+    );
+  } catch {
+    return false;
+  }
+};
 const allowedPath = (path: string) =>
+  sharedLabelPath(path) ||
   /^\/api\/v1\/articles\?[^#]*$/.test(path) ||
   /^\/api\/v1\/vocabulary\/snapshots\/(?:current|[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})(?:\?cursor=\d{1,6})?$/.test(
     path,
@@ -115,6 +142,7 @@ export class TagApiTransport {
       try {
         response = await this.request(new URL(path, this.activeOrigin), {
           redirect: 'error',
+          cache: 'no-store',
           signal,
           headers,
         });
@@ -143,7 +171,7 @@ export class TagApiTransport {
       }
       if (!response.ok) {
         await response.body?.cancel().catch(() => undefined);
-        throw Error(`${label} HTTP ${response.status}`);
+        throw new TagHttpError(response.status, label);
       }
       if (!response.body) throw Error(`${label} empty response`);
       const reader = response.body.getReader();
@@ -167,7 +195,7 @@ export class TagApiTransport {
         signal.throwIfAborted();
         this.assertRunning();
         try {
-          return JSON.parse(Buffer.concat(chunks).toString('utf8'));
+          return JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(Buffer.concat(chunks)));
         } catch {
           throw Error(`${label} invalid JSON`);
         }
