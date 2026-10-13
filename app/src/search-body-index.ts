@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 import type { Pool, RowDataPacket } from 'mysql2/promise';
+import { articleIdentityKey } from './crawl/feed.ts';
 import { publicPost, publicSummary } from './public-post.ts';
 import { publicationHome } from './relations/identity.ts';
 import { boundedSearchStatement, CURRENT_BODY_SQL, PUBLIC_SEARCH_SQL } from './search-bounds.ts';
@@ -46,6 +47,16 @@ export function bodySearchOwner(source: string, home: string) {
       !!publicationHome(home) &&
       (!path || s.pathname === path || s.pathname.startsWith(`${path}/`))
     );
+  } catch {
+    return false;
+  }
+}
+/** Publication ownership alone does not bind a saved body to the current article. */
+export function bodySearchSameArticle(saved: unknown, current: unknown): boolean {
+  if (typeof saved !== 'string' || typeof current !== 'string' || saved.length > 1024 || current.length > 1024) return false;
+  try {
+    const key = articleIdentityKey(saved);
+    return key !== null && new URL(saved).origin === new URL(current).origin && key === articleIdentityKey(current);
   } catch {
     return false;
   }
@@ -113,7 +124,8 @@ export async function loadIndexedBodySearch(pool: Pool, q: string, blog = '') {
     if (
       !bodySearchOwner(row.sourceUrl, row.blogUrl) ||
       !bodySearchOwner(row.articleUrl, row.blogUrl) ||
-      !bodySearchOwner(row.url, row.blogUrl)
+      !bodySearchOwner(row.url, row.blogUrl) ||
+      !bodySearchSameArticle(row.articleUrl, row.url)
     ) {
       coverage.staleOrIneligible++;
       continue;

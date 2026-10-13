@@ -1,5 +1,5 @@
 import type { Pool, PoolConnection, RowDataPacket } from 'mysql2/promise';
-import { BODY_INDEX_BYTES, BODY_INDEX_VERSION, bodySearchOwner, buildBodySearchIndex } from './search-body-index.ts';
+import { BODY_INDEX_BYTES, BODY_INDEX_VERSION, bodySearchOwner, bodySearchSameArticle, buildBodySearchIndex } from './search-body-index.ts';
 import { boundedSearchStatement } from './search-bounds.ts';
 export function searchIndexPostIds(raw: unknown): number[] {
   if (
@@ -71,7 +71,8 @@ export async function produceBodySearchIndex(pool: Pool, rawIds: unknown, apply 
         row &&
         typeof row.content_hash === 'string' &&
         /^[a-f0-9]{64}$/.test(row.content_hash) &&
-        [row.source_url, row.article_url, row.url].every((url) => bodySearchOwner(url, row.blog_url))
+        [row.source_url, row.article_url, row.url].every((url) => bodySearchOwner(url, row.blog_url)) &&
+        bodySearchSameArticle(row.article_url, row.url)
       ) {
         const bytes = Buffer.isBuffer(row.body_bytes) ? row.body_bytes : Buffer.from(row.body_bytes ?? '', 'utf8');
         if (bytes.length > BODY_INDEX_BYTES) status = 'overcap';

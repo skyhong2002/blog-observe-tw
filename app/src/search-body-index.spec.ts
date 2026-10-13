@@ -6,6 +6,7 @@ import {
   BODY_INDEX_CHARACTERS,
   BODY_INDEX_VERSION,
   bodySearchOwner,
+  bodySearchSameArticle,
   buildBodySearchIndex,
   loadIndexedBodySearch,
 } from './search-body-index.ts';
@@ -88,6 +89,22 @@ describe('bounded body prefix candidate index', () => {
     const f = mock([r]);
     expect((await loadIndexedBodySearch(f.pool, phrase)).items).toEqual([]);
     expect(bodySearchOwner('https://anise.tw/blogger/x', 'https://anise.tw/blog/')).toBe(false);
+  });
+  it('requires the same article, rather than another public article of the same owner', async () => {
+    const r = { ...row(), articleUrl: 'https://anise.tw/290725' };
+    const result = await loadIndexedBodySearch(mock([r]).pool, phrase);
+    expect(result.items).toEqual([]);
+    expect(result.coverage.staleOrIneligible).toBe(1);
+  });
+  it('preserves query article IDs, origin and platform paths while removing tracking', () => {
+    expect(bodySearchSameArticle('https://anise.tw/290726?utm_source=feed#part', 'https://anise.tw/290726')).toBe(true);
+    expect(bodySearchSameArticle('https://anise.tw/?p=1', 'https://anise.tw/?p=2')).toBe(false);
+    expect(bodySearchSameArticle('https://home.gamer.com.tw/artwork.php?sn=1', 'https://home.gamer.com.tw/artwork.php?sn=2')).toBe(false);
+    expect(bodySearchSameArticle('https://medium.com/@a/p', 'https://medium.com/@b/p')).toBe(false);
+    expect(bodySearchSameArticle('http://anise.tw/290726', 'https://anise.tw/290726')).toBe(false);
+    expect(bodySearchSameArticle('https://www.anise.tw/290726', 'https://anise.tw/290726')).toBe(false);
+    expect(bodySearchSameArticle(null, 'https://anise.tw/290726')).toBe(false);
+    expect(bodySearchSameArticle('https://anise.tw/290726', 'https://anise.tw:444/290726')).toBe(false);
   });
   it('never verifies more than200 rows after a201 sentinel and reports cap', async () => {
     const f = mock([], 201);

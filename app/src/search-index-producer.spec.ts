@@ -66,6 +66,17 @@ describe('explicit small body index producer', () => {
       expect(f.connection.query.mock.calls[1][1]).toEqual([20875]);
     }
   });
+  it('clears selected postings but never replaces them from another same-owner article', async () => {
+    const f = fixture({ ...row, article_url: 'https://anise.tw/290725' });
+    expect((await produceBodySearchIndex(f.pool, [20875], true)).items[0].status).toBe('unindexed');
+    expect(f.connection.query).toHaveBeenCalledTimes(2);
+    expect(f.connection.query.mock.calls[1][1]).toEqual([20875]);
+    expect(f.connection.commit).toHaveBeenCalledOnce();
+  });
+  it('allows verified same-article tracking variants without changing the index version', async () => {
+    const f = fixture({ ...row, article_url: `${row.article_url}?utm_source=fixture#part` });
+    expect((await produceBodySearchIndex(f.pool, [20875], true)).items[0].status).toBe('stored');
+  });
   it('failed write rolls back and stops batch without fake stored result or retry', async () => {
     const f = fixture();
     f.connection.query.mockResolvedValueOnce([[row]]).mockRejectedValueOnce({ code: 'ER_STATEMENT_TIMEOUT' });
