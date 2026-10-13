@@ -10,12 +10,38 @@ import { pathToFileURL } from 'node:url';
 
 const MiB = 1024 ** 2;
 export const LIMITS = Object.freeze({ images: 4, bytes: 50 * MiB, reserve: 40 * 1024 ** 3, stopReserve: 30 * 1024 ** 3, load: 12, delay: 5000 });
-const analyticsRoots = ['google-analytics.com', 'googletagmanager.com', 'doubleclick.net', 'googleadservices.com', 'googlesyndication.com'];
+const analyticsRoots = ['google-analytics.com', 'analytics.google.com', 'googletagmanager.com', 'doubleclick.net', 'googleadservices.com', 'googlesyndication.com'];
+export const NETWORK_GUARD_RULES = Object.freeze({
+  requestPattern: '**/*', websocketPattern: '**/*',
+  allowedSchemes: Object.freeze(['http:', 'https:']), allowedMethods: Object.freeze(['GET', 'HEAD']),
+  analyticsHostRoots: Object.freeze([...analyticsRoots]), hostMatch: 'exact-root-or-dot-subdomain',
+  analyticsDenySchemes: 'all URL schemes with a parsed analytics hostname',
+  defaultDeny: 'non-target-origin, credentials, non-http(s), private paths, non-GET/HEAD',
+  websockets: 'all denied; never connectToServer',
+});
+function analyticsHost(raw) {
+  try { const host = new URL(raw).hostname; return analyticsRoots.find(root => host === root || host.endsWith(`.${root}`)) ?? null; }
+  catch { return null; }
+}
+export function privateCapturePath(raw) {
+  let path = raw;
+  const forbidden = /\/(?:admin|auth|login|my|me|reader)(?:[/;\x5c.]|$)/i;
+  for (let depth = 0; depth < 5; depth++) {
+    if (forbidden.test(path)) return true;
+    try {
+      if (forbidden.test(new URL(path, 'http://guard.invalid').pathname)) return true;
+      const decoded = decodeURIComponent(path);
+      if (decoded === path) return false;
+      path = decoded;
+    } catch { return true; }
+  }
+  return true; // Deep/malformed encodings are unverified, not a public-route exemption.
+}
 export function requestDecision(raw, targetOrigin) {
   try {
     const url = new URL(raw);
-    if (analyticsRoots.some(root => url.hostname === root || url.hostname.endsWith(`.${root}`)) || url.hostname === 'analytics.google.com') return 'analytics';
-    if (/\/(?:admin|auth|login|my|me)(?:\/|$)/.test(url.pathname)) return 'external';
+    if (analyticsHost(raw)) return 'analytics';
+    if (privateCapturePath(url.pathname)) return 'external';
     return url.origin === targetOrigin && ['http:', 'https:'].includes(url.protocol) && !url.username && !url.password ? 'allow' : 'external';
   } catch { return 'external'; }
 }
@@ -27,7 +53,7 @@ export function plan(config) {
   const pages = config.pages.map((page, index) => {
     if (![1280, 390].includes(page.width) || typeof page.path !== 'string' || !page.path.startsWith('/') || page.path.startsWith('//')) throw Error('invalid_page');
     const url = new URL(page.path, origin);
-    if (url.origin !== origin.origin || url.username || url.password || /\/(?:admin|auth|login|my|me)(?:\/|$)/.test(url.pathname)) throw Error('private_route');
+    if (url.origin !== origin.origin || url.username || url.password || privateCapturePath(url.pathname)) throw Error('private_route');
     const theme = page.theme ?? 'light';
     if (!['light', 'dark'].includes(theme)) throw Error('invalid_theme');
     return { url: url.href, width: page.width, height: 900, theme, name: `page-${index + 1}-${page.width}-${theme}.png` };
@@ -43,35 +69,96 @@ export function verifyIdentity(headers, config) {
   if (headers['x-blog-release'] !== config.expectedSHA || headers[config.buildIdHeader.toLowerCase()] !== config.expectedBuildId) throw Error('identity_unverified');
   return { sha: headers['x-blog-release'], buildId: headers[config.buildIdHeader.toLowerCase()] };
 }
-export function recordNetworkAttempt(raw, method, resourceType, decision, network) {
+function ensureNetworkEvidence(network) {
   if (!network) return;
+  for (const transport of ['http', 'websocket']) network[transport] ??= { attempted: 0, denied: 0, blocked: 0, allowed: 0, actionFailures: 0 };
+  network.http.errorResponses ??= 0;
+  network.http.requestFailures ??= 0;
+  network.analyticsEvidence ??= { attempted: 0, denied: 0, blocked: 0, allowed: 0, actionFailures: 0,
+    ga: { attempted: 0, blocked: 0, allowed: 0 }, gtm: { attempted: 0, blocked: 0, allowed: 0 } };
+  network.guardFailures ??= 0;
+}
+export function recordNetworkAttempt(raw, method, resourceType, decision, network, transport = 'http') {
+  if (!network) return;
+  ensureNetworkEvidence(network);
   network.attempted++;
-  let hostname = '', pathname = '';
-  try { const url = new URL(raw); hostname = url.hostname; pathname = url.pathname; } catch { /* only counters for invalid URL */ }
-  if (/(^|\.)google-analytics\.com$/.test(hostname) || hostname === 'analytics.google.com') network.ga++;
-  if (/(^|\.)googletagmanager\.com$/.test(hostname)) network.gtm++;
+  const root = analyticsHost(raw);
+  let pathname = '', protocol = 'other';
+  try { const url = new URL(raw); pathname = url.pathname; if (['http:', 'https:', 'ws:', 'wss:', 'ftp:', 'data:', 'blob:'].includes(url.protocol)) protocol = url.protocol; } catch { /* counters only */ }
+  const ga = root === 'google-analytics.com' || root === 'analytics.google.com', gtm = root === 'googletagmanager.com';
+  if (ga) network.ga++;
+  if (gtm) network.gtm++;
   if (decision === 'analytics') network.analytics++;
-  const blocked = decision !== 'allow' || !['GET', 'HEAD'].includes(method);
-  if (blocked) network.blocked++;
-  if (network.requests.length < 500) network.requests.push({ method: /^[A-Z]{1,10}$/.test(method) ? method : 'other', resourceType, decision: blocked ? decision === 'allow' ? 'method' : decision : 'allow',
-    ...(decision === 'allow' ? { pathname } : decision === 'analytics' ? { hostname } : {}) });
+  const denied = transport === 'websocket' || decision !== 'allow' || !['GET', 'HEAD'].includes(method);
+  if (denied) network.blocked++; // Legacy field is policy-denied attempts, not confirmed abort outcomes.
+  network[transport].attempted++;
+  if (denied) network[transport].denied++;
+  if (root) {
+    network.analyticsEvidence.attempted++;
+    if (denied) network.analyticsEvidence.denied++;
+    if (ga) network.analyticsEvidence.ga.attempted++;
+    if (gtm) network.analyticsEvidence.gtm.attempted++;
+  }
+  const types = ['document', 'stylesheet', 'image', 'media', 'font', 'script', 'texttrack', 'xhr', 'fetch', 'eventsource', 'websocket', 'manifest', 'other'];
+  if (network.requests.length < 500) network.requests.push({ transport, protocol, method: /^[A-Z]{1,10}$/.test(method) ? method : 'other', resourceType: types.includes(resourceType) ? resourceType : 'unknown', decision: denied ? decision === 'allow' ? transport === 'websocket' ? 'websocket' : 'method' : decision : 'allow',
+    ...(decision === 'allow' && transport === 'http' ? { pathname } : root ? { hostname: root } : {}) });
   else network.truncated = true;
 }
-export async function installGuards(context, origin, counters, network) {
-  await context.route('**/*', async route => {
-    const decision = requestDecision(route.request().url(), origin);
-    recordNetworkAttempt(route.request().url(), route.request().method(), route.request().resourceType?.() ?? 'unknown', decision, network);
-    if (decision !== 'allow' || !['GET', 'HEAD'].includes(route.request().method())) { counters[decision === 'analytics' ? 'analytics' : 'external']++; return route.abort('blockedbyclient'); }
-    return route.continue();
-  });
+export function recordNetworkOutcome(raw, transport, outcome, network) {
+  if (!network) return;
+  ensureNetworkEvidence(network);
+  network[transport][outcome]++;
+  const root = analyticsHost(raw);
+  if (outcome === 'actionFailures') network.guardFailures++;
+  if (!root) return;
+  network.analyticsEvidence[outcome]++;
+  if (outcome === 'blocked' || outcome === 'allowed') {
+    if (root === 'google-analytics.com' || root === 'analytics.google.com') network.analyticsEvidence.ga[outcome]++;
+    if (root === 'googletagmanager.com') network.analyticsEvidence.gtm[outcome]++;
+  }
+}
+export async function installGuards(context, origin, counters, network, now = () => new Date().toISOString()) {
+  const startedAt = now();
+  ensureNetworkEvidence(network);
   if (typeof context.routeWebSocket !== 'function') throw Error('websocket_guard_unavailable');
-  await context.routeWebSocket('**/*', socket => socket.close());
+  if (typeof context.on !== 'function') throw Error('http_observation_unavailable');
+  const failed = async (raw, transport) => {
+    recordNetworkOutcome(raw, transport, 'actionFailures', network);
+    // Close only this owned context on failed enforcement. Do not permit a failed abort as success.
+    try { await context.close(); } catch { if (network) network.contextCloseFailures = (network.contextCloseFailures ?? 0) + 1; }
+  };
+  await context.route('**/*', async route => {
+    const request = route.request(), raw = request.url(), method = request.method();
+    const decision = requestDecision(raw, origin);
+    recordNetworkAttempt(raw, method, request.resourceType?.() ?? 'unknown', decision, network);
+    const denied = decision !== 'allow' || !['GET', 'HEAD'].includes(method);
+    if (denied) counters[decision === 'analytics' ? 'analytics' : 'external']++;
+    try {
+      if (denied) await route.abort('blockedbyclient'); else await route.continue();
+      recordNetworkOutcome(raw, 'http', denied ? 'blocked' : 'allowed', network);
+    } catch { await failed(raw, 'http'); }
+  });
+  await context.routeWebSocket('**/*', async socket => {
+    let raw = '';
+    let urlObserved = false;
+    try { if (typeof socket.url === 'function') { raw = socket.url(); urlObserved = typeof raw === 'string'; } } catch { /* unverified URL closes the owned context below */ }
+    const decision = analyticsHost(raw) ? 'analytics' : 'external';
+    recordNetworkAttempt(raw, 'GET', 'websocket', decision, network, 'websocket');
+    counters[decision === 'analytics' ? 'analytics' : 'external']++;
+    if (!urlObserved) { await failed('', 'websocket'); return; }
+    try { await socket.close(); recordNetworkOutcome(raw, 'websocket', 'blocked', network); }
+    catch { await failed(raw, 'websocket'); }
+  });
+  context.on('response', response => { if (response.status() >= 400 && network) network.http.errorResponses++; });
+  context.on('requestfailed', () => { if (network) network.http.requestFailures++; });
   await context.addInitScript(() => {
     localStorage.setItem('blog-analytics-opt-out', '1');
     localStorage.setItem('tag-analytics-opt-out', '1');
     localStorage.setItem('youtube-analytics-opt-out', '1');
     Object.defineProperty(navigator, 'doNotTrack', { get: () => '1' });
   });
+  return { status: 'installed', startedAt, installedAt: now(), phase: 'before-newPage-and-first-navigation',
+    requestRouteInstalled: true, websocketRouteInstalled: true, initScriptInstalled: true, httpEventObserversInstalled: true, rules: NETWORK_GUARD_RULES };
 }
 /** Only the two allowed request fields are read; no bulk headers or native GPC override. */
 export async function observePrivacy(request, navigatorValues) {
@@ -336,23 +423,63 @@ export const TTFB_LIMITS = HOMEPAGE_LIMIT_SECONDS;
 export function verifyLatencyGate(rows) {
   if (!Array.isArray(rows) || rows.length !== 3 || new Set(rows.map(row => row.host)).size !== 3 || rows.some(row => !Object.hasOwn(TTFB_LIMITS, row.host) || row.status !== 200 || !Number.isFinite(row.totalSeconds) || row.totalSeconds < 0 || row.totalSeconds > TTFB_LIMITS[row.host])) throw Error('ttfb_gate');
 }
-async function formalTTFB() {
+async function formalTTFB(onAttempt = () => {}) {
   const rows = [];
   for (const host of ['blog.observe.tw', 'tag.observe.tw', 'youtube.observe.tw']) {
     const start = performance.now();
-    const response = await fetch(`https://${host}/`, { headers: { DNT: '1', Accept: 'text/html' }, redirect: 'error', signal: AbortSignal.timeout(TTFB_LIMITS[host] * 1000 + 500) });
-    const ttfbSeconds = (performance.now() - start) / 1000;
-    let bytes = 0;
-    const reader = response.body?.getReader();
-    if (reader) try { while (true) { const part = await reader.read(); if (part.done) break; bytes += part.value.length; if (bytes > 2 * MiB) throw Error('probe_body_limit'); } } finally { await reader.cancel().catch(() => undefined); }
-    const totalSeconds = (performance.now() - start) / 1000;
-    rows.push({ host, totalSeconds, ttfbSeconds, status: response.status });
+    onAttempt({ host, status: 'started', utc: new Date().toISOString() });
+    let response;
+    try {
+      response = await fetch(`https://${host}/`, { headers: { DNT: '1', Accept: 'text/html' }, redirect: 'error', signal: AbortSignal.timeout(TTFB_LIMITS[host] * 1000 + 500) });
+      const ttfbSeconds = (performance.now() - start) / 1000;
+      let bytes = 0;
+      const reader = response.body?.getReader();
+      if (reader) try { while (true) { const part = await reader.read(); if (part.done) break; bytes += part.value.length; if (bytes > 2 * MiB) throw Error('probe_body_limit'); } } finally { await reader.cancel().catch(() => undefined); }
+      const row = { host, totalSeconds: (performance.now() - start) / 1000, ttfbSeconds, status: response.status };
+      rows.push(row);
+      onAttempt({ host, status: 'completed', httpStatus: response.status, totalSeconds: row.totalSeconds, ttfbSeconds, utc: new Date().toISOString() });
+    } catch {
+      onAttempt({ host, status: 'failed', httpStatus: response?.status ?? null, utc: new Date().toISOString() });
+      throw Error('ttfb_gate');
+    }
   }
   return rows;
 }
+export async function globalHomepageProbe(report, phase, deps) {
+  const receipt = { phase, startedAt: deps.now(), endedAt: null, status: 'running',
+    scope: 'user-required-global-resource-gate; applies-to-formal-and-candidate', transport: 'independent-Node-fetch',
+    path: '/', method: 'GET', configuredDNT: '1', configuredAccept: 'text/html', observedRequestDNT: null,
+    browserNetworkIncluded: false, javascriptExecuted: false, resourceSubrequests: false,
+    homepageBaseline: HOMEPAGE_BASELINE, eventsSource: 'dependency-result-only',
+    attempts: Object.keys(TTFB_LIMITS).map(host => ({ host, attempted: false, status: 'not-attempted' })) };
+  report.globalHomepageProbes ??= [];
+  report.globalHomepageProbes.push(receipt);
+  const observe = event => {
+    const slot = receipt.attempts.find(row => row.host === event?.host);
+    if (!slot || !['started', 'completed', 'failed'].includes(event.status)) return;
+    receipt.eventsSource = 'transport-attempt-events';
+    slot.attempted = true; slot.status = event.status;
+    slot.utc = typeof event.utc === 'string' && /^\d{4}-\d{2}-\d{2}T[0-9:.]+Z$/.test(event.utc) ? event.utc : null;
+    if (event.httpStatus === null || Number.isInteger(event.httpStatus) && event.httpStatus >= 100 && event.httpStatus <= 599) slot.httpStatus = event.httpStatus;
+    for (const field of ['totalSeconds', 'ttfbSeconds']) if (Number.isFinite(event[field]) && event[field] >= 0) slot[field] = event[field];
+  };
+  try {
+    const rows = await deps.ttfb(observe);
+    for (const row of Array.isArray(rows) ? rows : []) {
+      const slot = receipt.attempts.find(item => item.host === row?.host);
+      if (slot) { slot.attempted = true; slot.status = row.status === 200 ? 'completed' : 'http-error';
+        if (Number.isInteger(row.status) && row.status >= 100 && row.status <= 599) slot.httpStatus = row.status;
+        for (const field of ['totalSeconds', 'ttfbSeconds']) if (Number.isFinite(row[field]) && row[field] >= 0) slot[field] = row[field]; }
+    }
+    verifyLatencyGate(rows);
+    receipt.status = 'passed';
+    return rows;
+  } catch { receipt.status = 'failed'; throw Error('ttfb_gate'); }
+  finally { receipt.endedAt = deps.now(); }
+}
 export async function capture(config, deps) {
   const batch = plan(config);
-  const report = { homepageBaseline: HOMEPAGE_BASELINE, startedAt: deps.now(), endedAt: null, closeAt: null, closed: false, status: 'stopped', gates: [], pages: [], blocked: { analytics: 0, external: 0 }, network: { attempted: 0, ga: 0, gtm: 0, analytics: 0, blocked: 0, requests: [], truncated: false, limitation: 'External images/fonts/scripts are blocked by default; their absence is not evidence of a page defect.' }, authorization: typeof config.authorization === 'string' ? config.authorization.slice(0, 300) : 'explicit-user-thaw'  };
+  const report = { evidenceVersion: 2, expectedIdentity: { sha: config.expectedSHA, buildId: config.expectedBuildId }, guardSetup: { status: 'not-installed', phase: 'before-newPage-and-first-navigation' }, privacyConfiguration: { documentDNT: '1', navigatorDNT: '1', navigatorDNTSource: 'init-script-override', documentSecGPC: 'not-configured', navigatorGPC: 'not-overridden-by-runner', serviceWorkers: 'block', optOutLocalStorage: ['blog-analytics-opt-out', 'tag-analytics-opt-out', 'youtube-analytics-opt-out'], limitation: 'Configuration is not an observation. Document request values and navigator values are recorded separately per page.' }, homepageBaseline: HOMEPAGE_BASELINE, startedAt: deps.now(), endedAt: null, closeAt: null, closed: false, status: 'stopped', gates: [], pages: [], blocked: { analytics: 0, external: 0 }, network: { attempted: 0, ga: 0, gtm: 0, analytics: 0, blocked: 0, requests: [], truncated: false, limitation: 'External images/fonts/scripts are blocked by default; their absence is not evidence of a page defect.' }, authorization: typeof config.authorization === 'string' ? config.authorization.slice(0, 300) : 'explicit-user-thaw'  };
   let browser, lease;
   const noteProcessFailure = (error, phase) => {
     if (Array.isArray(error?.processDiagnostics)) {
@@ -372,14 +499,17 @@ export async function capture(config, deps) {
       report.localIdentity = await deps.verifyLocalArchive?.();
       if (!report.localIdentity || report.localIdentity.sha !== config.expectedSHA || report.localIdentity.buildId !== config.expectedBuildId || !report.localIdentity.verifiedFiles) throw Error('identity_unverified');
     }
-    { report.beforeTTFB = await deps.ttfb(); verifyLatencyGate(report.beforeTTFB); }
+    report.beforeTTFB = await globalHomepageProbe(report, 'before', deps);
     const launchGate = await deps.gate(); report.gates.push({ phase: 'prelaunch', ...launchGate }); verifyGate(launchGate, batch.estimatedBytes);
     await proveQuota();
     browser = await deps.launch();
     const context = await browser.newContext({ viewport: { width: 1280, height: 900 }, extraHTTPHeaders: { DNT: '1' }, serviceWorkers: 'block', permissions: [], acceptDownloads: false });
-    await installGuards(context, batch.targetOrigin, report.blocked, report.network);
+    report.guardSetup = { ...report.guardSetup, status: 'installing', startedAt: deps.now() };
+    report.guardSetup = await installGuards(context, batch.targetOrigin, report.blocked, report.network, deps.now);
+    if (report.network.guardFailures) throw Error('network_guard_unverified');
     for (const item of batch.pages) {
     const page = await context.newPage();
+    report.guardSetup.pageCreatedAt = deps.now();
     await page.emulateMedia({ colorScheme: item.theme });
     await page.addInitScript(theme => localStorage.setItem('theme', theme), item.theme);
     let identityFailure = false;
@@ -395,6 +525,7 @@ export async function capture(config, deps) {
       // constrains participants only; stop if the live root inventory exceeds two.
       if (!Number.isFinite(gate.load) || gate.load > LIMITS.load || !Number.isSafeInteger(gate.browserRoots) || gate.browserRoots < 0 || gate.browserRoots > 2 || !Number.isFinite(gate.available) || gate.available - Math.max(0, batch.estimatedBytes - report.pages.reduce((sum, row) => sum + row.bytes, 0)) < LIMITS.stopReserve) throw Error('page_gate');
       await page.setViewportSize({ width: item.width, height: item.height });
+      report.guardSetup.firstNavigationAt ??= deps.now();
       const response = await page.goto(item.url, { waitUntil: 'domcontentloaded', timeout: 15000 });
       if (!response || response.status() !== 200) throw Error('document_unavailable');
       const identity = config.localIdentity ? await deps.verifyLocalProcess?.() : verifyIdentity(await response.allHeaders(), config);
@@ -412,13 +543,15 @@ export async function capture(config, deps) {
       report.privacyObservations ??= [];
       report.privacyObservations.push({ pathname: new URL(item.url).pathname, utc: deps.now(), ...privacy });
       requireDNT(privacy);
+      if (report.network.guardFailures || report.network.analyticsEvidence?.allowed) throw Error('network_guard_unverified');
       const contrastSamples = (await page.evaluate(collectSecondaryContrastDOM)).map(sample => sample.ancestorLimitReached ? { ...sample, ratio: null, result: 'unknown', reason: 'ancestor_limit' } : assessContrast(sample));
       const png = await page.screenshot({ fullPage: false });
       if (png.length > item.width * item.height * 4 || report.pages.reduce((sum, row) => sum + row.bytes, 0) + png.length > LIMITS.bytes) throw Error('actual_artifact_budget');
       await deps.saveImage(item.name, png);
-      report.pages.push({ privacy, contrastSamples, contrastLimitation: 'Visible main secondary-class DOM samples only; unsupported CSS colors/backgrounds/group opacity remain unknown, not a full WCAG scan.', name: item.name, pathname: new URL(item.url).pathname, viewport: [item.width, item.height], theme: observedTheme.theme, darkMedia: observedTheme.darkMedia, utc: deps.now(), identity: config.localIdentity ? { ...identity, sha: report.localIdentity.sha, sourceTreeHash: report.localIdentity.sourceTreeHash } : identity, bytes: png.length, sha256: createHash('sha256').update(png).digest('hex'), status: 'captured-unreviewed' });
+      report.pages.push({ privacyObservation: { source: 'actual-document-request-and-navigator', navigatorDNTSource: 'observed-value; init-script-override-configured', navigatorGPCSource: 'observed-value; runner-does-not-override' }, privacy, contrastSamples, contrastLimitation: 'Visible main secondary-class DOM samples only; unsupported CSS colors/backgrounds/group opacity remain unknown, not a full WCAG scan.', name: item.name, pathname: new URL(item.url).pathname, viewport: [item.width, item.height], theme: observedTheme.theme, darkMedia: observedTheme.darkMedia, utc: deps.now(), identity: config.localIdentity ? { ...identity, sha: report.localIdentity.sha, sourceTreeHash: report.localIdentity.sourceTreeHash } : identity, bytes: png.length, sha256: createHash('sha256').update(png).digest('hex'), status: 'captured-unreviewed' });
       await page.close();
     }
+    if (report.network.guardFailures || report.network.analyticsEvidence?.allowed) throw Error('network_guard_unverified');
     report.status = 'captured-unreviewed';
   } catch (error) { noteProcessFailure(error, report.currentPathname ? 'page' : 'initial'); report.error = error.message && /^[a-z_]+$/.test(error.message) ? error.message : 'capture_stopped'; }
   finally {
@@ -428,11 +561,13 @@ export async function capture(config, deps) {
     try {
       const after = await deps.gate(); report.gates.push({ phase: 'after', ...after });
       if (browser && report.closed && report.beforeTTFB && Number.isFinite(after.load) && after.load <= LIMITS.load) {
-        try { report.afterTTFB = await deps.ttfb(); verifyLatencyGate(report.afterTTFB); }
+        try { report.afterTTFB = await globalHomepageProbe(report, 'after', deps); }
         catch { report.afterGateError = 'ttfb_gate'; report.error ??= 'after_ttfb_gate'; report.status = 'stopped'; }
       }
       else report.afterTTFBSkipped = 'no_completed_browser_or_load_gate';
     } catch (error) { noteProcessFailure(error, 'after'); report.afterGateError = 'gate_unavailable'; }
+    if (report.network.guardFailures || report.network.analyticsEvidence?.allowed) { report.error ??= 'network_guard_unverified'; report.status = 'stopped'; }
+    report.network.evidenceSemantics = { legacyBlocked: 'policy-denied attempts', blocked: 'route.abort or websocket.close completed', allowed: 'route.continue completed; not proof of packet delivery', httpErrors: 'observed HTTP status >=400; response bodies not logged', requestFailures: 'observed requestfailed including guard aborts, not all server errors', analyticsOutbound: 'No analytics route was permitted only when allowed=0, actionFailures=0 and pre-navigation guards installed; not packet capture', limitation: 'Counters cover intercepted requests and websocket routes, not a host-wide packet trace; independent Node homepage probes are recorded separately and are outbound HTML requests. Zero analytics allowed is not zero all outbound. Truncated rows do not truncate counters.' };
     report.endedAt = deps.now();
     await deps.saveReport(report);
   }
@@ -460,4 +595,4 @@ async function main() {
   const report = await capture(config, { now: () => new Date().toISOString(), gate: snapshotGate, ttfb: formalTTFB, verifyLocalArchive: () => verifyArchiveIdentity(config), verifyLocalProcess: () => localProcessIdentity(config), acquireGlobalQuota: () => acquireHostBrowserQuota(), launch: () => chromium.launch({ headless: true }), sleep: ms => new Promise(resolve => setTimeout(resolve, ms)), saveImage: (name, data) => writeFile(resolve(artifactDir, name), data, { flag: 'wx', mode: 0o600 }), saveReport: report => writeFile(resolve(artifactDir, 'capture-report.json'), JSON.stringify(report, null, 2), { flag: 'wx', mode: 0o600 }) });
   if (report.error) process.exitCode = 1;
 }
-if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) main().catch(error => { console.error('ui_capture_refused'); process.exitCode = 1; });
+if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) main().catch(() => { console.error('ui_capture_refused'); process.exitCode = 1; });

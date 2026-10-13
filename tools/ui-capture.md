@@ -69,3 +69,74 @@ Baseline 的 DYNAMIC time_total 包含來源站渲染、Cloudflare edge 與網�
 可見main中的次要zinc文字最多20組computed-style contrast樣本，不存文字／title；只支援可確定的RGB(A)與alpha合成。OKLCH、背景圖、gradient、group opacity、未解析透明底等保持unknown；不是完整WCAG掃描，不表示P2已完成實測。新欄位與DNT失敗、GPC如實、已知ratio21、透明分層及unsupported情況有mock測試。
 
 最新使用者限制：SM不新增build／capture／restore；CLI具備實作不構成現在啟動capture的授權，排隊等Mint。舊私有interaction wrapper須由最新guarded runner重新生成並核對新guardedSourceHash，不能沿用舊copy漏掉privacy觀測；這輪未重拍或覆寫任何舊artifact。
+
+## Mint evidence version 2 (source/mock only)
+
+New reports add `evidenceVersion: 2`, expected SHA/BUILD_ID separate from each page's
+actually verified identity, and `guardSetup`. Registration completes before any
+`newPage` or first `goto`; the receipt records start/install/page creation/first
+navigation UTC and the rule set. Missing `routeWebSocket` or HTTP event observation
+support fails closed before navigation. Registration is evidence of the runner's
+executed setup, not evidence that an analytics request was attempted. Existing
+manifests are never upgraded, relabeled or supplied fabricated timestamps.
+
+The explicit policy only permits credential-free target-origin HTTP(S) GET/HEAD
+outside private routes. Analytics roots match only the exact root or dot-delimited
+subdomain, for every parsed URL scheme; lookalike suffix hosts remain external and
+are still denied by default. Roots include google-analytics.com,
+analytics.google.com, googletagmanager.com, doubleclick.net, googleadservices.com and
+googlesyndication.com. All WebSockets close without `connectToServer`, including
+same-origin WS/WSS. Service workers remain blocked. Rules do not constitute a
+host-wide firewall or a guarantee about unobservable non-HTTP browser internals.
+
+`network.ga`, `gtm`, `analytics` and legacy `blocked` retain attempted/policy-denied
+semantics. `http` and `websocket` now record attempted, denied, blocked (abort/close
+completed), allowed (continue completed), and actionFailures separately.
+`analyticsEvidence` additionally separates GA and GTM attempted/blocked/allowed.
+Failed abort/close is not successful blocking: the owned context is closed, the
+manifest is stopped, and no new image can be saved. Unknown WebSocket URL is an
+enforcement failure. `http.errorResponses` counts observed status >=400;
+`requestFailures` counts requestfailed, including expected guard aborts. Neither
+copies response content, error text, full URL, request headers or credentials.
+
+The first 500 safe request rows are retained; all counters continue beyond
+truncation. Analytics row hostnames are reduced to the recognized root, removing
+arbitrary subdomain identifiers. No foreign URL/query/path is recorded. An allowed
+route is NOT proof of transmission or arrival. `allowed=0` analytics together with
+installed pre-navigation guards and zero actionFailures is interception-layer
+no-permitted-analytics evidence, not packet-capture or server receipt evidence.
+A zero attempt count alone does not prove guards were installed or privacy honored.
+
+`privacyConfiguration` describes requested DNT, init script, local opt-out settings
+and runner-unmodified GPC. Per-page `privacy` still comes from the real document
+request's DNT/Sec-GPC and the real navigator values before saving; `privacyObservation`
+labels these observations separately. Navigator DNT can be configured by the init
+script, so observing it is not proof of a user's native preference. GPC is not
+synthesized by this runner; its observed true/false/null remains explicit. Only an
+actual document DNT=1 and observed navigator DNT=1 satisfy the DNT gate. Old missing
+privacy fields remain unverified. The existing identity/gates/quota are unchanged.
+
+These changes have only offline mocked validation. No capture, browser, HTTP,
+build or old manifest rewrite was performed by their author; execution awaits Mint
+and independent source review.
+
+## Independent global HTML probes and private-path variants
+
+The before/after three-site HTML gate is an explicit global resource requirement.
+It applies to both formal and local candidate capture; candidate status NEVER
+bypasses the gate. `globalHomepageProbes` records the separate Node fetch scope,
+phase/UTC, fixed hosts, each attempted/completed/failed/not-attempted state, safe
+HTTP status and timing, baseline, configured DNT/Accept and no-JS/no-subresources.
+These are outbound HTML requests outside the browser context and its route guard.
+They are not included in browser GA/GTM/network counters. Zero analytics permitted
+therefore does NOT mean zero all outbound. `observedRequestDNT` stays null: the Node
+probe configures DNT but does not pretend its configuration is a captured wire
+header observation. Real per-attempt callbacks distinguish transport events from
+mock/dependency result-only receipts. A failed before gate still prevents launch;
+no second probe is issued just because the first failed. Existing after gates and
+resource limits remain unchanged.
+
+Private-route checks now examine case-insensitive, safely decoded and dot-normalized
+path forms for both page plans and requests. Malformed/deep encoding fails closed;
+no decoded query, credentials, full foreign URL or error message is saved. This is
+source/mock validation only; no new probe/capture or old receipt rewrite occurred.

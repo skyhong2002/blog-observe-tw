@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { EventEmitter } from 'node:events';
 import { PassThrough } from 'node:stream';
-import { capture, observePrivacy, requireDNT, assessContrast, collectSecondaryContrastDOM, verifyPrivateArtifactDirectory, verifyLatencyGate, installGuards, LIMITS, plan, requestDecision, verifyGate, verifyIdentity, browserRootInventory, quotaLeaseFromProcess, localProcessIdentity, listenerInodes, acquireHostBrowserQuota, recordNetworkAttempt, processInventory } from './ui-capture.mjs';
+import { capture, observePrivacy, requireDNT, assessContrast, collectSecondaryContrastDOM, verifyPrivateArtifactDirectory, verifyLatencyGate, installGuards, LIMITS, plan, requestDecision, verifyGate, verifyIdentity, browserRootInventory, quotaLeaseFromProcess, localProcessIdentity, listenerInodes, acquireHostBrowserQuota, recordNetworkAttempt, recordNetworkOutcome, NETWORK_GUARD_RULES, privateCapturePath, globalHomepageProbe, processInventory } from './ui-capture.mjs';
 
 const config = { targetOrigin: 'http://127.0.0.1:18174', expectedSHA: 'a'.repeat(40), expectedBuildId: 'fixture-build', buildIdHeader: 'x-build-id', pages: [{ path: '/', width: 1280 }, { path: '/articles/', width: 390 }] };
 const gate = { load: 1, browserRoots: 0, rawPgrepCount: 10, available: LIMITS.reserve + 100 * 1024 ** 2 };
@@ -36,7 +36,7 @@ test('response identity requires observed SHA and BUILD_ID', () => {
 test('all-request and websocket guards install before init script, without logging URL/header/query', async () => {
   const calls = [], counters = { analytics: 0, external: 0 };
   let handler;
-  await installGuards({ route: async (pattern, fn) => { calls.push(pattern); handler = fn; }, routeWebSocket: async pattern => calls.push(`ws:${pattern}`), addInitScript: async () => calls.push('init') }, config.targetOrigin, counters);
+  await installGuards({ on: () => {}, route: async (pattern, fn) => { calls.push(pattern); handler = fn; }, routeWebSocket: async pattern => calls.push(`ws:${pattern}`), addInitScript: async () => calls.push('init') }, config.targetOrigin, counters);
   const actions = [];
   await handler({ request: () => ({ url: () => 'https://www.google-analytics.com/g/collect?secret=private', method: () => 'GET' }), abort: async () => actions.push('abort'), continue: async () => actions.push('continue') });
   assert.deepEqual(calls, ['**/*', 'ws:**/*', 'init']); assert.deepEqual(actions, ['abort']); assert.deepEqual(counters, { analytics: 1, external: 0 });
@@ -45,10 +45,10 @@ function mocks({ badIdentity = false, quota = true, hotPage = false, closeFails 
   const events = [], reports = [], images = []; let gates = 0;
   const headers = { 'x-blog-release': badIdentity ? 'b'.repeat(40) : config.expectedSHA, 'x-build-id': config.expectedBuildId };
   let current, theme = 'light';
-  const page = { emulateMedia: async options => { theme = options.colorScheme; }, addInitScript: async (fn, value) => assert.equal(value, theme), evaluate: async fn => fn === collectSecondaryContrastDOM ? [] : String(fn).includes('globalPrivacyControl') ? {doNotTrack:navigatorDNT,globalPrivacyControl:navigatorGPC} : ({ theme: wrongTheme ? 'unexpected' : theme, darkMedia: theme === 'dark' }), close: async () => {}, on: () => {}, setViewportSize: async () => {}, goto: async url => { current = url; events.push('goto'); return { status: () => 200, allHeaders: async () => headers, request: () => ({headerValue: async name => name === 'dnt' ? documentDNT : documentGPC}) }; }, url: () => current, screenshot: async options => { assert.equal(options.fullPage, false); return Buffer.alloc(64); } };
-  const context = { route: async () => events.push('route'), routeWebSocket: async () => events.push('ws'), addInitScript: async () => {}, newPage: async () => { events.push('newPage'); return page; } };
+  const page = { emulateMedia: async options => { theme = options.colorScheme; }, addInitScript: async (_fn, value) => assert.equal(value, theme), evaluate: async fn => fn === collectSecondaryContrastDOM ? [] : String(fn).includes('globalPrivacyControl') ? {doNotTrack:navigatorDNT,globalPrivacyControl:navigatorGPC} : ({ theme: wrongTheme ? 'unexpected' : theme, darkMedia: theme === 'dark' }), close: async () => {}, on: () => {}, setViewportSize: async () => {}, goto: async url => { current = url; events.push('goto'); return { status: () => 200, allHeaders: async () => headers, request: () => ({headerValue: async name => name === 'dnt' ? documentDNT : documentGPC}) }; }, url: () => current, screenshot: async options => { assert.equal(options.fullPage, false); return Buffer.alloc(64); } };
+  const context = { on: () => {}, route: async () => events.push('route'), routeWebSocket: async () => events.push('ws'), addInitScript: async () => {}, newPage: async () => { events.push('newPage'); return page; } };
   const deps = { now: () => 'mock-clock', gate: async () => { gates++; return { ...gate, load: hotPage && gates === 3 ? 13 : 1 }; }, acquireGlobalQuota: async () => quota ? { assertHeld: async () => true, release: async () => events.push('release') } : null, launch: async () => { events.push('launch'); return { newContext: async opts => { assert.equal(opts.extraHTTPHeaders.DNT, '1'); assert.equal(opts.serviceWorkers, 'block'); return context; }, close: async () => { events.push('close'); if (closeFails) throw Error('fail'); } }; }, sleep: async ms => assert.equal(ms, 5000), saveImage: async name => images.push(name), saveReport: async r => reports.push(r), ttfb: async () => ['blog.observe.tw','tag.observe.tw','youtube.observe.tw'].map(host => ({host, totalSeconds: 0.2, ttfbSeconds: 0.2, status: 200})) };
-  return { deps, events, reports, images };
+  return { deps, events, reports, images, context };
 }
 test('quota cannot be proven: no launch or network; termination is honestly recorded', async () => {
   const m = mocks({ quota: false }); const report = await capture(config, m.deps);
@@ -340,4 +340,136 @@ test('DOM contrast sample is bounded/visible and never reads text or copies imag
  const elements=Array.from({length:30},(_,i)=>({tagName:'SPAN',classList:['text-zinc-500','do-not-record-private-class'],parentElement:null,getBoundingClientRect:()=>({width:20,height:20,left:0,right:20,top:i===0?-40:10,bottom:i===0?-20:30}),get textContent(){throw Error('text_must_not_be_read');},get title(){throw Error('title_must_not_be_read');},style:{...style,backgroundImage:i===1?'url(https://private.example/secret-image)':'none'}}));
  const globals={document:{querySelectorAll:()=>elements},innerWidth:390,innerHeight:900,getComputedStyle:e=>e.style};
  try{for(const[k,v]of Object.entries(globals)){saved.set(k,Object.getOwnPropertyDescriptor(globalThis,k));Object.defineProperty(globalThis,k,{value:v,configurable:true});}const rows=collectSecondaryContrastDOM();assert.equal(rows.length,20);assert.equal(rows[0].ordinal,1);assert.deepEqual(rows[0].classes,['text-zinc-500']);assert.equal(rows[0].backgrounds[0].image,'unsupported');assert.ok(!JSON.stringify(rows).includes('private'));assert.equal(assessContrast(rows[0]).result,'unknown');}finally{for(const[k,v]of saved)v?Object.defineProperty(globalThis,k,v):delete globalThis[k];}
+});
+
+test('manifest distinguishes configured privacy, observed document privacy and pre-navigation installed guard', async () => {
+  const m = mocks({ documentGPC: '1', navigatorGPC: true });
+  const report = await capture(config, m.deps);
+  assert.equal(report.guardSetup.status, 'installed');
+  assert.equal(report.guardSetup.phase, 'before-newPage-and-first-navigation');
+  assert.equal(report.guardSetup.installedAt, 'mock-clock');
+  assert.ok(m.events.indexOf('route') < m.events.indexOf('newPage'));
+  assert.ok(m.events.indexOf('ws') < m.events.indexOf('goto'));
+  assert.equal(report.privacyConfiguration.documentDNT, '1');
+  assert.equal(report.privacyConfiguration.documentSecGPC, 'not-configured');
+  assert.equal(report.pages[0].privacy.documentSecGPC, '1');
+  assert.equal(report.pages[0].privacy.navigatorGPC, true);
+  assert.equal(report.pages[0].privacyObservation.source, 'actual-document-request-and-navigator');
+  assert.equal(report.pages[0].privacyObservation.navigatorDNTSource, 'observed-value; init-script-override-configured');
+  assert.deepEqual(report.expectedIdentity, { sha: config.expectedSHA, buildId: config.expectedBuildId });
+  assert.equal(report.pages[0].identity.sha, config.expectedSHA);
+  assert.equal(report.pages[0].identity.buildId, config.expectedBuildId);
+});
+test('missing WebSocket API fails closed before newPage or navigation', async () => {
+  const m = mocks(); delete m.context.routeWebSocket;
+  const report = await capture(config, m.deps);
+  assert.equal(report.error, 'websocket_guard_unavailable');
+  assert.equal(report.guardSetup.status, 'installing');
+  assert.ok(!m.events.includes('newPage')); assert.ok(!m.events.includes('goto'));
+  assert.equal(m.images.length, 0); assert.equal(report.closed, true);
+});
+test('host/scheme rules deny all analytics schemes and subdomains without matching deceptive suffixes', () => {
+  assert.deepEqual(NETWORK_GUARD_RULES.allowedSchemes, ['http:', 'https:']);
+  for (const scheme of ['http:', 'https:', 'ws:', 'wss:', 'ftp:']) {
+    for (const root of NETWORK_GUARD_RULES.analyticsHostRoots) {
+      assert.equal(requestDecision(`${scheme}//sub.${root}/secret?q=private`, config.targetOrigin), 'analytics');
+      assert.equal(requestDecision(`${scheme}//${root}.attacker.test/`, config.targetOrigin), 'external');
+    }
+  }
+  for (const scheme of ['ws:', 'wss:', 'ftp:', 'blob:', 'data:']) assert.notEqual(requestDecision(`${scheme}//127.0.0.1:18174/x`, config.targetOrigin), 'allow');
+});
+function guardMocks() {
+  const context = { on: (event, cb) => { context.events[event] = cb; }, events: {}, close: async () => { context.closed = true; }, route: async (_, cb) => { context.http = cb; }, routeWebSocket: async (_, cb) => { context.ws = cb; }, addInitScript: async () => {} };
+  const network = { attempted: 0, ga: 0, gtm: 0, analytics: 0, blocked: 0, requests: [], truncated: false };
+  return { context, network, counters: { analytics: 0, external: 0 } };
+}
+test('HTTP, WebSocket and GA/GTM outcomes count completed policy actions, HTTP errors and requestfailed separately', async () => {
+  const m = guardMocks(); await installGuards(m.context, config.targetOrigin, m.counters, m.network);
+  await m.context.http({ request: () => ({ url: () => `${config.targetOrigin}/assets.js`, method: () => 'GET', resourceType: () => 'script' }), continue: async () => {}, abort: async () => assert.fail('not denied') });
+  await m.context.http({ request: () => ({ url: () => 'https://secret.google-analytics.com/collect?token=never-log', method: () => 'POST', resourceType: () => 'fetch' }), abort: async () => {}, continue: async () => assert.fail('GA is never allowed') });
+  for (const url of ['wss://www.googletagmanager.com/ws?token=never-log', 'ws://127.0.0.1:18174/socket?token=never-log']) await m.context.ws({ url: () => url, close: async () => {} });
+  m.context.events.response({ status: () => 404 }); m.context.events.response({ status: () => 200 }); m.context.events.requestfailed({});
+  assert.deepEqual(m.network.http, { attempted: 2, denied: 1, blocked: 1, allowed: 1, actionFailures: 0, errorResponses: 1, requestFailures: 1 });
+  assert.deepEqual(m.network.websocket, { attempted: 2, denied: 2, blocked: 2, allowed: 0, actionFailures: 0 });
+  assert.equal(m.network.analyticsEvidence.attempted, 2); assert.equal(m.network.analyticsEvidence.blocked, 2); assert.equal(m.network.analyticsEvidence.allowed, 0);
+  assert.equal(m.network.analyticsEvidence.ga.blocked, 1); assert.equal(m.network.analyticsEvidence.gtm.blocked, 1);
+  assert.ok(!JSON.stringify(m.network).includes('never-log')); assert.ok(!JSON.stringify(m.network).includes('secret.'));
+});
+test('failed abort or WebSocket close is not recorded as blocked and closes only owned context', async () => {
+  for (const kind of ['http', 'websocket']) {
+    const m = guardMocks(); await installGuards(m.context, config.targetOrigin, m.counters, m.network);
+    if (kind === 'http') await m.context.http({ request: () => ({ url: () => 'https://www.google-analytics.com/collect', method: () => 'POST' }), abort: async () => { throw Error('private diagnostic'); } });
+    else await m.context.ws({ url: () => 'wss://www.google-analytics.com/socket', close: async () => { throw Error('private diagnostic'); } });
+    assert.equal(m.network[kind].blocked, 0); assert.equal(m.network[kind].actionFailures, 1);
+    assert.equal(m.network.analyticsEvidence.actionFailures, 1); assert.equal(m.network.guardFailures, 1); assert.equal(m.context.closed, true);
+    assert.ok(!JSON.stringify(m.network).includes('private diagnostic'));
+  }
+});
+test('network row truncation does not truncate completed HTTP/WS analytics counters', async () => {
+  const m = guardMocks(); await installGuards(m.context, config.targetOrigin, m.counters, m.network);
+  for (let i = 0; i < 503; i++) await m.context.ws({ url: () => 'wss://www.google-analytics.com/socket?secret=not-stored', close: async () => {} });
+  assert.equal(m.network.requests.length, 500); assert.equal(m.network.truncated, true);
+  assert.equal(m.network.websocket.attempted, 503); assert.equal(m.network.websocket.blocked, 503);
+  assert.equal(m.network.analyticsEvidence.ga.attempted, 503); assert.equal(m.network.analyticsEvidence.ga.blocked, 503); assert.equal(m.network.analyticsEvidence.ga.allowed, 0);
+});
+test('unknown WebSocket URL is an enforcement failure and never fake zero-GA evidence', async () => {
+  const m = guardMocks(); await installGuards(m.context, config.targetOrigin, m.counters, m.network);
+  await m.context.ws({ close: async () => {} });
+  assert.equal(m.network.websocket.attempted, 1); assert.equal(m.network.guardFailures, 1); assert.equal(m.context.closed, true);
+});
+test('analytics permitted outcome is distinguishable from attempted and denied counters', () => {
+  const m = guardMocks(); recordNetworkAttempt('https://www.google-analytics.com/collect', 'GET', 'fetch', 'allow', m.network);
+  recordNetworkOutcome('https://www.google-analytics.com/collect','http','allowed',m.network);
+  assert.equal(m.network.analyticsEvidence.attempted, 1); assert.equal(m.network.analyticsEvidence.denied, 0); assert.equal(m.network.analyticsEvidence.allowed, 1); assert.equal(m.network.analyticsEvidence.ga.allowed, 1);
+});
+test('failed network enforcement leaves a stopped manifest and never saves or claims outbound-safe success', async () => {
+  const m = mocks(); m.context.close = async () => { m.events.push('contextClose'); };
+  m.context.route = async (_, callback) => callback({ request: () => ({ url: () => 'https://www.google-analytics.com/collect', method: () => 'POST' }), abort: async () => { throw Error('secret failure'); } });
+  const report = await capture(config,m.deps);
+  assert.equal(report.status,'stopped'); assert.equal(report.error,'network_guard_unverified');
+  assert.equal(report.network.analyticsEvidence.blocked,0); assert.equal(report.network.analyticsEvidence.actionFailures,1);
+  assert.ok(!m.events.includes('newPage')); assert.ok(!m.events.includes('goto')); assert.equal(m.images.length,0);
+  assert.equal(report.closed,true); assert.ok(!JSON.stringify(report).includes('secret failure'));
+});
+
+test('private route deny is case-insensitive and checks safe decoded/dot variants for plans and requests', () => {
+  for (const path of ['/ADMIN/', '/Auth/google', '/LOGIN', '/MY/', '/Me;', '/%61dmin/', '/%2561dmin/', '/x/%2e%2e/%6dy/', '/%2fadmin/', '/%zz']) {
+    assert.equal(privateCapturePath(path),true);
+    assert.equal(requestDecision(config.targetOrigin+path,config.targetOrigin),'external');
+    assert.throws(()=>plan({...config,pages:[{path,width:390}]}));
+  }
+  assert.equal(privateCapturePath('/articles/'),false); assert.equal(privateCapturePath('/assets/my-icon.svg'),false);
+});
+test('candidate and formal captures retain the same required independent Node global HTML gate receipts', async () => {
+  for(const targetOrigin of [config.targetOrigin,'https://blog.observe.tw']){
+    const m=mocks();const r=await capture({...config,targetOrigin},m.deps);
+    assert.equal(r.globalHomepageProbes.length,2);
+    for(const receipt of r.globalHomepageProbes){assert.equal(receipt.status,'passed');assert.equal(receipt.configuredDNT,'1');assert.equal(receipt.observedRequestDNT,null);assert.equal(receipt.browserNetworkIncluded,false);assert.equal(receipt.eventsSource,'dependency-result-only');assert.equal(receipt.attempts.length,3);assert.ok(receipt.attempts.every(x=>x.attempted&&x.httpStatus===200));}
+    assert.equal(r.network.attempted,0);assert.match(r.network.evidenceSemantics.limitation,/Zero analytics allowed is not zero all outbound/);
+  }
+});
+test('failed global probe retains mask-safe attempted/failed/not-attempted statuses separately from browser network',async()=>{
+  const report={};const deps={now:()=> '2026-10-13T10:00:00.000Z',ttfb:async observe=>{
+    observe({host:'blog.observe.tw',status:'started',utc:'2026-10-13T10:00:00.000Z',cookie:'never-log',url:'https://secret.invalid/?token=never-log'});
+    observe({host:'blog.observe.tw',status:'failed',httpStatus:503,utc:'2026-10-13T10:00:00.001Z',message:'never-log'});
+    throw Error('never-log');
+  }};
+  await assert.rejects(globalHomepageProbe(report,'before',deps),/ttfb_gate/);
+  const receipt=report.globalHomepageProbes[0];assert.equal(receipt.status,'failed');assert.equal(receipt.eventsSource,'transport-attempt-events');
+  assert.deepEqual(receipt.attempts.map(x=>x.status),['failed','not-attempted','not-attempted']);assert.equal(receipt.attempts[0].httpStatus,503);
+  assert.ok(!JSON.stringify(receipt).includes('never-log'));assert.ok(!JSON.stringify(receipt).includes('secret.invalid'));
+});
+test('a candidate global probe failure is never skipped or replaced by zero browser analytics attempts', async()=>{
+  const m=mocks();m.deps.ttfb=async observe=>{observe({host:'tag.observe.tw',status:'failed',httpStatus:null});throw Error('privatefailure');};
+  const r=await capture(config,m.deps);assert.equal(r.error,'ttfb_gate');assert.ok(!m.events.includes('launch'));assert.equal(r.network.attempted,0);
+  assert.equal(r.globalHomepageProbes[0].status,'failed');assert.equal(r.globalHomepageProbes[0].attempts.find(x=>x.host==='tag.observe.tw').attempted,true);
+});
+
+test('reader routes are denied for case and encoded variants before navigation or resource continuation', () => {
+  for (const path of ['/reader/', '/READER/', '/Reader/keys', '/%72eader/', '/%2572eader/', '/x/%2e%2e/%72eader/', '/reader;keys']) {
+    assert.equal(privateCapturePath(path), true);
+    assert.equal(requestDecision(config.targetOrigin + path, config.targetOrigin), 'external');
+    assert.throws(() => plan({ ...config, pages: [{ path, width: 390 }] }), /private_route/);
+  }
+  assert.equal(privateCapturePath('/articles/reader-guide/'), false);
 });
