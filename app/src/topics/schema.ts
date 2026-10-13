@@ -272,3 +272,20 @@ export const topicMatchesV3 = mysqlTable(
   },
   (t) => [primaryKey({ columns: [t.snapshotId, t.postId, t.termId, t.source] }), index('topic_matches_v2_term').on(t.snapshotId, t.termId)],
 );
+
+export const topicStagedScanRuns = mysqlTable(
+  'topic_staged_scan_runs',
+  {
+    runId: char('run_id', { length: 36 }).primaryKey(),
+    targetSnapshotId: char('target_snapshot_id', { length: 36 }).notNull(),
+    status: varchar('status', { length: 24 }).notNull(),
+    stateJson: json('state_json').notNull(),
+    createdAt: datetime('created_at').notNull(),
+    updatedAt: datetime('updated_at').notNull(),
+  },
+  (t) => [index('topic_staged_scan_target').on(t.targetSnapshotId, t.status)],
+);
+export const topicStagedScanOwner = mysqlTable('topic_staged_scan_owner', {
+  source: varchar('source', { length: 128 }).primaryKey(),
+  runId: char('run_id', { length: 36 }),
+});

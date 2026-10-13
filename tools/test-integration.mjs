@@ -1,5 +1,6 @@
 /** Explicit private clone credentials only. Never load .env or reuse the clone's existing database. */
 import { randomBytes } from 'node:crypto';
+import { existsSync } from 'node:fs';
 import { lstat, readdir, readFile } from 'node:fs/promises';
 import { basename, resolve } from 'node:path';
 import { parseEnv } from 'node:util';
@@ -15,7 +16,8 @@ try {
   if (
     ![4, 6].includes(process.argv.length) ||
     process.argv[2] !== '--env-file' ||
-    (process.argv.length === 6 && (process.argv[4] !== '--suite' || !['f3-f4', 'b3', 'vocabulary-snapshot'].includes(process.argv[5])))
+    (process.argv.length === 6 &&
+      (process.argv[4] !== '--suite' || !['f3-f4', 'b3', 'vocabulary-snapshot', 'staged-scan-v2'].includes(process.argv[5])))
   )
     throw Error('explicit_private_clone_env_required');
   const file = resolve(process.argv[3]);
@@ -58,6 +60,7 @@ try {
       await store.pool.query(sql);
   }
   const suites = [
+    ['staged-scan-v2', '../app/src/topics/staged-scan-v2.integration.ts', 'runStagedScanV2Integration'],
     ['budgets-ai', '../tests/integration/core.mjs', 'runCoreIntegration'],
     ['candidates', '../tests/integration/candidates.mjs', 'runCandidateIntegration'],
     ['relations', '../app/src/relations/integration.ts', 'runRelationIntegration'],
@@ -112,7 +115,9 @@ try {
         ? suites.filter(([label]) => label.startsWith('shared-label-'))
         : process.argv[5] === 'vocabulary-snapshot'
           ? suites.filter(([label]) => label === 'snapshot-import')
-          : suites;
+          : process.argv[5] === 'staged-scan-v2'
+            ? suites.filter(([label]) => label === 'staged-scan-v2')
+            : suites;
   for (const [label, module, entry] of selected) {
     phase = label;
     const result = await (await import(module))[entry](store.pool);
@@ -125,11 +130,65 @@ try {
     error && typeof error === 'object' && typeof error.code === 'string' && /^[A-Z_0-9]{1,60}$/.test(error.code)
       ? error.code
       : 'INTEGRATION_FAILED';
-  const location = String(error?.stack || '')
-    .split('\n')
-    .find((line) => /(?:tests\/integration\/|app\/src\/[^/]+\/[^/]*integration)/.test(line))
-    ?.replace(process.cwd(), '<repo>');
-  console.error(JSON.stringify({ passed: false, phase, code, location }));
+  // Extract only repo-relative file:line:column. Never emit whole stack lines or error messages.
+  const repoPattern = process.cwd().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const pattern = new RegExp(
+    `${repoPattern}/((?:app/src|tests/integration|tools)/[A-Za-z0-9_./-]+\\.(?:ts|mjs|js)):(\\d{1,7}):(\\d{1,7})`,
+    'g',
+  );
+  const frames = [...String(error?.stack || '').matchAll(pattern)]
+    .filter((m) => m[1].length <= 240 && !m[1].split('/').includes('..') && existsSync(resolve(process.cwd(), m[1])))
+    .slice(0, 3)
+    .map((m) => `${m[1]}:${m[2]}:${m[3]}`);
+  const ordinal = error?.testOrdinal;
+  const rawDiagnostic = error?.syntheticDiagnostic;
+  const diagnostic =
+    rawDiagnostic && typeof rawDiagnostic === 'object'
+      ? {
+          sourceCase: ['rss', 'tracking', 'meaningful', 'capped', 'oversize'].includes(rawDiagnostic.sourceCase)
+            ? rawDiagnostic.sourceCase
+            : 'unknown',
+          status: ['disabled', 'busy', 'blocked', 'deferred', 'conflict', 'scanning', 'scanned-as-of', 'unknown'].includes(
+            rawDiagnostic.status,
+          )
+            ? rawDiagnostic.status
+            : 'unknown',
+          reason: [
+            'none',
+            'unknown',
+            'deadline',
+            'lease',
+            'local-db-unavailable',
+            'target-not-ready',
+            'target-public',
+            'active-scan',
+            'invalid-input',
+            'scan-owner',
+            'missing-run',
+            'policy-count',
+            'cursor-conflict',
+          ].includes(rawDiagnostic.reason)
+            ? rawDiagnostic.reason
+            : 'unknown',
+          counters: Object.fromEntries(
+            ['checked', 'eligible', 'titleOnly', 'zeroHit', 'skipped', 'capped', 'unresolved'].flatMap((k) => {
+              const n = rawDiagnostic.counters?.[k];
+              return Number.isSafeInteger(n) && n >= 0 && n <= 2147483647 ? [[k, n]] : [];
+            }),
+          ),
+        }
+      : undefined;
+
+  console.error(
+    JSON.stringify({
+      passed: false,
+      phase,
+      code,
+      ...(Number.isSafeInteger(ordinal) && ordinal >= 1 && ordinal <= 100_000 ? { testOrdinal: ordinal } : {}),
+      frames,
+      ...(diagnostic ? { syntheticDiagnostic: diagnostic } : {}),
+    }),
+  );
   process.exitCode = 1;
 } finally {
   if (store) await store.close();

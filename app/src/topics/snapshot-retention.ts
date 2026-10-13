@@ -50,6 +50,7 @@ function protection() {
   return `EXISTS (SELECT 1 FROM topic_current WHERE snapshot_id=s.id)
     OR EXISTS (SELECT 1 FROM topic_window_runs WHERE (id=s.id OR parent_run_id=s.id) AND ${unfinishedWindow})
     OR EXISTS (SELECT 1 FROM topic_snapshot_runs WHERE snapshot_id=s.id AND ${activeImport})
+    OR EXISTS (SELECT 1 FROM topic_staged_scan_runs WHERE target_snapshot_id=s.id AND status IN ('scanning','scanned-as-of'))
     OR EXISTS (SELECT 1 FROM topic_post_indexes_v2 WHERE snapshot_id=s.id)
     OR EXISTS (SELECT 1 FROM topic_post_indexes WHERE snapshot_id=s.id)`;
 }

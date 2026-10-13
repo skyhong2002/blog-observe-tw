@@ -176,6 +176,13 @@
       "when": 1791892085402,
       "tag": "0024_single_copy_snapshot_storage",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "5",
+      "when": 1791900058934,
+      "tag": "0025_staged_scan_v2",
+      "breakpoints": true
     }
   ]
 }
