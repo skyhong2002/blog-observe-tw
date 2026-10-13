@@ -32,6 +32,7 @@
     "ai:once": "node --env-file-if-exists=.env tools/ai-once.ts",
     "topics:once": "node --env-file-if-exists=.env tools/topics-once.ts",
     "vocabulary:sync": "node --env-file-if-exists=.env tools/topics-once.ts --sync",
+    "audit:topic-writers": "node tools/audit-topic-writers.ts",
     "test:integration": "node tools/test-integration.mjs",
     "test:visibility": "node tools/test-visibility-barrier.mjs",
     "content:once": "node --env-file-if-exists=.env tools/content-once.ts",
