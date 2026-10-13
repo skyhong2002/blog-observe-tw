@@ -126,3 +126,38 @@ verified-deltas身份，不強求先新增tree，但後者仍需overlay/count/pr
 原scope仍34項，UI24項狀態不變。沒有新BUILD_ID/圖/正式probe、也沒有full4.733M容量實測。
 本批source commits均push main/work分支；正在接SQLwarmup與F3 canonical trust的離線方案，
 不把待Mint名額、上游契約與真人Google驗收混成已完成，也不標『只剩等待』。
+
+### Staged SQL、canonical 與發布前界線
+
+以下是接續離線成果，取代前段「尚未有 DAO」的描述，沒有改變正式 gen5：
+
+- `9baf408`：純 target canonical resolver；獨立 Sol 88 項 mocks。只接受目前公開的
+  primary publication、精確文章身份及完整已存逐跳 assertion，不根據 final URL 猜
+  redirect。尚未接 native proof store／reconcile，真 gojp → gogojp 證據仍缺。
+- `dc3f56e`：正文搜尋 producer 與 reader 都核對同一篇文章的 identity，保留 tracking
+  正規化、意味 query ID 與 exact origin。32 項測試／獨立審查；仍是 4096-codepoint
+  prefix index，不等於完整全文覆蓋或正式『蛤蜊絲瓜』驗收。
+- `bb297b1`：generation-local staged scan DAO、0025 additive 與隔離 SQL fixture。
+  28 mocks、18169 disposable schema／25 migrations／94 checks／九個 writer-commit
+  barrier 通過；實際 500001-byte sentinel、window A→B→C、游標／命中原子性已驗。
+  首三份失敗 artifact 保留，fixture 的 prepared `execute` array `IN (?)` 清理錯誤改用
+  driver `query` 展開，新增真正空 corpus 斷言，未放寬 runtime／counter。
+- `ba201fc`：纯 cutover intent，55 項 mocks／非作者 Sol；固定 predecessor、版本、
+  TTL 與 retention claims。相符仍 hold、canPublish／canVerify 永遠 false，沒有 SQL
+  CAS、dirty hooks 或 worker full 排程。採納 Opus M1–M4，但依賴仍不能以 metadata 代替。
+- `8ccf284`：writer source drift 檢查，16 項 mocks／非作者 Sol，161 references／127
+  dynamic（包含 read-only wrappers，不是 writer 數或覆蓋率）；symlink／descriptor／
+  computed-callee 漏掃已修。它不是 DB write-admission，非 JS/TS、operator／restore、
+  外部 SQL 與 caller/barrier 修改仍須另有契約。
+
+私有正式 source／SQL proof：
+`/home/deck/.t3/projects/blog-observe-tw/.reviews/offline-quality/staged-scan-v2-committed-proof.json`。
+這不是最終 Next build 的 B0 HTML／RSC artifact，沒有借用舊 BUILD_ID 宣稱候選已驗。
+source 與 review 說明見 [staged scan](vocabulary-staged-scan.md)、
+[writer drift](topic-writer-audit.md)。0024／0025 均未在正式資料庫套用。
+
+下一個可離線 source 項目是新 full generation 的 reader 相容契約與 dirty writer／
+barrier 接線；先釐清 title-only／legacy fallback hash、owner/provenance 與 cleanup
+版本，不能放寬 freshness 來讓 warmup 過關。完整池 preview、changes 跨世代 catalog、
+overlay／watermark／daily reconciliation 及 candidate／UI／正式驗收仍 pending。
+UI ledger 維持 24 項：pass 0、fixed 3、issues 8、pending 11、n/a-ui 2。
