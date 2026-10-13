@@ -88,6 +88,7 @@ try {
     ['search-recall', '../app/src/search.integration.ts', 'runSearchIntegration'],
     ['profile-evidence', '../app/src/relations/profile-evidence.integration.ts', 'runProfileEvidenceIntegration'],
     ['shared-tags', '../app/src/relations/shared-tags.integration.ts', 'runSharedTagsIntegration'],
+    ['text-similarity', '../app/src/relations/text-similarity.integration.ts', 'runTextSimilarityIntegration'],
     ['shared-label-selection', '../app/src/topics/shared-label-selection.integration.ts', 'runSharedLabelSelectionIntegration'],
     ['shared-label-store', '../app/src/topics/shared-label-store.integration.ts', 'runSharedLabelStoreIntegration'],
     ['tech-store', '../app/src/tech/store.integration.ts', 'runTechStoreIntegration'],
@@ -98,7 +99,12 @@ try {
   const selected =
     process.argv[5] === 'f3-f4'
       ? suites.filter(
-          ([label]) => label === 'search-recall' || label === 'profile-evidence' || label === 'shared-tags' || label.startsWith('tech-'),
+          ([label]) =>
+            label === 'search-recall' ||
+            label === 'profile-evidence' ||
+            label === 'shared-tags' ||
+            label === 'text-similarity' ||
+            label.startsWith('tech-'),
         )
       : process.argv[5] === 'b3'
         ? suites.filter(([label]) => label.startsWith('shared-label-'))

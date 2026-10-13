@@ -6,6 +6,7 @@ import { publicSummary } from '../public-post.ts';
 import { iconManifest } from '../v1/favicon-routes.ts';
 import { iconUrl } from '../v1/icons.ts';
 import { loadSharedTags } from './shared-tags.ts';
+import { registerTextSimilarityRoute } from './text-similarity-routes.ts';
 
 export type RelationEdge = {
   sourceBlogId: number;
@@ -301,6 +302,7 @@ async function projectionResponse(reply: FastifyReply, build: () => Promise<unkn
   }
 }
 export async function registerRelationRoutes(app: FastifyInstance, pool: Pool) {
+  registerTextSimilarityRoute(app, pool);
   const read = (days: number) => readPublicRelations(pool, days);
   app.get('/api/relations', async (request, reply) => {
     const days = relationDays((request.query as { days?: unknown }).days);
