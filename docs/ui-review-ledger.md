@@ -1,5 +1,13 @@
 # UI 逐頁審查紀錄
 
+## 最新 source 修正：待 Mint 重拍，既有狀態不提升
+
+基底 `b96ef9b` 的離線品質批次：話題／歷史頁、話題排行及 BlogTopics 深色次要文字已由既有 Opus 5.5 session 修正，Sol 獨立 source 複審；舊 gen5 指定色對比約 4.10:1，新 zinc-400 同底預估 7.55:1。這不是新版全頁 contrast 或 WCAG pass。首頁 compact／Suspense 的新畫面、晚失敗 error boundary、舊圖缺 DNT/GPC、F4 新觀測、F3 真正文與 B2 狀態都待同產物重拍。
+
+原始 source review 路徑：`/home/deck/.t3/userdata/ui-review-blog-20261013/home-perf-independent/frontend-opus-final-source-followup.json`（actual model／UTC／受審檔 hash），contrast 證據為同目錄 `dark-secondary-contrast-audit.json`；source-only 不填不存在的新 BUILD_ID、桌機／手機路徑，也不冒充看圖 review。前端 author 與 reviewer 是不同 instance。capture 新欄位只會在下次實際操作時生成，不回填舊 manifest。
+
+權威24項仍 **pass0／fixed3／issues8／pending11／n/a-ui2**；全scope pending。完整重拍 route、1280／390、深淺色、資料量與 empty／error／權限狀態見 [Mint capture plan](mint-capture-plan.md)；方法、guard、私有資料與效能測試限制見 [本批 source 報告](mint-offline-quality-2026-10-13.md)。正式維持 green gen5，SM沒有建置或截圖。
+
 ## Mint 排隊：source 修正不等於新畫面通過
 
 2026-10-13 本批 F4 passive fetch 接線、F3 partial body posting 索引及 B3 文件時序補正只有 source／mock／隔離 SQL 證據，沒有新的 BUILD_ID 或 capture；正式仍為 gen5 `4cc7bcd`。24 項的既有狀態不因這批程式碼變動而提升，缺少 DNT/GPC 或手機圖的舊證據仍缺件。
@@ -20,7 +28,7 @@
 
 收到的外部原始 review：`/home/deck/.cache/youtube-ui-review/root-blog-candidate-review-1430.json`，22,758 bytes，SHA-256 `4dfc1549b1f10cb9949c7c6c2754349e7a9ca14c9d1da36d262837482de76374`（本輪再次核對相符）。原檔 auditUTC `2026-10-13T06:31:48.104984Z`，root 於台北14:44另核對 runtime green/gen5/4cc、切換UTC06:28:04.914、BUILD_ID `2ZIfs00KopZi_HHl8ahLU`；兩種時間分開，不改原檔。review model依外部原檔為 GPT-6.1 Sol，實際看過16張home/articles/topic/history fixture圖及6張tag參考，首屏沒有blocking；`candidateApproval=false`、`routeComplete=false`、`productionContentAccepted=false`。原檔未附本機可讀的raw model session，本ledger引用已交付JSON與人類轉達，不冒充本thread親自看圖。
 
-- **P2仍待量測：**topic/history深色次要來源、日期、統計與同步文字偏暗；尚無數值contrast證據，不把它寫成已確認WCAG失敗或已修復。
+- **當時P2仍待量測：**topic/history深色次要來源、日期、統計與同步文字偏暗；當時尚無數值contrast證據，不把這段歷史紀錄寫成已確認WCAG失敗或已修復。後續指定色的離線數值與source修正見本文件最新段落，現版畫面仍待重拍。
 - **舊網路證據缺件：**既有capture counters為零GA/GTM，但原manifest沒有DNT／GPC觀測欄位；舊圖這兩欄仍unverified，不能由現在工具設定補造歷史。新的runner只讀實際document DNT／Sec-GPC與navigator值，DNT不足拒絕存圖；GPC true／false／null如實記錄。此工具修正只完成source review與mocks，尚未新增capture，也不關閉P2。
 - **正式抽查（使用者轉達，不冒稱本thread執行）：**babysit UTC06:45，以內建opt-out檢查，GA請求0、ga-disable=true。首頁與`/tech/`桌機1280正常且HTML帶同BUILD_ID；no-store／DYNAMIC。首頁三次完整時間3.04／2.72／2.39s，在6.17s內。手機390的preview調寬逾時、沒有截圖，保持missing。使用者未提供該批截圖／網路artifact的絕對路徑，不捏造路徑或新增pass。
 - **worker補證已存在：**獨立設定review `/home/deck/.t3/userdata/ui-review-blog-20261013/home-perf-independent/worker-node-path-4cc7bcd-review.json`（model gpt-6.1-sol與raw session receipt於檔內）；最終交接 `/home/deck/.t3/projects/blog-observe-tw/.reviews/thaw-candidate/worker-runtime-final.json`，UTC06:42:26–06:43:26，PID1512645同cwd、7次至少60秒、NRestarts0。首次sharp失敗24次重啟與恢復檔均保留。UTC06:47本輪再查仍running／同PID／0restart，這是運行補證，不是UIpass。
