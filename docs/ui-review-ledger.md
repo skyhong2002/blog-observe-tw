@@ -24,6 +24,36 @@
 
 原始 log 均位於 gitignore 私有目錄；獨立 reviewer 的 raw harness model receipt、UTC、讀取 calls 寫在上述 review 記錄，不以文件作者自述替代模型證據。截圖仍必須放 repo 外；本輪沒有 capture、正式 probe、合成 GA、建置或新增大檔。解除凍結後依 `docs/f3-f4-thaw-release-plan.md` 一次候選建置驗收；若未過，不切正式流量。
 
+## B3 話題接線的 source review 補充（2026-10-13；非畫面通過）
+
+範例仍為 `/topics/旅行/` 及歷史 fallback 模板；使用 mock，不產生新話題或截圖。前端作者 **claude-opus-5-5**：`/home/deck/.t3/projects/blog-observe-tw/.reviews/b3-topic-wiring/ui-opus.jsonl`，修訂為 `ui-fix-opus.jsonl`／`ui-types-opus.jsonl`。獨立 reviewer **GPT-6.1 Sol**：`/home/deck/.t3/projects/blog-observe-tw/.reviews/b0-f4/b3-topic-ui-independent-review.md`（含 UTC、來源雜湊、實際 model receipt、原始 transcript 路徑）。受審基底 `104da1f`，前端修正 commit `ee81c9d`、後端接線 `3bfc5f6`；改動檔案 hash 另見該紀錄。未有 build／BUILD_ID。
+
+採納 URL dot-segment identity 驗證、區分 JSON 與瀏覽器圖片請求，以及型別縮窄修正。保留 tag component 風格與品牌綠色；上位／相關／別名是部落格頁補充資料，不改已存在文章的優先順序或建立話題頁。代表圖固定 64px、lazy 原生 img，避免額外經 Next optimizer 回源；Biome 的 noImgElement 是已評估保留的警告，不代表完成影像效能實测。沒有新的桌機／手機／深色截图，當前頁面狀態仍 **issues／待重拍**，不可升成 pass。
+
+## 接續 104da1f：解凍後重拍與磁碟預算
+
+本批只做 source review 與 mock／既有隔離 DB 測試。**凍結尚未解除，以下均未執行**，即使估算低於 500 MB 也不能開始 capture。route 主表狀態不因 source 通過而升級；仍須當版 SHA／BUILD_ID 的桌機1280、手機390、淺色／深色截圖與非作者 reviewer transcript。
+
+| 順序／route | 當版必拍的重要狀態 | 預算狀態數（每狀態4張） | 來源與差異核對 |
+|---|---|---|---|
+| 1 `/tech/` | 五種coverage狀態、多筆／少筆、篩選空、旗標off、API錯誤／截斷；狀態可同一fixture涵蓋 | 8 | tag來源／流量列表參考；首欄固定縮小、表頭、nowrap、內部橫捲 |
+| 2 `/blogs/<slug>/` 技術區 | 有證據、unknown版本、blocked保留舊成功、optional錯誤 | 4 | tag來源頁sidebar；Alina/Carol/timdream需真實可追溯輸入 |
+| 3 `/blogs/<slug>/` 引用區 | 雙向不同日期、同篇多URL、blogroll另列、共標籤off／empty／ready／unavailable、局部錯誤 | 5 | tag來源頁；合成樣本不可當正式gojp ownership驗收 |
+| 4 `/relations/` | 多／少／空或error，雙向日期與圖例 | 3 | tag關係圖；只畫正文直接連結，不把共詞叫交流 |
+| 5 `/topics/<label>/` | 共用標籤off、分類／相關詞／alias、無圖／有授權圖、獨立missing／unavailable、歷史fallback與malformed DTO | 6 | tag話題頁；手機文章優先，一份方法details；上游關係不是blog文章證據 |
+| 6 `/articles/?q=…` | 蛤蜊絲瓜／歷史召回、無結果、錯誤、撤下後下一讀 | 4 | tag文章列表；顯示上下文來源與matchVersion |
+
+首批共 **30個狀態、最多120張**（同一fixture覆蓋多狀態時可減張數，但每項仍記錄對應input）。`/topics` 的既有薄頁、歷史及所有其他 pending route／權限／錯誤狀態仍依主表全部 review，不因首批結束免驗。完整22個 UI 模板暫編列最多90個狀態＝360張；實際case manifest若增加狀態，先更新預算，不擅自降覆蓋率。
+
+估算依據：只對既有 repo 外 `batch-a`、`batch-b`、`batch-final-42711cf` 的 PNG 做檔案大小統計，沒有開瀏覽器。113張合計11.8MiB，中位88.5KiB，最大0.509MiB。採保守每張0.6MiB，另留JSON/transcript與50%餘裕：
+
+- 首批：120×0.6＋16＝88MiB，再×1.5，向上預留 **160MiB**。
+- 完整清單：360×0.6＋32＝248MiB，再×1.5，向上預留 **384MiB**（已含首批，不相加）。
+- 不錄影、不存 HAR response body／trace zip；沒有必要不產生這些大檔。超過估算時停止並重算，不能刪舊截圖／review／backup來換空間。
+- 這是 screenshot／review artifact 預算，**不包含 Next建置、release拷貝、資料庫或備份**；那些仍須解凍後單獨盤點，而且完成後保留10GiB以上。不得用384MiB估計冒充整個部署容量。
+
+解凍通知前不產生任何新capture；解凍後仍先核對全站最多2個browser、最多1個build、load≤12及正式首頁TTFB≤2秒，優先candidate，DNT=1且啟動前阻擋GA/GTM。若load或任何guard不符，停止capture，繼續source工作。所有真實事件與gate測量當下記錄，不補造歷史時間或不存在的檔案。
+
 ## 權威 route 主表
 
 |route|example URL / state|reviewer/model + UTC|viewport（實際）|原始reviewer log provenance|reviewedSHA|desktop1280 screenshotPath|mobile390 screenshotPath|state/log/referenceScreens|tag偏離/理由|issues/未驗狀態|fixCommit|retestSHA/screenshots|status|

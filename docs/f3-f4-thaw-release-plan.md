@@ -39,3 +39,15 @@
 發生功能或資源問題，先將 `BLOG_TECH_ENABLED`／`BLOG_TECH_PUBLIC_ENABLED`／`BLOG_SEARCH_HISTORICAL_BODY_ENABLED`／`BLOG_SHARED_TAGS_ENABLED` 設 false；新 UI 的功能入口不得殘留。必要時重新檢查前一 B0-safe slot 健康後走既有 rollback，保留新增表與觀測，不執行 down migration，不恢復到 f6bd919 等有舊隱私漏洞的版本，不刪任何 release／artifact。停止觀測不代表刪除已存證據，公開層仍即時檢查隱私。
 
 已下載的靜態資產或使用者自行保存的內容不在撤回範圍。任何快取恢復必須另交 origin、Next、CF 三層失效證據並取得既有流程的同意。
+
+## B3 後續批次（基底 104da1f；仍未解凍）
+
+- 0021 僅新增 `topic_shared_label_snapshots`，0022 僅新增 `shared_label_sync_control`；均 additive，舊程式可忽略。不建立新完整備份、不執行 down migration。正式套用前重新核對 SQL；目前只套用於既有 18169 的隨機 fixture schema。
+- `BLOG_SHARED_LABEL_SYNC_ENABLED` 與 `BLOG_SHARED_LABELS_PUBLIC_ENABLED` 預設 false，分別控制手動背景同步與話題頁本地資料呈現。沒有新增排程；不得在頁面請求時呼叫上游。
+- `tools/shared-label-sync.ts --selection <json>` 預設 dry-run（不開 DB／HTTP）；最多 10 個精確標籤。解凍後、契約與真實上游確認後才允許加 `--apply`，且同步旗標必須精確為 true。來源必須有目前公開 blog 文章的話題證據，上游詞庫或選單檔本身不授權建立頁面。
+- 背景工作預設 UTC 每日 40 次 wire request、單批 30 秒、跨程序 DB lease；每一次 fallback／retry 都計預算。任何 429 立即停止整批，Retry-After 存於資料庫，下個程序仍遵守。全部保持既有 local/public 間隔與 token 使用範圍。
+- 快照 24 小時有效期只代表上游補充資料時效，**不是公開頁快取 TTL**；公開父話題仍 fresh read、no-store。讀取時再驗契約、精確標籤與期限，metadata 出錯只影響該區塊；失敗更新清除前次 ready 資料。契約 SHA 不是資料版本，後者目前 unknown。
+- 解凍後 B3 候選畫面要驗：關閉／缺欄位、ready／missing／unavailable、關係與圖示局部失敗、24 筆截斷、授權缺值、歷史文章優先。代表圖片由瀏覽器 lazy 向 tag 載入；SSR 不另讀上游 JSON，不宣稱瀏覽器零圖片請求。
+- 回滾先關上述雙旗標，再依既有 B0-safe slot 流程切換；保留表、冷卻紀錄與資料，不能為避開預算重設 cooldown。尚未建置，沒有本批 BUILD_ID 或正式切換 UTC。
+
+若 B3 同步因 store／lease 失敗退出，不得自動重跑；尤其冷卻寫入失敗時，先確認上次 Retry-After 與儲存狀態，再安排下一批。解凍後也不可因 source tests 已通過就逕行新增 timer。
