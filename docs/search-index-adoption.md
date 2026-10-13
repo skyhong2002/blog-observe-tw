@@ -87,3 +87,33 @@ skip，不復活 queue。ack 先讀固定length（最多10），逐索引只讀�
 
 這只固定契約metadata的讀取／驗證語意，不是任意JavaScript執行的沙箱。committed
 仍是trustedcaller宣告，不能被文件或mock誇大成資料庫提交證明。
+
+## 實際 caller／queue 接線（離線 source 批次）
+
+本節取代上文「沒有worker hook」的現況描述；上文保留為純契約階段的證據界線。
+`BLOG_SEARCH_INDEX_ADOPTION_ENABLED` 只有字串 `true` 才開啟，預設關閉。
+`runContentBatch` 在 `ingestContentEvidence` 已鎖住 verified／owner 的交易成功 commit、
+connection release 後收集 changed／ok 正文 ID，批末 flush。304、retained、rollback、
+unknown commit、不相符 ID 不排隊。只接這個 content caller，feed／history 的其他正文
+寫入通道尚未接入，F4 的 URL callback 也不等同正文索引事件。
+
+使用 blog 既有 BullMQ queue／prefix，新 job 名 `blogs-search-index`，不增加 Redis
+服務、全站掃描或 backfill 排程。每個 job 最多10個選定 ID，attempts=1。enqueue
+及 Redis NX claim 都有1000ms deadline；尚未 settle 的操作保留單一 pending 槽，
+不能逾時後再累積同類操作。晚到 claim 不會啟動 SQL。queue 錯誤回 needs-repair，
+不 rollback、不把已提交正文改記成抓取失敗。
+
+consumer 先以既有 queue namespace 的原子 Redis SET NX 保存 claimed-not-indexed
+標記，再由 producer 依現存公開／owner／日期／正文 hash 重讀處理；不共用舊 promise。
+claim 沒有 TTL，job 被移除也不自動移除 marker，避免未知 SQL 結果被自動重播。
+**claimed 不是 indexed；Redis 遺失也不保證 exactly-once。**marker 會隨工作數增加，
+必須在正式 enable 前確認 Redis 持久化、容量監控與 operator reconcile 流程。
+repair 必須核實既存正文、SQL postings 與 queue／claim 狀態，另以受控選定 ID 執行；
+本批沒有自動刪 marker、重試或自動修復。
+
+作者與非作者各實跑4 suites／56 mock；raw作者報告：
+`/home/deck/.t3/userdata/blog-sprint-4cc7bcd/search-index-queue-wiring/author-report.json`；
+獨立 review：
+`/home/deck/.t3/userdata/ui-review-blog-20261013/home-perf-independent/search-index-queue-wiring-independent-review.json`。
+app no-emit 與5檔Biome通過。沒有 native Redis／正式DB／HTTP／新build或capture，
+所以不是正式索引coverage、worker運行或「蛤蜊絲瓜」產品驗收。

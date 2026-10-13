@@ -15,6 +15,7 @@ import { createDb } from './db/client.ts';
 import { runPublicationDiscoveryBatch } from './relations/home.ts';
 import { runRelationSnapshotBatch } from './relations/routes.ts';
 import { runRelationBatch } from './relations/worker.ts';
+import { createIndexJobClaim, createIndexJobEnqueue, runSearchIndexJob, SEARCH_INDEX_JOB } from './search-index-job.ts';
 import { backfillPublicRoutes, backfillTopicRouteAliases } from './seo/page-routes.ts';
 import { createTechFetchBatch } from './tech/fetch-batch.ts';
 import { runTopicsBatch } from './topics/batch.ts';
@@ -54,6 +55,9 @@ const relationsEnabled = process.env.BLOG_RELATIONS_ENABLED === 'true';
 const aiEnabled = process.env.BLOG_AI_ENABLED === 'true';
 const topicsEnabled = process.env.BLOG_TOPICS_ENABLED === 'true';
 const vocabularyEnabled = process.env.BLOG_VOCABULARY_ENABLED === 'true';
+const indexAdoptionEnabled = process.env.BLOG_SEARCH_INDEX_ADOPTION_ENABLED === 'true';
+const enqueueIndex = createIndexJobEnqueue((name, data, options) => queue.add(name, data, options));
+const claimIndex = createIndexJobClaim(async (key) => (await connection.set(key, 'claimed-not-indexed', 'NX')) === 'OK');
 const contentEnabled = process.env.BLOG_CONTENT_ENABLED === 'true';
 const shutdown = new AbortController();
 const missingIconsEnabled = process.env.BLOG_MISSING_FAVICONS_ENABLED !== 'false';
@@ -95,7 +99,18 @@ const worker = new Worker(
       const aliases = await backfillTopicRouteAliases(store.pool, { limit: 100, missingOnly: true });
       return { blogs, topics, aliases };
     }
-    if (job.name === 'blogs-content') return contentEnabled ? runContentBatch(store.pool, batchOptions) : { skipped: 'disabled' };
+    if (job.name === SEARCH_INDEX_JOB)
+      return runSearchIndexJob(store.pool, job.data, {
+        enabled: indexAdoptionEnabled,
+        claim: async () => {
+          if (!job.id) return false;
+          return claimIndex(`${queue.toKey(job.id)}:body-index-claimed`);
+        },
+      });
+    if (job.name === 'blogs-content')
+      return contentEnabled
+        ? runContentBatch(store.pool, { ...batchOptions, indexAdoptionEnabled, enqueueIndex })
+        : { skipped: 'disabled' };
     if (job.name === 'blogs-relation-snapshots') return runRelationSnapshotBatch(store.pool, batchOptions);
     if (job.name === 'blogs-publication-discovery')
       return relationsEnabled ? runPublicationDiscoveryBatch(store.pool, batchOptions) : { skipped: 'disabled' };

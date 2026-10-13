@@ -4,6 +4,7 @@ import { reserveBudget } from '../jobs/budget.ts';
 import type { BatchOptions, BatchResult } from '../jobs/contracts.ts';
 import { withJobLease } from '../jobs/lease.ts';
 import { budgetedRelationFetcher, relationBudgetAvailable, relationFailureCode } from '../relations/worker.ts';
+import { type AdoptionEnqueue, createSearchIndexAdoption } from '../search-index-adoption.ts';
 import { createTechObserver } from '../tech/observer.ts';
 import { inPublication, wordpressEvidence } from './article-content.ts';
 import { CONTENT_VERSION, type ContentEvidence, type ContentRule } from './contracts.ts';
@@ -57,11 +58,15 @@ async function noteFailure(pool: Pool, post: RowDataPacket, rule: ContentRule, r
   }
 }
 /** Shared relations lease + actual HTTP scopes: the body worker and legacy article fetch can never race. */
-export async function runContentBatch(pool: Pool, options: BatchOptions & { blogId?: number } = {}): Promise<BatchResult> {
+export async function runContentBatch(
+  pool: Pool,
+  options: BatchOptions & { blogId?: number; indexAdoptionEnabled?: boolean; enqueueIndex?: AdoptionEnqueue } = {},
+): Promise<BatchResult & { indexAdoption?: ReturnType<ReturnType<typeof createSearchIndexAdoption>['snapshot']> }> {
   if (options.blogId !== undefined && (!Number.isSafeInteger(options.blogId) || options.blogId < 1)) throw Error('invalid blog id');
   const empty = { processed: 0, skipped: 0, truncated: false, reservedUnused: 0 };
   return (
     (await withJobLease(pool, 'relations', async (assertLease) => {
+      const adoption = createSearchIndexAdoption({ enabled: options.indexAdoptionEnabled, enqueue: options.enqueueIndex });
       const result = { ...empty },
         now = () => options.now?.() ?? new Date(),
         deadline = Date.now() + Math.max(1000, Math.min(120000, options.maxDurationMs ?? 120000));
@@ -165,11 +170,10 @@ export async function runContentBatch(pool: Pool, options: BatchOptions & { blog
             if (!evidence) throw Error('content_api_no_matching_post');
             await assertLease();
             const c = await pool.getConnection();
-            let status: string;
+            let written: Awaited<ReturnType<typeof ingestContentEvidence>>;
             try {
               await c.beginTransaction();
-              const written = await ingestContentEvidence(c, evidence, now());
-              status = written.status;
+              written = await ingestContentEvidence(c, evidence, now());
               await c.commit();
             } catch (e) {
               await c.rollback();
@@ -177,7 +181,19 @@ export async function runContentBatch(pool: Pool, options: BatchOptions & { blog
             } finally {
               c.release();
             }
-            if (status === 'ok') {
+            // Only after successful COMMIT and connection release. No queue operation inside the body failure catch.
+            if (written.postId === post.id)
+              adoption.recordCommitted({
+                commitState: 'committed',
+                status: written.status,
+                changed: written.changed,
+                publicationStatus: 'verified',
+                postId: post.id,
+                blogId: post.blog_id,
+                postOwnerBlogId: post.blog_id,
+                bodyOwnerBlogId: evidence.blogId,
+              });
+            if (written.status === 'ok') {
               complete = true;
               break;
             }
@@ -197,7 +213,8 @@ export async function runContentBatch(pool: Pool, options: BatchOptions & { blog
         if (complete) result.processed++;
         else result.skipped++;
       }
-      return result;
+      // Adoption catches queue errors locally; already committed bodies must never become noteFailure.
+      return options.indexAdoptionEnabled === true ? { ...result, indexAdoption: await adoption.flush() } : result;
     })) ?? { ...empty, skipped: 1 }
   );
 }
