@@ -1,5 +1,21 @@
 # UI 逐頁審查紀錄
 
+## Mint 排隊：source 修正不等於新畫面通過
+
+2026-10-13 本批 F4 passive fetch 接線、F3 partial body posting 索引及 B3 文件時序補正只有 source／mock／隔離 SQL 證據，沒有新的 BUILD_ID 或 capture；正式仍為 gen5 `4cc7bcd`。24 項的既有狀態不因這批程式碼變動而提升，缺少 DNT/GPC 或手機圖的舊證據仍缺件。
+
+下一份 Mint 同產物候選須重拍：`/tech/` 多筆／少筆／unknown／failed／blocked／未觀測／空篩選／error、三個指定部落格的技術區塊、`/relations/` 與單站引用明細、`/articles/?q=蛤蜊絲瓜`、三個歷史 fallback 話題及 dark contrast。方法說明的收合、上下文來源、match version 及每個方向的文章／日期要分別看圖，不能以共享 component review 替代。
+
+每批預估四張 PNG（1280／390、light／dark）合計約 1–8 MiB；這只是排程估計，實際以 manifest bytes 記錄。SM 不新增 capture；Mint 須先取得名額與隔離 readiness，再保存真實 DNT、GA/GTM network、SHA／BUILD_ID、截圖 hashes 和非作者 reviewer 原始 transcript。完整 route／重要狀態仍見下方權威表，不縮小 scope。
+
+### 既有圖的真正離線複審（不提升現行版本狀態）
+
+`/ranking/`、`/about/` 的 1280／390 圖與四張對應 tag 參考已由非作者 GPT-6.1 Sol 實際檢視（共八張）。受審舊 source SHA `b011873255f9bbf30c252df2ca65ead0ef1c306e`；review UTC `2026-10-13T08:32:05.437Z`，實際 image tool UTC `08:30:31.785Z`。原始 model receipt、圖片路徑／目前 hashes、raw transcript 及 11 項 pending inventory 都在 `/home/deck/.t3/userdata/ui-review-blog-20261013/home-perf-independent/pending-ranking-about-offline-review.json`，不是只有模板或 Done 訊息。
+
+可見首屏無新 blocker；手機 about 只見到作者與標籤區開頭，不能代替完整文件與互動檢查。舊 manifest 沒有 BUILD_ID、DNT/GPC 或 capture-time PNG hash；本次計算的檔案 hash 只能確認現在輸入，不能補造當時完整性。dark、現行／新 candidate、權限狀態仍待重拍，`error.tsx`／500 缺圖。兩個 route 保持 pending。
+
+同一非作者另外實際看過 `/tags/`、`/api/`、`/api/status`、`/login/`、`/observe/opt-out/` 的五頁、20 張既有桌機／手機及 tag 參考圖。證據 `/home/deck/.t3/userdata/ui-review-blog-20261013/home-perf-independent/pending-tags-api-login-optout-offline-review.json`，SHA-256 `24a1520465b2259aab890271de3d23871703dfabc580c0aa3bcc1e51e3a07c52`；model receipt UTC `08:33:27.082Z`，實際 view calls `08:33:40Z`／`08:33:52Z`。仍是 b011 舊圖與缺欄，沒有提升 route。舊 API status 手機的 path／用途截斷符合歷史 UI-B001，不能拿它當新候選修正的重驗；API inline code 斷字為 minor，其他可見首屏沒有新 blocker。`/my/`、admin／discovery 缺合法權限證據，沒有開圖或建立帳號；500 仍缺圖。
+
 ## 2026-10-13：root 獨立 gen5 驗收與 babysit 正式抽查（scope仍pending）
 
 收到的外部原始 review：`/home/deck/.cache/youtube-ui-review/root-blog-candidate-review-1430.json`，22,758 bytes，SHA-256 `4dfc1549b1f10cb9949c7c6c2754349e7a9ca14c9d1da36d262837482de76374`（本輪再次核對相符）。原檔 auditUTC `2026-10-13T06:31:48.104984Z`，root 於台北14:44另核對 runtime green/gen5/4cc、切換UTC06:28:04.914、BUILD_ID `2ZIfs00KopZi_HHl8ahLU`；兩種時間分開，不改原檔。review model依外部原檔為 GPT-6.1 Sol，實際看過16張home/articles/topic/history fixture圖及6張tag參考，首屏沒有blocking；`candidateApproval=false`、`routeComplete=false`、`productionContentAccepted=false`。原檔未附本機可讀的raw model session，本ledger引用已交付JSON與人類轉達，不冒充本thread親自看圖。
