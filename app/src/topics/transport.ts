@@ -73,6 +73,9 @@ const allowedPath = (path: string) =>
     path,
   ) ||
   /^\/api\/v1\/articles\?[^#]*$/.test(path) ||
+  /^\/api\/v1\/vocabulary\/snapshots\/[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\?cursor=(?:0|[1-9]\d{0,5})&compact=1&limit=5000$/.test(
+    path,
+  ) ||
   /^\/api\/v1\/vocabulary\/snapshots\/(?:current|[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})(?:\?cursor=\d{1,6}(?:&compact=1)?)?$/.test(
     path,
   );

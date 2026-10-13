@@ -36,10 +36,39 @@ receipt使用首尾label的SHA（不是兩個最長原label），固定有界met
 
 『凍結』是**合作writer契約，不是資料庫強制immutability**：只由此importer寫full snapshot ID，scanning→validating鎖住狀態後不再insert；window sync使用自己獨立ID、retention不碰active fullrun。未來任何writer必須遵守這個限制；需要改已驗payload時必須restart完整validation，不能沿用checkpoint。stateDigest不是auth。完整manifest原文字串在首個checkpoint開始綁定；在此之前惡意DB改opaque metadata不在防護承諾內。沒有宣稱hostileDB／TOCTOU安全。
 
-root final55＋3＝58mocks保留；existing18169 disposable SQL1suite／24migration、1001詞3頁通過：真CJK＋emoji label排序、exactCAST payload(U2028/escape)、游標[0,0,1,2,3]續跑、6種tamper含oversize、commit後記憶體未更新續跑、A barrier後B advance的stale不poison、雙向mode衝突、current保留。不是實際4.733M完整池成本或正式cutover。
+root 最終5 suites／67 mocks通過（作者與獨立 reviewer 的選定 subset 另見原始 log）；existing18169 disposable SQL1suite／24migration、1001詞3頁通過：真CJK＋emoji label排序、exactCAST payload(U2028/escape)、游標[0,0,1,2,3]續跑、6種tamper含oversize、commit後記憶體未更新續跑、A barrier後B advance的stale不poison、雙向mode衝突、current保留。不是實際4.733M完整池成本或正式cutover。
 
 獨立Sol最終sourcehash／原始transcript：
 `/home/deck/.t3/userdata/ui-review-blog-20261013/home-perf-independent/snapshot-single-copy-independent-fixes-followup.json`與`/home/deck/.t3/userdata/ui-review-blog-20261013/home-perf-independent/snapshot-single-copy-independent-byte-cap-followup.json`。
 Opus非自審runtime／followup：`.reviews/offline-quality/single-copy-final-opus.jsonl`、`single-copy-followup-opus.jsonl`，model實為claude-opus-5-5且success。採納F1–F4與rootbyte邊界；F5合作writer限制與兩項低風險範圍已在此明記。Opus只審backend，沒有審自己的B2 UI。
 
 原SQLlog保留；最新`.reviews/offline-quality/single-copy-isolated-byte-cap-final.log`。ready依然不是published；接下來需full版本fixture／容量／throughput及保留期preview、bounded matching warmup／atomiccutover、delta-overlay與可驗chain契約。上游本機a899source只保留3份fullbase；現在600/day budget若每HTTP500詞需約16天，**不能直接開full500同步宣稱能在保留期完成**。需先評估已支援5000/compact契約或其他有界throughput方案，仍保留2MB cap及globalguard，blog不自行修改tag。
+
+## 5000 compact SOURCE adapter（尚未接排程）
+
+明確 `enabled:true` 加 `largeContract='tag-a89908a-large5000-compact-v1'` 才使用
+LargeSnapshotSource，預設零HTTP。只對固定版本 SOURCE 增加
+`?cursor=N&compact=1&limit=5000`，保留原manifest的500詞pageSize／原page catalog，
+不把上游large group冒充一頁500詞。先驗五項pinned identity、group count／cursor／
+largePages原group SHA，再逐個500詞chunk驗original頁hash／terms，全部通過才留單group。
+沒有增加2MB decompressed page／4MB manifest、原600/day budget或匹配RAM上限。
+
+只有已知大頁byte-cap會在同instance記該group走原500 compact fallback；逐次只取需要
+的小頁，不一次存十頁。每group最多10次small wire保留（含retry），**不包含先前large
+attempt**；large的retry／origin fallback亦消耗外部budget。JSON／hash／identity／count
+錯誤不fallback。busy時拒絕第二個操作，不累積共享promise。回傳term物件和內部cache
+尚共享引用；可信caller應只讀，若改動則下次checksum fail closed，availability硬化可後續
+處理；這不是對不可信任JavaScript的sandbox。
+
+Throughput僅估算：4,733,073詞約947個large group、仍9,467個原500頁；每批最多50原頁、
+15分鐘一批，scan約47.5小時，另local validation約47.5小時，再加policy projection／warmup。
+validation已從本地儲存讀取，不需上游base仍存在；scan仍受上游3fullbase保留期影響。
+5000 byte-cap fallback比例、window共用600/day budget、manifest輪詢、retry、resume於group
+中間的重抓都可能延長。不得把 nominal947requests當實際wire或保證完成時間。
+
+root 3 suites／45 mocks及app no-emit通過；非作者Sol自跑29 adapter／transport mocks，
+sourcehash／model／UTC／原transcript：
+`/home/deck/.t3/userdata/blog-sprint-4cc7bcd/large-source-independent-review/review.json`。
+Opus拆解review `.reviews/offline-quality/large-pages-plan-opus.jsonl`：採納validation分段估算、
+bytecaponly有界fallback、原500頁checksum與quota維持。**P5 caller／scheduler尚未接**；
+沒有任何實際完整pool／wire fixture／page size／retention cadence驗收，正式mode保持hold。
