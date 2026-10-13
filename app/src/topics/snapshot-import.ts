@@ -4,6 +4,18 @@ import type { Pool, RowDataPacket } from 'mysql2/promise';
 import { storedNormalizedLabel } from './policy.ts';
 import { prepareStagedTopicPolicy } from './policy-store.ts';
 import { type ExportManifest, MAX_SNAPSHOT_BYTES, type SnapshotSource, validateManifest, validatePage } from './snapshot-client.ts';
+import {
+  assertRunUnchanged,
+  LEGACY_PAYLOAD_MODE,
+  lockedRun,
+  RECEIPT_BYTE_CAP,
+  SINGLE_COPY_MODE,
+  SnapshotModeMismatch,
+  SnapshotStorageError,
+  singleCopyReceipt,
+  snapshotMode,
+  validateSingleCopy,
+} from './snapshot-storage.ts';
 import { TagRateLimitError } from './transport.ts';
 
 const parsed = <T>(raw: unknown): T => (typeof raw === 'string' ? JSON.parse(raw) : raw) as T;
@@ -19,6 +31,9 @@ type Controls = {
   deadline?: number;
   beforeStart?: () => Promise<boolean>;
   beforeRequest?: () => Promise<void>;
+  payloadMode?: 'legacy-dual' | 'single-copy-v1';
+  /** Test seam: commit may succeed before the caller updates its in-memory cursor. */
+  afterPageCommit?: () => Promise<void>;
 };
 /** Fixed transport contract failures will not improve by fetching the same immutable page again.
  * Match only the transport's known messages; never save an upstream/error message as a reason. */
@@ -28,6 +43,9 @@ export function snapshotWireFailureCode(error: unknown): 'wire-byte-cap' | 'wire
   if (error.message === 'Vocabulary export invalid JSON') return 'wire-invalid-json';
   return null;
 }
+const localDbTimeout = (error: unknown) =>
+  ['ER_STATEMENT_TIMEOUT', 'ER_QUERY_INTERRUPTED', 'PROTOCOL_SEQUENCE_TIMEOUT'].includes((error as { code?: string })?.code ?? '') ||
+  [1969, 1317].includes((error as { errno?: number })?.errno ?? 0);
 /** Page receipts preserve JSON.stringify(entries), the upstream checksum representation, not wire whitespace.
  * No current pointer changes here: a ready full pool needs a separately reviewed matching warmup/cutover. */
 export async function importSnapshot(
@@ -42,15 +60,35 @@ export async function importSnapshot(
     control.signal?.throwIfAborted();
     if (Date.now() >= (control.deadline ?? Infinity)) throw Error('snapshot deadline; current retained');
   };
+  const requestedMode = control.payloadMode ?? LEGACY_PAYLOAD_MODE;
+  if (![LEGACY_PAYLOAD_MODE, SINGLE_COPY_MODE].includes(requestedMode))
+    return { status: 'blocked', reason: 'mode-mismatch', becameCurrent: false };
   assertRunning();
   const [[active]] = await pool.query<RowDataPacket[]>(
-    "SELECT * FROM topic_snapshot_runs WHERE status IN ('scanning','validating','preparing') ORDER BY created_at LIMIT 1",
+    "SELECT *,CAST(manifest AS CHAR CHARACTER SET utf8mb4) manifest_raw,CAST(checksum_checkpoint AS CHAR CHARACTER SET utf8mb4) checkpoint_raw FROM topic_snapshot_runs WHERE status IN ('scanning','validating','preparing') ORDER BY created_at LIMIT 1",
   );
+  if (active && snapshotMode(active) !== requestedMode)
+    return { status: 'blocked', version: active.snapshot_id, reason: 'mode-mismatch', becameCurrent: false };
   if (active?.next_attempt_at && new Date(active.next_attempt_at).getTime() > now.getTime())
     return { status: 'deferred', version: active.snapshot_id, nextAttemptAt: active.next_attempt_at };
+  if (requestedMode === SINGLE_COPY_MODE) {
+    let database: RowDataPacket | undefined;
+    try {
+      [[database]] = await pool.query<RowDataPacket[]>('SELECT VERSION() AS db_version');
+    } catch (error) {
+      return {
+        status: 'deferred',
+        version: active?.snapshot_id ?? null,
+        reason: localDbTimeout(error) ? 'local-db-timeout' : 'local-db-unavailable',
+        nextAttemptAt: new Date(now.getTime() + 300_000),
+        becameCurrent: false,
+      };
+    }
+    if (typeof database?.db_version !== 'string' || !/MariaDB/i.test(database.db_version))
+      return { status: 'blocked', version: active?.snapshot_id ?? null, reason: 'unsupported-database', becameCurrent: false };
+  }
   let run = active;
   let manifest: ExportManifest | undefined;
-  let phase = 'manifest';
   let processed = 0;
   try {
     if (run) manifest = validateManifest(parsed(run.manifest));
@@ -61,6 +99,8 @@ export async function importSnapshot(
       assertRunning();
       const [[existing]] = await pool.query<RowDataPacket[]>('SELECT * FROM topic_snapshot_runs WHERE snapshot_id=?', [manifest.id]);
       if (existing) {
+        if (snapshotMode(existing) !== requestedMode)
+          return { status: 'blocked', version: manifest.id, reason: 'mode-mismatch', becameCurrent: false };
         if (!isDeepStrictEqual(parsed(existing.manifest), manifest)) throw new InvalidSnapshot('manifest-changed');
         return { status: existing.status, version: manifest.id, total: manifest.total, becameCurrent: false };
       }
@@ -77,12 +117,10 @@ export async function importSnapshot(
           "INSERT INTO topic_snapshots(id,manifest,status,generated_at) VALUES (?,?,'staging',?) ON DUPLICATE KEY UPDATE id=VALUES(id)",
           [manifest.id, JSON.stringify(manifest), new Date(manifest.generatedAt)],
         );
-        await c.execute("INSERT INTO topic_snapshot_runs(snapshot_id,manifest,status,created_at,updated_at) VALUES (?,?,'scanning',?,?)", [
-          manifest.id,
-          JSON.stringify(manifest),
-          now,
-          now,
-        ]);
+        await c.execute(
+          "INSERT INTO topic_snapshot_runs(snapshot_id,manifest,payload_mode,status,created_at,updated_at) VALUES (?,?,?,'scanning',?,?)",
+          [manifest.id, JSON.stringify(manifest), requestedMode, now, now],
+        );
         await assertLease();
         await c.commit();
       } catch (error) {
@@ -98,11 +136,20 @@ export async function importSnapshot(
         staged_bytes: 0,
         last_label: null,
         status: 'scanning',
+        payload_mode: requestedMode,
+        manifest_raw: JSON.stringify(manifest),
+        receipt_bytes: 0,
+        checkpoint_raw: null,
+        checksum_checkpoint: null,
+        checkpoint_last_label: null,
+        validation_next_page: 0,
+        validated_terms: 0,
+        validated_bytes: 0,
       } as RowDataPacket;
     }
-    phase = 'pages';
     const limit = Math.min(50, Math.max(1, Math.floor(maxPages)));
-    while (Number(run.next_page) < manifest.pages.length && processed < limit) {
+    const singleCopy = requestedMode === SINGLE_COPY_MODE;
+    while (run.status === 'scanning' && Number(run.next_page) < manifest.pages.length && processed < limit) {
       assertRunning();
       await assertLease();
       await control.beforeRequest?.();
@@ -117,16 +164,21 @@ export async function importSnapshot(
         previous = label;
         bytes += Buffer.byteLength(JSON.stringify(term) + '\n');
       }
-      const receipt = JSON.stringify(page.entries);
-      bytes += Buffer.byteLength(receipt);
+      const metadata = singleCopy ? singleCopyReceipt(page.entries) : null;
+      const receipt = metadata?.text ?? JSON.stringify(page.entries);
+      if (!singleCopy) bytes += Buffer.byteLength(receipt);
+      const receiptBytes = metadata?.receiptBytes ?? 0;
+      if (singleCopy && Number(run.receipt_bytes ?? 0) + receiptBytes > RECEIPT_BYTE_CAP) throw new InvalidSnapshot('receipt-cap');
       if (Number(run.staged_bytes) + bytes > MAX_SNAPSHOT_BYTES) throw new InvalidSnapshot('cap-bytes');
       const c = await pool.getConnection();
       try {
         await c.beginTransaction();
         const [[fresh]] = await c.query<RowDataPacket[]>(
-          'SELECT next_page,status,staged_terms,staged_bytes FROM topic_snapshot_runs WHERE snapshot_id=? FOR UPDATE',
+          'SELECT *,CAST(manifest AS CHAR CHARACTER SET utf8mb4) manifest_raw,CAST(checksum_checkpoint AS CHAR CHARACTER SET utf8mb4) checkpoint_raw FROM topic_snapshot_runs WHERE snapshot_id=? FOR UPDATE',
           [manifest.id],
         );
+        if (snapshotMode(fresh) !== requestedMode) throw new SnapshotModeMismatch('mode-mismatch');
+        if (singleCopy) assertRunUnchanged(fresh, run, 'scanning');
         if (
           fresh?.status !== 'scanning' ||
           Number(fresh.next_page) !== index ||
@@ -135,9 +187,21 @@ export async function importSnapshot(
         )
           throw new InvalidSnapshot('stale-cursor');
         if (page.entries.length)
-          await c.query('INSERT INTO topic_terms(snapshot_id,id,label,normalized_label,payload) VALUES ?', [
-            page.entries.map((t) => [manifest!.id, t.id, t.label, storedNormalizedLabel(t.label), JSON.stringify(t)]),
-          ]);
+          await c.query(
+            singleCopy
+              ? 'INSERT INTO topic_terms(snapshot_id,id,label,normalized_label,payload,import_page_index) VALUES ?'
+              : 'INSERT INTO topic_terms(snapshot_id,id,label,normalized_label,payload) VALUES ?',
+            [
+              page.entries.map((t) => [
+                manifest!.id,
+                t.id,
+                t.label,
+                storedNormalizedLabel(t.label),
+                JSON.stringify(t),
+                ...(singleCopy ? [index] : []),
+              ]),
+            ],
+          );
         await c.execute('INSERT INTO topic_snapshot_pages(snapshot_id,page_index,entries_json,sha256) VALUES (?,?,?,?)', [
           manifest.id,
           index,
@@ -145,14 +209,17 @@ export async function importSnapshot(
           page.sha256,
         ]);
         await c.execute(
-          'UPDATE topic_snapshot_runs SET next_page=?,staged_terms=staged_terms+?,staged_bytes=staged_bytes+?,last_label=?,updated_at=?,next_attempt_at=NULL,error_code=NULL WHERE snapshot_id=?',
-          [index + 1, page.entries.length, bytes, page.entries.at(-1)?.label ?? run.last_label, now, manifest.id],
+          'UPDATE topic_snapshot_runs SET next_page=?,staged_terms=staged_terms+?,staged_bytes=staged_bytes+?,receipt_bytes=receipt_bytes+?,last_label=?,updated_at=?,next_attempt_at=NULL,error_code=NULL WHERE snapshot_id=?',
+          [index + 1, page.entries.length, bytes, receiptBytes, page.entries.at(-1)?.label ?? run.last_label, now, manifest.id],
         );
         await assertLease();
+        assertRunning();
         await c.commit();
+        await control.afterPageCommit?.();
         run.next_page = index + 1;
         run.staged_terms = Number(run.staged_terms) + page.entries.length;
         run.staged_bytes = Number(run.staged_bytes) + bytes;
+        run.receipt_bytes = Number(run.receipt_bytes ?? 0) + receiptBytes;
         run.last_label = page.entries.at(-1)?.label ?? run.last_label;
         processed++;
       } catch (error) {
@@ -171,12 +238,35 @@ export async function importSnapshot(
         total: manifest.total,
         stagedTerms: Number(run.staged_terms),
       };
-    if (run.status !== 'preparing') {
-      phase = 'checksum';
+    if (singleCopy && run.status !== 'preparing') {
+      const validation = await validateSingleCopy(
+        pool,
+        run,
+        manifest,
+        now,
+        Math.max(0, limit - processed),
+        async () => {
+          assertRunning();
+          await assertLease();
+        },
+        control.afterPageCommit,
+      );
+      if (!validation.ready)
+        return {
+          status: 'incomplete',
+          phase: 'checksum',
+          version: manifest.id,
+          pages: Number(run.validation_next_page ?? 0),
+          processed: validation.processed,
+          becameCurrent: false,
+        };
+    }
+    if (!singleCopy && run.status !== 'preparing') {
       await pool.execute("UPDATE topic_snapshot_runs SET status='validating',next_attempt_at=NULL,updated_at=? WHERE snapshot_id=?", [
         now,
         manifest.id,
       ]);
+      run.status = 'validating';
       const hash = createHash('sha256');
       let count = 0;
       let bytes = 0;
@@ -225,7 +315,6 @@ export async function importSnapshot(
       await pool.execute("UPDATE topic_snapshot_runs SET status='preparing',updated_at=? WHERE snapshot_id=?", [now, manifest.id]);
       run.status = 'preparing';
     }
-    phase = 'policy';
     assertRunning();
     await assertLease();
     const policy = await prepareStagedTopicPolicy(pool, manifest.id, async () => {
@@ -239,9 +328,12 @@ export async function importSnapshot(
     const c = await pool.getConnection();
     try {
       await c.beginTransaction();
-      const [[fresh]] = await c.query<RowDataPacket[]>('SELECT status FROM topic_snapshot_runs WHERE snapshot_id=? FOR UPDATE', [
-        manifest.id,
-      ]);
+      const [[fresh]] = await c.query<RowDataPacket[]>(
+        'SELECT *,CAST(manifest AS CHAR CHARACTER SET utf8mb4) manifest_raw,CAST(checksum_checkpoint AS CHAR CHARACTER SET utf8mb4) checkpoint_raw FROM topic_snapshot_runs WHERE snapshot_id=? FOR UPDATE',
+        [manifest.id],
+      );
+      if (snapshotMode(fresh) !== requestedMode) throw new SnapshotModeMismatch('mode-mismatch');
+      if (singleCopy) assertRunUnchanged(fresh, run, 'preparing');
       if (fresh?.status !== 'preparing') throw new InvalidSnapshot('stale-cursor');
       await c.execute("UPDATE topic_snapshots SET status='ready',synced_at=? WHERE id=? AND status='staging'", [now, manifest.id]);
       await c.execute(
@@ -249,6 +341,7 @@ export async function importSnapshot(
         [now, manifest.id],
       );
       await assertLease();
+      assertRunning();
       await c.commit();
     } catch (error) {
       await c.rollback();
@@ -258,50 +351,67 @@ export async function importSnapshot(
     }
     return { status: 'ready', version: manifest.id, total: manifest.total, becameCurrent: false, coverage: manifest.coverage };
   } catch (error) {
+    if (error instanceof SnapshotModeMismatch)
+      return { status: 'blocked', version: manifest?.id ?? run?.snapshot_id ?? null, reason: 'mode-mismatch', becameCurrent: false };
+    if ((error instanceof InvalidSnapshot || error instanceof SnapshotStorageError) && error.code === 'stale-cursor')
+      return { status: 'conflict', version: manifest?.id ?? run?.snapshot_id ?? null, reason: 'stale-cursor', becameCurrent: false };
     const message = error instanceof Error ? error.message : '';
     const wireFailure = snapshotWireFailureCode(error);
     const expired = /HTTP (404|410)\b/.test(message);
     const invalid =
       error instanceof InvalidSnapshot ||
+      error instanceof SnapshotStorageError ||
       wireFailure !== null ||
       /^(Invalid (upstream vocabulary|vocabulary)|Vocabulary (page|snapshot))/.test(message) ||
       (error as { code?: string })?.code === 'ER_DUP_ENTRY';
     const budget = message === 'topic_upstream_budget';
-    const code = expired
-      ? 'snapshot-expired'
-      : error instanceof InvalidSnapshot
-        ? error.code
-        : wireFailure
-          ? wireFailure
-          : invalid
-            ? 'invalid-snapshot'
-            : budget
-              ? 'request-budget'
-              : error instanceof TagRateLimitError
-                ? 'rate-limit'
-                : control.signal?.aborted || message.includes('deadline')
-                  ? 'deadline'
-                  : 'upstream-unavailable';
+    const dbTimeout = localDbTimeout(error);
+    const code = dbTimeout
+      ? 'local-db-timeout'
+      : expired
+        ? 'snapshot-expired'
+        : error instanceof InvalidSnapshot || error instanceof SnapshotStorageError
+          ? error.code
+          : wireFailure
+            ? wireFailure
+            : invalid
+              ? 'invalid-snapshot'
+              : budget
+                ? 'request-budget'
+                : error instanceof TagRateLimitError
+                  ? 'rate-limit'
+                  : control.signal?.aborted || message.includes('deadline')
+                    ? 'deadline'
+                    : 'upstream-unavailable';
     const retryAt = error instanceof TagRateLimitError ? error.retryAt : new Date(now.getTime() + (budget ? 3600_000 : 300_000));
     if (run && manifest) {
-      await assertLease();
-      await pool.execute('UPDATE topic_snapshot_runs SET status=?,next_attempt_at=?,error_code=?,updated_at=? WHERE snapshot_id=?', [
-        expired || invalid
-          ? 'failed'
-          : run.status === 'scanning' && phase === 'pages'
-            ? 'scanning'
-            : phase === 'checksum'
-              ? 'validating'
-              : phase === 'policy'
-                ? 'preparing'
-                : run.status,
-        expired || invalid ? null : retryAt,
-        code,
-        now,
-        manifest.id,
-      ]);
-      if (expired || invalid)
-        await pool.execute("UPDATE topic_snapshots SET status='failed' WHERE id=? AND status='staging'", [manifest.id]);
+      const c = await pool.getConnection();
+      try {
+        await c.beginTransaction();
+        const fresh = await lockedRun(c, manifest.id);
+        assertRunUnchanged(fresh, run, run.status);
+        await assertLease();
+        await c.execute('UPDATE topic_snapshot_runs SET status=?,next_attempt_at=?,error_code=?,updated_at=? WHERE snapshot_id=?', [
+          expired || invalid ? 'failed' : run.status,
+          expired || invalid ? null : retryAt,
+          code,
+          now,
+          manifest.id,
+        ]);
+        if (expired || invalid)
+          await c.execute("UPDATE topic_snapshots SET status='failed' WHERE id=? AND status='staging'", [manifest.id]);
+        await assertLease();
+        await c.commit();
+      } catch (writeError) {
+        await c.rollback();
+        if (writeError instanceof SnapshotModeMismatch)
+          return { status: 'blocked', version: manifest.id, reason: 'mode-mismatch', becameCurrent: false };
+        if (writeError instanceof SnapshotStorageError && writeError.code === 'stale-cursor')
+          return { status: 'conflict', version: manifest.id, reason: 'stale-cursor', becameCurrent: false };
+        throw writeError;
+      } finally {
+        c.release();
+      }
     }
     return {
       status: expired || invalid ? 'failed' : 'deferred',

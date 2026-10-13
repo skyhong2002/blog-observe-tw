@@ -50,7 +50,15 @@ describe('immutable vocabulary wire failures', () => {
     };
     const query = vi.fn(async () => [[row]]),
       execute = vi.fn(async (_sql: string, _values?: unknown[]) => []);
-    const pool = { query, execute } as unknown as Pool;
+    const getConnection = vi.fn(async () => ({
+      query,
+      execute,
+      beginTransaction: vi.fn(),
+      commit: vi.fn(),
+      rollback: vi.fn(),
+      release: vi.fn(),
+    }));
+    const pool = { query, execute, getConnection } as unknown as Pool;
     const current = vi.fn(),
       page = vi.fn(async () => {
         throw Error(message);

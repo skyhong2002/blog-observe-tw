@@ -21,3 +21,25 @@ helper檢查identity與預期counters，但不證明SQL cursor原子、receipt�
 既有Opus5.5非自審design review raw `.reviews/offline-quality/b2-fix-vocab-plan-opus.jsonl` 的taskB，taskA是UI作者fix不算review。採納：保留legacy mode、單份MariaDB原JSON payload、exact byte roundtrip oracle、mode/CAS隔離、LIMIT501、原SHA與checkpoint同transaction。新提案不用另一份v2 payload表，以免policy reader分岔；前提是18169 MariaDB實測原JSON byte保留，不支援的driver/DB直接失敗，不能重serialize冒充原字串。
 
 receipt使用首尾label的SHA（不是兩個最長原label），固定有界metadata；logical payload2GiB只計一次，receipt另有8MiB安全閥。實體DB、index、policy與磁碟用量仍需量測，不保證10M都能stage。0024預留additive模式／pageindex／checkpoint欄位；current、warmup、cutover、changes皆為後續批次，不能以ready宣稱已發布。
+
+## 單份儲存與 stored-data checkpoint 已接線（仍不切 current）
+
+新增0024 additive migration，保留既有legacy-dual為預設。只有明確 `importSnapshot(..., control.payloadMode='single-copy-v1')` 使用新模式。MariaDB VERSION先驗；MySQL不在本專案的exact-JSON／SET STATEMENT相容範圍，single-mode回blocked。既有legacy資料不重解讀、不減舊計費、不放寬其manifest CAS；移植到MySQL需要另做版本化儲存契約，暫不採『只比較數字而放寬legacy原文pin』。
+
+新模式在topic_terms.payload存唯一一份原JSON，每頁indexed import_page_index；page receipt只存count／bytes／首尾labelSHA，≤512B，另8MiB cap。2GiB只計termJSON+LF一次，與標準SHA字節相同。schema／journal／0024 snapshot一起更新，rollback不刪欄位或原資料；0024尚未正式apply。
+
+讀取儲存頁前先做≤501列的長度摘要，驗count與Σpayload上限；同raw SELECT再次byte條件／NULL sentinel，JS再驗單行與總bytes，不先把壞巨大page拉進RAM才驗。原2MB page限制不放寬。每頁以CAST原JSON byte roundtrip、UTF8 BINARY排序、original頁SHA核對，checkpoint／cursor／counts同交易commit，寫完再重驗lease。續跑重新驗上一頁連續性；最後original整體SHA＋各頁counts／receipt計費對齊。
+
+收尾不COUNT473萬詞：使用indexed NULL／負值／越界頁index的三個LIMIT1探測。stale cursor回conflict零UPDATE，所有failed/deferred寫回也先locked CAS，不能把另一worker進度覆蓋成failed。DBtimeout明確local-db-timeout，不叫上游失敗。
+
+### Immutable與證據界線
+
+『凍結』是**合作writer契約，不是資料庫強制immutability**：只由此importer寫full snapshot ID，scanning→validating鎖住狀態後不再insert；window sync使用自己獨立ID、retention不碰active fullrun。未來任何writer必須遵守這個限制；需要改已驗payload時必須restart完整validation，不能沿用checkpoint。stateDigest不是auth。完整manifest原文字串在首個checkpoint開始綁定；在此之前惡意DB改opaque metadata不在防護承諾內。沒有宣稱hostileDB／TOCTOU安全。
+
+root final55＋3＝58mocks保留；existing18169 disposable SQL1suite／24migration、1001詞3頁通過：真CJK＋emoji label排序、exactCAST payload(U2028/escape)、游標[0,0,1,2,3]續跑、6種tamper含oversize、commit後記憶體未更新續跑、A barrier後B advance的stale不poison、雙向mode衝突、current保留。不是實際4.733M完整池成本或正式cutover。
+
+獨立Sol最終sourcehash／原始transcript：
+`/home/deck/.t3/userdata/ui-review-blog-20261013/home-perf-independent/snapshot-single-copy-independent-fixes-followup.json`與`/home/deck/.t3/userdata/ui-review-blog-20261013/home-perf-independent/snapshot-single-copy-independent-byte-cap-followup.json`。
+Opus非自審runtime／followup：`.reviews/offline-quality/single-copy-final-opus.jsonl`、`single-copy-followup-opus.jsonl`，model實為claude-opus-5-5且success。採納F1–F4與rootbyte邊界；F5合作writer限制與兩項低風險範圍已在此明記。Opus只審backend，沒有審自己的B2 UI。
+
+原SQLlog保留；最新`.reviews/offline-quality/single-copy-isolated-byte-cap-final.log`。ready依然不是published；接下來需full版本fixture／容量／throughput及保留期preview、bounded matching warmup／atomiccutover、delta-overlay與可驗chain契約。上游本機a899source只保留3份fullbase；現在600/day budget若每HTTP500詞需約16天，**不能直接開full500同步宣稱能在保留期完成**。需先評估已支援5000/compact契約或其他有界throughput方案，仍保留2MB cap及globalguard，blog不自行修改tag。

@@ -169,6 +169,13 @@
       "when": 1791878959812,
       "tag": "0023_indexed_body_search",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "5",
+      "when": 1791892085402,
+      "tag": "0024_single_copy_snapshot_storage",
+      "breakpoints": true
     }
   ]
 }

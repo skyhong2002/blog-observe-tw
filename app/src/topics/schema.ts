@@ -19,8 +19,13 @@ export const topicTerms = mysqlTable(
     label: varchar('label', { length: 255 }).notNull(),
     normalizedLabel: varchar('normalized_label', { length: 255 }).notNull(),
     payload: json('payload').notNull(),
+    importPageIndex: int('import_page_index'),
   },
-  (t) => [primaryKey({ columns: [t.snapshotId, t.id] }), index('topic_terms_label').on(t.snapshotId, t.normalizedLabel)],
+  (t) => [
+    primaryKey({ columns: [t.snapshotId, t.id] }),
+    index('topic_terms_label').on(t.snapshotId, t.normalizedLabel),
+    index('topic_terms_import_page').on(t.snapshotId, t.importPageIndex, t.id),
+  ],
 );
 export const topicPostIndexes = mysqlTable(
   'topic_post_indexes',
@@ -136,6 +141,13 @@ export const topicSnapshotRuns = mysqlTable(
   'topic_snapshot_runs',
   {
     snapshotId: char('snapshot_id', { length: 36 }).primaryKey(),
+    payloadMode: varchar('payload_mode', { length: 24 }).notNull().default('legacy-dual'),
+    receiptBytes: bigint('receipt_bytes', { mode: 'number' }).notNull().default(0),
+    checksumCheckpoint: json('checksum_checkpoint'),
+    checkpointLastLabel: varchar('checkpoint_last_label', { length: 255 }),
+    validationNextPage: int('validation_next_page').notNull().default(0),
+    validatedTerms: int('validated_terms').notNull().default(0),
+    validatedBytes: bigint('validated_bytes', { mode: 'number' }).notNull().default(0),
     manifest: json('manifest').notNull(),
     nextPage: int('next_page').notNull().default(0),
     stagedTerms: int('staged_terms').notNull().default(0),
@@ -155,7 +167,7 @@ export const topicSnapshotPages = mysqlTable(
   {
     snapshotId: char('snapshot_id', { length: 36 }).notNull(),
     pageIndex: int('page_index').notNull(),
-    // Exact JSON.stringify(entries) text used by the upstream page checksum, not a JSON column.
+    // Legacy: exact JSON.stringify(entries). single-copy-v1: bounded hashed receipt metadata; run mode prevents reinterpretation.
     entriesJson: longtext('entries_json').notNull(),
     sha256: char('sha256', { length: 64 }).notNull(),
   },
