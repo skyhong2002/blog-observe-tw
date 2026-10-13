@@ -3,6 +3,7 @@ import { type ActiveState, admitActiveTerm, sourceTermMetadata, startActiveSelec
 import {
   ACTIVE_TOPIC_LIMITS,
   digest,
+  displayTerm,
   exclusionReason,
   mergeExclusionReasons,
   NORMALIZATION_VERSION,
@@ -73,7 +74,7 @@ async function projectPage(c: Connection, snapshotId: string, ctx: Context, curs
       ...(old ?? {}),
       id,
       normalized_label: storedNormalizedLabel(String(term.label)),
-      label: winner ? term.label : old!.label,
+      label: winner ? displayTerm(String(term.label)) : old!.label,
       winner_id: winner ? term.id : old!.winner_id,
       winner_count: winner ? metadata.articleCount : Number(old!.winner_count),
       article_count: Math.max(Number(old?.article_count ?? 0), metadata.articleCount),
@@ -217,6 +218,9 @@ export async function ensureTopicPolicy(pool: Pool, snapshotId: string) {
     [snapshotId, POLICY_VERSION],
   );
   if (ready) return;
+  const [[snapshot]] = await pool.query<RowDataPacket[]>('SELECT manifest FROM topic_snapshots WHERE id=?', [snapshotId]);
+  if (snapshot && parse(snapshot.manifest).coverage === 'all-current-indexed-article-tags')
+    throw Error('full_vocabulary_policy_requires_staged_preparation');
   const c = await pool.getConnection();
   try {
     await c.beginTransaction();

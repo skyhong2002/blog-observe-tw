@@ -1,8 +1,22 @@
 import { describe, expect, it } from 'vitest';
 import { TopicMatcher } from './matcher.ts';
-import { digest, exclusionReason, MATCHER_VERSION, normalizeTerm, POLICY_VERSION, projectTopicTerms } from './policy.ts';
+import { digest, displayTerm, exclusionReason, MATCHER_VERSION, normalizeTerm, POLICY_VERSION, projectTopicTerms } from './policy.ts';
 
 describe('crowdsourced vocabulary matching policy', () => {
+  it('merges zero-width/case/width variants in derived matching, preserving exact raw source labels and IDs', () => {
+    const raw = ['\u200BTPBL', 'tpbl', 'ＴＰＢＬ', 'T\u200cP\u200dBL', '\uFEFFTPBL', 'TP\u2060BL'];
+    const input = raw.map((label, i) => ({ id: digest(label), label, payload: { articleCount: 10 - i } }));
+    const result = projectTopicTerms(input);
+    expect(result.terms).toEqual([{ id: digest('tpbl'), normalizedLabel: 'tpbl', label: 'TPBL', exclusionReason: null, occurrences: 45 }]);
+    expect(result.aliases).toHaveLength(6);
+    expect(result.aliases.every((alias) => alias.canonicalId === digest('tpbl'))).toBe(true);
+    expect(input.map((term) => term.label)).toEqual(raw);
+    expect(displayTerm('\u200B 樂天桃猿\uFEFF')).toBe('樂天桃猿');
+    expect(exclusionReason('\u200B')).toBe('punctuation-only');
+    expect(new TopicMatcher([{ id: digest('tpbl'), label: '\u200BTPBL' }]).match('TPBL T\u200bPBL')).toMatchObject({
+      ids: [digest('tpbl')],
+    });
+  });
   it('excludes one-character Chinese substrings: 穩定性 never matches 性', () => {
     expect(exclusionReason('性')).toBe('too-short');
     expect(new TopicMatcher([{ id: 'sex', label: '性' }]).match('穩定性').ids).toEqual([]);
