@@ -983,6 +983,13 @@
       "occurrences": 1
     },
     {
+      "path": "app/src/topics/staged-proof-inspector.ts",
+      "digest": "09cbd6e4e39c5404830c9363da75ef52a305fedfdad5c58f3d4ddd699ba335c2",
+      "tables": [],
+      "dynamic": true,
+      "occurrences": 1
+    },
+    {
       "path": "app/src/topics/staged-scan-v2.ts",
       "digest": "05db3bf7325e7bf4b07b0692a67c4dfc06d7d25c3e30535adf73c955f4d4ba25",
       "tables": [],
