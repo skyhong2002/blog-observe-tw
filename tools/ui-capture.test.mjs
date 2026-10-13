@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { EventEmitter } from 'node:events';
 import { PassThrough } from 'node:stream';
-import { capture, verifyPrivateArtifactDirectory, verifyLatencyGate, installGuards, LIMITS, plan, requestDecision, verifyGate, verifyIdentity, browserRootInventory, quotaLeaseFromProcess, localProcessIdentity, listenerInodes, acquireHostBrowserQuota, recordNetworkAttempt, processInventory } from './ui-capture.mjs';
+import { capture, observePrivacy, requireDNT, assessContrast, collectSecondaryContrastDOM, verifyPrivateArtifactDirectory, verifyLatencyGate, installGuards, LIMITS, plan, requestDecision, verifyGate, verifyIdentity, browserRootInventory, quotaLeaseFromProcess, localProcessIdentity, listenerInodes, acquireHostBrowserQuota, recordNetworkAttempt, processInventory } from './ui-capture.mjs';
 
 const config = { targetOrigin: 'http://127.0.0.1:18174', expectedSHA: 'a'.repeat(40), expectedBuildId: 'fixture-build', buildIdHeader: 'x-build-id', pages: [{ path: '/', width: 1280 }, { path: '/articles/', width: 390 }] };
 const gate = { load: 1, browserRoots: 0, rawPgrepCount: 10, available: LIMITS.reserve + 100 * 1024 ** 2 };
@@ -41,11 +41,11 @@ test('all-request and websocket guards install before init script, without loggi
   await handler({ request: () => ({ url: () => 'https://www.google-analytics.com/g/collect?secret=private', method: () => 'GET' }), abort: async () => actions.push('abort'), continue: async () => actions.push('continue') });
   assert.deepEqual(calls, ['**/*', 'ws:**/*', 'init']); assert.deepEqual(actions, ['abort']); assert.deepEqual(counters, { analytics: 1, external: 0 });
 });
-function mocks({ badIdentity = false, quota = true, hotPage = false, closeFails = false, wrongTheme = false } = {}) {
+function mocks({ badIdentity = false, quota = true, hotPage = false, closeFails = false, wrongTheme = false, documentDNT = '1', navigatorDNT = '1', documentGPC = null, navigatorGPC = null } = {}) {
   const events = [], reports = [], images = []; let gates = 0;
   const headers = { 'x-blog-release': badIdentity ? 'b'.repeat(40) : config.expectedSHA, 'x-build-id': config.expectedBuildId };
   let current, theme = 'light';
-  const page = { emulateMedia: async options => { theme = options.colorScheme; }, addInitScript: async (fn, value) => assert.equal(value, theme), evaluate: async () => ({ theme: wrongTheme ? 'unexpected' : theme, darkMedia: theme === 'dark' }), close: async () => {}, on: () => {}, setViewportSize: async () => {}, goto: async url => { current = url; events.push('goto'); return { status: () => 200, allHeaders: async () => headers }; }, url: () => current, screenshot: async options => { assert.equal(options.fullPage, false); return Buffer.alloc(64); } };
+  const page = { emulateMedia: async options => { theme = options.colorScheme; }, addInitScript: async (fn, value) => assert.equal(value, theme), evaluate: async fn => fn === collectSecondaryContrastDOM ? [] : String(fn).includes('globalPrivacyControl') ? {doNotTrack:navigatorDNT,globalPrivacyControl:navigatorGPC} : ({ theme: wrongTheme ? 'unexpected' : theme, darkMedia: theme === 'dark' }), close: async () => {}, on: () => {}, setViewportSize: async () => {}, goto: async url => { current = url; events.push('goto'); return { status: () => 200, allHeaders: async () => headers, request: () => ({headerValue: async name => name === 'dnt' ? documentDNT : documentGPC}) }; }, url: () => current, screenshot: async options => { assert.equal(options.fullPage, false); return Buffer.alloc(64); } };
   const context = { route: async () => events.push('route'), routeWebSocket: async () => events.push('ws'), addInitScript: async () => {}, newPage: async () => { events.push('newPage'); return page; } };
   const deps = { now: () => 'mock-clock', gate: async () => { gates++; return { ...gate, load: hotPage && gates === 3 ? 13 : 1 }; }, acquireGlobalQuota: async () => quota ? { assertHeld: async () => true, release: async () => events.push('release') } : null, launch: async () => { events.push('launch'); return { newContext: async opts => { assert.equal(opts.extraHTTPHeaders.DNT, '1'); assert.equal(opts.serviceWorkers, 'block'); return context; }, close: async () => { events.push('close'); if (closeFails) throw Error('fail'); } }; }, sleep: async ms => assert.equal(ms, 5000), saveImage: async name => images.push(name), saveReport: async r => reports.push(r), ttfb: async () => ['blog.observe.tw','tag.observe.tw','youtube.observe.tw'].map(host => ({host, totalSeconds: 0.2, ttfbSeconds: 0.2, status: 200})) };
   return { deps, events, reports, images };
@@ -313,4 +313,31 @@ test('ancestry cycle, repeated PID, newer parent and missing start proof all fai
   for(const [rows,reason]of [[[row(100,101),row(101,100)],'browser_ancestry_cycle'],[[row(100,1),row(100,1)],'browser_pid_duplicate'],[[row(100,1,'20'),row(101,100,'10')],'browser_parent_identity_changed'],[[{...row(100,1),startTicks:undefined}],'process_inventory_unavailable']]) assert.throws(()=>browserRootInventory(rows),error=>error.message===reason&&Array.isArray(error.processDiagnostics));
   const orphan={...row(100,999),'args':['/proc/self/exe','--type=renderer']};
   assert.deepEqual(browserRootInventory([orphan]),{browserRoots:1,rootPids:[100],chromiumProcesses:1});
+});
+
+test('actual DNT receipt is required before saving and GPC true/false/null is not invented', async()=>{
+ for(const options of [{documentDNT:null},{documentDNT:'0'},{navigatorDNT:null},{navigatorDNT:'0'}]) { const m=mocks(options),r=await capture(config,m.deps);assert.equal(r.error,'privacy_unverified');assert.equal(m.images.length,0);assert.equal(r.closed,true);assert.equal(r.privacyObservations.length,1); }
+ for(const value of [true,false,null]) { const m=mocks({navigatorGPC:value,documentGPC:value===true?'1':null}),r=await capture(config,m.deps);assert.equal(r.pages[0].privacy.navigatorGPC,value);assert.equal(r.pages[0].privacy.documentSecGPC,value===true?'1':null); }
+});
+test('privacy reads only DNT/Sec-GPC via headerValue, never bulk sensitive headers',async()=>{
+ const names=[];const privacy=await observePrivacy({headerValue:async name=>{names.push(name);return name==='dnt'?'1':'0';},allHeaders:()=>{throw Error('must_not_read');}}, {doNotTrack:'1',globalPrivacyControl:false});
+ assert.deepEqual(names,['dnt','sec-gpc']);assert.deepEqual(privacy,{documentDNT:'1',documentSecGPC:'0',navigatorDNT:'1',navigatorDoNotTrack:true,navigatorGPC:false});requireDNT(privacy);assert.ok(!JSON.stringify(privacy).includes('headers'));
+});
+const contrastFixture = patch=>({ordinal:1,tagName:'SPAN',classes:['text-zinc-500'],fontSize:16,fontWeight:400,foreground:'rgb(0, 0, 0)',opacity:1,backgrounds:[{color:'rgb(255, 255, 255)',image:'none',opacity:1}],...patch});
+test('known WCAG ratios and transparent layered backgrounds are computed without content',()=>{
+ const result=assessContrast(contrastFixture({}));assert.equal(result.ratio,21);assert.equal(result.threshold,4.5);assert.equal(result.result,'pass-sample');
+ const low=assessContrast(contrastFixture({foreground:'rgb(180, 180, 180)'}));assert.ok(low.ratio<4.5);assert.equal(low.result,'fail-sample');
+ const large=assessContrast(contrastFixture({fontSize:24}));assert.equal(large.threshold,3);
+ const layered=assessContrast(contrastFixture({backgrounds:[{color:'rgb(255, 255, 255)',image:'none',opacity:1},{color:'rgba(0, 0, 0, 0.5)',image:'none',opacity:1}]}));assert.ok(layered.ratio>5&&layered.ratio<6);assert.deepEqual(layered.composedBackground,[0.5,0.5,0.5,1]);
+ assert.ok(!JSON.stringify(result).includes('textContent'));
+});
+test('unsupported colors, unresolved alpha, images and group opacity remain unknown',()=>{
+ for(const patch of [{foreground:'oklch(0.7 0.1 40)'},{backgrounds:[{color:'transparent',image:'none',opacity:1}]},{backgrounds:[{color:'rgb(255, 255, 255)',image:'linear-gradient(red,blue)',opacity:1}]},{backgrounds:[{color:'rgb(255, 255, 255)',image:'none',opacity:0.5}]}]) { const sample=assessContrast(contrastFixture(patch));assert.equal(sample.result,'unknown');assert.equal(sample.ratio,null); }
+});
+
+test('DOM contrast sample is bounded/visible and never reads text or copies image URL',()=>{
+ const saved=new Map();const style={fontSize:'14px',fontWeight:'400',color:'rgb(110, 110, 110)',opacity:'1',visibility:'visible',backgroundColor:'rgb(255, 255, 255)',backgroundImage:'none'};
+ const elements=Array.from({length:30},(_,i)=>({tagName:'SPAN',classList:['text-zinc-500','do-not-record-private-class'],parentElement:null,getBoundingClientRect:()=>({width:20,height:20,left:0,right:20,top:i===0?-40:10,bottom:i===0?-20:30}),get textContent(){throw Error('text_must_not_be_read');},get title(){throw Error('title_must_not_be_read');},style:{...style,backgroundImage:i===1?'url(https://private.example/secret-image)':'none'}}));
+ const globals={document:{querySelectorAll:()=>elements},innerWidth:390,innerHeight:900,getComputedStyle:e=>e.style};
+ try{for(const[k,v]of Object.entries(globals)){saved.set(k,Object.getOwnPropertyDescriptor(globalThis,k));Object.defineProperty(globalThis,k,{value:v,configurable:true});}const rows=collectSecondaryContrastDOM();assert.equal(rows.length,20);assert.equal(rows[0].ordinal,1);assert.deepEqual(rows[0].classes,['text-zinc-500']);assert.equal(rows[0].backgrounds[0].image,'unsupported');assert.ok(!JSON.stringify(rows).includes('private'));assert.equal(assessContrast(rows[0]).result,'unknown');}finally{for(const[k,v]of saved)v?Object.defineProperty(globalThis,k,v):delete globalThis[k];}
 });

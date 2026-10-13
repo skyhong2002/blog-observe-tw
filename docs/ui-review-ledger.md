@@ -1,5 +1,18 @@
 # UI 逐頁審查紀錄
 
+## 2026-10-13：root 獨立 gen5 驗收與 babysit 正式抽查（scope仍pending）
+
+收到的外部原始 review：`/home/deck/.cache/youtube-ui-review/root-blog-candidate-review-1430.json`，22,758 bytes，SHA-256 `4dfc1549b1f10cb9949c7c6c2754349e7a9ca14c9d1da36d262837482de76374`（本輪再次核對相符）。原檔 auditUTC `2026-10-13T06:31:48.104984Z`，root 於台北14:44另核對 runtime green/gen5/4cc、切換UTC06:28:04.914、BUILD_ID `2ZIfs00KopZi_HHl8ahLU`；兩種時間分開，不改原檔。review model依外部原檔為 GPT-6.1 Sol，實際看過16張home/articles/topic/history fixture圖及6張tag參考，首屏沒有blocking；`candidateApproval=false`、`routeComplete=false`、`productionContentAccepted=false`。原檔未附本機可讀的raw model session，本ledger引用已交付JSON與人類轉達，不冒充本thread親自看圖。
+
+- **P2仍待量測：**topic/history深色次要來源、日期、統計與同步文字偏暗；尚無數值contrast證據，不把它寫成已確認WCAG失敗或已修復。
+- **舊網路證據缺件：**既有capture counters為零GA/GTM，但原manifest沒有DNT／GPC觀測欄位；舊圖這兩欄仍unverified，不能由現在工具設定補造歷史。新的runner只讀實際document DNT／Sec-GPC與navigator值，DNT不足拒絕存圖；GPC true／false／null如實記錄。此工具修正只完成source review與mocks，尚未新增capture，也不關閉P2。
+- **正式抽查（使用者轉達，不冒稱本thread執行）：**babysit UTC06:45，以內建opt-out檢查，GA請求0、ga-disable=true。首頁與`/tech/`桌機1280正常且HTML帶同BUILD_ID；no-store／DYNAMIC。首頁三次完整時間3.04／2.72／2.39s，在6.17s內。手機390的preview調寬逾時、沒有截圖，保持missing。使用者未提供該批截圖／網路artifact的絕對路徑，不捏造路徑或新增pass。
+- **worker補證已存在：**獨立設定review `/home/deck/.t3/userdata/ui-review-blog-20261013/home-perf-independent/worker-node-path-4cc7bcd-review.json`（model gpt-6.1-sol與raw session receipt於檔內）；最終交接 `/home/deck/.t3/projects/blog-observe-tw/.reviews/thaw-candidate/worker-runtime-final.json`，UTC06:42:26–06:43:26，PID1512645同cwd、7次至少60秒、NRestarts0。首次sharp失敗24次重啟與恢復檔均保留。UTC06:47本輪再查仍running／同PID／0restart，這是運行補證，不是UIpass。
+- **F4仍未完成：**313站0detected／260unknown／53not-observed。已查出正文片段缺少技術線索與部分既有抓取入口未接observer；三站與完整HTML離線對照、source review詳見 [gen5診斷](f4-gen5-diagnosis.md)。不把offline detected寫成正式觀測，也不猜版本。
+
+權威24項仍pass0／fixed3／issues8／pending11／n/a-ui2。全scope pending，正式桌機少量抽查與fixture首屏review均不能取代每route／狀態驗收。
+
+
 ## 2026-10-13 UTC06:28：同產物正式切換與補圖驗收
 
 正式 green generation5，release `4cc7bcd688d2cf3d56f5cf1a796d0ff92aa150b8`，BUILD_ID `2ZIfs00KopZi_HHl8ahLU`；切換 UTC `2026-10-13T06:28:04.914Z`。同產物未重建；blue427 保留。正式切換後 babysit 瀏覽器驗收尚待，不宣稱全部 UI 完成。權威 24 項的狀態仍為 pass0／fixed3／issues8／pending11／n/a-ui2。

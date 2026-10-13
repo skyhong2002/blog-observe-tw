@@ -79,3 +79,6 @@ load1：切換前測量起迄4.04→6.09；切換後4.07→3.05，不能將其�
 - 後審無立即rollback阻擋；「blue未在新schema跑」是packet未交代造成的推測，前測與舊worker時間證據已補。沒有採納新增正式合成寫入；HSTS證據只涵蓋實測路徑，不冒稱逐一量測所有URL。尾端延遲、queue shutdown、完整UI仍列待辦。
 - scoped review ledger沿原logical-node口徑，累計Codex14／Opus5（2.8:1），重讀同一節點、UI作者、截斷不另計；原始索引`.reviews/thaw-candidate/review-ledger.json`。
 - 待辦：全文「蛤蜊絲瓜」正式bounded-query與索引驗收；擴大relations coverage、unknown target別名證據；真站CMS三例；B3契約正式接入（維持off）；ledger全部pending與未涵蓋狀態、正式瀏覽器驗收。這份部署不代表上述工作已完成。
+
+
+UTC06:45後的root獨立review、正式桌機抽查（手機missing）、worker最終補證與F4未完成原因，已接續至 [UI ledger](ui-review-ledger.md) 與 [gen5診斷](f4-gen5-diagnosis.md)。原部署時點的歷史資料保留，不回寫舊artifact。

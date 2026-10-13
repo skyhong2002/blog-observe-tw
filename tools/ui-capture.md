@@ -60,3 +60,12 @@ Playwright1243 cached binary 位於 `/home/deck/.cache/ms-playwright/chromium_he
 先前僅依 `--type` 的版本曾安全停止於 `ambiguous_browser_roots`。真實診斷 `/home/deck/.t3/userdata/blog-sprint-4cc7bcd/tech-table-right/attempt-3/capture-report.json` 顯示六個 chrome-headless-shell 都是 argCount=1、hasType=false，但 PPID 為單一樹：root1460454、子1460456/1460457/1460475、孫1460471/1460504，startTicks 順序有效。後續改用已驗 PPID 祖先樹定義 browser root；這不是忽略未知程序。重複 PID／循環／父晚於子／缺時間證據仍停止，父候選缺失則增加獨立 root；不得穿越未驗的父鏈合併。私有 capture report 的 processDiagnostics 只保留每列 pid／ppid／executable basename／comm／hasType／argCount／startTicks；最多128列並明記 truncated，以及取樣 phase／UTC。不保存完整 argv、參數值、環境或秘密。這份診斷僅供後續已授權受控 capture 留下真實輸入；開發 agent 僅做 mock；root 隨後執行的實際 capture 分開記錄在 ledger。
 
 Baseline 的 DYNAMIC time_total 包含來源站渲染、Cloudflare edge 與網路，不能當作精確的來源站渲染時間。
+
+
+## 2026-10-13 後續證據欄位（只完成離線驗證）
+
+新runner在每張存圖前從該document實際request只讀DNT／Sec-GPC，並讀navigator.doNotTrack與globalPrivacyControl；兩個DNT觀測都必須是1，否則記失敗並拒絕保存。GPC依實際true／false／null記錄，不強制假造為開啟，不讀或保存Cookie、Authorization或其他request headers。舊manifest沒有這些欄位仍unverified，不補造。
+
+可見main中的次要zinc文字最多20組computed-style contrast樣本，不存文字／title；只支援可確定的RGB(A)與alpha合成。OKLCH、背景圖、gradient、group opacity、未解析透明底等保持unknown；不是完整WCAG掃描，不表示P2已完成實測。新欄位與DNT失敗、GPC如實、已知ratio21、透明分層及unsupported情況有mock測試。
+
+最新使用者限制：SM不新增build／capture／restore；CLI具備實作不構成現在啟動capture的授權，排隊等Mint。舊私有interaction wrapper須由最新guarded runner重新生成並核對新guardedSourceHash，不能沿用舊copy漏掉privacy觀測；這輪未重拍或覆寫任何舊artifact。

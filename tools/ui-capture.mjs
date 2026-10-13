@@ -73,6 +73,62 @@ export async function installGuards(context, origin, counters, network) {
     Object.defineProperty(navigator, 'doNotTrack', { get: () => '1' });
   });
 }
+/** Only the two allowed request fields are read; no bulk headers or native GPC override. */
+export async function observePrivacy(request, navigatorValues) {
+  const field = async name => { const value = await request.headerValue(name); return value === null || value === undefined ? null : value === '1' || value === '0' ? value : 'unsupported'; };
+  return { documentDNT: await field('dnt'), documentSecGPC: await field('sec-gpc'), navigatorDNT: ['1', '0'].includes(navigatorValues.doNotTrack) ? navigatorValues.doNotTrack : null,
+    navigatorDoNotTrack: navigatorValues.doNotTrack === '1' ? true : navigatorValues.doNotTrack === '0' ? false : null,
+    navigatorGPC: typeof navigatorValues.globalPrivacyControl === 'boolean' ? navigatorValues.globalPrivacyControl : null };
+}
+export function requireDNT(privacy) {
+  if (privacy.documentDNT !== '1' || privacy.navigatorDNT !== '1') throw Error('privacy_unverified');
+}
+function rgba(color) {
+  if (color === 'transparent') return [0, 0, 0, 0];
+  const match = /^rgba?\(\s*([\d.]+)[, ]+([\d.]+)[, ]+([\d.]+)(?:\s*[,/]\s*([\d.]+))?\s*\)$/.exec(color ?? '');
+  if (!match) return null;
+  const values = [Number(match[1])/255, Number(match[2])/255, Number(match[3])/255, match[4] === undefined ? 1 : Number(match[4])];
+  return values.every(v => Number.isFinite(v) && v >= 0 && v <= 1) ? values : null;
+}
+const over = (top, bottom) => {
+  const alpha = top[3] + bottom[3]*(1-top[3]);
+  return alpha ? [...top.slice(0,3).map((v,i)=>(v*top[3]+bottom[i]*bottom[3]*(1-top[3]))/alpha),alpha] : [0,0,0,0];
+};
+export function assessContrast(sample) {
+  const unknown = reason => ({ ...sample, ratio: null, threshold: null, result: 'unknown', reason });
+  const fg = rgba(sample.foreground);
+  if (!fg || !Array.isArray(sample.backgrounds) || !sample.backgrounds.length || !Number.isFinite(sample.fontSize) || !Number.isFinite(sample.fontWeight)) return unknown('unsupported_color_or_font');
+  let bg=[0,0,0,0];
+  for (const layer of sample.backgrounds) {
+    const color=rgba(layer.color);
+    if (!color || layer.image !== 'none' || !Number.isFinite(layer.opacity) || layer.opacity !== 1) return unknown('unsupported_background_or_ancestor_opacity');
+    bg=over(color,bg);
+  }
+  if (bg[3] < 1 || !Number.isFinite(sample.opacity) || sample.opacity < 0 || sample.opacity > 1) return unknown('unresolved_transparency');
+  const text=over([...fg.slice(0,3),fg[3]*sample.opacity],bg);
+  const luminance = rgb => rgb.slice(0,3).map(v=>v<=0.04045?v/12.92:((v+0.055)/1.055)**2.4).reduce((sum,v,i)=>sum+v*[0.2126,0.7152,0.0722][i],0);
+  const a=luminance(text),b=luminance(bg), ratio=(Math.max(a,b)+0.05)/(Math.min(a,b)+0.05);
+  const threshold=sample.fontSize>=24 || (sample.fontSize>=18.6666667 && sample.fontWeight>=700) ? 3 : 4.5;
+  return { ...sample, composedBackground: bg, effectiveForeground: text, ratio, threshold, result: ratio>=threshold?'pass-sample':'fail-sample' };
+}
+/** Bounded visible secondary-class sample, no text/title/content/identity copied. */
+export function collectSecondaryContrastDOM() {
+  const output=[];
+  for (const element of document.querySelectorAll('main [class]')) {
+    const classes=Array.from(element.classList).filter(c=>/^(?:dark:)?text-zinc-(?:400|500|600)$/.test(c));
+    if (!classes.length) continue;
+    const box=element.getBoundingClientRect(),style=getComputedStyle(element);
+    if (box.width<=0 || box.height<=0 || box.bottom<=0 || box.top>=innerHeight || box.right<=0 || box.left>=innerWidth || style.visibility!=='visible' || Number(style.opacity)===0) continue;
+    const backgrounds=[];
+    let parent=element.parentElement,depth=0;
+    while(parent && depth++<32) { const s=getComputedStyle(parent);backgrounds.unshift({color:s.backgroundColor,image:s.backgroundImage === 'none' ? 'none' : 'unsupported',opacity:Number(s.opacity)});parent=parent.parentElement; }
+    // Own background is separate from its own text opacity; fractional group opacity is unsupported, not guessed.
+    backgrounds.push({color:style.backgroundColor,image:style.backgroundImage === 'none' ? 'none' : 'unsupported',opacity:Number(style.opacity)});
+    output.push({ordinal:output.length+1,tagName:element.tagName,classes,fontSize:Number.parseFloat(style.fontSize),fontWeight:Number.parseFloat(style.fontWeight),foreground:style.color,opacity:Number(style.opacity),backgrounds,ancestorLimitReached:Boolean(parent)});
+    if(output.length===20)break;
+  }
+  return output;
+}
 const exec = promisify(execFile);
 const isBrowserExecutable = name => /^(?:chrome|chromium|chromium-browser|chrome-headless-shell|headless_shell)$/.test(name);
 const safeProcessDiagnostics = rows => rows.slice(0, 128).map(row => ({
@@ -351,10 +407,16 @@ export async function capture(config, deps) {
       if (!Number.isFinite(saveGate.load) || saveGate.load > LIMITS.load || !Number.isFinite(saveGate.available) || saveGate.available - batch.estimatedBytes < LIMITS.stopReserve || !Number.isSafeInteger(saveGate.browserRoots) || saveGate.browserRoots < 0 || saveGate.browserRoots > 2) throw Error('page_gate');
       const observedTheme = await page.evaluate(() => ({ theme: document.documentElement.dataset.theme, darkMedia: matchMedia('(prefers-color-scheme: dark)').matches }));
       if (observedTheme.theme !== item.theme || observedTheme.darkMedia !== (item.theme === 'dark')) throw Error('theme_unverified');
+      const navigatorValues = await page.evaluate(() => ({ doNotTrack: navigator.doNotTrack, globalPrivacyControl: typeof navigator.globalPrivacyControl === 'boolean' ? navigator.globalPrivacyControl : null }));
+      const privacy = await observePrivacy(response.request(), navigatorValues);
+      report.privacyObservations ??= [];
+      report.privacyObservations.push({ pathname: new URL(item.url).pathname, utc: deps.now(), ...privacy });
+      requireDNT(privacy);
+      const contrastSamples = (await page.evaluate(collectSecondaryContrastDOM)).map(sample => sample.ancestorLimitReached ? { ...sample, ratio: null, result: 'unknown', reason: 'ancestor_limit' } : assessContrast(sample));
       const png = await page.screenshot({ fullPage: false });
       if (png.length > item.width * item.height * 4 || report.pages.reduce((sum, row) => sum + row.bytes, 0) + png.length > LIMITS.bytes) throw Error('actual_artifact_budget');
       await deps.saveImage(item.name, png);
-      report.pages.push({ name: item.name, pathname: new URL(item.url).pathname, viewport: [item.width, item.height], theme: observedTheme.theme, darkMedia: observedTheme.darkMedia, utc: deps.now(), identity: config.localIdentity ? { ...identity, sha: report.localIdentity.sha, sourceTreeHash: report.localIdentity.sourceTreeHash } : identity, bytes: png.length, sha256: createHash('sha256').update(png).digest('hex'), status: 'captured-unreviewed' });
+      report.pages.push({ privacy, contrastSamples, contrastLimitation: 'Visible main secondary-class DOM samples only; unsupported CSS colors/backgrounds/group opacity remain unknown, not a full WCAG scan.', name: item.name, pathname: new URL(item.url).pathname, viewport: [item.width, item.height], theme: observedTheme.theme, darkMedia: observedTheme.darkMedia, utc: deps.now(), identity: config.localIdentity ? { ...identity, sha: report.localIdentity.sha, sourceTreeHash: report.localIdentity.sourceTreeHash } : identity, bytes: png.length, sha256: createHash('sha256').update(png).digest('hex'), status: 'captured-unreviewed' });
       await page.close();
     }
     report.status = 'captured-unreviewed';
