@@ -139,10 +139,32 @@ export function validatePage(raw: unknown, manifest: ExportManifest, index: numb
   }
   return raw as unknown as ExportPage;
 }
+/** Explicit local-source contract, not evidence that the deployed provider supports it.
+ * Pin the full manifest separately; compact pages bind its checksum/count/date, not opaque metadata. */
+export const COMPACT_SNAPSHOT_CONTRACT = 'tag-a89908a-compact-v1' as const;
+export function validateCompactPage(raw: unknown, manifest: ExportManifest, index: number): ExportPage {
+  validateManifest(manifest);
+  if (!isObject(raw) || !isObject(raw.snapshot)) throw Error('Invalid vocabulary compact page');
+  const identity = raw.snapshot;
+  const keys = ['id', 'generatedAt', 'total', 'pageSize', 'sha256'] as const;
+  if (Object.keys(identity).length !== keys.length || keys.some((key) => identity[key] !== manifest[key]))
+    throw Error('Vocabulary snapshot changed while paging');
+  return validatePage({ ...raw, snapshot: manifest }, manifest, index);
+}
 export class HttpSnapshotSource implements SnapshotSource {
   private readonly transport: TagApiTransport;
-  constructor(request: typeof fetch = fetch, signal?: AbortSignal, options: TagTransportOptions = {}) {
+  private readonly compact: boolean;
+  constructor(
+    request: typeof fetch = fetch,
+    signal?: AbortSignal,
+    options: TagTransportOptions & {
+      compactContract?: typeof COMPACT_SNAPSHOT_CONTRACT;
+    } = {},
+  ) {
     this.transport = new TagApiTransport(request, { ...options, signal: signal ?? options.signal });
+    if (options.compactContract !== undefined && options.compactContract !== COMPACT_SNAPSHOT_CONTRACT)
+      throw Error('Invalid vocabulary compact contract');
+    this.compact = options.compactContract === COMPACT_SNAPSHOT_CONTRACT;
   }
   get diagnostics() {
     return this.transport.diagnostics;
@@ -154,6 +176,7 @@ export class HttpSnapshotSource implements SnapshotSource {
     return validateManifest(await this.json('snapshots/current', MAX_SNAPSHOT_MANIFEST_BYTES));
   }
   async page(manifest: ExportManifest, index: number) {
+    if (this.compact) return validateCompactPage(await this.json(`snapshots/${manifest.id}?cursor=${index}&compact=1`), manifest, index);
     return validatePage(await this.json(`snapshots/${manifest.id}?cursor=${index}`), manifest, index);
   }
 }
