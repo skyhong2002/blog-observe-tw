@@ -69,6 +69,9 @@ const sharedLabelPath = (path: string) => {
 };
 const allowedPath = (path: string) =>
   sharedLabelPath(path) ||
+  /^\/api\/v1\/vocabulary\/changes\?after=[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}(?:&target=[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})?&cursor=\d{1,6}$/.test(
+    path,
+  ) ||
   /^\/api\/v1\/articles\?[^#]*$/.test(path) ||
   /^\/api\/v1\/vocabulary\/snapshots\/(?:current|[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})(?:\?cursor=\d{1,6}(?:&compact=1)?)?$/.test(
     path,
