@@ -1,6 +1,6 @@
 # F3／F4 解凍後驗收與回滾計畫
 
-本文件是待執行計畫，不是部署紀錄。基底為 fetch 後的 `origin/main` `6f47dda`；開發直接在既有 main 選擇性整合，沒有建立工作樹、staging 或 build。凍結解除只能以使用者端明確通知為準；磁碟空間恢復本身不代表解除。
+本文件是待執行計畫，不是部署紀錄。基底為 fetch 後的 `origin/main` `6f47dda`；開發直接在既有 main 選擇性整合，沒有建立工作樹、staging 或 build。使用者已於 2026-10-13 明確解凍，以下門檻以當日 2 小時衝刺指示為準；磁碟空間恢復本身不代表解除。
 
 ## 凍結期間完成的工作與限制
 
@@ -12,9 +12,9 @@
 
 ## 唯一一次候選建置前
 
-1. 收到明確解凍通知，確認備份作業已安全收尾；重新檢查 /home 至少 10 GiB，估算安裝、build 與保留兩 slot 的增加量後仍滿足門檻。不能自行清理任何候選。
+1. 使用者已授權在備份仍執行時建置；不得接觸備份程序。開始前 /home 至少 40 GiB，監控降至 30 GiB 以下只暫停自己的程序群組。估算 build 2 GiB、不可變 release 1 GiB；截圖每批最多 4 張、50 MiB。既有 release、rollback、備份與 worktree 一律保留。
 2. `git fetch origin`，記錄乾淨 source SHA/tree、已審檔案 hashes、測試結果。確認本批所有 source review findings 已採納或有明確未啟用的界線；不以測試成功取代 UI review。
-3. 全站只容許一個建置，先與既有程序核對；當時負載不宜超過既定閘門。沿用 `tools/deploy-blue-green.sh` 準備 inactive slot，active slot 全程保留。
+3. 本機 tag/blog 合計最多兩個建置；nice 19、ionice c3、Next worker ≤2。load1 >12、任一首頁 5xx、blog 整頁 >6 秒或 tag/YT >2 秒即暫停自己的建置與 capture。以 guarded-build 的啟動握手、主機 quota 與 PGID 所有權檢查監控。只用 prepare-built 部署同一份已審產物，active slot 全程保留。
 4. migration 0020 僅新增 blog_tech_scans；沒有 DROP、改寫旧欄位或刪資料。原版程式可忽略新增表。此類 additive migration 不另產生完整備份；沿用既存備份，任何未來破壞性變更須另依授權、容量與串流壓縮規則處理。
 5. 先在隔離 schema 驗證 0020，正式 apply 前再次查核精確 SQL。worker 仍只有一份，不複製開第二個；收集旗標在正式資料驗收前保持 false。
 
@@ -22,7 +22,7 @@
 
 同一 SHA／BUILD_ID 只建置一次，記錄 source tree。候選 gateway／web 成對，API／SSR rewrites 必須指向同slot。以候選環境旗標驗 F4 on/off（公開開啟仍不啟動外網抓取）。所有畫面需要独立 Opus 5.5 或 GPT-6.1 Sol reviewer，作者不能審自己；至少 1280／390、深色、多筆／少筆／空／失敗／權限與旗標關閉的適用狀態。截圖沿用 ledger；凍結期間一律「待重拍」。
 
-解凍後 capture 仍須守全站最多兩個 browser、每頁間隔、load≤12、正式 TTFB≤2秒；優先 candidate。啟動前 DNT=1 並阻擋 GA/GTM，確認零外送，不送合成 GA。
+解凍後 capture 仍須守全站最多兩個 browser、每頁間隔、load≤12、blog 整頁≤6秒、tag/YT 整頁≤2秒；優先 candidate。啟動前 DNT=1 並阻擋 GA/GTM，確認零外送，不送合成 GA。
 
 - `/tech/`：分母與五種狀態總和、截斷、技術篩選、cursor、單行固定表頭／第一欄、CMS 與 CDN 分組、unknown 版本、最後嘗試和上次成功不得混淆。
 - `/blogs/<slug>/`：optional 技術失敗不拖垮主頁；直接引用每方向保留文章日期及上下文，blogroll／側欄分開；共同標籤不是交流，無文字相似資料不能假稱零相似。
@@ -40,7 +40,7 @@
 
 已下載的靜態資產或使用者自行保存的內容不在撤回範圍。任何快取恢復必須另交 origin、Next、CF 三層失效證據並取得既有流程的同意。
 
-## B3 後續批次（基底 104da1f；仍未解凍）
+## B3 後續批次（原始基底 104da1f；公開與同步旗標保持關閉）
 
 - 0021 僅新增 `topic_shared_label_snapshots`，0022 僅新增 `shared_label_sync_control`；均 additive，舊程式可忽略。不建立新完整備份、不執行 down migration。正式套用前重新核對 SQL；目前只套用於既有 18169 的隨機 fixture schema。
 - `BLOG_SHARED_LABEL_SYNC_ENABLED` 與 `BLOG_SHARED_LABELS_PUBLIC_ENABLED` 預設 false，分別控制手動背景同步與話題頁本地資料呈現。沒有新增排程；不得在頁面請求時呼叫上游。
@@ -51,3 +51,7 @@
 - 回滾先關上述雙旗標，再依既有 B0-safe slot 流程切換；保留表、冷卻紀錄與資料，不能為避開預算重設 cooldown。尚未建置，沒有本批 BUILD_ID 或正式切換 UTC。
 
 若 B3 同步因 store／lease 失敗退出，不得自動重跑；尤其冷卻寫入失敗時，先確認上次 Retry-After 與儲存狀態，再安排下一批。解凍後也不可因 source tests 已通過就逕行新增 timer。
+
+## 同產物交付紀錄
+
+候選由重新 fetch 的 origin/main 建置一次。`record-built` 保存 SHA、BUILD_ID 與 primary server/static 與完整 standalone（含 manifests／traced dependencies）、release 根 node_modules 雜湊及 edge 外部 receipt 摘要；`prepare-built` 與切換前再次驗證。這是位元組一致性證據，不是建置執行者的簽章。建置可借用既有依賴，release 的 runtime 依賴必須複製並固定，不能依賴其他工作樹的可變 symlink。候選透過 isolated gateway 18176 存取 Next 18177，避免直接打 Next 時走向編譯時 green gateway 18175；正式 green 為 gateway 18175 / web 18173。公開 B3 雙旗標維持 false。

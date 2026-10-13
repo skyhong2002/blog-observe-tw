@@ -15,7 +15,9 @@ import {
 import { verifyArchive } from '../app/src/edge/release-integrity.ts';
 import { readSlot, type SlotRelease, validateRelease } from '../app/src/edge/slot.ts';
 import { atomicJson, type EdgeState, parseState, SLOTS, type Slot, slotOf, stateRoot } from '../app/src/edge/state.ts';
+import { anchorReceipt, verifyReceiptAnchor } from './build-receipt-anchor.ts';
 import { assertLargeWriteSpace } from './disk-space.mjs';
+import { BUILD_RECEIPT, recordPrebuilt, verifyPrebuilt } from './prebuilt-release.ts';
 
 const execute = promisify(execFile);
 const root = stateRoot();
@@ -104,16 +106,30 @@ async function ensureStopped(slot: Slot) {
   for (const role of ['gateway', 'web'] as const)
     if (await serviceActive(unit(role, slot))) throw Error('inactive_slot_must_be_stopped_explicitly');
 }
-async function prepare(slot: Slot, directory: string, sourceDirectory: string) {
+async function requireSlotRewrites(release: string, slot: Slot) {
+  const manifest = JSON.parse(await readFile(join(release, 'web/.next/routes-manifest.json'), 'utf8'));
+  const rewrites = Array.isArray(manifest.rewrites) ? manifest.rewrites : Object.values(manifest.rewrites ?? {}).flat();
+  for (const prefix of ['api', 'auth'])
+    if (
+      !rewrites.some(
+        (route: { source?: string; destination?: string }) =>
+          route.source === `/${prefix}/:path*` && route.destination === `http://127.0.0.1:${SLOTS[slot].gateway}/${prefix}/:path*`,
+      )
+    )
+      throw Error('slot_build_origin_mismatch');
+}
+async function prepare(slot: Slot, directory: string, sourceDirectory: string, prebuilt = false) {
   const state = await current();
   if (state?.active === slot) throw Error('cannot_prepare_active_slot');
   await ensureStopped(slot);
   await assertLargeWriteSpace();
   const release = await realpath(directory);
+  if (!prebuilt && (await exists(join(release, BUILD_RECEIPT)))) throw Error('reviewed_artifact_must_not_be_rebuilt');
   const source = await realpath(sourceDirectory);
   if (source === release) throw Error('source_checkout_must_not_be_release');
   await git(source, 'fetch', 'origin');
   const commit = await git(source, 'rev-parse', 'HEAD');
+  if (!prebuilt && (await exists(join(root, 'build-receipts', `${commit}.json`)))) throw Error('reviewed_artifact_must_not_be_rebuilt');
   if (commit !== (await git(source, 'rev-parse', 'origin/main')) || (await git(source, 'status', '--porcelain', '--untracked-files=no')))
     throw Error('clean_current_origin_main_required');
   if (state) await git(source, 'merge-base', '--is-ancestor', state.commit, commit);
@@ -146,37 +162,37 @@ async function prepare(slot: Slot, directory: string, sourceDirectory: string) {
       ?.slice('WorkingDirectory='.length);
     if (cwd === release || cwd?.startsWith(`${release}/`)) throw Error('release_is_legacy_live_directory');
   }
+  await requirePrivacyRelease(commit, (floor, target) => git(source, 'merge-base', '--is-ancestor', floor, target));
+  const receipt = prebuilt ? await verifyPrebuilt(release, commit) : null;
+  if (prebuilt) {
+    await verifyReceiptAnchor(root, release, commit);
+    await requireSlotRewrites(release, slot);
+  }
   await atomicJson(join(root, 'slots', `${slot}.json`), descriptor);
   await start('gateway', slot);
   await waitHealth(slot);
   // This process is not a worker; there is still only one crawl/index scheduler.
-  const child = spawn('npm', ['run', 'web:build'], {
-    cwd: release,
-    stdio: 'inherit',
-    env: {
-      ...process.env,
-      BLOG_GATEWAY_INTERNAL_URL: `http://127.0.0.1:${SLOTS[slot].gateway}`,
-      NODE_ENV: 'production',
-      CIRCLE_NODE_TOTAL: '2',
-    },
-  });
-  const code = await new Promise<number | null>((resolve, reject) => {
-    child.once('error', reject);
-    child.once('exit', resolve);
-  });
-  if (code !== 0) throw Error('slot_build_failed_active_unchanged');
+  if (!prebuilt) {
+    const child = spawn('npm', ['run', 'web:build'], {
+      cwd: release,
+      stdio: 'inherit',
+      env: {
+        ...process.env,
+        BLOG_GATEWAY_INTERNAL_URL: `http://127.0.0.1:${SLOTS[slot].gateway}`,
+        NODE_ENV: 'production',
+        CIRCLE_NODE_TOTAL: '2',
+      },
+    });
+    const code = await new Promise<number | null>((resolve, reject) => {
+      child.once('error', reject);
+      child.once('exit', resolve);
+    });
+    if (code !== 0) throw Error('slot_build_failed_active_unchanged');
+  }
+  if (prebuilt) await verifyPrebuilt(release, commit);
   await git(source, 'fetch', 'origin');
   if (commit !== (await git(source, 'rev-parse', 'origin/main'))) throw Error('main_changed_rebuild_required');
-  const manifest = JSON.parse(await readFile(join(release, 'web/.next/routes-manifest.json'), 'utf8'));
-  const rewrites = Array.isArray(manifest.rewrites) ? manifest.rewrites : Object.values(manifest.rewrites ?? {}).flat();
-  for (const prefix of ['api', 'auth'])
-    if (
-      !rewrites.some(
-        (route: { source?: string; destination?: string }) =>
-          route.source === `/${prefix}/:path*` && route.destination === `http://127.0.0.1:${SLOTS[slot].gateway}/${prefix}/:path*`,
-      )
-    )
-      throw Error('slot_build_origin_mismatch');
+  await requireSlotRewrites(release, slot);
   await assertLargeWriteSpace();
   const assets = await archiveAssets(join(release, 'web/.next/static'), join(root, 'static'));
   const buildId = (await readFile(join(release, 'web/.next/BUILD_ID'), 'utf8')).trim();
@@ -184,8 +200,19 @@ async function prepare(slot: Slot, directory: string, sourceDirectory: string) {
   // A small startup allowance for transport/502/503/504 only. A bad route,
   // OAuth contract, wrong HTML, or exhausted retries keeps its real error.
   await pollReadiness(() => ready(slot));
-  await atomicJson(join(root, 'ready', `${slot}.json`), { ...descriptor, source, buildId, checkedAt: new Date().toISOString() });
-  await atomicJson(join(root, 'prepared-releases', `${commit}.json`), { ...descriptor, source, buildId });
+  await atomicJson(join(root, 'ready', `${slot}.json`), {
+    ...descriptor,
+    source,
+    buildId,
+    ...(receipt ? { prebuilt: true, buildObservedAt: receipt.observedAt } : {}),
+    checkedAt: new Date().toISOString(),
+  });
+  await atomicJson(join(root, 'prepared-releases', `${commit}.json`), {
+    ...descriptor,
+    source,
+    buildId,
+    ...(receipt ? { prebuilt: true, buildObservedAt: receipt.observedAt } : {}),
+  });
   console.log(JSON.stringify({ prepared: slot, commit, assets, switched: false }));
 }
 async function checkPrepared(slot: Slot): Promise<SlotRelease & { source: string }> {
@@ -200,6 +227,10 @@ async function checkPrepared(slot: Slot): Promise<SlotRelease & { source: string
     typeof record.source !== 'string'
   )
     throw Error('unverified_slot');
+  if (record.prebuilt === true) {
+    await verifyPrebuilt(descriptor.release, descriptor.commit);
+    await verifyReceiptAnchor(root, descriptor.release, descriptor.commit);
+  }
   await requirePrivacyRelease(descriptor.commit, (floor, target) => git(record.source, 'merge-base', '--is-ancestor', floor, target));
   await ready(slot);
   return { ...descriptor, source: record.source };
@@ -247,8 +278,26 @@ export async function main(args: string[]) {
     console.log(JSON.stringify(await current()));
     return;
   }
-  if (command === 'prepare' && args.length === 4) {
-    await prepare(slotOf(value), directory, source);
+  if (['prepare', 'prepare-built'].includes(command) && args.length === 4) {
+    await prepare(slotOf(value), directory, source, command === 'prepare-built');
+    return;
+  }
+  if (command === 'record-built' && args.length === 3) {
+    const release = await realpath(value);
+    const checkout = await realpath(directory);
+    await git(checkout, 'fetch', 'origin');
+    const commit = await git(checkout, 'rev-parse', 'HEAD');
+    if (
+      commit !== (await git(checkout, 'rev-parse', 'origin/main')) ||
+      (await git(checkout, 'status', '--porcelain', '--untracked-files=no'))
+    )
+      throw Error('clean_current_origin_main_required');
+    await validateRelease({ slot: 'blue', commit, release }, 'blue');
+    const tree = (await execute('git', ['-C', checkout, 'ls-tree', '-rz', '--full-tree', commit], { maxBuffer: 16 * 1024 * 1024 })).stdout;
+    await verifyArchive(release, tree);
+    const receipt = await recordPrebuilt(release, commit);
+    await anchorReceipt(root, release, commit);
+    console.log(JSON.stringify({ recorded: true, commit, buildId: receipt.buildId, observedAt: receipt.observedAt }));
     return;
   }
   if (command === 'archive-static' && args.length === 2) {
@@ -265,7 +314,7 @@ export async function main(args: string[]) {
     return;
   }
   throw Error(
-    'usage: prepare SLOT ARCHIVE_RELEASE SOURCE_CHECKOUT | archive-static RELEASE | switch SLOT | rollback SLOT | bootstrap SLOT | status',
+    'usage: prepare|prepare-built SLOT ARCHIVE_RELEASE SOURCE_CHECKOUT | record-built ARCHIVE_RELEASE SOURCE_CHECKOUT | archive-static RELEASE | switch SLOT | rollback SLOT | bootstrap SLOT | status',
   );
 }
 if (process.argv[1] === fileURLToPath(import.meta.url))
