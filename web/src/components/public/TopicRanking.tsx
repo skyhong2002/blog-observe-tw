@@ -32,7 +32,7 @@ export default function TopicRankingView({ days, load }: { days: Period; load: P
       {data ? (
         <TopicRows days={days} data={data} />
       ) : load.status === 'pending' ? (
-        <p role="status" aria-busy="true" className="text-zinc-500">
+        <p role="status" aria-busy="true" className="text-zinc-500 dark:text-zinc-400">
           正在載入近 {days} 天的話題…
         </p>
       ) : (
@@ -41,9 +41,7 @@ export default function TopicRankingView({ days, load }: { days: Period; load: P
       <FooterMethod
         page
         notes={
-          data ? (
-            <TopicMethod vocabulary={data.vocabulary} matchingPolicy={data.matchingPolicy} coverage={data.coverage} ranking />
-          ) : null
+          data ? <TopicMethod vocabulary={data.vocabulary} matchingPolicy={data.matchingPolicy} coverage={data.coverage} ranking /> : null
         }
       />
     </div>
@@ -103,13 +101,13 @@ function TopicRows({ days, data }: { days: Period; data: Topics }) {
                 <td className={table.num}>
                   {matchSplit(t)}
                   {t.matchingReason ? (
-                    <span className="ml-1 text-xs text-zinc-500" title={matchingReasonLabel(t.matchingReason)}>
+                    <span className="ml-1 text-xs text-zinc-500 dark:text-zinc-400" title={matchingReasonLabel(t.matchingReason)}>
                       只計標題
                     </span>
                   ) : null}
                 </td>
                 <td className={table.num}>{Number(t.score).toFixed(2)}</td>
-                <td className={`${table.num}${t.lift == null ? ' text-xs text-zinc-500' : ''}`} title={liftTitle}>
+                <td className={`${table.num}${t.lift == null ? ' text-xs text-zinc-500 dark:text-zinc-400' : ''}`} title={liftTitle}>
                   {formatLift(t.lift)}
                 </td>
               </tr>
@@ -118,9 +116,11 @@ function TopicRows({ days, data }: { days: Period; data: Topics }) {
         </table>
       </TableScroller>
       {!data.items.length ? (
-        <p className="py-8 text-zinc-500">這段期間尚無跨至少 {data.minimumBlogs} 個部落格的共同話題；個別站的主題可在部落格頁查看。</p>
+        <p className="py-8 text-zinc-500 dark:text-zinc-400">
+          這段期間尚無跨至少 {data.minimumBlogs} 個部落格的共同話題；個別站的主題可在部落格頁查看。
+        </p>
       ) : null}
-      {data.truncated ? <p className="text-xs text-zinc-500">僅顯示前 {data.items.length} 項。</p> : null}
+      {data.truncated ? <p className="text-xs text-zinc-500 dark:text-zinc-400">僅顯示前 {data.items.length} 項。</p> : null}
       {/* Partial coverage stays in view; the full period counts are in TopicMethod. */}
       {data.coverage && data.coverage.cappedPosts > 0 ? (
         <p role="note" className="text-xs font-medium text-zinc-700 dark:text-zinc-300">

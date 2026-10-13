@@ -1,0 +1,82 @@
+{
+  "evidenceType": "actual compiledCSS/source/PNG pixels; missing DOM computedstyle",
+  "releaseSHA": "4cc7bcd688d2cf3d56f5cf1a796d0ff92aa150b8",
+  "BUILD_ID": "2ZIfs00KopZi_HHl8ahLU",
+  "compiledCSS": {
+    "path": "/home/deck/.local/share/blog-observe/releases/4cc7bcd688d2cf3d56f5cf1a796d0ff92aa150b8/web/.next/static/chunks/2yvdx-r0s9iag.css",
+    "sha256": "8c9ab5b097ae1bab08952fd999ae06f2848b95c2fce14990a437464ac869eb83"
+  },
+  "sourceSample": {
+    "path": "web/src/components/public/TopicDetail.tsx",
+    "line": 267,
+    "classes": "mt-2 text-xs text-zinc-500",
+    "fontSizeSource": "text-xs=12px, regular; normal4.5 threshold",
+    "foreground": "#71717b",
+    "labOverride": "lab(47.8878% 1.65477 -5.77283)",
+    "background": "#0a0a0a",
+    "opacity": "Source no groupopacity found at sample; PNG supports effective solid RGB. No actual computedstyle receipt."
+  },
+  "screenshots": [
+    {
+      "path": "/home/deck/.t3/userdata/blog-sprint-4cc7bcd/topic/attempt-2/page-3-1280-dark.png",
+      "sha256": "eed2f9f872cc7290b8a1db67cfcffa5a348ad6287a119340024da4fb2e921d08",
+      "pixelRegionXYXY": [
+        466,
+        305,
+        710,
+        325
+      ],
+      "backgroundRGB": [
+        10,
+        10,
+        10
+      ],
+      "backgroundPixelCount": 3714,
+      "solidGlyphRGB": [
+        113,
+        113,
+        123
+      ],
+      "solidGlyphPixelCount": 37,
+      "method": "Existing8-bitPNG decoded offline using stdlib zlib/PNG filters; no image generated"
+    },
+    {
+      "path": "/home/deck/.t3/userdata/blog-sprint-4cc7bcd/topic/attempt-2/page-4-390-dark.png",
+      "sha256": "50581d62884048ea44b495d3f6f09d68a6e89b1505a8c7562a95d62fdfd4457f",
+      "pixelRegionXYXY": [
+        16,
+        336,
+        242,
+        355
+      ],
+      "backgroundRGB": [
+        10,
+        10,
+        10
+      ],
+      "backgroundPixelCount": 3145,
+      "solidGlyphRGB": [
+        113,
+        113,
+        123
+      ],
+      "solidGlyphPixelCount": 38,
+      "method": "Existing8-bitPNG decoded offline using stdlib zlib/PNG filters; no image generated"
+    }
+  ],
+  "ratios": {
+    "zinc500OnPage": 4.101237829195115,
+    "lab500OnPage": 4.100300489026849,
+    "zinc400OnPage": 7.54814206444775,
+    "zinc400OnZinc900": 6.754605289149313,
+    "zinc400OnZinc800": 5.678636346263947,
+    "brand400OnPage": 11.361667626070167
+  },
+  "recommendation": "For secondary text retain light class and add dark:text-zinc-400; brand400 reserved semanticlinks. Unknown ancestors/opacity need later guardedDOMmeasurement, do not bulkdeclarepass.",
+  "limitations": [
+    "Not live DOMcomputedstyle or fullWCAGscan",
+    "Historical screenshots not currentnewsourceUI acceptance",
+    "OKLCH/Lab explicit linear-sRGB clipping may differ for out-ofgamut browser perceptual gamut mapping; actualzinc colors in gamut",
+    "No browser/HTTP/build/capture performed"
+  ]
+}

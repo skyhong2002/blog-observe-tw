@@ -74,7 +74,7 @@ function TopicBlogs({ blogs }: { blogs: TopicDetail['blogs'] }) {
             <span className="shrink-0 tabular-nums">
               {b.posts} 篇
               {typeof b.titlePosts === 'number' && typeof b.bodyOnlyPosts === 'number' ? (
-                <span className="ml-1 text-xs text-zinc-500">
+                <span className="ml-1 text-xs text-zinc-500 dark:text-zinc-400">
                   （標題 {b.titlePosts}／僅正文 {b.bodyOnlyPosts}）
                 </span>
               ) : null}
@@ -93,11 +93,13 @@ function HistoryList({ history }: { history: Pick<TopicHistory, 'articles'> }) {
       {historyRows(history).map((a) => (
         <li className="py-4" key={a.id}>
           <ArticleTitle url={a.url} title={a.title} />
-          <p className="mt-2 text-xs text-zinc-500">
+          <p className="mt-2 text-xs text-zinc-500 dark:text-zinc-400">
             <Link {...blogLink(a.blogSlug, a.blogCanonicalPath)}>{a.blogName}</Link>
             {a.publishedAt ? ` · ${taipei(a.publishedAt)}` : null}
           </p>
-          <p className={`mt-1 text-xs ${a.evidenceState === 'pending' ? 'font-medium text-zinc-700 dark:text-zinc-300' : 'text-zinc-500'}`}>
+          <p
+            className={`mt-1 text-xs ${a.evidenceState === 'pending' ? 'font-medium text-zinc-700 dark:text-zinc-300' : 'text-zinc-500 dark:text-zinc-400'}`}
+          >
             {evidenceLabel(a.evidenceState, taipei(a.observedAt))}
           </p>
         </li>
@@ -115,7 +117,7 @@ function HistoryMore({ id, days, cursor }: { id: string; days: Period; cursor: s
   const [open, setOpen] = useState(false);
   const usable = isHistoryCursor(cursor);
   const load = usePublicJson(open && usable ? topicApiPath(id, days, cursor) : null, parseDetail);
-  if (!usable) return <p className="py-4 text-xs text-zinc-500">還有更多歷史文章，但目前無法載入下一頁。</p>;
+  if (!usable) return <p className="py-4 text-xs text-zinc-500 dark:text-zinc-400">還有更多歷史文章，但目前無法載入下一頁。</p>;
   if (!open || !load) {
     return (
       <button type="button" onClick={() => setOpen(true)} className="mt-2 text-sm text-brand-700 hover:underline dark:text-brand-400">
@@ -125,7 +127,7 @@ function HistoryMore({ id, days, cursor }: { id: string; days: Period; cursor: s
   }
   if (load.status === 'pending') {
     return (
-      <p role="status" aria-busy="true" className="py-4 text-sm text-zinc-500">
+      <p role="status" aria-busy="true" className="py-4 text-sm text-zinc-500 dark:text-zinc-400">
         正在載入更多歷史文章…
       </p>
     );
@@ -133,7 +135,7 @@ function HistoryMore({ id, days, cursor }: { id: string; days: Period; cursor: s
   const page = load.status === 'ready' ? load.data.history : undefined;
   if (!page) {
     return (
-      <p className="py-4 text-sm text-zinc-500">
+      <p className="py-4 text-sm text-zinc-500 dark:text-zinc-400">
         無法載入更多歷史文章。
         <button type="button" onClick={() => setOpen(false)} className="ml-1 text-brand-700 hover:underline dark:text-brand-400">
           稍後再試
@@ -159,7 +161,7 @@ function TopicHistorySection({ id, days, history }: { id: string; days: Period; 
         近 {days} 天沒有新的相關文章。以下是過去曾比對到這個詞的文章，只列原站標題與連結；標示「待重新確認」的文章不代表目前仍命中。
       </p>
       {summary || history.lastObservedAt ? (
-        <p className="mt-1 text-xs text-zinc-500">
+        <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
           {[summary, history.lastObservedAt ? `最近觀測：${taipei(history.lastObservedAt)}` : ''].filter(Boolean).join(' · ')}
         </p>
       ) : null}
@@ -231,7 +233,9 @@ export default function TopicDetailView({
               原因：{inactiveReasonLabel(data.topic.inactiveReason)}
               。這不代表它是雜訊：完整的詞仍保留在詞庫中可查，只是本次比對未納入，所以這裡沒有部落格與文章。
             </p>
-            {sourceActivity(data.topic) ? <p className="mt-1 text-xs text-zinc-500">{sourceActivity(data.topic)}</p> : null}
+            {sourceActivity(data.topic) ? (
+              <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">{sourceActivity(data.topic)}</p>
+            ) : null}
           </section>
           <VocabularySummary data={data.vocabulary} />
         </>
@@ -264,27 +268,27 @@ export default function TopicDetailView({
                   {data.articles.map((a) => (
                     <li className="py-4" key={a.id}>
                       <ArticleTitle url={a.url} title={a.title} />
-                      <p className="mt-2 text-xs text-zinc-500">
+                      <p className="mt-2 text-xs text-zinc-500 dark:text-zinc-400">
                         <Link {...blogLink(a.blogSlug, a.blogCanonicalPath)}>{a.blogName}</Link> · {taipei(a.publishedAt)}
                       </p>
                     </li>
                   ))}
                 </ul>
-                {!data.articles.length ? <p className="py-6 text-zinc-500">此期間尚無已比對文章。</p> : null}
+                {!data.articles.length ? <p className="py-6 text-zinc-500 dark:text-zinc-400">此期間尚無已比對文章。</p> : null}
               </section>
               <TopicBlogs blogs={data.blogs} />
             </div>
           )}
-          {data.truncated ? <p className="text-xs text-zinc-500">僅顯示部分來源與文章。</p> : null}
+          {data.truncated ? <p className="text-xs text-zinc-500 dark:text-zinc-400">僅顯示部分來源與文章。</p> : null}
           <SharedTopicLabels value={data.sharedLabels} tag={data.topic.label} />
           <VocabularySummary data={data.vocabulary} />
         </>
       ) : load.status === 'gone' ? (
-        <p role="status" className="text-sm text-zinc-500">
+        <p role="status" className="text-sm text-zinc-500 dark:text-zinc-400">
           此話題的文章比對證據已全部撤銷，不再提供內容。
         </p>
       ) : load.status === 'pending' ? (
-        <p role="status" aria-busy="true" className="text-sm text-zinc-500">
+        <p role="status" aria-busy="true" className="text-sm text-zinc-500 dark:text-zinc-400">
           正在載入近 {days} 天的話題資料…
         </p>
       ) : (
