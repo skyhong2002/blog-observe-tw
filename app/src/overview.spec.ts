@@ -3,6 +3,91 @@ import { buildApp } from './app.js';
 import { loadOverview } from './overview.js';
 
 describe('read-only frontend projection', () => {
+  it('home view queries only its bounded visible rows and omits the full blog catalog', async () => {
+    const statements: string[] = [];
+    let active = 0,
+      peak = 0;
+    const pool = {
+      query: async (sql: string) => {
+        statements.push(sql);
+        active++;
+        peak = Math.max(peak, active);
+        await Promise.resolve();
+        active--;
+        return [sql.includes('AS blogs,') ? [{ blogs: 2, posts: 7, updatedAt: null }] : []];
+      },
+    };
+    const data = await loadOverview(pool, { home: true });
+    expect(statements).toHaveLength(5);
+    expect(peak).toBe(2);
+    expect(statements.filter((sql) => sql.includes('LIMIT 7'))).toHaveLength(1);
+    expect(statements.filter((sql) => sql.includes('LIMIT 30'))).toHaveLength(1);
+    expect(statements.filter((sql) => sql.includes('LIMIT 8'))).toHaveLength(1);
+    expect(statements.filter((sql) => sql.includes('LIMIT 10'))).toHaveLength(1);
+    expect(statements.some((sql) => sql.includes('b.description'))).toBe(false);
+    expect(statements.some((sql) => sql.includes('ORDER BY postCount DESC'))).toBe(false);
+    expect(statements.every((sql) => sql.includes("status='verified'"))).toBe(true);
+    expect(statements[1]).toContain("t.visibility='public'");
+    expect(statements[1]).toContain("pt.status='active'");
+    expect(data.blogs).toEqual([]);
+    expect(data.view).toBe('home');
+    expect(data.cacheSeconds).toBe(0);
+  });
+  it('home request starting after hide commit reads independently while the older request is blocked', async () => {
+    let hidden = false,
+      release!: () => void,
+      first = true;
+    const barrier = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const query = vi.fn(async (sql: string) => {
+      if (sql.includes('p.summary')) {
+        const rows = hidden ? [] : [{ title: 'old visible', publishedAt: null }];
+        if (first) {
+          first = false;
+          await barrier;
+        }
+        return [rows];
+      }
+      return [sql.includes('AS blogs,') ? [{ blogs: hidden ? 0 : 1, posts: hidden ? 0 : 1, updatedAt: null }] : []];
+    });
+    const pool = { query };
+    const a = loadOverview(pool, { home: true });
+    hidden = true;
+    const b = await loadOverview(pool, { home: true });
+    expect(b.posts).toEqual([]);
+    expect(b.totals.blogs).toBe(0);
+    release();
+    expect((await a).posts).toHaveLength(1);
+    expect(query).toHaveBeenCalledTimes(10);
+  });
+  it('overview view input is bounded and all outcomes stay no-store', async () => {
+    const query = vi.fn(async (sql: string) => [sql.includes('AS blogs,') ? [{ blogs: 0, posts: 0, updatedAt: null }] : []]);
+    const app = await buildApp(
+      { login: null, uiOrigin: 'http://127.0.0.1:1', port: 18165 },
+      {
+        // @ts-expect-error JS gateway accepts injected pool.
+        store: { pool: { query } },
+      },
+    );
+    try {
+      const bad = await app.inject('/api/overview?view=unknown');
+      expect(bad.statusCode).toBe(400);
+      expect(bad.headers['cache-control']).toContain('no-store');
+      expect(query).not.toHaveBeenCalled();
+      const home = await app.inject('/api/overview?view=home');
+      expect(home.statusCode).toBe(200);
+      expect(home.json().view).toBe('home');
+      expect(home.headers['cache-control']).toContain('no-store');
+      expect(query).toHaveBeenCalledTimes(5);
+      const full = await app.inject('/api/overview');
+      expect(full.statusCode).toBe(200);
+      expect(full.json()).not.toHaveProperty('view');
+      expect(query).toHaveBeenCalledTimes(11);
+    } finally {
+      await app.close();
+    }
+  });
   it('reads each homepage independently and rejects overflow without retaining completed content', async () => {
     let release!: () => void;
     const barrier = new Promise<void>((resolve) => {

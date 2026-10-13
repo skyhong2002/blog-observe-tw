@@ -20,6 +20,80 @@ const topicRow = (id: string, blogs: number, matchedPosts = 5) => ({
 });
 
 describe('fresh topic ranking coverage', () => {
+  it('home view performs one exact ranking read with no full coverage or vocabulary projection', async () => {
+    const queries: string[] = [];
+    const pool = {
+      query: async (sql: string) => {
+        queries.push(sql);
+        return [[topicRow('tag:home', 2)]];
+      },
+    } as unknown as Pool;
+    const app = Fastify();
+    registerTopicRoutes(app, pool);
+    try {
+      const response = await app.inject('/api/topics?days=30&view=home');
+      expect(response.headers['cache-control']).toBe('no-store');
+      expect(response.statusCode).toBe(200);
+      expect(response.json()).toMatchObject({ view: 'home', days: 30, limit: 8, minimumBlogs: 2, cacheSeconds: 0 });
+      expect(response.json()).not.toHaveProperty('coverage');
+      expect(response.json()).not.toHaveProperty('vocabulary');
+      expect(queries).toHaveLength(1);
+      expect(queries[0]).not.toContain('ROW_NUMBER');
+      expect(queries[0]).toContain('LIMIT 9');
+      expect(queries[0]).toContain('SELECT DISTINCT p.id,p.blog_id,p.published_at,i.snapshot_id');
+      expect(queries[0]).toContain("b.status='verified'");
+      expect(queries[0]).toContain('(i.post_hash<=>p.content_hash)');
+      expect(queries[0]).toContain('(i.body_hash<=>');
+      expect(queries[0]).toContain('t.exclusion_reason IS NULL');
+      expect(queries[0]).toContain('t.inactive_reason IS NULL');
+      for (const path of ['/api/topics?view=bad', '/api/topics?days=bad&view=home']) {
+        const bad = await app.inject(path);
+        expect(bad.statusCode).toBe(400);
+        expect(bad.headers['cache-control']).toBe('no-store');
+      }
+      expect(queries).toHaveLength(1);
+    } finally {
+      await app.close();
+    }
+  });
+  it('home ranking after a hide commit does not inherit the older in-flight result', async () => {
+    let hidden = false,
+      release!: () => void,
+      started!: () => void;
+    const barrier = new Promise<void>((resolve) => {
+        release = resolve;
+      }),
+      reading = new Promise<void>((resolve) => {
+        started = resolve;
+      });
+    let reads = 0;
+    const pool = {
+      query: async () => {
+        reads++;
+        const rows = hidden ? [] : [topicRow('tag:old', 2)];
+        if (reads === 1) {
+          started();
+          await barrier;
+        }
+        return [rows];
+      },
+    } as unknown as Pool;
+    const app = Fastify();
+    registerTopicRoutes(app, pool);
+    try {
+      const a = app.inject('/api/topics?days=30&view=home');
+      await reading;
+      hidden = true;
+      const b = await app.inject('/api/topics?days=30&view=home');
+      expect(b.json().items).toEqual([]);
+      expect(reads).toBe(2);
+      release();
+      expect((await a).json().items).toHaveLength(1);
+    } finally {
+      release();
+      await app.close();
+    }
+  });
   it('retains coverage when all matched topics have only one blog', async () => {
     const queries: string[] = [];
     const pool = {

@@ -1,24 +1,26 @@
 // Layout and CSS copied from tag.observe.tw homepage at afe0a65; blog data replaces news-specific measures.
 
+import { Suspense } from 'react';
 import BlogIcon from '@/components/BlogIcon';
 import Link from '@/components/NoPrefetchLink';
 import { plainText, taipei } from '@/lib/api';
 import { recentBlogRows } from '@/lib/home';
 import { externalHref } from '@/lib/images';
-import { blogHref, blogLink, topicLink } from '@/lib/page-links';
-import { overview, publicJson } from '@/lib/public-api';
-import { topicsApiPath } from '@/lib/public-query';
+import { blogHref, blogLink } from '@/lib/page-links';
+import { homeOverview } from '@/lib/public-api';
 import { serializeJsonLd, siteSchema, staticPageMetadata } from '@/lib/seo';
-import type { Topics } from '@/lib/topics';
+import HomeTopicRanking, { HomeTopicsPending } from './_home/HomeTopics';
 import styles from './_home/home.module.css';
 import MastheadCloud from './_home/MastheadCloud';
 import NewsImage from './_home/NewsImage';
 // Rendered per request with no-store reads (public-read.ts): no stored page can
 // keep showing an article the gateway has since hidden. A failed read throws.
+// Only the bounded overview is awaited here; the topic ranking streams in its own
+// Suspense (HomeTopics.tsx) and its failure throws to the same error boundary.
 export const dynamic = 'force-dynamic';
 export const metadata = staticPageMetadata('/');
 export default async function HomePage() {
-  const [data, topics] = await Promise.all([overview(), publicJson<Topics>(topicsApiPath('30'))]);
+  const data = await homeOverview();
   const [lead, ...rest] = data.posts;
   const recentBlogs = recentBlogRows(data, 10);
   const postHref = (post: { url?: string | null; blogSlug?: string; blogCanonicalPath?: string }) =>
@@ -38,25 +40,9 @@ export default async function HomePage() {
               <h2>最近共同話題</h2>
               <Link href="/topics/">完整排行 →</Link>
             </div>
-            {topics?.items.length ? (
-              <ol className={styles.ranking}>
-                {topics.items.slice(0, 8).map((tag, i) => (
-                  <li key={tag.id}>
-                    <Link {...topicLink(tag.id, tag.canonicalPath, '30')}>
-                      <span className={styles.rank}>{String(i + 1).padStart(2, '0')}</span>
-                      <span className={styles.rankBody}>
-                        <strong>{tag.label}</strong>
-                        <small>
-                          {tag.blogs} 個部落格 · {tag.posts} 篇 · {tag.source === 'rss-category' ? 'RSS' : '共同詞彙'}
-                        </small>
-                      </span>
-                    </Link>
-                  </li>
-                ))}
-              </ol>
-            ) : (
-              <p className={styles.notice}>{topics ? '最近 30 天尚無足夠的共同話題。' : '話題資料暫時無法讀取。'}</p>
-            )}
+            <Suspense fallback={<HomeTopicsPending />}>
+              <HomeTopicRanking />
+            </Suspense>
             <p className={styles.muted}>近 30 天；同站貢獻逐次遞減，至少兩站參與。RSS 標籤與共同詞彙分開列出。</p>
             <div className={`${styles.sectionHeading} ${styles.sectionHeadingLater}`}>
               <h2>作者動態</h2>

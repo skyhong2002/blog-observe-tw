@@ -2,7 +2,8 @@ import assert from 'node:assert/strict';
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { test } from 'node:test';
-import { assertPublicApiPath, isPublicApiPath, PUBLIC_KINDS } from '../src/lib/public-paths.ts';
+import { assertPublicApiPath, isPublicApiPath, PUBLIC_KINDS, publicKindOf } from '../src/lib/public-paths.ts';
+import { HOME_OVERVIEW_PATH, homeTopicsApiPath } from '../src/lib/public-query.ts';
 import { PUBLIC_RETRY_MS, PublicGatewayError, publicInit, readPublic } from '../src/lib/public-read.ts';
 import { EMPTY, json, PATHS } from './public-payloads.ts';
 
@@ -86,6 +87,42 @@ test('public gateway paths: no other origin, route, key or encoding trick', () =
   ])
     assert.equal(isPublicApiPath(path), false, path);
   assert.throws(() => assertPublicApiPath('/api/me/follows'), /Not a public gateway path/);
+});
+
+test('public gateway paths: view=home is exact, only on overview and topics, and is its own kind', () => {
+  assert.equal(publicKindOf('/api/overview?view=home'), 'homeOverview');
+  assert.equal(publicKindOf('/api/topics?days=30&view=home'), 'homeTopics');
+  assert.equal(publicKindOf('/api/topics?view=home&days=30'), 'homeTopics');
+  assert.equal(publicKindOf(HOME_OVERVIEW_PATH), 'homeOverview');
+  for (const days of ['7', '30', '90'] as const) assert.equal(publicKindOf(homeTopicsApiPath(days)), 'homeTopics', days);
+  // The full pages keep their own kinds and contracts.
+  assert.equal(publicKindOf('/api/overview'), 'overview');
+  assert.equal(publicKindOf('/api/topics?days=30'), 'topics');
+  for (const path of [
+    '/api/overview?view=',
+    '/api/overview?view=full',
+    '/api/overview?view=HOME',
+    '/api/overview?view=home%20',
+    '/api/overview?view=home&view=home',
+    '/api/overview?view=home&x=1',
+    '/api/overview?view=home&days=30',
+    '/api/overview?view=constructor',
+    '/api/overview?view=__proto__',
+    '/api/overview?view=toString',
+    '/api/topics?days=30&view=full',
+    '/api/topics?days=30&view=home&view=home',
+    '/api/topics?days=30&view=home&cookie=a',
+    '/api/topics/rss%3A1?days=30&view=home',
+    '/api/relations?days=90&view=home',
+    '/api/catalog?view=home',
+    '/api/tech?view=home',
+    '/api/blogs/a?view=home',
+    '/api/blogs/a/topics?days=90&view=home',
+    '/api/blogs/a/relations?days=90&view=home',
+    '/api/me/follows?view=home',
+    '/api/admin/session?view=home',
+  ])
+    assert.equal(publicKindOf(path), null, path);
 });
 
 /* Read rules --------------------------------------------------------------- */

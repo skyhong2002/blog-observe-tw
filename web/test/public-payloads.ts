@@ -117,6 +117,31 @@ export const EMPTY: Record<PublicKind, unknown> = {
     filters: { q: '', technology: '', status: '' },
   },
   blogTech: { generatedAt: '2026-10-12T00:00:00.000Z', method: techMethod, blog: notObservedBlog },
+  // view=home (app/src/overview.js loadHomeProjection, topics/routes.ts): marked, bounded, no directory rows,
+  // and no vocabulary or coverage on the topic list.
+  homeOverview: {
+    view: 'home',
+    generatedAt: '2026-10-12T00:00:00.000Z',
+    cacheSeconds: 0,
+    posts: [],
+    tags: [],
+    authors: [],
+    blogs: [],
+    recentBlogs: [],
+    totals: { blogs: 0, posts: 0 },
+    updatedAt: null,
+  },
+  homeTopics: {
+    view: 'home',
+    generatedAt: '2026-10-12T00:00:00.000Z',
+    cacheSeconds: 0,
+    days: 30,
+    source: 'tag-vocabulary',
+    items: [],
+    truncated: false,
+    minimumBlogs: 2,
+    limit: 8,
+  },
   // app/src/seo/page-api.ts: zero counts are a valid registered page (counts never gate indexing).
   blogPage: {
     page: {
@@ -164,6 +189,8 @@ export const PATHS: Record<PublicKind, string> = {
   blogTech: '/api/blogs/a/tech',
   blogPage: '/api/pages/blogs/example.com',
   topicPage: '/api/pages/topics/%E6%97%85%E8%A1%8C',
+  homeOverview: '/api/overview?view=home',
+  homeTopics: '/api/topics?days=30&view=home',
 };
 
 export const json = (status: number, body: unknown = { ok: true }) =>

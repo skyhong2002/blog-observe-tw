@@ -34,17 +34,24 @@ export const PUBLIC_KINDS = [
   'blogTech',
   'blogPage',
   'topicPage',
+  'homeOverview',
+  'homeTopics',
 ] as const;
 export type PublicKind = (typeof PUBLIC_KINDS)[number];
 
-type Rule = { kind: PublicKind; path: RegExp; query: readonly string[] };
+/**
+ * `views`: the only `?view=` values a rule takes, each answering with its own kind (and contract). Exact text,
+ * once; any other value, or `view` on a rule without views, is not a public path.
+ */
+type Rule = { kind: PublicKind; path: RegExp; query: readonly string[]; views?: Readonly<Record<string, PublicKind>> };
 const blogPath = (tail: string) => new RegExp(`^/api/blogs/${SEGMENT}${tail}$`);
 const RULES: readonly Rule[] = [
-  { kind: 'overview', path: /^\/api\/overview$/, query: [] },
+  // view=home: the homepage's bounded projections (app/src/app.js, overview.js; topics/routes.ts).
+  { kind: 'overview', path: /^\/api\/overview$/, query: [], views: { home: 'homeOverview' } },
   { kind: 'catalog', path: /^\/api\/catalog$/, query: ['q', 'category', 'status', 'sort', 'dir', 'page', 'limit'] },
   { kind: 'authors', path: /^\/api\/catalog\/authors$/, query: ['author', 'page', 'limit'] },
   { kind: 'search', path: /^\/api\/search$/, query: ['q', 'page', 'limit', 'blog'] },
-  { kind: 'topics', path: /^\/api\/topics$/, query: ['days'] },
+  { kind: 'topics', path: /^\/api\/topics$/, query: ['days'], views: { home: 'homeTopics' } },
   { kind: 'topic', path: new RegExp(`^/api/topics/${SEGMENT}$`), query: ['days', 'historyCursor'] },
   { kind: 'relations', path: /^\/api\/relations$/, query: ['days'] },
   { kind: 'traffic', path: /^\/api\/traffic$/, query: ['blog'] },
@@ -98,11 +105,16 @@ export function publicKindOf(path: string): PublicKind | null {
     return null;
   }
   const seen = new Set<string>();
+  let kind = rule.kind;
   for (const [key, value] of params) {
-    if (!rule.query.includes(key) || seen.has(key) || value.length > VALUE_MAX) return null;
+    if (seen.has(key) || value.length > VALUE_MAX) return null;
     seen.add(key);
+    if (key === 'view') {
+      if (!rule.views || !Object.hasOwn(rule.views, value)) return null;
+      kind = rule.views[value];
+    } else if (!rule.query.includes(key)) return null;
   }
-  return rule.kind;
+  return kind;
 }
 
 export const isPublicApiPath = (path: string) => publicKindOf(path) !== null;

@@ -2,7 +2,7 @@ import 'server-only';
 import { cache } from 'react';
 import type { AuthorCatalog, AuthorCatalogQuery, Blog, Catalog, CatalogQuery, Overview, Post } from './api';
 import { type PageKind, type PublicPageInfo, pageApiPath, pageInfoOf, pageKeyOfParam } from './page-links';
-import { authorApiPath, catalogApiPath } from './public-query';
+import { authorApiPath, catalogApiPath, HOME_OVERVIEW_PATH } from './public-query';
 import { PublicGatewayError, readPublic } from './public-read';
 import { gatewayOrigin } from './server-gateway';
 
@@ -36,6 +36,8 @@ export async function publicJsonOrNull<T>(path: string): Promise<T | null> {
 }
 
 export const overview = () => publicJson<Overview>('/api/overview');
+/** The homepage's bounded overview (homeOverview contract): the same shape, a few rows of each. */
+export const homeOverview = () => publicJson<Overview>(HOME_OVERVIEW_PATH);
 export const catalog = (query: CatalogQuery = {}) => publicJson<Catalog>(catalogApiPath(query));
 export const authorCatalog = (query: AuthorCatalogQuery = {}) => publicJson<AuthorCatalog>(authorApiPath(query));
 

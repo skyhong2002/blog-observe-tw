@@ -136,9 +136,10 @@ export async function buildApp(config, { logger = false, store = null } = {}) {
     }
   });
 
-  app.get('/api/overview', async (_request, reply) => {
+  app.get('/api/overview', async (request, reply) => {
     reply.header('cache-control', 'no-store');
-    return loadOverview(pool);
+    if (request.query?.view !== undefined && request.query.view !== 'home') return reply.code(400).send({ error: 'invalid_view' });
+    return loadOverview(pool, { home: request.query?.view === 'home' });
   });
 
   app.get('/api/tags/:slug', async (request, reply) => {

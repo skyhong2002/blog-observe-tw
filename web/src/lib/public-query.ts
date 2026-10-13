@@ -111,6 +111,9 @@ export function periodOf(query: QueryReader, fallback: Period): Period {
 }
 
 export const topicsApiPath = (days: Period) => `/api/topics?days=${days}`;
+/** The homepage's bounded projections (view=home): their own kinds and contracts, never the full pages' payloads. */
+export const HOME_OVERVIEW_PATH = '/api/overview?view=home';
+export const homeTopicsApiPath = (days: Period) => `/api/topics?days=${days}&view=home`;
 export const relationsApiPath = (days: Period) => `/api/relations?days=${days}`;
 /** `id` is always the stable topic id (never the readable canonical path); `historyCursor` asks for the next history page. */
 export function topicApiPath(id: string, days: Period, historyCursor?: string) {

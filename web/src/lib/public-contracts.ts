@@ -101,6 +101,69 @@ const sharedTags = (value: unknown) => {
   });
 };
 
+/** The full overview's keys (app/src/overview.js loadProjection). */
+const overviewShape = {
+  posts: rows,
+  tags: rows,
+  authors: rows,
+  blogs: rows,
+  recentBlogs: optional(rows),
+  totals: (value: unknown) => shape(value, { blogs: number, posts: number }),
+  updatedAt: optional(nullable(text)),
+};
+const atMost = (max: number) => (value: unknown) => list(value) && value.length <= max;
+/**
+ * A recent blog's latestPost (lib/home.ts RecentPost): absent (looked up in `posts`), null (no collected post), or
+ * what recentBlogRows reads: a title it trims, a url or null, a publish time or null, and the post id when sent.
+ */
+const recentPost = (value: unknown) => shape(value, { id: optional(count), title: text, url: nullable(text), publishedAt: nullable(text) });
+/**
+ * /api/overview?view=home (loadHomeProjection): marked view 'home', the overview's shape at the homepage's bounds,
+ * recentBlogs always sent and no directory rows. A full overview (no mark, 200 posts, its blogs) is not this answer.
+ */
+const homeOverview = (raw: unknown) =>
+  shape(raw, overviewShape) &&
+  shape(raw, {
+    view: (v) => v === 'home',
+    posts: atMost(7),
+    tags: atMost(30),
+    authors: atMost(8),
+    blogs: atMost(0),
+    // Only the keys the homepage's recent-blog rows need are promised (recentBlogRows, BlogIcon, blogLink).
+    recentBlogs: (value) => rows(value, { slug: text, name: text, latestPost: optional(nullable(recentPost)) }) && atMost(10)(value),
+  });
+/**
+ * /api/topics?view=home (topics/routes.ts): marked view 'home', the top `limit` (8) of the shared vocabulary with
+ * at least two blogs, and none of the full ranking's vocabulary or coverage, so a full payload cannot pass for it.
+ */
+const homeTopics = (raw: unknown) => {
+  if (
+    !shape(raw, {
+      view: (v) => v === 'home',
+      generatedAt: text,
+      cacheSeconds: (v) => v === 0,
+      days: count,
+      source: (v) => v === 'tag-vocabulary',
+      items: (items) =>
+        rows(items, {
+          id: text,
+          label: text,
+          canonicalPath: optional(text),
+          source: oneOf('rss-category', 'tag-vocabulary'),
+          posts: count,
+          blogs: count,
+        }),
+      truncated: boolean,
+      minimumBlogs: (v) => v === 2,
+      limit: (v) => v === 8,
+      vocabulary: (v) => v === undefined,
+      coverage: (v) => v === undefined,
+    })
+  )
+    return false;
+  return (raw.items as unknown[]).length <= (raw.limit as number);
+};
+
 const techStatus = oneOf('detected', 'unknown', 'failed', 'blocked', 'not-observed');
 const techCategory = oneOf('cms', 'framework', 'theme', 'plugin', 'analytics', 'hosting', 'cdn');
 const techErrorCode = oneOf('robots', 'waf', 'rate-limit', 'http-error', 'timeout', 'network', 'invalid-response');
@@ -199,16 +262,9 @@ const techCoverage = (value: unknown) => {
 };
 
 export const PUBLIC_CONTRACTS: Record<PublicKind, (raw: unknown) => boolean> = {
-  overview: (raw) =>
-    shape(raw, {
-      posts: rows,
-      tags: rows,
-      authors: rows,
-      blogs: rows,
-      recentBlogs: optional(rows),
-      totals: (value) => shape(value, { blogs: number, posts: number }),
-      updatedAt: optional(nullable(text)),
-    }),
+  overview: (raw) => shape(raw, overviewShape),
+  homeOverview,
+  homeTopics,
   catalog: (raw) =>
     shape(raw, {
       blogs: (value) => rows(value, { slug: text, name: text }),
@@ -227,6 +283,7 @@ export const PUBLIC_CONTRACTS: Record<PublicKind, (raw: unknown) => boolean> = {
       filters: (value) => shape(value, { author: nullable(number) }),
     }),
   search: (raw) => shape(raw, { items: list }),
+  // The full ranking: vocabulary stays required (the homepage's view=home answer is homeTopics).
   topics: (raw) => shape(raw, { items: topicItems, vocabulary: object }),
   topic: (raw) =>
     shape(raw, {

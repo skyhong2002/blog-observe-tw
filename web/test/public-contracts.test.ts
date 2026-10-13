@@ -229,3 +229,116 @@ test('contracts: each required container of the wrong type fails', () => {
   for (const [kind, key, value] of cases)
     assert.equal(validPublicPayload(kind, with_(kind, key, value)), false, `${kind}.${key} = ${JSON.stringify(value)}`);
 });
+
+/* view=home ---------------------------------------------------------------- */
+
+// Synthetic homepage rows: no real article, author or blog.
+const HOME_TOPIC = { id: 'rss:1', label: '旅行', source: 'tag-vocabulary', score: 1.5, posts: 4, blogs: 2 };
+const RECENT_BLOG = {
+  id: 1,
+  slug: 'a',
+  name: '甲',
+  url: 'https://a.example/',
+  lastPublishedAt: '2026-10-01T00:00:00.000Z',
+  iconUrl: null,
+  latestPost: { id: 1, title: '甲文', url: 'https://a.example/p/1', publishedAt: '2026-10-01T00:00:00.000Z' },
+};
+const many = (n: number, row: object) => Array.from({ length: n }, () => row);
+
+test('contracts: the homepage answers are their own kinds, full at their bounds', () => {
+  const homeOverview = {
+    ...(EMPTY.homeOverview as object),
+    posts: many(7, { id: 1, title: '甲文' }),
+    tags: many(30, { slug: '旅行', label: '旅行', postCount: 1, blogCount: 1 }),
+    authors: many(8, { id: 1, displayName: '甲' }),
+    recentBlogs: many(10, RECENT_BLOG),
+    totals: { blogs: 10, posts: 70 },
+    updatedAt: '2026-10-12T00:00:00.000Z',
+  };
+  assert.equal(validPublicPayload('homeOverview', homeOverview), true);
+  // latestPost: null (no collected post), absent (looked up in posts), or what recentBlogRows reads, nulls included.
+  const { latestPost: _latest, ...withoutLatest } = RECENT_BLOG;
+  for (const blog of [
+    { ...RECENT_BLOG, latestPost: null },
+    withoutLatest,
+    { ...RECENT_BLOG, latestPost: { ...RECENT_BLOG.latestPost, url: null, publishedAt: null } },
+    { ...RECENT_BLOG, latestPost: without(RECENT_BLOG.latestPost, 'id') },
+    { ...RECENT_BLOG, latestPost: { ...RECENT_BLOG.latestPost, title: '' } },
+  ])
+    assert.equal(validPublicPayload('homeOverview', with_('homeOverview', 'recentBlogs', [blog])), true, JSON.stringify(blog));
+  const homeTopics = { ...(EMPTY.homeTopics as object), items: many(8, HOME_TOPIC), truncated: true };
+  assert.equal(validPublicPayload('homeTopics', homeTopics), true);
+  assert.equal(
+    validPublicPayload('homeTopics', { ...homeTopics, items: [{ ...HOME_TOPIC, canonicalPath: '/topics/%E6%97%85%E8%A1%8C/' }] }),
+    true,
+  );
+  // The compact overview is still an overview; the compact topics are not the full ranking (no vocabulary).
+  assert.equal(validPublicPayload('overview', homeOverview), true);
+  // The full overview's contract is unchanged: its recentBlogs rows are not checked further here.
+  assert.equal(validPublicPayload('overview', { ...(EMPTY.overview as object), recentBlogs: [{ ...RECENT_BLOG, latestPost: {} }] }), true);
+  assert.equal(validPublicPayload('topics', homeTopics), false);
+});
+
+test('contracts: a full payload cannot pass for a homepage one, nor a malformed compact one', () => {
+  // The full answers, as /api/overview and /api/topics?days=30 send them: no view mark, full bounds, vocabulary.
+  assert.equal(validPublicPayload('homeOverview', EMPTY.overview), false);
+  assert.equal(validPublicPayload('homeTopics', EMPTY.topics), false);
+  assert.equal(validPublicPayload('homeTopics', { ...(EMPTY.topics as object), view: 'home' }), false);
+  const cases: Array<[PublicKind, string, unknown]> = [
+    ['homeOverview', 'view', undefined],
+    ['homeOverview', 'view', 'full'],
+    ['homeOverview', 'view', 'HOME'],
+    ['homeOverview', 'posts', many(8, {})],
+    ['homeOverview', 'tags', many(31, {})],
+    ['homeOverview', 'authors', many(9, {})],
+    ['homeOverview', 'blogs', [RECENT_BLOG]],
+    ['homeOverview', 'recentBlogs', undefined],
+    ['homeOverview', 'recentBlogs', many(11, RECENT_BLOG)],
+    ['homeOverview', 'recentBlogs', [{ ...RECENT_BLOG, slug: undefined }]],
+    ['homeOverview', 'recentBlogs', [{ ...RECENT_BLOG, name: 1 }]],
+    // A latestPost recentBlogRows would crash on (latest.title.trim) or misread.
+    ...[
+      {},
+      [],
+      'x',
+      0,
+      without(RECENT_BLOG.latestPost, 'title'),
+      without(RECENT_BLOG.latestPost, 'url'),
+      without(RECENT_BLOG.latestPost, 'publishedAt'),
+      { ...RECENT_BLOG.latestPost, title: null },
+      { ...RECENT_BLOG.latestPost, title: 1 },
+      { ...RECENT_BLOG.latestPost, title: { text: '甲文' } },
+      { ...RECENT_BLOG.latestPost, url: {} },
+      { ...RECENT_BLOG.latestPost, url: 1 },
+      { ...RECENT_BLOG.latestPost, publishedAt: 0 },
+      { ...RECENT_BLOG.latestPost, publishedAt: [] },
+      { ...RECENT_BLOG.latestPost, id: '1' },
+      { ...RECENT_BLOG.latestPost, id: -1 },
+      { ...RECENT_BLOG.latestPost, id: 1.5 },
+      { ...RECENT_BLOG.latestPost, id: null },
+    ].map((latestPost): [PublicKind, string, unknown] => ['homeOverview', 'recentBlogs', [{ ...RECENT_BLOG, latestPost }]]),
+    ['homeOverview', 'totals', { blogs: '1', posts: 1 }],
+    ['homeOverview', 'posts', null],
+    ['homeTopics', 'view', undefined],
+    ['homeTopics', 'view', 'full'],
+    ['homeTopics', 'generatedAt', undefined],
+    ['homeTopics', 'cacheSeconds', 60],
+    ['homeTopics', 'cacheSeconds', undefined],
+    ['homeTopics', 'days', '30'],
+    ['homeTopics', 'source', 'rss-category'],
+    ['homeTopics', 'items', undefined],
+    ['homeTopics', 'items', many(9, HOME_TOPIC)],
+    ['homeTopics', 'items', [{ ...HOME_TOPIC, label: undefined }]],
+    ['homeTopics', 'items', [{ ...HOME_TOPIC, posts: '4' }]],
+    ['homeTopics', 'items', [{ ...HOME_TOPIC, blogs: -1 }]],
+    ['homeTopics', 'items', [{ ...HOME_TOPIC, source: 'other' }]],
+    ['homeTopics', 'items', [{ ...HOME_TOPIC, canonicalPath: {} }]],
+    ['homeTopics', 'truncated', 'false'],
+    ['homeTopics', 'minimumBlogs', 1],
+    ['homeTopics', 'limit', 100],
+    ['homeTopics', 'vocabulary', (EMPTY.topics as { vocabulary: unknown }).vocabulary],
+    ['homeTopics', 'coverage', { datedPosts: 0 }],
+  ];
+  for (const [kind, key, value] of cases)
+    assert.equal(validPublicPayload(kind, with_(kind, key, value)), false, `${kind}.${key} = ${JSON.stringify(value)}`);
+});

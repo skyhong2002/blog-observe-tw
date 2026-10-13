@@ -27,16 +27,20 @@ const literal = (value: string) => `'${value.replaceAll("'", "''")}'`;
 export const evidence = (
   blogScoped = false,
   _verifiedOnly = true,
-) => `scoped_posts AS (SELECT p.id,p.blog_id,p.published_at,p.content_hash FROM posts p JOIN blogs b ON b.id=p.blog_id WHERE p.published_at>=? AND p.published_at<=? AND b.status='verified' ${blogScoped ? 'AND b.slug=?' : ''}), evidence AS (
+) => `scoped_posts AS (SELECT p.id,p.blog_id,p.published_at,p.content_hash FROM posts p JOIN blogs b ON b.id=p.blog_id WHERE p.published_at>=? AND p.published_at<=? AND b.status='verified' ${blogScoped ? 'AND b.slug=?' : ''}), fresh_posts AS (
+ SELECT DISTINCT p.id,p.blog_id,p.published_at,i.snapshot_id FROM scoped_posts p
+ JOIN topic_current c ON c.source=${literal(SOURCE)}
+ JOIN topic_post_indexes_v3 i ON i.post_id=p.id AND i.snapshot_id=c.snapshot_id
+ ${topicBodyJoins}
+ WHERE i.status='ok' AND (i.post_hash<=>p.content_hash) AND (i.body_hash<=>(${topicBodyHash}))
+ AND i.matcher_version=${literal(MATCHER_VERSION)}
+), evidence AS (
  SELECT p.id post_id,p.blog_id,p.published_at,CONCAT('tag:',t.id) topic_id,t.label,'tag-vocabulary' source,MAX(m.source='title') title_hit
- FROM scoped_posts p JOIN topic_matches_v3 m ON m.post_id=p.id JOIN topic_current c ON c.snapshot_id=m.snapshot_id AND c.source=${literal(SOURCE)}
+ FROM fresh_posts p JOIN topic_matches_v3 m ON m.post_id=p.id AND m.snapshot_id=p.snapshot_id
  JOIN topic_canonical_terms_v3 t ON t.snapshot_id=m.snapshot_id AND t.id=m.term_id
  LEFT JOIN topic_term_frequencies f ON f.snapshot_id=t.snapshot_id AND f.term_id=t.id
  LEFT JOIN topic_frequency_runs fr ON fr.snapshot_id=t.snapshot_id AND fr.policy_version=${literal(FREQUENCY_POLICY.version)}
- JOIN topic_post_indexes_v3 i ON i.post_id=p.id AND i.snapshot_id=m.snapshot_id
- ${topicBodyJoins}
- WHERE i.status='ok' AND (i.post_hash<=>p.content_hash) AND (i.body_hash<=>(${topicBodyHash}))
- AND i.matcher_version=${literal(MATCHER_VERSION)} AND t.policy_version=${literal(POLICY_VERSION)}
+ WHERE t.policy_version=${literal(POLICY_VERSION)}
  AND t.exclusion_reason IS NULL AND t.inactive_reason IS NULL AND ${publicationLabelSql('t.label')} AND m.source IN ('title','body')
  AND (m.source='title' OR fr.snapshot_id IS NULL OR COALESCE(f.high_frequency,0)=0)
  GROUP BY p.id,p.blog_id,p.published_at,t.id,t.label
@@ -280,10 +284,25 @@ export function registerTopicRoutes(app: FastifyInstance, pool: Pool) {
     if (!active.size) caches.delete(pool);
   });
   const metadata = () => ({ generatedAt: new Date().toISOString(), cacheSeconds: cache.ttlMs / 1000, matchingPolicy });
-  app.get<{ Querystring: { days?: string } }>('/api/topics', async (req, reply) => {
+  app.get<{ Querystring: { days?: string; view?: string } }>('/api/topics', async (req, reply) => {
     const days = daysValue(req.query.days);
     reply.header('cache-control', 'no-store');
     if (!days) return reply.code(400).send({ error: 'invalid_days' });
+    if (req.query.view !== undefined && req.query.view !== 'home') return reply.code(400).send({ error: 'invalid_view' });
+    if (req.query.view === 'home')
+      return cache.get(`rank:${days}:home`, async () => {
+        const results = await ranking(pool, days, undefined, true, 8, new Date(), false);
+        return {
+          ...metadata(),
+          view: 'home',
+          days,
+          source: 'tag-vocabulary',
+          items: results.items,
+          truncated: results.truncated,
+          minimumBlogs: 2,
+          limit: 8,
+        };
+      });
     return cache.get(`rank:${days}`, async () => {
       const now = new Date();
       const [results, vocabulary] = await Promise.all([ranking(pool, days, undefined, true, 100, now, true), vocabularyStatus(pool)]);
