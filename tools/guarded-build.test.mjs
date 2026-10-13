@@ -11,6 +11,7 @@ import {
   HOMES,
   isBuildCommand,
   ownedGroup,
+  scanProcessPid,
 } from './guarded-build.mjs';
 
 const approval = {
@@ -241,4 +242,11 @@ test('paused detach unrefs child and control pipe without releasing a child-owne
     unref: () => calls.push('child-unref'),
   });
   assert.deepEqual(calls, ['pipe-unref', 'child-unref']);
+});
+
+test('host scan excludes init but keeps all potential build processes', () => {
+  assert.equal(scanProcessPid('1'), false);
+  assert.equal(scanProcessPid('self'), false);
+  assert.equal(scanProcessPid('2'), true);
+  assert.equal(scanProcessPid('1365351'), true);
 });

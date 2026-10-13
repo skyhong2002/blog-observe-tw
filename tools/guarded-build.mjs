@@ -116,11 +116,12 @@ export function isBuildCommand(argv) {
 async function readIdentity(pid) {
   return procIdentity(pid, await readFile(`/proc/${pid}/stat`, 'utf8'));
 }
+export const scanProcessPid = (name) => /^\d+$/.test(name) && Number(name) > 1;
 async function resources(ownedPid = null) {
   const disk = await statfs('/home', { bigint: true });
   const otherGroups = new Set();
   for (const name of await readdir('/proc')) {
-    if (!/^\d+$/.test(name)) continue;
+    if (!scanProcessPid(name)) continue;
     try {
       const identity = await readIdentity(Number(name));
       if (['Z', 'X'].includes(identity.state) || identity.pgid === ownedPid) continue;
