@@ -68,3 +68,7 @@ UTC20:49:04.958Z以同一份前端產物切到green/gen19/46c074c，homepage五�
 另核對到公開v1允許until有60秒clock skew容忍，不能讓它變成提早公開文章的權限。`listArticles` 改為重用 `PUBLIC_SEARCH_SQL`，除此之外維持窗口、分頁與q的標題搜尋合約。18169的public-api suite以真實SQL＋Fastify注入請求，測試40秒後發布／until55秒後的兩端點皆為0；有實際 `content_post_bodies` 正文與summary包含查詢但標題沒有的fixture，v1仍0。這不是socket端到端測試；正式body搜尋另有實際loopbackHTTP barrier證據。
 
 此純API變更為n/a-ui，前端git tree、data/openapi與lockfiles不變，不把gen19圖片改寫SHA。既有非作者Opus5.5看過source差異，actual modelUsage/success在 `.reviews/f3-fulltext/public-title-future-opus-review.json`；採納其建議補實際正文fixture，重跑integration-final通過。未額外改動其他端點或q搜尋語意。
+
+### 回填續跑記錄
+
+原先一篇／60秒的20批均通過，cursor24438；首頁各批200，最慢3.485秒。接著保持單一writer、Nice19／IO idle／pool1，設定五篇／60秒，單次最多2000批，非200／>6.17秒立即取消，沒有失敗自動重試。worker仍af0，不啟用新的whole-body producer。CLI日誌與cursor：`/home/deck/.cache/blog-home-cloud-b3-20261014/.reviews/f3-fulltext/backfill-five-per-minute.log`；回填未完成，不把「已能搜到歷史文章」當成全站歷史coverage已完成。
