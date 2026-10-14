@@ -1,5 +1,56 @@
 # UI 逐頁審查紀錄
 
+## 2026-10-14 UTC11:58：43d 同產物正式 blue/gen12（瀏覽器複驗待 babysit）
+
+正式 APP `43d17900c24efae6879bf075d1c576ba74d6a3e8`、
+BUILD_ID `zwqhLTfWMBRUuDn6YP5Tr`（primary/standalone 相同）；
+transition12 的 UTC `2026-10-14T11:58:57.687Z`；核准流程驗證完成
+UTC `2026-10-14T12:00:33.529273+00:00`。原 built43d 與 origin/main不變、沒有重建。
+文件 OPS commit 不作為 APP/build identity。active.json 為 blue／gen12／43d；
+green4cc仍在線可立即 `rollback green`，兩slot/所有release/backup/worktree保留。
+
+原 packet `/tmp/babysit/mint-queue/blog43-blue-switch-command.json` SHA009bacea...
+未覆寫。第一次 UTC11:52:09.553Z切blue/gen10，postSwitch19項通過但後續YT
+探針exit28/5.002344s/0bytes（UTC11:53:02.498–11:53:07.509）而立即回滾
+green/gen11，UTC11:53:17.862Z。Babysit告知YT也在部署，核准等待3min後重切；
+第二次preflight從11:58:35.718Z開始，超過notBefore11:57:52.552Z。只expected
+generation9/10改11/12；必需的output paths分開以保存原failedfiles；其餘所有
+斷言、APP/runtime/flag/CF均不改。exactargv與diff於
+`/home/deck/.t3/projects/blog-observe-tw/.reviews/sm-build-9888ebf/approved-reswitch43-gen12-command-proof.json`
+和同目錄 `approved-reswitch43-gen12-command.diff`，不是重寫成功的舊紀錄。
+
+技術HTTP檢查19項通過：正式話題100筆與green完整ordereditems／policy一致，
+home8為前8；HTML/API/RSC current43d/build/gen12、private no-store／DYNAMIC、
+HSTS精確max-age=86400、404、SSRF400、OAuth起始302/S256/正確callback；
+static favicon200/image/png/HSTS，但不將cached immutable header當runtime版本。
+正式19項log `/home/deck/.t3/projects/blog-observe-tw/.reviews/sm-build-9888ebf/approved-reswitch43-gen12/formal-http-acceptance.json`；原始部署receipt
+`/home/deck/.t3/projects/blog-observe-tw/.reviews/sm-build-9888ebf/approved-reswitch43-gen12/deployment-receipt.json`。原同artifactB0的53barrier/60sequence未被
+拿掉；没有再次改runtime、正式migration、worker或cache/privacy規則。
+
+效能原始紀錄 `/home/deck/.t3/projects/blog-observe-tw/.reviews/sm-build-9888ebf/approved-reswitch43-gen12/formal-performance.json`：首頁五次完整HTML回應
+時間[2.522866, 2.69502, 2.560887, 2.649546, 2.451865]秒，中位
+2.560887秒；不是TTFB、origin純渲染或瀏覽器load。
+三站各3次median blog3.112564s／
+tag0.351371s／YT0.250446s，
+皆200/exit0且在6.17/2/2s門檻內。Load1 4.48，
+/home 48.14GiB、MemAvailable 3.18GiB。
+DNT1，只HTML/JSON與manualredirect，不執行GA、JS或真人OAuth，不是Realtime驗收。
+
+**正式實際畫面仍待 babysit：**本節只有正式HTTP/SSR/RSC與同產物候選28張
+actualmodelreview，沒有新正式1280/390截圖，不填不存在路徑。首頁話題與
+`&#038;` 正常顯示需由human指定正式瀏覽器複驗後補證。整頁UI、互動、
+對比unknown與F3歷史全文仍pending；歷史正文旗標關閉，蛤蜊絲瓜未命中，
+本批不宣稱全部scope完成。
+
+先前所稱07:56green首頁500，existingjournal確認 `PublicGatewayError:
+Public gateway read failed: /api/topics?days=30 (network)`，cause為
+`TimeoutError`；發生在改inactiveblue／切換前。只確認舊green讀取話題API
+逾時，不推論未量到的DB/CPU深層原因。去識別原始摘要
+`/home/deck/.t3/projects/blog-observe-tw/.reviews/sm-build-9888ebf/approved-reswitch43-gen12/green500-confirmed-cause.json`。
+
+---
+
+
 ## 2026-10-14：43d 修正版候選實際看圖（正式仍 green/gen9）
 
 APP `43d17900c24efae6879bf075d1c576ba74d6a3e8`、tree `a335ed943d4b7682394be43a1db14a2e7cf05aaa`，
