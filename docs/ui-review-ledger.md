@@ -462,3 +462,26 @@ GPT-6.1 Sol 再逐張讀取36張既有blog/tag圖，九個畫面狀態：authors
 ## 新 B2 source 批次（待重拍，不升 UI pass）
 
 `/blogs/<slug>/` 的引用與交流新增有界文字配對consumer。作者為既有Opus5.5；另一既有Sol的source／48 SSR複審紀錄：`/home/deck/.t3/userdata/ui-review-blog-20261013/home-perf-independent/b2-opus-ui-independent-followup.json`。這不是看圖review；尚缺該新SHA／BUILD_ID在1280／390、深淺色的實際圖與tag對照。ready兩邊日期、disabled、無已知target、insufficient、unavailable／withdrawn、截斷都在Mint重拍清單。主表計數不變：24項，pass0/fixed3/issues8/pending11/n-a2。沒有從source通過推成整頁通過。
+
+
+## 2026-10-14：9888ebf 同產物 candidate 主要頁實際 review
+
+受審 release `9888ebf36229400c2323ae12334d72280cbe699a`，BUILD_ID `Rkz0sExkVW-uDfl_srJEX`，tree `b4d90f8e717831532b1b5986f3ec51d0262bd11d`。來源未重建，blue loopback 18174/18172，正式仍 green/gen5。此 ledger 補記在 OPS 分支，凍結 main／受審 release 不改。
+
+既有非作者 `/root/home_perf`（實際 `gpt-6.1-sol`，UTC 2026-10-14T05:54:35.818227+00:00）逐張看過20 candidate圖及8 tag參照；raw review `/home/deck/.t3/userdata/ui-review-blog-20261013/home-perf-independent/9888ebf-candidate-actual-ui-review.json`（sha256 `be41dc9ec0ea6d5dc1ec41ae92d018b6b252e0ccb1d4e7b590289f43d58cee84`），log同名 `.log`。原始 transcript `/home/deck/.codex/sessions/2026/10/13/rollout-2026-10-13T13-12-51-01a133ad-8034-7e81-a619-c9d28bd4ff5f.jsonl`，JSON逐圖記工具line／UTC／hash／viewport。
+
+capture manifest `/home/deck/.t3/userdata/blog-release-9888ebf-candidate-20261014/submission-manifest.json`（sha256 `268b462a9b8434975c7fffd0cba2387ebeb606e12ea030969bec8a31a788ab84`）；每組private PNG均為 `page-1-1280-light.png`、`page-2-390-light.png`、`page-3-1280-dark.png`、`page-4-390-dark.png`，每組 `capture-report.json` 真實核對PID/socket/source764files/SHA/BUILD_ID。實際 document/navigator DNT=1，GPC=null如實保留；pre-navigation network guard installed，GA/GTM attempted=0、analytics allowed=0，browser closed=true。這是攔截層證據，不是封包追蹤；root沒有補造舊manifest。
+
+| route／實際候選 URL | reviewer／受審 SHA | 桌機1280／手機390截圖目錄（含light/dark） | tag偏離與理由 | 發現／修正／重驗 | 狀態 |
+|---|---|---|---|---|---|
+| `/`；`http://127.0.0.1:18174/` | GPT-6.1 Sol；9888ebf／Rkz0sExkVW-uDfl_srJEX | `/home/deck/.t3/userdata/blog-release-9888ebf-candidate-20261014/home/`（上述四檔） | tag新聞焦點/熱門關鍵字橙色，blog用綠色生活標籤與公開文章，不要求同新聞圖卡功能。 | 首篇公開文章標題原始 &#038; 在四張圖均顯示，內容呈現小問題，非阻擋。。無新runtime修正commit；此次已以9888同產物重拍。待驗：手機下方共同話題/sidebar未入鏡；Suspense pending/late error與搜尋/menu/theme實際操作；第三篇以下完整列表與footer | pending（僅visible-pass） |
+| `/tech/`；`http://127.0.0.1:18174/tech/` | GPT-6.1 Sol；9888ebf／Rkz0sExkVW-uDfl_srJEX | `/home/deck/.t3/userdata/blog-release-9888ebf-candidate-20261014/tech/`（上述四檔） | tag traffic只作表格容器/搜尋/密集列基準；tech是被動觀測證據統計，不具媒體流量月份/sparkline功能。 | 入鏡範圍無阻擋。無新runtime修正commit；此次已以9888同產物重拍。待驗：390部落格表格位於900px下方未入鏡；Desktop表格右側成功時間部分裁於容器邊，橫向scroll/排序/搜尋/最後欄操作未驗；方法說明與低於首屏其他技術卡/完整清單 | pending（僅visible-pass） |
+| `/relations/`；`http://127.0.0.1:18174/relations/` | GPT-6.1 Sol；9888ebf／Rkz0sExkVW-uDfl_srJEX | `/home/deck/.t3/userdata/blog-release-9888ebf-candidate-20261014/relations/`（上述四檔） | tag新聞圖有多關係色/期間/排名/zoom controls，blog本圖只正文直接連結且實際資料少，大片留白與較簡控件不視為缺媒體功能。 | dark圖下方法fineprint偏暗，列後續對比驗證，不以肉眼判定WCAG數值通過。。無新runtime修正commit；此次已以9888同產物重拍。待驗：節點hover/click/tooltip/zoom與各期間切換；手機下方互相提及卡及所有列表；實際邊方向資料正確性屬既有source/SQL證據，圖片不重證 | pending（僅visible-pass） |
+| `/blogs/kocpc/`；`http://127.0.0.1:18174/blogs/kocpc/` | GPT-6.1 Sol；9888ebf／Rkz0sExkVW-uDfl_srJEX | `/home/deck/.t3/userdata/blog-release-9888ebf-candidate-20261014/blog-profile/`（上述四檔） | tag媒體資訊/多日收錄/新聞關鍵字，blog核對網站/本頁50篇/內文來源技術證據，保留相似頁面層次但資料語義不同。 | 入鏡範圍無阻擋。無新runtime修正commit；此次已以9888同產物重拍。待驗：mobile收合展開後技術/來源/流量狀態；相關作者/來源資料tabs與追蹤操作；下方完整文章/方法/技術證據狀態 | pending（僅visible-pass） |
+| `/blogs/kocpc/#relations-body`；`http://127.0.0.1:18174/blogs/kocpc/#relations-body` | GPT-6.1 Sol；9888ebf／Rkz0sExkVW-uDfl_srJEX | `/home/deck/.t3/userdata/blog-release-9888ebf-candidate-20261014/blog-exchanges/`（上述四檔） | 不是tag新聞copy關係，只針對本blog已觀察正文links、另列其他關係；disabled comparison是清楚標示的狀態，不能當populated B2結果驗收。 | 入鏡範圍無阻擋。無新runtime修正commit；此次已以9888同產物重拍。待驗：anchor圖从中段起，上方title/期間與sticky-header offset未完整入鏡；非空直接引用證據/共同標籤/文字相似啟用結果未展示；方法link展開/下方話題及完整AI閱讀線索未入鏡（desktop只有線索上緣） | pending（僅visible-pass） |
+
+五模板 blocker 均 false，但**全24項權威狀態仍 pass0／fixed3／issues8／pending11／n/a-ui2**；不把首屏、B2 disabled比較空態或tag缺dark參照當整頁／全部資料狀態通過。首頁raw `&#038;` 與dark小字contrast列後續修正/實測，220 unsupported LAB samples不能冒稱WCAG AA通過。新feature公開前已完成本批主要頁非作者實際看圖；正式瀏覽器驗收仍待。
+
+非UI技術檢查（n/a-ui）：`tests/integration/visibility-barrier.mjs`／`tools/test-visibility-barrier.mjs`，same-release existing runner raw evidence `/home/deck/.t3/projects/blog-observe-tw/.reviews/b0-final-barrier/9888ebf36229400c2323ae12334d72280cbe699a/{runner-result,barrier-result,sequence-result}.json`，53barrier＋60sequence；isolatedDB18169/HTTP18176/18177。Liveblue17 HTML/RSC/API/sitemap GET全部200及no-store，raw `/home/deck/.t3/projects/blog-observe-tw/.reviews/sm-build-9888ebf/blue-http-9888ebf-recheck.json`。首次任意 `_rsc`307與缺techflag404兩次失敗原log保留；只用existing cache-busting helper及blue旗標true精確匹配green，沒有放寬斷言／改source。
+
+操作狀態：switch前fresh曾blog median7.284s/load12.17而暫停；原量測 `/home/deck/.t3/projects/blog-observe-tw/.reviews/sm-build-9888ebf/switch-submission-fresh.json` 保留，不能當通過。switch／rollback尚未執行，no-store與CF Disabled維持。
