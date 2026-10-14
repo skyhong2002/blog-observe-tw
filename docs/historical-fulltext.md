@@ -71,4 +71,4 @@ UTC20:49:04.958Z以同一份前端產物切到green/gen19/46c074c，homepage五�
 
 ### 回填續跑記錄
 
-原先一篇／60秒的20批均通過，cursor24438；首頁各批200，最慢3.485秒。接著保持單一writer、Nice19／IO idle／pool1，設定五篇／60秒，單次最多2000批，非200／>6.17秒立即取消，沒有失敗自動重試。worker仍af0，不啟用新的whole-body producer。CLI日誌與cursor：`/home/deck/.cache/blog-home-cloud-b3-20261014/.reviews/f3-fulltext/backfill-five-per-minute.log`；回填未完成，不把「已能搜到歷史文章」當成全站歷史coverage已完成。
+原先一篇／60秒的20批均通過，cursor24438；首頁各批200，最慢4.342秒。接著保持單一writer、Nice19／IO idle／pool1，設定五篇／60秒，單次最多2000批，非200／>6.17秒立即取消，沒有失敗自動重試。worker仍af0，不啟用新的whole-body producer。CLI日誌與cursor：`/home/deck/.cache/blog-home-cloud-b3-20261014/.reviews/f3-fulltext/backfill-five-per-minute.log`；回填未完成，不把「已能搜到歷史文章」當成全站歷史coverage已完成。
