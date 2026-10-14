@@ -1,0 +1,2151 @@
+{
+  "schemaVersion": 1,
+  "currentProduction": {
+    "slot": "blue",
+    "generation": 22,
+    "sha": "58e551a79626681024bf47e70ab8e1eee2b2f073",
+    "buildId": "Xm1Rp-cc1A9eW-NCT5lnf",
+    "switchedAt": "2026-10-14T22:28:02.034Z"
+  },
+  "summary": {
+    "pageRoutes": 20,
+    "errorBoundaries": 2,
+    "items": 22,
+    "formalObservedRoutes": 8,
+    "noCurrentFormalReview": 14,
+    "completeRoutesAndStates": 0,
+    "scopePending": 22
+  },
+  "limitations": "Machine-readable index of real screenshot/review artifacts, not a template promoted to pass. Markdown ledger contains deliberate deviations and issues. Missing states remain pending. Old artifacts retained separately.",
+  "routes": [
+    {
+      "route": "/about/",
+      "source": "web/src/app/about/page.tsx",
+      "exampleUrl": "https://blog.observe.tw/about/",
+      "status": "pending",
+      "completeRouteAndStates": false,
+      "reviews": [],
+      "deviationsAndReasons": "尚未完成當版逐頁對照，不以共用元件推定pass。 公開資料維持no-store是隱私要求，不跟tag恢復快取。",
+      "fixCommit": null,
+      "fixScope": null,
+      "reverification": []
+    },
+    {
+      "route": "/admin/discovery/",
+      "source": "web/src/app/admin/discovery/page.tsx",
+      "exampleUrl": "https://blog.observe.tw/admin/discovery/",
+      "status": "pending",
+      "completeRouteAndStates": false,
+      "reviews": [],
+      "missingReason": "Capture guard forbids private/auth routes; no account or permission created. Existing authorized account or manual verification needed.",
+      "deviationsAndReasons": "尚未完成當版逐頁對照，不以共用元件推定pass。 公開資料維持no-store是隱私要求，不跟tag恢復快取。",
+      "fixCommit": null,
+      "fixScope": null,
+      "reverification": []
+    },
+    {
+      "route": "/admin/",
+      "source": "web/src/app/admin/page.tsx",
+      "exampleUrl": "https://blog.observe.tw/admin/",
+      "status": "pending",
+      "completeRouteAndStates": false,
+      "reviews": [],
+      "missingReason": "Capture guard forbids private/auth routes; no account or permission created. Existing authorized account or manual verification needed.",
+      "deviationsAndReasons": "尚未完成當版逐頁對照，不以共用元件推定pass。 公開資料維持no-store是隱私要求，不跟tag恢復快取。",
+      "fixCommit": null,
+      "fixScope": null,
+      "reverification": []
+    },
+    {
+      "route": "/api/",
+      "source": "web/src/app/api/page.tsx",
+      "exampleUrl": "https://blog.observe.tw/api/",
+      "status": "pending",
+      "completeRouteAndStates": false,
+      "reviews": [],
+      "deviationsAndReasons": "尚未完成當版逐頁對照，不以共用元件推定pass。 公開資料維持no-store是隱私要求，不跟tag恢復快取。",
+      "fixCommit": null,
+      "fixScope": null,
+      "reverification": []
+    },
+    {
+      "route": "/api/status/",
+      "source": "web/src/app/api/status/page.tsx",
+      "exampleUrl": "https://blog.observe.tw/api/status/",
+      "status": "pending",
+      "completeRouteAndStates": false,
+      "reviews": [],
+      "deviationsAndReasons": "尚未完成當版逐頁對照，不以共用元件推定pass。 公開資料維持no-store是隱私要求，不跟tag恢復快取。",
+      "fixCommit": null,
+      "fixScope": null,
+      "reverification": []
+    },
+    {
+      "route": "/articles/",
+      "source": "web/src/app/articles/page.tsx",
+      "exampleUrl": "https://blog.observe.tw/articles/",
+      "status": "pending",
+      "completeRouteAndStates": false,
+      "reviews": [],
+      "deviationsAndReasons": "尚未完成當版逐頁對照，不以共用元件推定pass。 公開資料維持no-store是隱私要求，不跟tag恢復快取。",
+      "fixCommit": null,
+      "fixScope": null,
+      "reverification": []
+    },
+    {
+      "route": "/authors/",
+      "source": "web/src/app/authors/page.tsx",
+      "exampleUrl": "https://blog.observe.tw/authors/",
+      "status": "pending",
+      "completeRouteAndStates": false,
+      "reviews": [
+        {
+          "phase": "formal",
+          "state": "captured-viewport",
+          "viewport": [
+            1280,
+            900
+          ],
+          "theme": "light",
+          "reviewer": "independent non-author instance",
+          "model": "gpt-6.1-sol",
+          "reviewedSha": "58e551a79626681024bf47e70ab8e1eee2b2f073",
+          "buildId": "Xm1Rp-cc1A9eW-NCT5lnf",
+          "reviewUtc": "2026-10-14T22:36:45.496144+00:00",
+          "transcript": "/home/deck/.cache/blog-home-cloud-b3-20261014/.reviews/f4-round2/formal-gen22-batch2-review.json",
+          "transcriptSha256": "87b14cdd5f8e31c396124e8a1783ee6a1c19da515ef30b1a72abe7e3cbdc120c",
+          "screenshot": "/home/deck/.t3/userdata/blog-f4-round2-20261015/formal-batch2-directory-authors/page-3-1280-light.png",
+          "screenshotSha256": "1b8a4eb217b2830aea52e77dc23a46e8d05e479be431703e3e8ce9f95b298ede",
+          "manifest": "/home/deck/.t3/userdata/blog-f4-round2-20261015/formal-batch2-directory-authors/capture-report.json",
+          "rawNetwork": "network.requests within manifest",
+          "result": "limited-state review; remaining states pending",
+          "scroll": null,
+          "interaction": null,
+          "privacy": {
+            "documentDNT": "1",
+            "documentSecGPC": null,
+            "navigatorDNT": "1",
+            "navigatorDoNotTrack": true,
+            "navigatorGPC": null
+          },
+          "analyticsAllowed": 0,
+          "guardFailures": 0
+        },
+        {
+          "phase": "formal",
+          "state": "captured-viewport",
+          "viewport": [
+            390,
+            900
+          ],
+          "theme": "light",
+          "reviewer": "independent non-author instance",
+          "model": "gpt-6.1-sol",
+          "reviewedSha": "58e551a79626681024bf47e70ab8e1eee2b2f073",
+          "buildId": "Xm1Rp-cc1A9eW-NCT5lnf",
+          "reviewUtc": "2026-10-14T22:36:45.496144+00:00",
+          "transcript": "/home/deck/.cache/blog-home-cloud-b3-20261014/.reviews/f4-round2/formal-gen22-batch2-review.json",
+          "transcriptSha256": "87b14cdd5f8e31c396124e8a1783ee6a1c19da515ef30b1a72abe7e3cbdc120c",
+          "screenshot": "/home/deck/.t3/userdata/blog-f4-round2-20261015/formal-batch2-directory-authors/page-4-390-light.png",
+          "screenshotSha256": "5bd200f9ff21ed7f573669ce528284ea2d654cce7e46159891a14cd30d70ada1",
+          "manifest": "/home/deck/.t3/userdata/blog-f4-round2-20261015/formal-batch2-directory-authors/capture-report.json",
+          "rawNetwork": "network.requests within manifest",
+          "result": "limited-state review; remaining states pending",
+          "scroll": null,
+          "interaction": null,
+          "privacy": {
+            "documentDNT": "1",
+            "documentSecGPC": null,
+            "navigatorDNT": "1",
+            "navigatorDoNotTrack": true,
+            "navigatorGPC": null
+          },
+          "analyticsAllowed": 0,
+          "guardFailures": 0
+        },
+        {
+          "phase": "formal",
+          "state": "table-scroll",
+          "viewport": [
+            390,
+            900
+          ],
+          "theme": "light",
+          "reviewer": "independent non-author instance",
+          "model": "gpt-6.1-sol",
+          "reviewedSha": "58e551a79626681024bf47e70ab8e1eee2b2f073",
+          "buildId": "Xm1Rp-cc1A9eW-NCT5lnf",
+          "reviewUtc": "2026-10-14T22:40:49.998383+00:00",
+          "transcript": "/home/deck/.cache/blog-home-cloud-b3-20261014/.reviews/f4-round2/formal-gen22-batch2-mobile-review.json",
+          "transcriptSha256": "fe28b63ba990cbe918b579f949c3058ca5d5d399bdb08215eed789b484727352",
+          "screenshot": "/home/deck/.t3/userdata/blog-f4-round2-20261015/formal-batch2-mobile-tables/page-2-390-light.png",
+          "screenshotSha256": "c1311a3e02644b41d7417949d2c3f47c98129d8ef5a8f4afd8e2de3273ae8783",
+          "manifest": "/home/deck/.t3/userdata/blog-f4-round2-20261015/formal-batch2-mobile-tables/capture-report.json",
+          "rawNetwork": "network.requests within manifest",
+          "result": "limited-state pass; sorting/filter/dark/error and other states pending",
+          "interaction": {
+            "action": "table-scroll",
+            "before": {
+              "viewportWidth": 390,
+              "documentWidth": 390,
+              "actualY": 0,
+              "scrollLeft": 0,
+              "scrollWidth": 489,
+              "clientWidth": 356,
+              "scrollState": "start",
+              "scroller": {
+                "left": 17,
+                "top": 218,
+                "width": 356,
+                "right": 373
+              },
+              "header": {
+                "left": 17,
+                "top": 218,
+                "width": 488.96875,
+                "right": 505.96875
+              },
+              "lastHeader": {
+                "left": 441.953125,
+                "top": 218,
+                "width": 64.015625,
+                "right": 505.96875
+              },
+              "lastHeaderVisible": false,
+              "lead": {
+                "left": 17,
+                "top": 250,
+                "width": 162.390625,
+                "right": 179.390625
+              },
+              "leadPosition": "sticky",
+              "leadBoxMaxWidth": "152px",
+              "extrasHidden": true,
+              "cellWhiteSpace": [
+                "nowrap"
+              ],
+              "siteHeaderHeight": 57,
+              "headerText": [
+                "作者",
+                "部落格",
+                "收錄文章"
+              ]
+            },
+            "after": {
+              "viewportWidth": 390,
+              "documentWidth": 390,
+              "actualY": 368,
+              "scrollLeft": 92,
+              "scrollWidth": 448,
+              "clientWidth": 356,
+              "scrollState": "end",
+              "scroller": {
+                "left": 17,
+                "top": -150,
+                "width": 356,
+                "right": 373
+              },
+              "header": {
+                "left": -75,
+                "top": 57,
+                "width": 448,
+                "right": 373
+              },
+              "lastHeader": {
+                "left": 306.375,
+                "top": 57,
+                "width": 66.625,
+                "right": 373
+              },
+              "lastHeaderVisible": true,
+              "lead": {
+                "left": 17,
+                "top": -118,
+                "width": 108.203125,
+                "right": 125.203125
+              },
+              "leadPosition": "sticky",
+              "leadBoxMaxWidth": "88px",
+              "extrasHidden": true,
+              "cellWhiteSpace": [
+                "nowrap"
+              ],
+              "siteHeaderHeight": 57,
+              "headerText": [
+                "作者",
+                "部落格",
+                "收錄文章"
+              ]
+            },
+            "capturedArea": "horizontally-scrolled-table-viewport"
+          },
+          "privacy": {
+            "documentDNT": "1",
+            "documentSecGPC": null,
+            "navigatorDNT": "1",
+            "navigatorDoNotTrack": true,
+            "navigatorGPC": null
+          },
+          "analyticsAllowed": 0,
+          "guardFailures": 0
+        }
+      ],
+      "deviationsAndReasons": "公開byline與站主分開，同名不跨站合併，表格/圖示沿tag。 公開資料維持no-store是隱私要求，不跟tag恢復快取。",
+      "fixCommit": null,
+      "fixScope": null,
+      "reverification": [
+        {
+          "sha": "58e551a79626681024bf47e70ab8e1eee2b2f073",
+          "transcript": "/home/deck/.cache/blog-home-cloud-b3-20261014/.reviews/f4-round2/formal-gen22-batch2-review.json",
+          "screenshot": "/home/deck/.t3/userdata/blog-f4-round2-20261015/formal-batch2-directory-authors/page-3-1280-light.png"
+        },
+        {
+          "sha": "58e551a79626681024bf47e70ab8e1eee2b2f073",
+          "transcript": "/home/deck/.cache/blog-home-cloud-b3-20261014/.reviews/f4-round2/formal-gen22-batch2-review.json",
+          "screenshot": "/home/deck/.t3/userdata/blog-f4-round2-20261015/formal-batch2-directory-authors/page-4-390-light.png"
+        },
+        {
+          "sha": "58e551a79626681024bf47e70ab8e1eee2b2f073",
+          "transcript": "/home/deck/.cache/blog-home-cloud-b3-20261014/.reviews/f4-round2/formal-gen22-batch2-mobile-review.json",
+          "screenshot": "/home/deck/.t3/userdata/blog-f4-round2-20261015/formal-batch2-mobile-tables/page-2-390-light.png"
+        }
+      ]
+    },
+    {
+      "route": "/blogs/[slug]/",
+      "source": "web/src/app/blogs/[slug]/page.tsx",
+      "exampleUrl": "https://blog.observe.tw/blogs/carol-691/",
+      "status": "issues",
+      "completeRouteAndStates": false,
+      "reviews": [
+        {
+          "phase": "candidate",
+          "state": "scrolled-viewport",
+          "viewport": [
+            1280,
+            900
+          ],
+          "theme": "dark",
+          "reviewer": "independent non-author instance",
+          "model": "gpt-6.1-sol",
+          "reviewedSha": "58e551a79626681024bf47e70ab8e1eee2b2f073",
+          "buildId": "Xm1Rp-cc1A9eW-NCT5lnf",
+          "reviewUtc": "2026-10-14T22:26:47.127340+00:00",
+          "transcript": "/home/deck/.cache/blog-home-cloud-b3-20261014/.reviews/f4-round2/candidate-independent-ui-review.json",
+          "transcriptSha256": "bbdc1c03f73fecaab715edd52d49bc61880cd81e01d6218f94cb19cec420bd6f",
+          "screenshot": "/home/deck/.t3/userdata/blog-f4-round2-20261015/candidate-tech-controls/page-3-1280-dark.png",
+          "screenshotSha256": "8def75145c02af26ce89bb87d80f7345b06b6d2b07ab86a6ea4feacfb505b453",
+          "manifest": "/home/deck/.t3/userdata/blog-f4-round2-20261015/candidate-tech-controls/capture-report.json",
+          "rawNetwork": "network.requests within manifest",
+          "result": "limited-state review; remaining states pending",
+          "scroll": {
+            "requestedY": 650,
+            "actualY": 650,
+            "viewportWidth": 1280,
+            "documentWidth": 1280,
+            "capturedArea": "scrolled-viewport"
+          },
+          "interaction": null,
+          "privacy": {
+            "documentDNT": "1",
+            "documentSecGPC": null,
+            "navigatorDNT": "1",
+            "navigatorDoNotTrack": true,
+            "navigatorGPC": null
+          },
+          "analyticsAllowed": 0,
+          "guardFailures": 0
+        },
+        {
+          "phase": "candidate",
+          "state": "scrolled-viewport",
+          "viewport": [
+            390,
+            900
+          ],
+          "theme": "dark",
+          "reviewer": "independent non-author instance",
+          "model": "gpt-6.1-sol",
+          "reviewedSha": "58e551a79626681024bf47e70ab8e1eee2b2f073",
+          "buildId": "Xm1Rp-cc1A9eW-NCT5lnf",
+          "reviewUtc": "2026-10-14T22:26:47.127340+00:00",
+          "transcript": "/home/deck/.cache/blog-home-cloud-b3-20261014/.reviews/f4-round2/candidate-independent-ui-review.json",
+          "transcriptSha256": "bbdc1c03f73fecaab715edd52d49bc61880cd81e01d6218f94cb19cec420bd6f",
+          "screenshot": "/home/deck/.t3/userdata/blog-f4-round2-20261015/candidate-tech-controls/page-4-390-dark.png",
+          "screenshotSha256": "9be195756bdc47ff7e727feabc15ec45cdaebb123680ee67c46e9222523f8f67",
+          "manifest": "/home/deck/.t3/userdata/blog-f4-round2-20261015/candidate-tech-controls/capture-report.json",
+          "rawNetwork": "network.requests within manifest",
+          "result": "limited-state review; remaining states pending",
+          "scroll": {
+            "requestedY": 650,
+            "actualY": 650,
+            "viewportWidth": 390,
+            "documentWidth": 390,
+            "capturedArea": "scrolled-viewport"
+          },
+          "interaction": null,
+          "privacy": {
+            "documentDNT": "1",
+            "documentSecGPC": null,
+            "navigatorDNT": "1",
+            "navigatorDoNotTrack": true,
+            "navigatorGPC": null
+          },
+          "analyticsAllowed": 0,
+          "guardFailures": 0
+        },
+        {
+          "phase": "formal",
+          "state": "captured-viewport",
+          "viewport": [
+            1280,
+            900
+          ],
+          "theme": "dark",
+          "reviewer": "independent non-author instance",
+          "model": "gpt-6.1-sol",
+          "reviewedSha": "58e551a79626681024bf47e70ab8e1eee2b2f073",
+          "buildId": "Xm1Rp-cc1A9eW-NCT5lnf",
+          "reviewUtc": "2026-10-14T22:32:17.626482+00:00",
+          "transcript": "/home/deck/.cache/blog-home-cloud-b3-20261014/.reviews/f4-round2/formal-gen22-four-page-review.json",
+          "transcriptSha256": "4216e4320dd83acec6cb051d0d582ee61aa09f492d3d6d8c0f890bc53149bee1",
+          "screenshot": "/home/deck/.t3/userdata/blog-f4-round2-20261015/formal-method-profile-new/page-3-1280-dark.png",
+          "screenshotSha256": "9d31bcf9f0ac80c5d01630a4b5c682d71e0f8f65c85c3739b8521456827e8d22",
+          "manifest": "/home/deck/.t3/userdata/blog-f4-round2-20261015/formal-method-profile-new/capture-report.json",
+          "rawNetwork": "network.requests within manifest",
+          "result": "limited-state review; remaining states pending",
+          "scroll": null,
+          "interaction": null,
+          "privacy": {
+            "documentDNT": "1",
+            "documentSecGPC": null,
+            "navigatorDNT": "1",
+            "navigatorDoNotTrack": true,
+            "navigatorGPC": null
+          },
+          "analyticsAllowed": 0,
+          "guardFailures": 0
+        },
+        {
+          "phase": "formal",
+          "state": "captured-viewport",
+          "viewport": [
+            390,
+            900
+          ],
+          "theme": "dark",
+          "reviewer": "independent non-author instance",
+          "model": "gpt-6.1-sol",
+          "reviewedSha": "58e551a79626681024bf47e70ab8e1eee2b2f073",
+          "buildId": "Xm1Rp-cc1A9eW-NCT5lnf",
+          "reviewUtc": "2026-10-14T22:32:17.626482+00:00",
+          "transcript": "/home/deck/.cache/blog-home-cloud-b3-20261014/.reviews/f4-round2/formal-gen22-four-page-review.json",
+          "transcriptSha256": "4216e4320dd83acec6cb051d0d582ee61aa09f492d3d6d8c0f890bc53149bee1",
+          "screenshot": "/home/deck/.t3/userdata/blog-f4-round2-20261015/formal-method-profile-new/page-4-390-dark.png",
+          "screenshotSha256": "e77fc1b5b5f088be5bc53280e5a67b39e5c1ed4ea8566d7a0a50ea3192cf0af6",
+          "manifest": "/home/deck/.t3/userdata/blog-f4-round2-20261015/formal-method-profile-new/capture-report.json",
+          "rawNetwork": "network.requests within manifest",
+          "result": "limited-state review; remaining states pending",
+          "scroll": null,
+          "interaction": null,
+          "privacy": {
+            "documentDNT": "1",
+            "documentSecGPC": null,
+            "navigatorDNT": "1",
+            "navigatorDoNotTrack": true,
+            "navigatorGPC": null
+          },
+          "analyticsAllowed": 0,
+          "guardFailures": 0
+        }
+      ],
+      "deviationsAndReasons": "站名與作者分開，sidebar保留正文取得狀態和技術證據，全文回原站。 公開資料維持no-store是隱私要求，不跟tag恢復快取。",
+      "fixCommit": "58e551a79626681024bf47e70ab8e1eee2b2f073",
+      "fixScope": "TechStats/BlogTech色票與44px操作；不含SourceProfile舊說明對比問題",
+      "reverification": [
+        {
+          "sha": "58e551a79626681024bf47e70ab8e1eee2b2f073",
+          "transcript": "/home/deck/.cache/blog-home-cloud-b3-20261014/.reviews/f4-round2/formal-gen22-four-page-review.json",
+          "screenshot": "/home/deck/.t3/userdata/blog-f4-round2-20261015/formal-method-profile-new/page-3-1280-dark.png"
+        },
+        {
+          "sha": "58e551a79626681024bf47e70ab8e1eee2b2f073",
+          "transcript": "/home/deck/.cache/blog-home-cloud-b3-20261014/.reviews/f4-round2/formal-gen22-four-page-review.json",
+          "screenshot": "/home/deck/.t3/userdata/blog-f4-round2-20261015/formal-method-profile-new/page-4-390-dark.png"
+        }
+      ]
+    },
+    {
+      "route": "/blogs/",
+      "source": "web/src/app/blogs/page.tsx",
+      "exampleUrl": "https://blog.observe.tw/blogs/",
+      "status": "issues",
+      "completeRouteAndStates": false,
+      "reviews": [
+        {
+          "phase": "formal",
+          "state": "captured-viewport",
+          "viewport": [
+            1280,
+            900
+          ],
+          "theme": "light",
+          "reviewer": "independent non-author instance",
+          "model": "gpt-6.1-sol",
+          "reviewedSha": "58e551a79626681024bf47e70ab8e1eee2b2f073",
+          "buildId": "Xm1Rp-cc1A9eW-NCT5lnf",
+          "reviewUtc": "2026-10-14T22:36:45.496144+00:00",
+          "transcript": "/home/deck/.cache/blog-home-cloud-b3-20261014/.reviews/f4-round2/formal-gen22-batch2-review.json",
+          "transcriptSha256": "87b14cdd5f8e31c396124e8a1783ee6a1c19da515ef30b1a72abe7e3cbdc120c",
+          "screenshot": "/home/deck/.t3/userdata/blog-f4-round2-20261015/formal-batch2-directory-authors/page-1-1280-light.png",
+          "screenshotSha256": "056cadc945964450aea5dbd8c0fdbc804f30aa68596389ba9f6a413f7948c5c9",
+          "manifest": "/home/deck/.t3/userdata/blog-f4-round2-20261015/formal-batch2-directory-authors/capture-report.json",
+          "rawNetwork": "network.requests within manifest",
+          "result": "limited-state review; remaining states pending",
+          "scroll": null,
+          "interaction": null,
+          "privacy": {
+            "documentDNT": "1",
+            "documentSecGPC": null,
+            "navigatorDNT": "1",
+            "navigatorDoNotTrack": true,
+            "navigatorGPC": null
+          },
+          "analyticsAllowed": 0,
+          "guardFailures": 0
+        },
+        {
+          "phase": "formal",
+          "state": "captured-viewport",
+          "viewport": [
+            390,
+            900
+          ],
+          "theme": "light",
+          "reviewer": "independent non-author instance",
+          "model": "gpt-6.1-sol",
+          "reviewedSha": "58e551a79626681024bf47e70ab8e1eee2b2f073",
+          "buildId": "Xm1Rp-cc1A9eW-NCT5lnf",
+          "reviewUtc": "2026-10-14T22:36:45.496144+00:00",
+          "transcript": "/home/deck/.cache/blog-home-cloud-b3-20261014/.reviews/f4-round2/formal-gen22-batch2-review.json",
+          "transcriptSha256": "87b14cdd5f8e31c396124e8a1783ee6a1c19da515ef30b1a72abe7e3cbdc120c",
+          "screenshot": "/home/deck/.t3/userdata/blog-f4-round2-20261015/formal-batch2-directory-authors/page-2-390-light.png",
+          "screenshotSha256": "6a5486ee7ba8422d11b9f535df317b4da767476b74b26d1168f86b5ec8a75b3c",
+          "manifest": "/home/deck/.t3/userdata/blog-f4-round2-20261015/formal-batch2-directory-authors/capture-report.json",
+          "rawNetwork": "network.requests within manifest",
+          "result": "limited-state review; remaining states pending",
+          "scroll": null,
+          "interaction": null,
+          "privacy": {
+            "documentDNT": "1",
+            "documentSecGPC": null,
+            "navigatorDNT": "1",
+            "navigatorDoNotTrack": true,
+            "navigatorGPC": null
+          },
+          "analyticsAllowed": 0,
+          "guardFailures": 0
+        },
+        {
+          "phase": "formal",
+          "state": "table-scroll",
+          "viewport": [
+            390,
+            900
+          ],
+          "theme": "light",
+          "reviewer": "independent non-author instance",
+          "model": "gpt-6.1-sol",
+          "reviewedSha": "58e551a79626681024bf47e70ab8e1eee2b2f073",
+          "buildId": "Xm1Rp-cc1A9eW-NCT5lnf",
+          "reviewUtc": "2026-10-14T22:40:49.998383+00:00",
+          "transcript": "/home/deck/.cache/blog-home-cloud-b3-20261014/.reviews/f4-round2/formal-gen22-batch2-mobile-review.json",
+          "transcriptSha256": "fe28b63ba990cbe918b579f949c3058ca5d5d399bdb08215eed789b484727352",
+          "screenshot": "/home/deck/.t3/userdata/blog-f4-round2-20261015/formal-batch2-mobile-tables/page-1-390-light.png",
+          "screenshotSha256": "e327d198252b0a0ca6e444c5a7dc267ecdec087f72ef42a875b19cb28ac7fde3",
+          "manifest": "/home/deck/.t3/userdata/blog-f4-round2-20261015/formal-batch2-mobile-tables/capture-report.json",
+          "rawNetwork": "network.requests within manifest",
+          "result": "limited-state pass; sorting/filter/dark/error and other states pending",
+          "interaction": {
+            "action": "table-scroll",
+            "before": {
+              "viewportWidth": 390,
+              "documentWidth": 390,
+              "actualY": 0,
+              "scrollLeft": 0,
+              "scrollWidth": 832,
+              "clientWidth": 356,
+              "scrollState": "start",
+              "scroller": {
+                "left": 17,
+                "top": 686,
+                "width": 356,
+                "right": 373
+              },
+              "header": {
+                "left": 17,
+                "top": 686,
+                "width": 832,
+                "right": 849
+              },
+              "lastHeader": {
+                "left": 736.59375,
+                "top": 686,
+                "width": 112.40625,
+                "right": 849
+              },
+              "lastHeaderVisible": false,
+              "lead": {
+                "left": 17,
+                "top": 718,
+                "width": 213.84375,
+                "right": 230.84375
+              },
+              "leadPosition": "sticky",
+              "leadBoxMaxWidth": "152px",
+              "extrasHidden": false,
+              "cellWhiteSpace": [
+                "nowrap"
+              ],
+              "siteHeaderHeight": 57,
+              "headerText": [
+                "部落格▲",
+                "分類↕",
+                "已收錄文章↕",
+                "最新文章↕",
+                "抓取成功↕",
+                "狀態↕"
+              ]
+            },
+            "after": {
+              "viewportWidth": 390,
+              "documentWidth": 390,
+              "actualY": 836,
+              "scrollLeft": 476,
+              "scrollWidth": 832,
+              "clientWidth": 356,
+              "scrollState": "end",
+              "scroller": {
+                "left": 17,
+                "top": -150,
+                "width": 356,
+                "right": 373
+              },
+              "header": {
+                "left": -459,
+                "top": 57,
+                "width": 832,
+                "right": 373
+              },
+              "lastHeader": {
+                "left": 248.40625,
+                "top": 57,
+                "width": 124.59375,
+                "right": 373
+              },
+              "lastHeaderVisible": true,
+              "lead": {
+                "left": 17,
+                "top": -118,
+                "width": 146.75,
+                "right": 163.75
+              },
+              "leadPosition": "sticky",
+              "leadBoxMaxWidth": "88px",
+              "extrasHidden": true,
+              "cellWhiteSpace": [
+                "nowrap"
+              ],
+              "siteHeaderHeight": 57,
+              "headerText": [
+                "部落格▲",
+                "分類↕",
+                "已收錄文章↕",
+                "最新文章↕",
+                "抓取成功↕",
+                "狀態↕"
+              ]
+            },
+            "capturedArea": "horizontally-scrolled-table-viewport"
+          },
+          "privacy": {
+            "documentDNT": "1",
+            "documentSecGPC": null,
+            "navigatorDNT": "1",
+            "navigatorDoNotTrack": true,
+            "navigatorGPC": null
+          },
+          "analyticsAllowed": 0,
+          "guardFailures": 0
+        }
+      ],
+      "deviationsAndReasons": "媒體目錄實體換成部落格；低頻不失效，表格與chips沿tag。 公開資料維持no-store是隱私要求，不跟tag恢復快取。",
+      "fixCommit": null,
+      "fixScope": null,
+      "reverification": [
+        {
+          "sha": "58e551a79626681024bf47e70ab8e1eee2b2f073",
+          "transcript": "/home/deck/.cache/blog-home-cloud-b3-20261014/.reviews/f4-round2/formal-gen22-batch2-review.json",
+          "screenshot": "/home/deck/.t3/userdata/blog-f4-round2-20261015/formal-batch2-directory-authors/page-1-1280-light.png"
+        },
+        {
+          "sha": "58e551a79626681024bf47e70ab8e1eee2b2f073",
+          "transcript": "/home/deck/.cache/blog-home-cloud-b3-20261014/.reviews/f4-round2/formal-gen22-batch2-review.json",
+          "screenshot": "/home/deck/.t3/userdata/blog-f4-round2-20261015/formal-batch2-directory-authors/page-2-390-light.png"
+        },
+        {
+          "sha": "58e551a79626681024bf47e70ab8e1eee2b2f073",
+          "transcript": "/home/deck/.cache/blog-home-cloud-b3-20261014/.reviews/f4-round2/formal-gen22-batch2-mobile-review.json",
+          "screenshot": "/home/deck/.t3/userdata/blog-f4-round2-20261015/formal-batch2-mobile-tables/page-1-390-light.png"
+        }
+      ]
+    },
+    {
+      "route": "/login/",
+      "source": "web/src/app/login/page.tsx",
+      "exampleUrl": "https://blog.observe.tw/login/",
+      "status": "pending",
+      "completeRouteAndStates": false,
+      "reviews": [],
+      "missingReason": "Capture guard forbids private/auth routes; no account or permission created. Existing authorized account or manual verification needed.",
+      "deviationsAndReasons": "尚未完成當版逐頁對照，不以共用元件推定pass。 公開資料維持no-store是隱私要求，不跟tag恢復快取。",
+      "fixCommit": null,
+      "fixScope": null,
+      "reverification": []
+    },
+    {
+      "route": "/my/",
+      "source": "web/src/app/my/page.tsx",
+      "exampleUrl": "https://blog.observe.tw/my/",
+      "status": "pending",
+      "completeRouteAndStates": false,
+      "reviews": [],
+      "missingReason": "Capture guard forbids private/auth routes; no account or permission created. Existing authorized account or manual verification needed.",
+      "deviationsAndReasons": "尚未完成當版逐頁對照，不以共用元件推定pass。 公開資料維持no-store是隱私要求，不跟tag恢復快取。",
+      "fixCommit": null,
+      "fixScope": null,
+      "reverification": []
+    },
+    {
+      "route": "/observe/opt-out/",
+      "source": "web/src/app/observe/opt-out/page.tsx",
+      "exampleUrl": "https://blog.observe.tw/observe/opt-out/",
+      "status": "pending",
+      "completeRouteAndStates": false,
+      "reviews": [],
+      "deviationsAndReasons": "尚未完成當版逐頁對照，不以共用元件推定pass。 公開資料維持no-store是隱私要求，不跟tag恢復快取。",
+      "fixCommit": null,
+      "fixScope": null,
+      "reverification": []
+    },
+    {
+      "route": "/",
+      "source": "web/src/app/page.tsx",
+      "exampleUrl": "https://blog.observe.tw/",
+      "status": "pending",
+      "completeRouteAndStates": false,
+      "reviews": [
+        {
+          "phase": "candidate",
+          "state": "captured-viewport",
+          "viewport": [
+            1280,
+            900
+          ],
+          "theme": "light",
+          "reviewer": "independent non-author instance",
+          "model": "gpt-6.1-sol",
+          "reviewedSha": "58e551a79626681024bf47e70ab8e1eee2b2f073",
+          "buildId": "Xm1Rp-cc1A9eW-NCT5lnf",
+          "reviewUtc": "2026-10-14T22:26:47.127340+00:00",
+          "transcript": "/home/deck/.cache/blog-home-cloud-b3-20261014/.reviews/f4-round2/candidate-independent-ui-review.json",
+          "transcriptSha256": "bbdc1c03f73fecaab715edd52d49bc61880cd81e01d6218f94cb19cec420bd6f",
+          "screenshot": "/home/deck/.t3/userdata/blog-f4-round2-20261015/candidate-home-tech/page-1-1280-light.png",
+          "screenshotSha256": "86c0fd4b220be7addd36de95ba5b56ef17018b5cb9325d0bc561cd9e2545f924",
+          "manifest": "/home/deck/.t3/userdata/blog-f4-round2-20261015/candidate-home-tech/capture-report.json",
+          "rawNetwork": "network.requests within manifest",
+          "result": "limited-state review; remaining states pending",
+          "scroll": null,
+          "interaction": null,
+          "privacy": {
+            "documentDNT": "1",
+            "documentSecGPC": null,
+            "navigatorDNT": "1",
+            "navigatorDoNotTrack": true,
+            "navigatorGPC": null
+          },
+          "analyticsAllowed": 0,
+          "guardFailures": 0
+        },
+        {
+          "phase": "candidate",
+          "state": "captured-viewport",
+          "viewport": [
+            390,
+            900
+          ],
+          "theme": "light",
+          "reviewer": "independent non-author instance",
+          "model": "gpt-6.1-sol",
+          "reviewedSha": "58e551a79626681024bf47e70ab8e1eee2b2f073",
+          "buildId": "Xm1Rp-cc1A9eW-NCT5lnf",
+          "reviewUtc": "2026-10-14T22:26:47.127340+00:00",
+          "transcript": "/home/deck/.cache/blog-home-cloud-b3-20261014/.reviews/f4-round2/candidate-independent-ui-review.json",
+          "transcriptSha256": "bbdc1c03f73fecaab715edd52d49bc61880cd81e01d6218f94cb19cec420bd6f",
+          "screenshot": "/home/deck/.t3/userdata/blog-f4-round2-20261015/candidate-home-tech/page-2-390-light.png",
+          "screenshotSha256": "a60d52886fe3c6ea67d5faccb04631221ba8f2887feb714976eec513beca6a23",
+          "manifest": "/home/deck/.t3/userdata/blog-f4-round2-20261015/candidate-home-tech/capture-report.json",
+          "rawNetwork": "network.requests within manifest",
+          "result": "limited-state review; remaining states pending",
+          "scroll": null,
+          "interaction": null,
+          "privacy": {
+            "documentDNT": "1",
+            "documentSecGPC": null,
+            "navigatorDNT": "1",
+            "navigatorDoNotTrack": true,
+            "navigatorGPC": null
+          },
+          "analyticsAllowed": 0,
+          "guardFailures": 0
+        }
+      ],
+      "deviationsAndReasons": "品牌綠色、部落格正文引用取代新聞焦點；首頁三欄與tag token沿用。 公開資料維持no-store是隱私要求，不跟tag恢復快取。",
+      "fixCommit": null,
+      "fixScope": null,
+      "reverification": []
+    },
+    {
+      "route": "/ranking/",
+      "source": "web/src/app/ranking/page.tsx",
+      "exampleUrl": "https://blog.observe.tw/ranking/",
+      "status": "issues",
+      "completeRouteAndStates": false,
+      "reviews": [
+        {
+          "phase": "formal",
+          "state": "captured-viewport",
+          "viewport": [
+            1280,
+            900
+          ],
+          "theme": "light",
+          "reviewer": "independent non-author instance",
+          "model": "gpt-6.1-sol",
+          "reviewedSha": "58e551a79626681024bf47e70ab8e1eee2b2f073",
+          "buildId": "Xm1Rp-cc1A9eW-NCT5lnf",
+          "reviewUtc": "2026-10-14T22:36:45.496144+00:00",
+          "transcript": "/home/deck/.cache/blog-home-cloud-b3-20261014/.reviews/f4-round2/formal-gen22-batch2-review.json",
+          "transcriptSha256": "87b14cdd5f8e31c396124e8a1783ee6a1c19da515ef30b1a72abe7e3cbdc120c",
+          "screenshot": "/home/deck/.t3/userdata/blog-f4-round2-20261015/formal-batch2-traffic-ranking/page-3-1280-light.png",
+          "screenshotSha256": "b7419f309c45e014de03295d5395ade83e2ae3847492f5ef00a91566ef00a40e",
+          "manifest": "/home/deck/.t3/userdata/blog-f4-round2-20261015/formal-batch2-traffic-ranking/capture-report.json",
+          "rawNetwork": "network.requests within manifest",
+          "result": "limited-state review; remaining states pending",
+          "scroll": null,
+          "interaction": null,
+          "privacy": {
+            "documentDNT": "1",
+            "documentSecGPC": null,
+            "navigatorDNT": "1",
+            "navigatorDoNotTrack": true,
+            "navigatorGPC": null
+          },
+          "analyticsAllowed": 0,
+          "guardFailures": 0
+        },
+        {
+          "phase": "formal",
+          "state": "captured-viewport",
+          "viewport": [
+            390,
+            900
+          ],
+          "theme": "light",
+          "reviewer": "independent non-author instance",
+          "model": "gpt-6.1-sol",
+          "reviewedSha": "58e551a79626681024bf47e70ab8e1eee2b2f073",
+          "buildId": "Xm1Rp-cc1A9eW-NCT5lnf",
+          "reviewUtc": "2026-10-14T22:36:45.496144+00:00",
+          "transcript": "/home/deck/.cache/blog-home-cloud-b3-20261014/.reviews/f4-round2/formal-gen22-batch2-review.json",
+          "transcriptSha256": "87b14cdd5f8e31c396124e8a1783ee6a1c19da515ef30b1a72abe7e3cbdc120c",
+          "screenshot": "/home/deck/.t3/userdata/blog-f4-round2-20261015/formal-batch2-traffic-ranking/page-4-390-light.png",
+          "screenshotSha256": "46b15c3f4d0df414093881dc744bfa639a8e21e9cf88d1d8d84c03a6f3fda508",
+          "manifest": "/home/deck/.t3/userdata/blog-f4-round2-20261015/formal-batch2-traffic-ranking/capture-report.json",
+          "rawNetwork": "network.requests within manifest",
+          "result": "limited-state review; remaining states pending",
+          "scroll": null,
+          "interaction": null,
+          "privacy": {
+            "documentDNT": "1",
+            "documentSecGPC": null,
+            "navigatorDNT": "1",
+            "navigatorDoNotTrack": true,
+            "navigatorGPC": null
+          },
+          "analyticsAllowed": 0,
+          "guardFailures": 0
+        },
+        {
+          "phase": "formal",
+          "state": "table-scroll",
+          "viewport": [
+            390,
+            900
+          ],
+          "theme": "light",
+          "reviewer": "independent non-author instance",
+          "model": "gpt-6.1-sol",
+          "reviewedSha": "58e551a79626681024bf47e70ab8e1eee2b2f073",
+          "buildId": "Xm1Rp-cc1A9eW-NCT5lnf",
+          "reviewUtc": "2026-10-14T22:40:49.998383+00:00",
+          "transcript": "/home/deck/.cache/blog-home-cloud-b3-20261014/.reviews/f4-round2/formal-gen22-batch2-mobile-review.json",
+          "transcriptSha256": "fe28b63ba990cbe918b579f949c3058ca5d5d399bdb08215eed789b484727352",
+          "screenshot": "/home/deck/.t3/userdata/blog-f4-round2-20261015/formal-batch2-mobile-tables/page-4-390-light.png",
+          "screenshotSha256": "052e1119de2332ade586a2c457a91a0a4a24842500f71ddef80d8b4508d76c5b",
+          "manifest": "/home/deck/.t3/userdata/blog-f4-round2-20261015/formal-batch2-mobile-tables/capture-report.json",
+          "rawNetwork": "network.requests within manifest",
+          "result": "limited-state pass; sorting/filter/dark/error and other states pending",
+          "interaction": {
+            "action": "table-scroll",
+            "before": {
+              "viewportWidth": 390,
+              "documentWidth": 390,
+              "actualY": 0,
+              "scrollLeft": 0,
+              "scrollWidth": 356,
+              "clientWidth": 356,
+              "scrollState": "none",
+              "scroller": {
+                "left": 17,
+                "top": 676,
+                "width": 356,
+                "right": 373
+              },
+              "header": {
+                "left": 17,
+                "top": 676,
+                "width": 356,
+                "right": 373
+              },
+              "lastHeader": {
+                "left": 290.859375,
+                "top": 676,
+                "width": 82.140625,
+                "right": 373
+              },
+              "lastHeaderVisible": true,
+              "lead": {
+                "left": 17,
+                "top": 708,
+                "width": 207.125,
+                "right": 224.125
+              },
+              "leadPosition": "sticky",
+              "leadBoxMaxWidth": "152px",
+              "extrasHidden": false,
+              "cellWhiteSpace": [
+                "nowrap"
+              ],
+              "siteHeaderHeight": 57,
+              "headerText": [
+                "名次 · 標籤",
+                "部落格",
+                "收錄文章"
+              ]
+            },
+            "after": {
+              "viewportWidth": 390,
+              "documentWidth": 390,
+              "actualY": 826,
+              "scrollLeft": 0,
+              "scrollWidth": 356,
+              "clientWidth": 356,
+              "scrollState": "none",
+              "scroller": {
+                "left": 17,
+                "top": -150,
+                "width": 356,
+                "right": 373
+              },
+              "header": {
+                "left": 17,
+                "top": 57,
+                "width": 356,
+                "right": 373
+              },
+              "lastHeader": {
+                "left": 290.859375,
+                "top": 57,
+                "width": 82.140625,
+                "right": 373
+              },
+              "lastHeaderVisible": true,
+              "lead": {
+                "left": 17,
+                "top": -118,
+                "width": 207.125,
+                "right": 224.125
+              },
+              "leadPosition": "sticky",
+              "leadBoxMaxWidth": "152px",
+              "extrasHidden": false,
+              "cellWhiteSpace": [
+                "nowrap"
+              ],
+              "siteHeaderHeight": 57,
+              "headerText": [
+                "名次 · 標籤",
+                "部落格",
+                "收錄文章"
+              ]
+            },
+            "capturedArea": "horizontally-scrolled-table-viewport"
+          },
+          "privacy": {
+            "documentDNT": "1",
+            "documentSecGPC": null,
+            "navigatorDNT": "1",
+            "navigatorDoNotTrack": true,
+            "navigatorGPC": null
+          },
+          "analyticsAllowed": 0,
+          "guardFailures": 0
+        }
+      ],
+      "deviationsAndReasons": "原始標籤收錄站數/篇數，非新聞熱度；來源品質規則與共同話題分開。 公開資料維持no-store是隱私要求，不跟tag恢復快取。",
+      "fixCommit": null,
+      "fixScope": null,
+      "reverification": [
+        {
+          "sha": "58e551a79626681024bf47e70ab8e1eee2b2f073",
+          "transcript": "/home/deck/.cache/blog-home-cloud-b3-20261014/.reviews/f4-round2/formal-gen22-batch2-review.json",
+          "screenshot": "/home/deck/.t3/userdata/blog-f4-round2-20261015/formal-batch2-traffic-ranking/page-3-1280-light.png"
+        },
+        {
+          "sha": "58e551a79626681024bf47e70ab8e1eee2b2f073",
+          "transcript": "/home/deck/.cache/blog-home-cloud-b3-20261014/.reviews/f4-round2/formal-gen22-batch2-review.json",
+          "screenshot": "/home/deck/.t3/userdata/blog-f4-round2-20261015/formal-batch2-traffic-ranking/page-4-390-light.png"
+        },
+        {
+          "sha": "58e551a79626681024bf47e70ab8e1eee2b2f073",
+          "transcript": "/home/deck/.cache/blog-home-cloud-b3-20261014/.reviews/f4-round2/formal-gen22-batch2-mobile-review.json",
+          "screenshot": "/home/deck/.t3/userdata/blog-f4-round2-20261015/formal-batch2-mobile-tables/page-4-390-light.png"
+        }
+      ]
+    },
+    {
+      "route": "/relations/",
+      "source": "web/src/app/relations/page.tsx",
+      "exampleUrl": "https://blog.observe.tw/relations/",
+      "status": "pending",
+      "completeRouteAndStates": false,
+      "reviews": [
+        {
+          "phase": "formal",
+          "state": "expand-method",
+          "viewport": [
+            1280,
+            900
+          ],
+          "theme": "light",
+          "reviewer": "independent non-author instance",
+          "model": "gpt-6.1-sol",
+          "reviewedSha": "58e551a79626681024bf47e70ab8e1eee2b2f073",
+          "buildId": "Xm1Rp-cc1A9eW-NCT5lnf",
+          "reviewUtc": "2026-10-14T22:32:17.626482+00:00",
+          "transcript": "/home/deck/.cache/blog-home-cloud-b3-20261014/.reviews/f4-round2/formal-gen22-four-page-review.json",
+          "transcriptSha256": "4216e4320dd83acec6cb051d0d582ee61aa09f492d3d6d8c0f890bc53149bee1",
+          "screenshot": "/home/deck/.t3/userdata/blog-f4-round2-20261015/formal-method-profile-new/page-1-1280-light.png",
+          "screenshotSha256": "bd0f728729a67ff1c74eb53b7d35d807b0c03a323741728275cd162622cad3bd",
+          "manifest": "/home/deck/.t3/userdata/blog-f4-round2-20261015/formal-method-profile-new/capture-report.json",
+          "rawNetwork": "network.requests within manifest",
+          "result": "limited-state review; remaining states pending",
+          "scroll": null,
+          "interaction": {
+            "action": "expand-method",
+            "wasOpen": false,
+            "open": true,
+            "contentLayoutHeight": 430.9375,
+            "contentVisible": true,
+            "viewportWidth": 1280,
+            "documentWidth": 1280,
+            "actualY": 1245,
+            "capturedArea": "expanded-method-viewport"
+          },
+          "privacy": {
+            "documentDNT": "1",
+            "documentSecGPC": null,
+            "navigatorDNT": "1",
+            "navigatorDoNotTrack": true,
+            "navigatorGPC": null
+          },
+          "analyticsAllowed": 0,
+          "guardFailures": 0
+        },
+        {
+          "phase": "formal",
+          "state": "expand-method",
+          "viewport": [
+            390,
+            900
+          ],
+          "theme": "light",
+          "reviewer": "independent non-author instance",
+          "model": "gpt-6.1-sol",
+          "reviewedSha": "58e551a79626681024bf47e70ab8e1eee2b2f073",
+          "buildId": "Xm1Rp-cc1A9eW-NCT5lnf",
+          "reviewUtc": "2026-10-14T22:32:17.626482+00:00",
+          "transcript": "/home/deck/.cache/blog-home-cloud-b3-20261014/.reviews/f4-round2/formal-gen22-four-page-review.json",
+          "transcriptSha256": "4216e4320dd83acec6cb051d0d582ee61aa09f492d3d6d8c0f890bc53149bee1",
+          "screenshot": "/home/deck/.t3/userdata/blog-f4-round2-20261015/formal-method-profile-new/page-2-390-light.png",
+          "screenshotSha256": "b3c665b24db3dbed21fb819b8ccf1d7b992387a1b3044769b4579a2a5d1ac7fd",
+          "manifest": "/home/deck/.t3/userdata/blog-f4-round2-20261015/formal-method-profile-new/capture-report.json",
+          "rawNetwork": "network.requests within manifest",
+          "result": "limited-state review; remaining states pending",
+          "scroll": null,
+          "interaction": {
+            "action": "expand-method",
+            "wasOpen": false,
+            "open": true,
+            "contentLayoutHeight": 628.4375,
+            "contentVisible": true,
+            "viewportWidth": 390,
+            "documentWidth": 390,
+            "actualY": 1539,
+            "capturedArea": "expanded-method-viewport"
+          },
+          "privacy": {
+            "documentDNT": "1",
+            "documentSecGPC": null,
+            "navigatorDNT": "1",
+            "navigatorDoNotTrack": true,
+            "navigatorGPC": null
+          },
+          "analyticsAllowed": 0,
+          "guardFailures": 0
+        }
+      ],
+      "deviationsAndReasons": "直接引用、共同標籤、文字相似分開；不作抄襲判定。 公開資料維持no-store是隱私要求，不跟tag恢復快取。",
+      "fixCommit": null,
+      "fixScope": null,
+      "reverification": [
+        {
+          "sha": "58e551a79626681024bf47e70ab8e1eee2b2f073",
+          "transcript": "/home/deck/.cache/blog-home-cloud-b3-20261014/.reviews/f4-round2/formal-gen22-four-page-review.json",
+          "screenshot": "/home/deck/.t3/userdata/blog-f4-round2-20261015/formal-method-profile-new/page-1-1280-light.png"
+        },
+        {
+          "sha": "58e551a79626681024bf47e70ab8e1eee2b2f073",
+          "transcript": "/home/deck/.cache/blog-home-cloud-b3-20261014/.reviews/f4-round2/formal-gen22-four-page-review.json",
+          "screenshot": "/home/deck/.t3/userdata/blog-f4-round2-20261015/formal-method-profile-new/page-2-390-light.png"
+        }
+      ]
+    },
+    {
+      "route": "/tags/",
+      "source": "web/src/app/tags/page.tsx",
+      "exampleUrl": "https://blog.observe.tw/tags/",
+      "status": "pending",
+      "completeRouteAndStates": false,
+      "reviews": [],
+      "deviationsAndReasons": "尚未完成當版逐頁對照，不以共用元件推定pass。 公開資料維持no-store是隱私要求，不跟tag恢復快取。",
+      "fixCommit": null,
+      "fixScope": null,
+      "reverification": []
+    },
+    {
+      "route": "/tech/",
+      "source": "web/src/app/tech/page.tsx",
+      "exampleUrl": "https://blog.observe.tw/tech/",
+      "status": "pending",
+      "completeRouteAndStates": false,
+      "reviews": [
+        {
+          "phase": "candidate",
+          "state": "captured-viewport",
+          "viewport": [
+            1280,
+            900
+          ],
+          "theme": "dark",
+          "reviewer": "independent non-author instance",
+          "model": "gpt-6.1-sol",
+          "reviewedSha": "58e551a79626681024bf47e70ab8e1eee2b2f073",
+          "buildId": "Xm1Rp-cc1A9eW-NCT5lnf",
+          "reviewUtc": "2026-10-14T22:26:47.127340+00:00",
+          "transcript": "/home/deck/.cache/blog-home-cloud-b3-20261014/.reviews/f4-round2/candidate-independent-ui-review.json",
+          "transcriptSha256": "bbdc1c03f73fecaab715edd52d49bc61880cd81e01d6218f94cb19cec420bd6f",
+          "screenshot": "/home/deck/.t3/userdata/blog-f4-round2-20261015/candidate-home-tech/page-3-1280-dark.png",
+          "screenshotSha256": "0aef4368c4b772f9e22a85394657db09aa357001ec390bb3b7411fe9a47c0831",
+          "manifest": "/home/deck/.t3/userdata/blog-f4-round2-20261015/candidate-home-tech/capture-report.json",
+          "rawNetwork": "network.requests within manifest",
+          "result": "limited-state review; remaining states pending",
+          "scroll": null,
+          "interaction": null,
+          "privacy": {
+            "documentDNT": "1",
+            "documentSecGPC": null,
+            "navigatorDNT": "1",
+            "navigatorDoNotTrack": true,
+            "navigatorGPC": null
+          },
+          "analyticsAllowed": 0,
+          "guardFailures": 0
+        },
+        {
+          "phase": "candidate",
+          "state": "captured-viewport",
+          "viewport": [
+            390,
+            900
+          ],
+          "theme": "dark",
+          "reviewer": "independent non-author instance",
+          "model": "gpt-6.1-sol",
+          "reviewedSha": "58e551a79626681024bf47e70ab8e1eee2b2f073",
+          "buildId": "Xm1Rp-cc1A9eW-NCT5lnf",
+          "reviewUtc": "2026-10-14T22:26:47.127340+00:00",
+          "transcript": "/home/deck/.cache/blog-home-cloud-b3-20261014/.reviews/f4-round2/candidate-independent-ui-review.json",
+          "transcriptSha256": "bbdc1c03f73fecaab715edd52d49bc61880cd81e01d6218f94cb19cec420bd6f",
+          "screenshot": "/home/deck/.t3/userdata/blog-f4-round2-20261015/candidate-home-tech/page-4-390-dark.png",
+          "screenshotSha256": "279e6053570d042a68dc3be565c14a5e2f8b4e476d23cf8a7c808db547ee9fd7",
+          "manifest": "/home/deck/.t3/userdata/blog-f4-round2-20261015/candidate-home-tech/capture-report.json",
+          "rawNetwork": "network.requests within manifest",
+          "result": "limited-state review; remaining states pending",
+          "scroll": null,
+          "interaction": null,
+          "privacy": {
+            "documentDNT": "1",
+            "documentSecGPC": null,
+            "navigatorDNT": "1",
+            "navigatorDoNotTrack": true,
+            "navigatorGPC": null
+          },
+          "analyticsAllowed": 0,
+          "guardFailures": 0
+        },
+        {
+          "phase": "candidate",
+          "state": "scrolled-viewport",
+          "viewport": [
+            1280,
+            900
+          ],
+          "theme": "light",
+          "reviewer": "independent non-author instance",
+          "model": "gpt-6.1-sol",
+          "reviewedSha": "58e551a79626681024bf47e70ab8e1eee2b2f073",
+          "buildId": "Xm1Rp-cc1A9eW-NCT5lnf",
+          "reviewUtc": "2026-10-14T22:26:47.127340+00:00",
+          "transcript": "/home/deck/.cache/blog-home-cloud-b3-20261014/.reviews/f4-round2/candidate-independent-ui-review.json",
+          "transcriptSha256": "bbdc1c03f73fecaab715edd52d49bc61880cd81e01d6218f94cb19cec420bd6f",
+          "screenshot": "/home/deck/.t3/userdata/blog-f4-round2-20261015/candidate-tech-controls/page-1-1280-light.png",
+          "screenshotSha256": "1300566c4991d7309f43c1d9caa5b64a538d8b74cc2e2845cb1a6e5885e14fa4",
+          "manifest": "/home/deck/.t3/userdata/blog-f4-round2-20261015/candidate-tech-controls/capture-report.json",
+          "rawNetwork": "network.requests within manifest",
+          "result": "limited-state review; remaining states pending",
+          "scroll": {
+            "requestedY": 850,
+            "actualY": 850,
+            "viewportWidth": 1280,
+            "documentWidth": 1280,
+            "capturedArea": "scrolled-viewport"
+          },
+          "interaction": null,
+          "privacy": {
+            "documentDNT": "1",
+            "documentSecGPC": null,
+            "navigatorDNT": "1",
+            "navigatorDoNotTrack": true,
+            "navigatorGPC": null
+          },
+          "analyticsAllowed": 0,
+          "guardFailures": 0
+        },
+        {
+          "phase": "candidate",
+          "state": "scrolled-viewport",
+          "viewport": [
+            390,
+            900
+          ],
+          "theme": "light",
+          "reviewer": "independent non-author instance",
+          "model": "gpt-6.1-sol",
+          "reviewedSha": "58e551a79626681024bf47e70ab8e1eee2b2f073",
+          "buildId": "Xm1Rp-cc1A9eW-NCT5lnf",
+          "reviewUtc": "2026-10-14T22:26:47.127340+00:00",
+          "transcript": "/home/deck/.cache/blog-home-cloud-b3-20261014/.reviews/f4-round2/candidate-independent-ui-review.json",
+          "transcriptSha256": "bbdc1c03f73fecaab715edd52d49bc61880cd81e01d6218f94cb19cec420bd6f",
+          "screenshot": "/home/deck/.t3/userdata/blog-f4-round2-20261015/candidate-tech-controls/page-2-390-light.png",
+          "screenshotSha256": "78dc3c159f72db82238bf8f44c863d9c7dd74f9a8a48d4c2a047d5bdd8345997",
+          "manifest": "/home/deck/.t3/userdata/blog-f4-round2-20261015/candidate-tech-controls/capture-report.json",
+          "rawNetwork": "network.requests within manifest",
+          "result": "limited-state review; remaining states pending",
+          "scroll": {
+            "requestedY": 2100,
+            "actualY": 2100,
+            "viewportWidth": 390,
+            "documentWidth": 390,
+            "capturedArea": "scrolled-viewport"
+          },
+          "interaction": null,
+          "privacy": {
+            "documentDNT": "1",
+            "documentSecGPC": null,
+            "navigatorDNT": "1",
+            "navigatorDoNotTrack": true,
+            "navigatorGPC": null
+          },
+          "analyticsAllowed": 0,
+          "guardFailures": 0
+        },
+        {
+          "phase": "formal",
+          "state": "table-scroll",
+          "viewport": [
+            1280,
+            900
+          ],
+          "theme": "dark",
+          "reviewer": "independent non-author instance",
+          "model": "gpt-6.1-sol",
+          "reviewedSha": "58e551a79626681024bf47e70ab8e1eee2b2f073",
+          "buildId": "Xm1Rp-cc1A9eW-NCT5lnf",
+          "reviewUtc": "2026-10-14T22:32:17.626482+00:00",
+          "transcript": "/home/deck/.cache/blog-home-cloud-b3-20261014/.reviews/f4-round2/formal-gen22-four-page-review.json",
+          "transcriptSha256": "4216e4320dd83acec6cb051d0d582ee61aa09f492d3d6d8c0f890bc53149bee1",
+          "screenshot": "/home/deck/.t3/userdata/blog-f4-round2-20261015/formal-tables-new/page-3-1280-dark.png",
+          "screenshotSha256": "a8d567fa38b2ffad11d39fb78a7eb42da26e581de78aabc94dd3e575b873a06f",
+          "manifest": "/home/deck/.t3/userdata/blog-f4-round2-20261015/formal-tables-new/capture-report.json",
+          "rawNetwork": "network.requests within manifest",
+          "result": "limited-state review; remaining states pending",
+          "scroll": null,
+          "interaction": {
+            "action": "table-scroll",
+            "before": {
+              "viewportWidth": 1280,
+              "documentWidth": 1280,
+              "actualY": 0,
+              "scrollLeft": 0,
+              "scrollWidth": 1312,
+              "clientWidth": 1118,
+              "scrollState": "start",
+              "scroller": {
+                "left": 81,
+                "top": 1437.3125,
+                "width": 1118,
+                "right": 1199
+              },
+              "header": {
+                "left": 81,
+                "top": 1437.3125,
+                "width": 1311.609375,
+                "right": 1392.609375
+              },
+              "lastHeader": {
+                "left": 1273.25,
+                "top": 1437.3125,
+                "width": 119.359375,
+                "right": 1392.609375
+              },
+              "lastHeaderVisible": false,
+              "lead": {
+                "left": 81,
+                "top": 1469.3125,
+                "width": 323.484375,
+                "right": 404.484375
+              },
+              "leadPosition": "sticky",
+              "leadBoxMaxWidth": "none",
+              "extrasHidden": false,
+              "cellWhiteSpace": [
+                "nowrap"
+              ],
+              "siteHeaderHeight": 59,
+              "headerText": [
+                "部落格",
+                "狀態",
+                "技術數",
+                "辨識到的技術",
+                "觀測範圍",
+                "成功觀測",
+                "最後嘗試"
+              ]
+            },
+            "after": {
+              "viewportWidth": 1280,
+              "documentWidth": 1280,
+              "actualY": 1587,
+              "scrollLeft": 194,
+              "scrollWidth": 1312,
+              "clientWidth": 1118,
+              "scrollState": "end",
+              "scroller": {
+                "left": 81,
+                "top": -149.6875,
+                "width": 1118,
+                "right": 1199
+              },
+              "header": {
+                "left": -113,
+                "top": 59,
+                "width": 1311.609375,
+                "right": 1198.609375
+              },
+              "lastHeader": {
+                "left": 1079.25,
+                "top": 59,
+                "width": 119.359375,
+                "right": 1198.609375
+              },
+              "lastHeaderVisible": true,
+              "lead": {
+                "left": 81,
+                "top": -117.6875,
+                "width": 323.484375,
+                "right": 404.484375
+              },
+              "leadPosition": "sticky",
+              "leadBoxMaxWidth": "none",
+              "extrasHidden": false,
+              "cellWhiteSpace": [
+                "nowrap"
+              ],
+              "siteHeaderHeight": 59,
+              "headerText": [
+                "部落格",
+                "狀態",
+                "技術數",
+                "辨識到的技術",
+                "觀測範圍",
+                "成功觀測",
+                "最後嘗試"
+              ]
+            },
+            "capturedArea": "horizontally-scrolled-table-viewport"
+          },
+          "privacy": {
+            "documentDNT": "1",
+            "documentSecGPC": null,
+            "navigatorDNT": "1",
+            "navigatorDoNotTrack": true,
+            "navigatorGPC": null
+          },
+          "analyticsAllowed": 0,
+          "guardFailures": 0
+        },
+        {
+          "phase": "formal",
+          "state": "table-scroll",
+          "viewport": [
+            390,
+            900
+          ],
+          "theme": "dark",
+          "reviewer": "independent non-author instance",
+          "model": "gpt-6.1-sol",
+          "reviewedSha": "58e551a79626681024bf47e70ab8e1eee2b2f073",
+          "buildId": "Xm1Rp-cc1A9eW-NCT5lnf",
+          "reviewUtc": "2026-10-14T22:32:17.626482+00:00",
+          "transcript": "/home/deck/.cache/blog-home-cloud-b3-20261014/.reviews/f4-round2/formal-gen22-four-page-review.json",
+          "transcriptSha256": "4216e4320dd83acec6cb051d0d582ee61aa09f492d3d6d8c0f890bc53149bee1",
+          "screenshot": "/home/deck/.t3/userdata/blog-f4-round2-20261015/formal-tables-new/page-4-390-dark.png",
+          "screenshotSha256": "e5e2db13f06f42e66dc9c03efdaaeeb5d5325a08534d2b80681f39cc3705b2a4",
+          "manifest": "/home/deck/.t3/userdata/blog-f4-round2-20261015/formal-tables-new/capture-report.json",
+          "rawNetwork": "network.requests within manifest",
+          "result": "limited-state review; remaining states pending",
+          "scroll": null,
+          "interaction": {
+            "action": "table-scroll",
+            "before": {
+              "viewportWidth": 390,
+              "documentWidth": 390,
+              "actualY": 0,
+              "scrollLeft": 0,
+              "scrollWidth": 1108,
+              "clientWidth": 356,
+              "scrollState": "start",
+              "scroller": {
+                "left": 17,
+                "top": 2562.8125,
+                "width": 356,
+                "right": 373
+              },
+              "header": {
+                "left": 17,
+                "top": 2562.8125,
+                "width": 1108.125,
+                "right": 1125.125
+              },
+              "lastHeader": {
+                "left": 1013.765625,
+                "top": 2562.8125,
+                "width": 111.359375,
+                "right": 1125.125
+              },
+              "lastHeaderVisible": false,
+              "lead": {
+                "left": 17,
+                "top": 2594.8125,
+                "width": 168,
+                "right": 185
+              },
+              "leadPosition": "sticky",
+              "leadBoxMaxWidth": "152px",
+              "extrasHidden": false,
+              "cellWhiteSpace": [
+                "nowrap"
+              ],
+              "siteHeaderHeight": 57,
+              "headerText": [
+                "部落格",
+                "狀態",
+                "技術數",
+                "辨識到的技術",
+                "觀測範圍",
+                "成功觀測",
+                "最後嘗試"
+              ]
+            },
+            "after": {
+              "viewportWidth": 390,
+              "documentWidth": 390,
+              "actualY": 2713,
+              "scrollLeft": 688,
+              "scrollWidth": 1044,
+              "clientWidth": 356,
+              "scrollState": "end",
+              "scroller": {
+                "left": 17,
+                "top": -150.1875,
+                "width": 356,
+                "right": 373
+              },
+              "header": {
+                "left": -671,
+                "top": 57,
+                "width": 1044.125,
+                "right": 373.125
+              },
+              "lastHeader": {
+                "left": 261.765625,
+                "top": 57,
+                "width": 111.359375,
+                "right": 373.125
+              },
+              "lastHeaderVisible": true,
+              "lead": {
+                "left": 17,
+                "top": -118.1875,
+                "width": 104,
+                "right": 121
+              },
+              "leadPosition": "sticky",
+              "leadBoxMaxWidth": "88px",
+              "extrasHidden": true,
+              "cellWhiteSpace": [
+                "nowrap"
+              ],
+              "siteHeaderHeight": 57,
+              "headerText": [
+                "部落格",
+                "狀態",
+                "技術數",
+                "辨識到的技術",
+                "觀測範圍",
+                "成功觀測",
+                "最後嘗試"
+              ]
+            },
+            "capturedArea": "horizontally-scrolled-table-viewport"
+          },
+          "privacy": {
+            "documentDNT": "1",
+            "documentSecGPC": null,
+            "navigatorDNT": "1",
+            "navigatorDoNotTrack": true,
+            "navigatorGPC": null
+          },
+          "analyticsAllowed": 0,
+          "guardFailures": 0
+        }
+      ],
+      "deviationsAndReasons": "被動技術觀測無新聞流量月份口徑；CMS與低信心主機/CDN分開，卡片與表格沿tag。 公開資料維持no-store是隱私要求，不跟tag恢復快取。",
+      "fixCommit": "58e551a79626681024bf47e70ab8e1eee2b2f073",
+      "fixScope": "TechStats/BlogTech色票與44px操作；不含SourceProfile舊說明對比問題",
+      "reverification": [
+        {
+          "sha": "58e551a79626681024bf47e70ab8e1eee2b2f073",
+          "transcript": "/home/deck/.cache/blog-home-cloud-b3-20261014/.reviews/f4-round2/formal-gen22-four-page-review.json",
+          "screenshot": "/home/deck/.t3/userdata/blog-f4-round2-20261015/formal-tables-new/page-3-1280-dark.png"
+        },
+        {
+          "sha": "58e551a79626681024bf47e70ab8e1eee2b2f073",
+          "transcript": "/home/deck/.cache/blog-home-cloud-b3-20261014/.reviews/f4-round2/formal-gen22-four-page-review.json",
+          "screenshot": "/home/deck/.t3/userdata/blog-f4-round2-20261015/formal-tables-new/page-4-390-dark.png"
+        }
+      ]
+    },
+    {
+      "route": "/topics/[id]/",
+      "source": "web/src/app/topics/[id]/page.tsx",
+      "exampleUrl": "https://blog.observe.tw/topics/%E6%9F%AF%E6%96%87%E5%93%B2/",
+      "status": "pending",
+      "completeRouteAndStates": false,
+      "reviews": [],
+      "deviationsAndReasons": "尚未完成當版逐頁對照，不以共用元件推定pass。 公開資料維持no-store是隱私要求，不跟tag恢復快取。",
+      "fixCommit": null,
+      "fixScope": null,
+      "reverification": []
+    },
+    {
+      "route": "/topics/",
+      "source": "web/src/app/topics/page.tsx",
+      "exampleUrl": "https://blog.observe.tw/topics/",
+      "status": "pending",
+      "completeRouteAndStates": false,
+      "reviews": [
+        {
+          "phase": "formal",
+          "state": "table-scroll",
+          "viewport": [
+            1280,
+            900
+          ],
+          "theme": "light",
+          "reviewer": "independent non-author instance",
+          "model": "gpt-6.1-sol",
+          "reviewedSha": "58e551a79626681024bf47e70ab8e1eee2b2f073",
+          "buildId": "Xm1Rp-cc1A9eW-NCT5lnf",
+          "reviewUtc": "2026-10-14T22:32:17.626482+00:00",
+          "transcript": "/home/deck/.cache/blog-home-cloud-b3-20261014/.reviews/f4-round2/formal-gen22-four-page-review.json",
+          "transcriptSha256": "4216e4320dd83acec6cb051d0d582ee61aa09f492d3d6d8c0f890bc53149bee1",
+          "screenshot": "/home/deck/.t3/userdata/blog-f4-round2-20261015/formal-tables-new/page-1-1280-light.png",
+          "screenshotSha256": "5e97dd4766b40ee7fb56cf96ef5e1c1293f0a577d06cf9e90373bb68fe35771b",
+          "manifest": "/home/deck/.t3/userdata/blog-f4-round2-20261015/formal-tables-new/capture-report.json",
+          "rawNetwork": "network.requests within manifest",
+          "result": "limited-state review; remaining states pending",
+          "scroll": null,
+          "interaction": {
+            "action": "table-scroll",
+            "before": {
+              "viewportWidth": 1280,
+              "documentWidth": 1280,
+              "actualY": 0,
+              "scrollLeft": 0,
+              "scrollWidth": 1118,
+              "clientWidth": 1118,
+              "scrollState": "none",
+              "scroller": {
+                "left": 81,
+                "top": 228,
+                "width": 1118,
+                "right": 1199
+              },
+              "header": {
+                "left": 81,
+                "top": 228,
+                "width": 1118,
+                "right": 1199
+              },
+              "lastHeader": {
+                "left": 1051.09375,
+                "top": 228,
+                "width": 147.90625,
+                "right": 1199
+              },
+              "lastHeaderVisible": true,
+              "lead": {
+                "left": 81,
+                "top": 260,
+                "width": 183.8125,
+                "right": 264.8125
+              },
+              "leadPosition": "sticky",
+              "leadBoxMaxWidth": "none",
+              "extrasHidden": true,
+              "cellWhiteSpace": [
+                "nowrap"
+              ],
+              "siteHeaderHeight": 59,
+              "headerText": [
+                "話題",
+                "來源",
+                "部落格",
+                "文章",
+                "標題／僅正文",
+                "加權貢獻",
+                "升溫倍率"
+              ]
+            },
+            "after": {
+              "viewportWidth": 1280,
+              "documentWidth": 1280,
+              "actualY": 378,
+              "scrollLeft": 0,
+              "scrollWidth": 1118,
+              "clientWidth": 1118,
+              "scrollState": "none",
+              "scroller": {
+                "left": 81,
+                "top": -150,
+                "width": 1118,
+                "right": 1199
+              },
+              "header": {
+                "left": 81,
+                "top": 59,
+                "width": 1118,
+                "right": 1199
+              },
+              "lastHeader": {
+                "left": 1051.09375,
+                "top": 59,
+                "width": 147.90625,
+                "right": 1199
+              },
+              "lastHeaderVisible": true,
+              "lead": {
+                "left": 81,
+                "top": -118,
+                "width": 183.8125,
+                "right": 264.8125
+              },
+              "leadPosition": "sticky",
+              "leadBoxMaxWidth": "none",
+              "extrasHidden": true,
+              "cellWhiteSpace": [
+                "nowrap"
+              ],
+              "siteHeaderHeight": 59,
+              "headerText": [
+                "話題",
+                "來源",
+                "部落格",
+                "文章",
+                "標題／僅正文",
+                "加權貢獻",
+                "升溫倍率"
+              ]
+            },
+            "capturedArea": "horizontally-scrolled-table-viewport"
+          },
+          "privacy": {
+            "documentDNT": "1",
+            "documentSecGPC": null,
+            "navigatorDNT": "1",
+            "navigatorDoNotTrack": true,
+            "navigatorGPC": null
+          },
+          "analyticsAllowed": 0,
+          "guardFailures": 0
+        },
+        {
+          "phase": "formal",
+          "state": "table-scroll",
+          "viewport": [
+            390,
+            900
+          ],
+          "theme": "light",
+          "reviewer": "independent non-author instance",
+          "model": "gpt-6.1-sol",
+          "reviewedSha": "58e551a79626681024bf47e70ab8e1eee2b2f073",
+          "buildId": "Xm1Rp-cc1A9eW-NCT5lnf",
+          "reviewUtc": "2026-10-14T22:32:17.626482+00:00",
+          "transcript": "/home/deck/.cache/blog-home-cloud-b3-20261014/.reviews/f4-round2/formal-gen22-four-page-review.json",
+          "transcriptSha256": "4216e4320dd83acec6cb051d0d582ee61aa09f492d3d6d8c0f890bc53149bee1",
+          "screenshot": "/home/deck/.t3/userdata/blog-f4-round2-20261015/formal-tables-new/page-2-390-light.png",
+          "screenshotSha256": "8ce914a345f4ea6fb7e3005740cabccfa5e7c48960b31ad13aed4c83d4a4eab0",
+          "manifest": "/home/deck/.t3/userdata/blog-f4-round2-20261015/formal-tables-new/capture-report.json",
+          "rawNetwork": "network.requests within manifest",
+          "result": "limited-state review; remaining states pending",
+          "scroll": null,
+          "interaction": {
+            "action": "table-scroll",
+            "before": {
+              "viewportWidth": 390,
+              "documentWidth": 390,
+              "actualY": 0,
+              "scrollLeft": 0,
+              "scrollWidth": 488,
+              "clientWidth": 356,
+              "scrollState": "start",
+              "scroller": {
+                "left": 17,
+                "top": 226,
+                "width": 356,
+                "right": 373
+              },
+              "header": {
+                "left": 17,
+                "top": 226,
+                "width": 488.453125,
+                "right": 505.453125
+              },
+              "lastHeader": {
+                "left": 441.4375,
+                "top": 226,
+                "width": 64.015625,
+                "right": 505.453125
+              },
+              "lastHeaderVisible": false,
+              "lead": {
+                "left": 17,
+                "top": 258,
+                "width": 81.515625,
+                "right": 98.515625
+              },
+              "leadPosition": "sticky",
+              "leadBoxMaxWidth": "152px",
+              "extrasHidden": true,
+              "cellWhiteSpace": [
+                "nowrap"
+              ],
+              "siteHeaderHeight": 57,
+              "headerText": [
+                "話題",
+                "來源",
+                "部落格",
+                "文章",
+                "標題／僅正文",
+                "加權貢獻",
+                "升溫倍率"
+              ]
+            },
+            "after": {
+              "viewportWidth": 390,
+              "documentWidth": 390,
+              "actualY": 376,
+              "scrollLeft": 132,
+              "scrollWidth": 488,
+              "clientWidth": 356,
+              "scrollState": "end",
+              "scroller": {
+                "left": 17,
+                "top": -150,
+                "width": 356,
+                "right": 373
+              },
+              "header": {
+                "left": -115,
+                "top": 57,
+                "width": 488.453125,
+                "right": 373.453125
+              },
+              "lastHeader": {
+                "left": 309.4375,
+                "top": 57,
+                "width": 64.015625,
+                "right": 373.453125
+              },
+              "lastHeaderVisible": true,
+              "lead": {
+                "left": 17,
+                "top": -118,
+                "width": 81.515625,
+                "right": 98.515625
+              },
+              "leadPosition": "sticky",
+              "leadBoxMaxWidth": "88px",
+              "extrasHidden": true,
+              "cellWhiteSpace": [
+                "nowrap"
+              ],
+              "siteHeaderHeight": 57,
+              "headerText": [
+                "話題",
+                "來源",
+                "部落格",
+                "文章",
+                "標題／僅正文",
+                "加權貢獻",
+                "升溫倍率"
+              ]
+            },
+            "capturedArea": "horizontally-scrolled-table-viewport"
+          },
+          "privacy": {
+            "documentDNT": "1",
+            "documentSecGPC": null,
+            "navigatorDNT": "1",
+            "navigatorDoNotTrack": true,
+            "navigatorGPC": null
+          },
+          "analyticsAllowed": 0,
+          "guardFailures": 0
+        }
+      ],
+      "deviationsAndReasons": "部落格7/30/90天、同站權重遞減；共用表格與method notes。 公開資料維持no-store是隱私要求，不跟tag恢復快取。",
+      "fixCommit": null,
+      "fixScope": null,
+      "reverification": [
+        {
+          "sha": "58e551a79626681024bf47e70ab8e1eee2b2f073",
+          "transcript": "/home/deck/.cache/blog-home-cloud-b3-20261014/.reviews/f4-round2/formal-gen22-four-page-review.json",
+          "screenshot": "/home/deck/.t3/userdata/blog-f4-round2-20261015/formal-tables-new/page-1-1280-light.png"
+        },
+        {
+          "sha": "58e551a79626681024bf47e70ab8e1eee2b2f073",
+          "transcript": "/home/deck/.cache/blog-home-cloud-b3-20261014/.reviews/f4-round2/formal-gen22-four-page-review.json",
+          "screenshot": "/home/deck/.t3/userdata/blog-f4-round2-20261015/formal-tables-new/page-2-390-light.png"
+        }
+      ]
+    },
+    {
+      "route": "/traffic/",
+      "source": "web/src/app/traffic/page.tsx",
+      "exampleUrl": "https://blog.observe.tw/traffic/",
+      "status": "pending",
+      "completeRouteAndStates": false,
+      "reviews": [
+        {
+          "phase": "formal",
+          "state": "captured-viewport",
+          "viewport": [
+            1280,
+            900
+          ],
+          "theme": "light",
+          "reviewer": "independent non-author instance",
+          "model": "gpt-6.1-sol",
+          "reviewedSha": "58e551a79626681024bf47e70ab8e1eee2b2f073",
+          "buildId": "Xm1Rp-cc1A9eW-NCT5lnf",
+          "reviewUtc": "2026-10-14T22:36:45.496144+00:00",
+          "transcript": "/home/deck/.cache/blog-home-cloud-b3-20261014/.reviews/f4-round2/formal-gen22-batch2-review.json",
+          "transcriptSha256": "87b14cdd5f8e31c396124e8a1783ee6a1c19da515ef30b1a72abe7e3cbdc120c",
+          "screenshot": "/home/deck/.t3/userdata/blog-f4-round2-20261015/formal-batch2-traffic-ranking/page-1-1280-light.png",
+          "screenshotSha256": "d3870c39a41cbe593ef6aa2de1e5fa8605c7b43e17581833671124bf8f3050d6",
+          "manifest": "/home/deck/.t3/userdata/blog-f4-round2-20261015/formal-batch2-traffic-ranking/capture-report.json",
+          "rawNetwork": "network.requests within manifest",
+          "result": "limited-state review; remaining states pending",
+          "scroll": null,
+          "interaction": null,
+          "privacy": {
+            "documentDNT": "1",
+            "documentSecGPC": null,
+            "navigatorDNT": "1",
+            "navigatorDoNotTrack": true,
+            "navigatorGPC": null
+          },
+          "analyticsAllowed": 0,
+          "guardFailures": 0
+        },
+        {
+          "phase": "formal",
+          "state": "captured-viewport",
+          "viewport": [
+            390,
+            900
+          ],
+          "theme": "light",
+          "reviewer": "independent non-author instance",
+          "model": "gpt-6.1-sol",
+          "reviewedSha": "58e551a79626681024bf47e70ab8e1eee2b2f073",
+          "buildId": "Xm1Rp-cc1A9eW-NCT5lnf",
+          "reviewUtc": "2026-10-14T22:36:45.496144+00:00",
+          "transcript": "/home/deck/.cache/blog-home-cloud-b3-20261014/.reviews/f4-round2/formal-gen22-batch2-review.json",
+          "transcriptSha256": "87b14cdd5f8e31c396124e8a1783ee6a1c19da515ef30b1a72abe7e3cbdc120c",
+          "screenshot": "/home/deck/.t3/userdata/blog-f4-round2-20261015/formal-batch2-traffic-ranking/page-2-390-light.png",
+          "screenshotSha256": "c9dee4e897db99d309a9c60487d1fda369ed4c8cc84b90ad050979987569c97e",
+          "manifest": "/home/deck/.t3/userdata/blog-f4-round2-20261015/formal-batch2-traffic-ranking/capture-report.json",
+          "rawNetwork": "network.requests within manifest",
+          "result": "limited-state review; remaining states pending",
+          "scroll": null,
+          "interaction": null,
+          "privacy": {
+            "documentDNT": "1",
+            "documentSecGPC": null,
+            "navigatorDNT": "1",
+            "navigatorDoNotTrack": true,
+            "navigatorGPC": null
+          },
+          "analyticsAllowed": 0,
+          "guardFailures": 0
+        },
+        {
+          "phase": "formal",
+          "state": "table-scroll",
+          "viewport": [
+            390,
+            900
+          ],
+          "theme": "light",
+          "reviewer": "independent non-author instance",
+          "model": "gpt-6.1-sol",
+          "reviewedSha": "58e551a79626681024bf47e70ab8e1eee2b2f073",
+          "buildId": "Xm1Rp-cc1A9eW-NCT5lnf",
+          "reviewUtc": "2026-10-14T22:40:49.998383+00:00",
+          "transcript": "/home/deck/.cache/blog-home-cloud-b3-20261014/.reviews/f4-round2/formal-gen22-batch2-mobile-review.json",
+          "transcriptSha256": "fe28b63ba990cbe918b579f949c3058ca5d5d399bdb08215eed789b484727352",
+          "screenshot": "/home/deck/.t3/userdata/blog-f4-round2-20261015/formal-batch2-mobile-tables/page-3-390-light.png",
+          "screenshotSha256": "6fed71b9504522a3cb40483c20e9c035555abc6456010aad0508edefed578b4c",
+          "manifest": "/home/deck/.t3/userdata/blog-f4-round2-20261015/formal-batch2-mobile-tables/capture-report.json",
+          "rawNetwork": "network.requests within manifest",
+          "result": "limited-state pass; sorting/filter/dark/error and other states pending",
+          "interaction": {
+            "action": "table-scroll",
+            "before": {
+              "viewportWidth": 390,
+              "documentWidth": 390,
+              "actualY": 0,
+              "scrollLeft": 0,
+              "scrollWidth": 1052,
+              "clientWidth": 356,
+              "scrollState": "start",
+              "scroller": {
+                "left": 17,
+                "top": 868,
+                "width": 356,
+                "right": 373
+              },
+              "header": {
+                "left": 17,
+                "top": 868,
+                "width": 1052.4375,
+                "right": 1069.4375
+              },
+              "lastHeader": {
+                "left": 986.421875,
+                "top": 868,
+                "width": 83.015625,
+                "right": 1069.4375
+              },
+              "lastHeaderVisible": false,
+              "lead": {
+                "left": 17,
+                "top": 916.5,
+                "width": 168,
+                "right": 185
+              },
+              "leadPosition": "sticky",
+              "leadBoxMaxWidth": "152px",
+              "extrasHidden": false,
+              "cellWhiteSpace": [
+                "nowrap"
+              ],
+              "siteHeaderHeight": 57,
+              "headerText": [
+                "部落格 ↕",
+                "月造訪 ▼",
+                "全球排名 ↕",
+                "國家排名 ↕",
+                "主要來源國家",
+                "類別 ↕",
+                "資料狀態 ↕",
+                "比較"
+              ]
+            },
+            "after": {
+              "viewportWidth": 390,
+              "documentWidth": 390,
+              "actualY": 1018,
+              "scrollLeft": 632,
+              "scrollWidth": 988,
+              "clientWidth": 356,
+              "scrollState": "end",
+              "scroller": {
+                "left": 17,
+                "top": -150,
+                "width": 356,
+                "right": 373
+              },
+              "header": {
+                "left": -615,
+                "top": 57,
+                "width": 988.4375,
+                "right": 373.4375
+              },
+              "lastHeader": {
+                "left": 290.421875,
+                "top": 57,
+                "width": 83.015625,
+                "right": 373.4375
+              },
+              "lastHeaderVisible": true,
+              "lead": {
+                "left": 17,
+                "top": -101.5,
+                "width": 104,
+                "right": 121
+              },
+              "leadPosition": "sticky",
+              "leadBoxMaxWidth": "88px",
+              "extrasHidden": true,
+              "cellWhiteSpace": [
+                "nowrap"
+              ],
+              "siteHeaderHeight": 57,
+              "headerText": [
+                "部落格 ↕",
+                "月造訪 ▼",
+                "全球排名 ↕",
+                "國家排名 ↕",
+                "主要來源國家",
+                "類別 ↕",
+                "資料狀態 ↕",
+                "比較"
+              ]
+            },
+            "capturedArea": "horizontally-scrolled-table-viewport"
+          },
+          "privacy": {
+            "documentDNT": "1",
+            "documentSecGPC": null,
+            "navigatorDNT": "1",
+            "navigatorDoNotTrack": true,
+            "navigatorGPC": null
+          },
+          "analyticsAllowed": 0,
+          "guardFailures": 0
+        }
+      ],
+      "deviationsAndReasons": "網域月流量估算非品質；缺月不補0，chart/table沿tag。 公開資料維持no-store是隱私要求，不跟tag恢復快取。",
+      "fixCommit": null,
+      "fixScope": null,
+      "reverification": [
+        {
+          "sha": "58e551a79626681024bf47e70ab8e1eee2b2f073",
+          "transcript": "/home/deck/.cache/blog-home-cloud-b3-20261014/.reviews/f4-round2/formal-gen22-batch2-review.json",
+          "screenshot": "/home/deck/.t3/userdata/blog-f4-round2-20261015/formal-batch2-traffic-ranking/page-1-1280-light.png"
+        },
+        {
+          "sha": "58e551a79626681024bf47e70ab8e1eee2b2f073",
+          "transcript": "/home/deck/.cache/blog-home-cloud-b3-20261014/.reviews/f4-round2/formal-gen22-batch2-review.json",
+          "screenshot": "/home/deck/.t3/userdata/blog-f4-round2-20261015/formal-batch2-traffic-ranking/page-2-390-light.png"
+        },
+        {
+          "sha": "58e551a79626681024bf47e70ab8e1eee2b2f073",
+          "transcript": "/home/deck/.cache/blog-home-cloud-b3-20261014/.reviews/f4-round2/formal-gen22-batch2-mobile-review.json",
+          "screenshot": "/home/deck/.t3/userdata/blog-f4-round2-20261015/formal-batch2-mobile-tables/page-3-390-light.png"
+        }
+      ]
+    },
+    {
+      "route": "(error)",
+      "source": "web/src/app/error.tsx",
+      "exampleUrl": null,
+      "status": "pending",
+      "completeRouteAndStates": false,
+      "reviews": [],
+      "deviationsAndReasons": "尚未完成當版逐頁對照，不以共用元件推定pass。 公開資料維持no-store是隱私要求，不跟tag恢復快取。",
+      "fixCommit": null,
+      "fixScope": null,
+      "reverification": []
+    },
+    {
+      "route": "(not-found)",
+      "source": "web/src/app/not-found.tsx",
+      "exampleUrl": "https://blog.observe.tw/not-a-real-blog-path-20261014/",
+      "status": "pending",
+      "completeRouteAndStates": false,
+      "reviews": [],
+      "deviationsAndReasons": "尚未完成當版逐頁對照，不以共用元件推定pass。 公開資料維持no-store是隱私要求，不跟tag恢復快取。",
+      "fixCommit": null,
+      "fixScope": null,
+      "reverification": []
+    }
+  ]
+}

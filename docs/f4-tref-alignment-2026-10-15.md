@@ -1,6 +1,6 @@
 # F4 T-ref 對齊與互動驗收（2026-10-15）
 
-本批基底為 fetch 後的 `origin/main` `53a408481e9c09bfd9a986e7625252220cbfa227`。正式仍是 green/gen21 `b8c1350e38a118c26a67fe67fc1336814e3685f0`／BUILD_ID `F_zSp1Bg_oZWzezesLRmQ`，以下原始碼修正尚待新 candidate 與部署，不把舊圖改標為新 SHA。
+本批基底為 fetch 後的 `origin/main` `53a408481e9c09bfd9a986e7625252220cbfa227`。本批已於 UTC2026-10-14T22:28:02.034Z 上線 blue/gen22 `58e551a79626681024bf47e70ab8e1eee2b2f073`／BUILD_ID `Xm1Rp-cc1A9eW-NCT5lnf`。起始盤點時正式為 gen21/b8；其舊圖保留原 SHA，不改標成新版本。實際候選與正式圖／獨立 review、隱私測試和回滾見 [gen22證據索引](f4-gen22-evidence.md)。
 
 ## 沿用與刻意偏離
 

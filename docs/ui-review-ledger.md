@@ -1,5 +1,52 @@
 # UI 逐頁審查紀錄
 
+## 現況（UTC2026-10-14T22:28:02.034Z，gen22）
+
+正式 **blue／gen22／58e551a79626681024bf47e70ab8e1eee2b2f073**，**BUILD_ID Xm1Rp-cc1A9eW-NCT5lnf**，SM 單次 build 後同產物 prepare-built／切換；green/b8 為在線回滾。`bash tools/deploy-blue-green.sh rollback green` 可立即切回。無 migration、無新完整備份、未改 Cloudflare/WAF 或 tag-backup；no-store／DYNAMIC、HSTS86400、DNT/GA guards 維持。
+
+本輪 inventory：**20 個 page route＋error/not-found，共22個項目；完整 route/state pass 0／pending22**。當次看圖只提升下列已入鏡狀態，不拿正常或同元件的證據代替空／錯／權限／全部資料量狀態。舊版圖片保留原 SHA，不改標 gen22。
+
+### F4 與 T-ref
+
+[逐頁沿用／偏離及資料查核](f4-tref-alignment-2026-10-15.md)。TableScroller 與 table-styles 和 T-ref 逐位元相同；搜尋／篩選操作44px、可見 label、次要文字 zinc600/dark400。品牌綠色、部落格引用語意、方法說明既有 FooterMethod 接線，以及隱私 no-store 是刻意差異。Alina/timdream 現有片段沒有 generator，仍 unknown；Carol 已有 Blogger 證據、版本 unknown。未為填技術 coverage 額外對原站請求，F4 全站完整觀測仍 pending。
+
+原作者：既有 **Claude Opus5.5** session6e17，`/home/deck/.cache/blog-home-cloud-b3-20261014/.reviews/f4-round2/opus-author.json` 實際 modelUsage/success；非作者 source review GPT-6.1 Sol 的 `independent-source-review-final.json`。初審兩個可見性測量問題已採納；「表格文字顏色也必須完全不變」是 packet 歧義，已釐清 T-ref 本就要求修正已知對比問題，複審通過，不為保留低對比而拒絕修正。
+
+Candidate 三個 route（home/tech/Carol）共8張1280/390，明暗／來源展開分開記錄，**不是正式畫面**；非作者實看8張＋4張當前 tag 參照，`candidate-independent-ui-review.json`，canDeploy=true。正式第一批四頁8張＋4張 tag 當前7dc參照，`formal-gen22-four-page-review.json`，UTC2026-10-14T22:32:17.626482，實際 GPT-6.1 Sol／finish_reason stop，無阻擋。所有絕對路徑/hash見 [本批證據索引](f4-gen22-evidence.md)。
+
+| route／實例 | 正式桌機1280／手機390（子目錄內 page1/page2 或 page3/page4） | 受審狀態、tag偏離與結果 | 待驗 |
+| --- | --- | --- | --- |
+| `/topics/` | `/home/deck/.t3/userdata/blog-f4-round2-20261015/formal-tables-new/page-1-1280-light.png`、同目錄 `page-2-390-light.png` | GPT-6.1 Sol／APP58e551a／BUILD Xm1R；light 橫捲末端 limited pass。部落格期間與權重取代新聞標籤排行，元件相同。 | 排序／期間／中間捲動、dark／空／錯仍 pending。 |
+| `/tech/` | 同上目錄 `page-3-1280-dark.png`、`page-4-390-dark.png` | 同 reviewer/SHA/BUILD；dark 橫捲末端 limited pass。主機/CDN 與軟體分開，列出觀測範圍與時間，非新聞流量。 | filter／分頁／loading／空／錯狀態仍 pending；額外原始完整來源觀測待自然取得。 |
+| `/relations/` | `/home/deck/.t3/userdata/blog-f4-round2-20261015/formal-method-profile-new/page-1-1280-light.png`、`page-2-390-light.png` | 同 reviewer/SHA/BUILD；light 方法展開 limited pass，summary 已避開 sticky header。正文引用、共現、相似分開的語意差異有說明。 | 關係圖互動／時段切換／dark／空／錯仍 pending。 |
+| `/blogs/carol-691/#content-source` | 同上目錄 `page-3-1280-dark.png`、`page-4-390-dark.png` | 同 reviewer/SHA/BUILD；dark 來源／技術區 limited pass，Blogger 證據與未知版本、成功／嘗試時間可核對。 | 其他資料量、鍵盤展開、整頁、錯誤仍 pending；舊 SourceProfile 說明曾測得4.10:1另列 issue。 |
+
+每張圖 report 都有 actual release/BUILD、DNT1／navigatorDNT1、實際GPC=null、導航前 Google/GTM 與外部傳輸阻擋、network.requests；analytics allowed0。手機兩表首欄152→88px，header top57＝site header57，最右欄完整可見、nowrap、documentWidth390；桌機1280不溢出。第一版過寬推導的原始 artifact 保留，正式 gen22 已用修正後工具重拍。可見次要字126個 DOM 樣本，CSS Lab 由既有 LightningCSS 轉為sRGB後做 WCAG 計算，最低4.827:1、126pass／0fail／0unknown；只限入鏡樣本，**不是整頁 AA 認證**。Candidate 另一段舊 SourceProfile 說明4.10:1仍待修，不以 source 改動假定已修全部頁面。
+
+### 第二批四頁：正常首屏（gen22）
+
+`/blogs/`、`/authors/`、`/traffic/`、`/ranking/` 各1280/390 light，原圖與raw network分兩個子目錄，每個report四張：
+`/home/deck/.t3/userdata/blog-f4-round2-20261015/formal-batch2-directory-authors/`（blogs=page1/page2；authors=page3/page4），
+`/home/deck/.t3/userdata/blog-f4-round2-20261015/formal-batch2-traffic-ranking/`（traffic=page1/page2；ranking=page3/page4）。全部APP58／BUILD Xm1R，導航前DNT1/阻擋、GAallowed0，先後的uptime/三站time_total都在report。
+非作者實看8張＋6張當前tag參照（含media目錄），GPT-6.1 Sol／stop、UTC2026-10-14T22:36:45.496144；transcript `/home/deck/.cache/blog-home-cloud-b3-20261014/.reviews/f4-round2/formal-gen22-batch2-review.json`。四頁首屏有限範圍無阻擋，但不宣稱完整pass。至此正式gen22實際review **8個不同route的部分狀態／14項尚無當版正式review**；完整route/state仍0完成／22pending。
+
+| route | tag對齊與刻意差異 | issue／未驗狀態 |
+| --- | --- | --- |
+| `/blogs/` | 沿tag媒體目錄的tabs/KPI/chips/表格；母體改為部落格，低頻不失效。 | 首屏右欄在容器內非整頁溢出，但需補橫捲末端；有文章但時間缺值的「尚無紀錄」應區分；filter/sort/empty/error/dark pending。 |
+| `/authors/` | 同表格與圖示，作者與站主分開且不跨站併名。 | 作者/網站/文章數的手機右欄需補橫捲；來源的泛稱或疑似評論署名需另查，不因看圖就自動刪站。 |
+| `/traffic/` | 圖表、tabs、表格沿tag流量頁，估算不是品質；缺月不補0。 | 手機圖表legend分頁和表格在首屏下方；月份/排序/選站/空/錯/dark尚待互動。沒有拿tag資料讀取失敗當合法空狀態。 |
+| `/ranking/` | 同rank/table tokens，但明示依原站標籤參與站數與篇數，非新聞熱度。 | 主導覽缺當前頁標示、dark次要字與排序/tie-breaking待驗；原始Uncategorized等與共同話題品質池分開，需標明來源差異，不能看圖直接刪詞庫。 |
+
+第二批手機橫捲已另做實際補證，APP/BUILD不變；私有 `formal-batch2-mobile-tables/` 四張 page1=blogs、page2=authors、page3=traffic、page4=ranking（皆390 light），report有before/after rect、header、nowrap與DNT/網路。既有非作者 GPT-6.1 Sol於 UTC2026-10-14T22:40:49.998383 再看四張＋當前tag參照，原始log `formal-gen22-batch2-mobile-review.json`：無阻擋。目錄/作者/流量首欄152→88px且最右欄可見；排行三欄本來就全寬可見，不需要橫捲，首欄152px是正常。四頁documentWidth390、nowrap、sticky lead/header。這只解除「沒有實際看過最右欄」的缺口；排序／選月份／圖例／完整名稱／鍵盤／其他狀態仍pending，未刪先前finding。
+
+對照每一頁的phase/model/SHA/BUILD、desktop/mobile路徑、transcript/hash、實際privacy欄位、偏離理由、fix scope和重驗，另有機器可讀 [ledger JSON](ui-review-ledger.json)；只有真實artifact的記錄才有review欄位，其他14項保留pending/missing，不把生成inventory當review。
+
+### 技術驗收與回填
+
+實際 runtime58 的53barrier＋60SSR/RSC（含精確SHA／BUILD／tree／隔離18169、HTTP18176/18177、事件順序）和28全文HTTP privacy皆通過。正式23項、4個實際RSC、三站閘門通過；切後三次中位 tag0.059／blog2.430／YT0.041秒；另五次公開首頁 HTML time_total 中位2.488秒（含edge/網路，不是純origin渲染）。所有HTML/RSC/API仍no-store/DYNAMIC，無恢復CF快取。Build artifact149MiB、1worker、nice19/IOidle；兩次 time 指令不可用均未進compiler，保留失敗log，實際compiler只跑一次；沒有量出整個process tree記憶體峰值，不虛報。
+
+先前五篇／60秒回填只寫10筆，在24448因首頁500自動取消。檢查恢復健康後改一篇／120秒、pool1、nice19/IOidle，`blog-fulltext-backfill-20261014t2233.service`；每批首頁非200或>6.17秒即退出、不自動重試，worker producer仍關。這是小量歷史索引進行中，尚未全量完成。回滾與所有舊原始證據保留；af0仍是worker的WorkingDirectory，不能因滾動清理刪掉。
+
 ## 現況（UTC2026-10-14T21:35:12.257Z，gen21）
 
 正式 **green／gen21／b8c1350e38a118c26a67fe67fc1336814e3685f0**，**Next BUILD_ID F_zSp1Bg_oZWzezesLRmQ**；blue af0在線回滾。gen19至gen21只是公開v1的未發布文章predicate修正，**n/a-ui**，web tree／兩份lockfile／data/openapi與同一份前端artifact完全相同。gen19正式看圖與gen17歷史證據保留原SHA，不改標成b8。
