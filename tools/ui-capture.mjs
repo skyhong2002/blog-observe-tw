@@ -48,7 +48,7 @@ export function requestDecision(raw, targetOrigin) {
 export function plan(config) {
   const origin = new URL(config.targetOrigin);
   if (origin.origin !== config.targetOrigin || origin.username || origin.password || !['http:', 'https:'].includes(origin.protocol)) throw Error('invalid_target');
-  if (!/^[a-f0-9]{40}$/.test(config.expectedSHA || '') || !config.expectedBuildId || (!config.localIdentity && !/^[a-z0-9-]+$/i.test(config.buildIdHeader || ''))) throw Error('identity_required');
+  if (!/^[a-f0-9]{40}$/.test(config.expectedSHA || '') || !config.expectedBuildId || (!config.localIdentity && config.htmlBuildIdentity !== true && !/^[a-z0-9-]+$/i.test(config.buildIdHeader || ''))) throw Error('identity_required');
   if (!Array.isArray(config.pages) || config.pages.length < 1 || config.pages.length > LIMITS.images) throw Error('batch_limit');
   const pages = config.pages.map((page, index) => {
     if (![1280, 390].includes(page.width) || typeof page.path !== 'string' || !page.path.startsWith('/') || page.path.startsWith('//')) throw Error('invalid_page');
@@ -65,9 +65,24 @@ export function plan(config) {
 export function verifyGate({ load, browserRoots, available }, estimate) {
   if (!Number.isFinite(load) || load > LIMITS.load || !Number.isSafeInteger(browserRoots) || browserRoots < 0 || browserRoots >= 2 || !Number.isFinite(available) || available - estimate < LIMITS.reserve) throw Error('gate_closed');
 }
-export function verifyIdentity(headers, config) {
-  if (headers['x-blog-release'] !== config.expectedSHA || headers[config.buildIdHeader.toLowerCase()] !== config.expectedBuildId) throw Error('identity_unverified');
-  return { sha: headers['x-blog-release'], buildId: headers[config.buildIdHeader.toLowerCase()] };
+export function htmlNextBuildId(html) {
+  const ids = new Set();
+  for (const script of html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/g)) {
+    const match = /self\.__next_f\.push\((\[[\s\S]*\])\)/.exec(script[1]);
+    if (!match) continue;
+    let frame; try { frame = JSON.parse(match[1]); } catch { continue; }
+    if (!Array.isArray(frame) || frame[0] !== 1 || typeof frame[1] !== 'string') continue;
+    for (const line of frame[1].split('\n')) {
+      if (!line.startsWith('0:{')) continue;
+      try { const value = JSON.parse(line.slice(2)); if (typeof value.b === 'string' && /^[A-Za-z0-9_-]{1,128}$/.test(value.b)) ids.add(value.b); } catch { /* other flight frames */ }
+    }
+  }
+  if (ids.size !== 1) throw Error('html_build_identity_unverified');
+  return [...ids][0];
+}
+export function verifyIdentity(headers, config, observedBuildId) {
+  if (headers['x-blog-release'] !== config.expectedSHA || (config.htmlBuildIdentity === true ? observedBuildId : headers[config.buildIdHeader.toLowerCase()]) !== config.expectedBuildId) throw Error('identity_unverified');
+  return { sha: headers['x-blog-release'], buildId: config.htmlBuildIdentity === true ? observedBuildId : headers[config.buildIdHeader.toLowerCase()] };
 }
 function ensureNetworkEvidence(network) {
   if (!network) return;
@@ -530,7 +545,7 @@ export async function capture(config, deps) {
     let identityFailure = false;
     page.on('response', response => {
       if (!config.localIdentity && response.request().resourceType() === 'document') {
-        try { verifyIdentity(response.headers(), config); } catch { identityFailure = true; }
+        try { if (config.htmlBuildIdentity === true) { if (response.headers()['x-blog-release'] !== config.expectedSHA) throw Error('identity_unverified'); } else verifyIdentity(response.headers(), config); } catch { identityFailure = true; }
       }
     });
       report.currentPathname = new URL(item.url).pathname;
@@ -543,7 +558,7 @@ export async function capture(config, deps) {
       report.guardSetup.firstNavigationAt ??= deps.now();
       const response = await page.goto(item.url, { waitUntil: 'domcontentloaded', timeout: 15000 });
       if (!response || response.status() !== 200) throw Error('document_unavailable');
-      const identity = config.localIdentity ? await deps.verifyLocalProcess?.() : verifyIdentity(await response.allHeaders(), config);
+      const identity = config.localIdentity ? await deps.verifyLocalProcess?.() : verifyIdentity(await response.allHeaders(), config, config.htmlBuildIdentity === true ? htmlNextBuildId(await response.text()) : undefined);
       if (config.localIdentity && (!identity || ['buildId','nextPid','nextStart','nextPort','port','cwd','releaseDir','gatewayPid','gatewayStart','gatewayCwd','gatewayUiOrigin','nextGatewayOrigin'].some(key => identity[key] !== report.localIdentity[key]))) throw Error('identity_unverified');
       await deps.sleep(LIMITS.delay);
       await proveQuota();

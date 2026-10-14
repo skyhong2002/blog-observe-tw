@@ -72,7 +72,7 @@ const contentEnabled = process.env.BLOG_CONTENT_ENABLED === 'true';
 const shutdown = new AbortController();
 const missingIconsEnabled = process.env.BLOG_MISSING_FAVICONS_ENABLED !== 'false';
 for (const [name, every, enabled] of [
-  ['blogs-fulltext', 60_000, process.env.BLOG_SEARCH_FULLTEXT_ENABLED === 'true'],
+  ['blogs-fulltext', 5 * 60_000, process.env.BLOG_SEARCH_FULLTEXT_ENABLED === 'true'],
   ['blogs-content', 5 * 60_000, contentEnabled],
   ['blogs-relation-snapshots', 5 * 60_000, process.env.BLOG_RELATION_SNAPSHOTS_ENABLED !== 'false'],
   ['blogs-relations', 5 * 60_000, relationsEnabled],
@@ -111,13 +111,25 @@ const worker = new Worker(
       const aliases = await backfillTopicRouteAliases(store.pool, { limit: 100, missingOnly: true });
       return { blogs, topics, aliases };
     }
+    if (process.env.BLOG_SEARCH_FULLTEXT_ENABLED === 'true' && (job.name === 'blogs-fulltext' || job.name === SEARCH_INDEX_JOB)) {
+      const start = performance.now();
+      const response = await fetch(config.publicOrigin + '/', { headers: { DNT: '1' }, signal: AbortSignal.timeout(13000) });
+      await response.arrayBuffer();
+      if (response.status !== 200 || performance.now() - start > 6170) return { deferred: 'homepage-unhealthy' };
+    }
     if (job.name === 'blogs-fulltext') {
       const cursorKey = `${config.queueName}:fulltext-cursor`;
       const after = Number((await connection.get(cursorKey)) || 0);
       const newCursorKey = `${config.queueName}:fulltext-new-cursor`;
-      const missing = await indexMissingFulltextPosts(store.pool, Number((await connection.get(newCursorKey)) || 0), 50);
+      let newCursor = await connection.get(newCursorKey);
+      if (newCursor === null) {
+        const [[watermark]] = await store.pool.query<import('mysql2/promise').RowDataPacket[]>('SELECT MAX(id) AS id FROM posts');
+        newCursor = String(Number(watermark.id || 0));
+        await connection.set(newCursorKey, newCursor);
+      }
+      const missing = await indexMissingFulltextPosts(store.pool, Number(newCursor), 5);
       await connection.set(newCursorKey, String(missing.next));
-      const result = await runFulltextBatch(store.pool, { after, limit: 50, signal: shutdown.signal });
+      const result = await runFulltextBatch(store.pool, { after, limit: 5, signal: shutdown.signal });
       await connection.set(cursorKey, String(result.next));
       return { processed: result.items.length, newPosts: missing.items.length, next: result.next, done: result.done };
     }

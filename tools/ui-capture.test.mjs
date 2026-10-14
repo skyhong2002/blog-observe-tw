@@ -481,3 +481,14 @@ await test('homepage gate uses three-sample median but never masks an HTTP error
  assert.throws(()=>summarizeHomepageSamples('blog.observe.tw',[...samples.slice(0,2),{status:500,totalSeconds:1}]),/ttfb_gate/);
  assert.throws(()=>summarizeHomepageSamples('blog.observe.tw',samples.slice(0,2)),/ttfb_gate/);
 });
+
+test('formal HTML identity reads actual Flight BUILD_ID and rejects absent/conflicting identities', async () => {
+  const { htmlNextBuildId, verifyIdentity } = await import('./ui-capture.mjs');
+  const flight = id => '<script>self.__next_f.push(' + JSON.stringify([1, '0:' + JSON.stringify({ b: id, c: ['articles'] }) + '\n']) + ')</script>';
+  assert.equal(htmlNextBuildId(flight('current-build')), 'current-build');
+  assert.throws(() => htmlNextBuildId('<script>"current-build"</script>'));
+  assert.throws(() => htmlNextBuildId(flight('current-build') + flight('other-build')));
+  const sha='a'.repeat(40),config={htmlBuildIdentity:true,expectedSHA:sha,expectedBuildId:'current-build'};
+  assert.equal(verifyIdentity({'x-blog-release':sha},config,htmlNextBuildId(flight('current-build'))).buildId,'current-build');
+  assert.throws(() => verifyIdentity({'x-blog-release':sha},config,'other-build'));
+});

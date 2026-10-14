@@ -20,8 +20,10 @@
 
 每個查詢最多兩個 SQL statement，每個 server timeout 1 秒；最多讀 200 個候選、候選上限固定公開，原始候選數／過期數／截斷狀態不對外提供，以免舊正文索引成為探測工具。公開 counts 只計當前驗證通過的結果。每頁最多 20 筆，只處理有界 ID 集合，沒有對全站歷史正文做 LIKE 掃描。
 
-`tools/index-historical-search.ts --after <ID> --batches <N>` 每批 50 篇、批間一秒、pool size=1；每篇 upsert 後保留 cursor，可續跑、可重複，不發 HTTP。不把文章全文或金鑰寫進 stdout。worker 每分鐘以獨立 high-water keyset 處理 50 個新文章，再循環核對 50 個歷史文章；hash／版本未變時跳過寫入，不持續重建 FULLTEXT。刪除文章透過 FK 同步清掉衍生 document，歷史核對會刪除已撤下文章的 document；正文 durable commit 後的既有 adoption job 可立即更新索引。只有一個 blog worker，不啟動第二個。
+`tools/index-historical-search.ts --after <ID> --batches <N>` 每批 10 篇、批間五秒、pool size=1；每篇 upsert 後保留 cursor，可續跑、可重複，不發 HTTP。不把文章全文或金鑰寫進 stdout。worker 每五分鐘以獨立 high-water keyset 處理 5 個新文章，再循環核對 5 個歷史文章；hash／版本未變時跳過寫入，不持續重建 FULLTEXT。刪除文章透過 FK 同步清掉衍生 document，歷史核對會刪除已撤下文章的 document；正文 durable commit 後的既有 adoption job 可立即更新索引。只有一個 blog worker，不啟動第二個。
 
 回滾關閉新旗標或切回 af0；保留 additive table 與索引，不需要 down migration。正式遷移前保留 streamed gzip 備份，既有備份不刪。建置、candidate 和正式截圖各自記錄 SHA／BUILD_ID；正式 DNT/傳輸層 Google 阻擋與 raw network 不拿 candidate review 代替。
 
 source review：既有 Opus 5.5 指出公開候選計數側通道、反向 anti-join 成本、unchanged 重寫、adoption 旗標與空白比對。以上皆修正並加測試；GPT-6.1 Sol 對最後的全文讀寫／DDL／fixture source 審查 pass（沒有冒稱執行測試）。常見詞與長字串實際查詢成本須在資料補齊後量測；仍有 SQL timeout 與候選上限，不隱藏失敗為「沒有結果」。兩份初期 API Opus 回應遭截斷，不計成功 review。私人 logs 位於 `.reviews/f3-fulltext/`。
+
+19:34 UTC 正式 overview 發生500，與建置／首次大量回填重疊；web log 沒有保留當時 DB driver error code，不能斷言唯一根因。19:42 停止回填後才繼續量測。CLI 已改10篇／五秒、pool1、nice19/ionice3；每批間用 DNT GET 正式首頁，非200或超過6.17秒便取消並保存cursor，沒有SIGSTOP或自動重試。worker 索引工作也先檢查首頁，並降至5+5篇／五分鐘，durable change job最多10篇；不把背景成本轉嫁給公開請求。

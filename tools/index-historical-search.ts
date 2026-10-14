@@ -7,20 +7,38 @@ const number = (key: string, fallback: number) => (args.includes(key) ? Number(a
 const max = number('--batches', 1),
   after = number('--after', 0);
 if (!Number.isInteger(max) || max < 1 || max > 2000 || !Number.isSafeInteger(after) || after < 0) throw Error('invalid_fulltext_run');
+async function homepageGate() {
+  const start = performance.now();
+  const r = await fetch('https://blog.observe.tw/', { headers: { DNT: '1' }, signal: AbortSignal.timeout(13000) });
+  const bytes = (await r.arrayBuffer()).byteLength;
+  const elapsedMs = performance.now() - start;
+  console.log(
+    JSON.stringify({
+      probeUtc: new Date().toISOString(),
+      status: r.status,
+      elapsedMs,
+      bytes,
+      cfCacheStatus: r.headers.get('cf-cache-status'),
+    }),
+  );
+  if (r.status !== 200 || elapsedMs > 6170) throw Error('homepage_guard_closed');
+}
 const db = createDb(undefined, { poolSize: 1 });
 let cursor = after,
   count = 0;
 try {
+  await homepageGate();
   for (let n = 0; n < max; n++) {
-    const result = await runFulltextBatch(db.pool, { after: cursor, limit: 50 });
+    const result = await runFulltextBatch(db.pool, { after: cursor, limit: 10 });
     cursor = result.next;
     count += result.items.length;
     console.log(JSON.stringify({ batch: n + 1, indexed: result.items.length, total: count, next: cursor, done: result.done }));
     if (result.done) break;
-    await delay(1000);
+    await delay(5000);
+    await homepageGate();
   }
 } catch {
-  console.error(JSON.stringify({ error: 'fulltext_batch_failed', resumeAfter: cursor }));
+  console.error(JSON.stringify({ error: 'fulltext_batch_failed_or_homepage_guard_closed', resumeAfter: cursor }));
   process.exitCode = 1;
 } finally {
   await db.close();
