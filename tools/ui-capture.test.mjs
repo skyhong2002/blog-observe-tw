@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { EventEmitter } from 'node:events';
 import { PassThrough } from 'node:stream';
-import { capture, observePrivacy, requireDNT, assessContrast, collectSecondaryContrastDOM, verifyPrivateArtifactDirectory, verifyLatencyGate, installGuards, LIMITS, plan, requestDecision, verifyGate, verifyIdentity, browserRootInventory, quotaLeaseFromProcess, localProcessIdentity, listenerInodes, acquireHostBrowserQuota, recordNetworkAttempt, recordNetworkOutcome, NETWORK_GUARD_RULES, privateCapturePath, globalHomepageProbe, processInventory } from './ui-capture.mjs';
+import { capture, captureScroll, observePrivacy, requireDNT, assessContrast, collectSecondaryContrastDOM, verifyPrivateArtifactDirectory, verifyLatencyGate, installGuards, LIMITS, plan, requestDecision, verifyGate, verifyIdentity, browserRootInventory, quotaLeaseFromProcess, localProcessIdentity, listenerInodes, acquireHostBrowserQuota, recordNetworkAttempt, recordNetworkOutcome, NETWORK_GUARD_RULES, privateCapturePath, globalHomepageProbe, processInventory } from './ui-capture.mjs';
 
 const config = { targetOrigin: 'http://127.0.0.1:18174', expectedSHA: 'a'.repeat(40), expectedBuildId: 'fixture-build', buildIdHeader: 'x-build-id', pages: [{ path: '/', width: 1280 }, { path: '/articles/', width: 390 }] };
 const gate = { load: 1, browserRoots: 0, rawPgrepCount: 10, available: LIMITS.reserve + 100 * 1024 ** 2 };
@@ -491,4 +491,18 @@ test('formal HTML identity reads actual Flight BUILD_ID and rejects absent/confl
   const sha='a'.repeat(40),config={htmlBuildIdentity:true,expectedSHA:sha,expectedBuildId:'current-build'};
   assert.equal(verifyIdentity({'x-blog-release':sha},config,htmlNextBuildId(flight('current-build'))).buildId,'current-build');
   assert.throws(() => verifyIdentity({'x-blog-release':sha},config,'other-build'));
+});
+
+test('below-fold evidence validates bounded coordinates and records actual scroll separately', async () => {
+  for (const scrollY of [-1, 20001, 1.5, '800']) {
+    assert.throws(() => plan({ ...config, pages: [{ path: '/articles/', width: 390, scrollY }] }), /invalid_scroll/);
+  }
+  assert.equal(plan({ ...config, pages: [{ path: '/articles/', width: 390, scrollY: 800 }] }).pages[0].scrollY, 800);
+  const result = await captureScroll({ evaluate: async (fn, requestedY) => {
+    assert.equal(requestedY, 800);
+    assert.match(String(fn), /window.scrollY/);
+    return { requestedY, actualY: 730, viewportWidth: 390, documentWidth: 390, capturedArea: 'scrolled-viewport' };
+  } }, 800);
+  assert.equal(result.actualY, 730);
+  assert.equal(result.capturedArea, 'scrolled-viewport');
 });

@@ -54,13 +54,23 @@ export function plan(config) {
     if (![1280, 390].includes(page.width) || typeof page.path !== 'string' || !page.path.startsWith('/') || page.path.startsWith('//')) throw Error('invalid_page');
     const url = new URL(page.path, origin);
     if (url.origin !== origin.origin || url.username || url.password || privateCapturePath(url.pathname)) throw Error('private_route');
+    const scrollY = page.scrollY ?? 0;
+    if (!Number.isSafeInteger(scrollY) || scrollY < 0 || scrollY > 20000) throw Error('invalid_scroll');
     const theme = page.theme ?? 'light';
     if (!['light', 'dark'].includes(theme)) throw Error('invalid_theme');
-    return { url: url.href, width: page.width, height: 900, theme, name: `page-${index + 1}-${page.width}-${theme}.png` };
+    return { url: url.href, width: page.width, height: 900, scrollY, theme, name: `page-${index + 1}-${page.width}-${theme}.png` };
   });
   const estimatedBytes = pages.reduce((sum, page) => sum + page.width * page.height * 4, 0);
   if (estimatedBytes > LIMITS.bytes) throw Error('artifact_budget');
   return { pages, estimatedBytes, targetOrigin: origin.origin, formal: !['localhost', '127.0.0.1', '[::1]'].includes(origin.hostname) };
+}
+/** Optional, bounded below-fold evidence; never relabel it as a first-screen capture. */
+export async function captureScroll(page, requestedY) {
+  return page.evaluate(y => {
+    window.scrollTo({ top: y, left: 0, behavior: 'instant' });
+    return { requestedY: y, actualY: window.scrollY, viewportWidth: window.innerWidth,
+      documentWidth: document.documentElement.scrollWidth, capturedArea: 'scrolled-viewport' };
+  }, requestedY);
 }
 export function verifyGate({ load, browserRoots, available }, estimate) {
   if (!Number.isFinite(load) || load > LIMITS.load || !Number.isSafeInteger(browserRoots) || browserRoots < 0 || browserRoots >= 2 || !Number.isFinite(available) || available - estimate < LIMITS.reserve) throw Error('gate_closed');
@@ -574,11 +584,12 @@ export async function capture(config, deps) {
       report.privacyObservations.push({ pathname: new URL(item.url).pathname, utc: deps.now(), ...privacy });
       requireDNT(privacy);
       if (report.network.guardFailures || report.network.analyticsEvidence?.allowed) throw Error('network_guard_unverified');
+      const scroll = item.scrollY ? await captureScroll(page, item.scrollY) : null;
       const contrastSamples = (await page.evaluate(collectSecondaryContrastDOM)).map(sample => sample.ancestorLimitReached ? { ...sample, ratio: null, result: 'unknown', reason: 'ancestor_limit' } : assessContrast(sample));
       const png = await page.screenshot({ fullPage: false });
       if (png.length > item.width * item.height * 4 || report.pages.reduce((sum, row) => sum + row.bytes, 0) + png.length > LIMITS.bytes) throw Error('actual_artifact_budget');
       await deps.saveImage(item.name, png);
-      report.pages.push({ privacyObservation: { source: 'actual-document-request-and-navigator', navigatorDNTSource: 'observed-value; init-script-override-configured', navigatorGPCSource: 'observed-value; runner-does-not-override' }, privacy, contrastSamples, contrastLimitation: 'Visible main secondary-class DOM samples only; unsupported CSS colors/backgrounds/group opacity remain unknown, not a full WCAG scan.', name: item.name, pathname: new URL(item.url).pathname, viewport: [item.width, item.height], theme: observedTheme.theme, darkMedia: observedTheme.darkMedia, utc: deps.now(), identity: config.localIdentity ? { ...identity, sha: report.localIdentity.sha, sourceTreeHash: report.localIdentity.sourceTreeHash } : identity, bytes: png.length, sha256: createHash('sha256').update(png).digest('hex'), status: 'captured-unreviewed' });
+      report.pages.push({ scroll, privacyObservation: { source: 'actual-document-request-and-navigator', navigatorDNTSource: 'observed-value; init-script-override-configured', navigatorGPCSource: 'observed-value; runner-does-not-override' }, privacy, contrastSamples, contrastLimitation: 'Visible main secondary-class DOM samples only; unsupported CSS colors/backgrounds/group opacity remain unknown, not a full WCAG scan.', name: item.name, pathname: new URL(item.url).pathname, viewport: [item.width, item.height], theme: observedTheme.theme, darkMedia: observedTheme.darkMedia, utc: deps.now(), identity: config.localIdentity ? { ...identity, sha: report.localIdentity.sha, sourceTreeHash: report.localIdentity.sourceTreeHash } : identity, bytes: png.length, sha256: createHash('sha256').update(png).digest('hex'), status: 'captured-unreviewed' });
       await page.close();
     }
     if (report.network.guardFailures || report.network.analyticsEvidence?.allowed) throw Error('network_guard_unverified');
