@@ -1,5 +1,58 @@
 # UI 逐頁審查紀錄
 
+## 2026-10-14：43d 修正版候選實際看圖（正式仍 green/gen9）
+
+APP `43d17900c24efae6879bf075d1c576ba74d6a3e8`、tree `a335ed943d4b7682394be43a1db14a2e7cf05aaa`，
+primary/standalone BUILD_ID `zwqhLTfWMBRUuDn6YP5Tr`。本節為同產物 candidate
+實際看圖紀錄，OPS 文件 commit 不會變更 APP、build 或正式 active。
+記錄 UTC `2026-10-14T08:35:40.777994+00:00`；28 張／7 個模板（1280、390，各 light/dark）由既有
+非作者 GPT-6.1 Sol `/root/home_perf` 逐張 actual view，另看 10 張 tag 參考。
+未增加 agent，沒有把捕圖、source review 或 Done 訊息當看圖證據。
+
+唯一 actual manifest：`/home/deck/.t3/userdata/blog-release-43d1790-candidate-20261014/submission-manifest.json`
+SHA-256 `6f162fec3303e6c3ae8efb0087b13c1b293d85d83dfe5d4724ef9828fb13d1a3`。每張含 viewport、PNG hash、image UTC、SHA/build/tree、
+實際 DNT=1、navigator DNT=1、GPC=null（沒有改寫為 true）、網路計數；
+GA/GTM 路由放行 0，before-navigation guard installed；每批 browser closed。
+
+獨立 reviewer 原始 JSON：`/home/deck/.t3/userdata/ui-review-blog-20261013/home-perf-independent/43d1790-candidate-actual-ui-review.json`
+SHA-256 `e75dbe31cd73f0bafd56f24651587e7bbc1b3c9f1eccda20f718d092d9c3c062`；逐圖 actual model／工具輸入／UTC／raw line 在 JSON；
+log：`/home/deck/.t3/userdata/ui-review-blog-20261013/home-perf-independent/43d1790-candidate-actual-ui-review.log`；完整原始 transcript：
+`/home/deck/.codex/sessions/2026/10/13/rollout-2026-10-13T13-12-51-01a133ad-8034-7e81-a619-c9d28bd4ff5f.jsonl`。同目錄 first8／first16／original24 歷史保留。
+
+| route／真實 candidate URL | 桌機／手機／兩色圖片目錄 | 跟 tag 的偏離與理由 | 發現、修正與重驗 | 本批狀態 |
+| --- | --- | --- | --- | --- |
+| `/` | `/home/deck/.t3/userdata/blog-release-43d1790-candidate-20261014/home/` | tag新聞焦點卡/橙色 vs blog綠色生活/公開文章/共同話題，沒有新聞專用charts。 | `&` 顯示正常、排行非空；修正 43d／5ae7；100 筆 exact parity。 未驗：phone共同話題sidebar belowframe；empty/pending/lateerror/menu/search/theme interactions；completebelowfold/methodopened/third+article states | fixed 部分問題／整頁 pending |
+| `/topics/` | `/home/deck/.t3/userdata/blog-release-43d1790-candidate-20261014/topics/` | tagtraffic serves dense tablelayoutreference only; blogtopics counts/weightedcontribution/lift notmedia monthlytraffic. | `&` 顯示正常、排行非空；修正 43d／5ae7；100 筆 exact parity。 未驗：390weighted/lift rightcolumns/horizontal scrolling notviewed；rowclick/tabperiod/select/frequency/details/methodopened notoperated；full100rows/footer notvisible | fixed 部分問題／整頁 pending |
+| `/tech/` | `/home/deck/.t3/userdata/blog-release-43d1790-candidate-20261014/tech/` | tagtraffic reference for dense borderedtable/search only, not monthlytraffic/sparkline functionparity. | 入鏡未見重大視覺 blocker。 未驗：390listing andplugins/CDNbelowframe；desktoprightmostsuccessdates clipped bytablecontainer; horizontalscroll nottested；filter/search/methodopened/notviewedrestofpage；WCAGcontrastunknown LAB | fixed 部分問題／整頁 pending |
+| `/relations/` | `/home/deck/.t3/userdata/blog-release-43d1790-candidate-20261014/relations/` | tagmultikindnewsgraph/zoom/ranking vs blogonlybodydirectlinks/fewobservednodes intentionaldifferentdata/controlscope. | 入鏡未見重大視覺 blocker。 未驗：graphhover/click/periodcontrols notoperated；390reciprocallistbelowframe andremainingrows；darkfineprintcontrast unknown/nodarktagreference；allbodyevidencecorrectness notprovedbyraster | fixed 部分問題／整頁 pending |
+| `/blogs/gogojp-tw-535/` | `/home/deck/.t3/userdata/blog-release-43d1790-candidate-20261014/blog-profile-canonical-attempt3/` | tagmediaprofile orange/news/reportkeywords vs bloggreen/travel+verifiedwebsite/contentcollectionevidence. Canonicalslug fromrealAPI, notguessedname. | 入鏡未見重大視覺 blocker。 未驗：mobile metadataaccordionopened/provenance/tech andfollow/tabs/searchoperations；full50articlelist/footer/methodopened unseen；darkfineprint/WCAGunknown andnodarktagreference | fixed 部分問題／整頁 pending |
+| `/blogs/gogojp-tw-535/#relations` | `/home/deck/.t3/userdata/blog-release-43d1790-candidate-20261014/blog-exchanges-canonical-attempt3/` | tagnewsreference relationtypes notidentical; blogdirectbodyproof/nonbodyseparated. DisabledcomparisonnotpopulatedB2acceptance. | 入鏡未見重大視覺 blocker。 未驗：body/nonbodyevidencedetailsclosed notactualviewed；390textsimilarity/method/topiclist below900frame partlyunseen；anchorintroaboveframe/stickyoffset notcompletelyseen；alllink/expand/graphactions/WCAGunknown | fixed 部分問題／整頁 pending |
+| `/articles/?q=蛤蜊絲瓜` | `/home/deck/.t3/userdata/blog-release-43d1790-candidate-20261014/articles-search/` | tagarticlesref shows populatednewsfocuscards/periods; blogsearch uses metadataform andboundedempty state, notsameeventfeatures or samequeryfixture. | 只限最近 1,000 metadata、歷史正文關閉、搜尋 0 筆；F3 全文未驗收。 未驗：actualhistorical/bodyhit/fullindexedcorpus/readiness/coverage claims；nonempty results/snippets/id/version/evidence/perhitURL/malformedfailurestates；formsubmit/keyboard/tabs/menu/methodopened notoperated；darkfineprint/contrastunknown | fixed 部分問題／整頁 pending |
+
+各目錄固定 `page-1-1280-light.png`、`page-2-390-light.png`、
+`page-3-1280-dark.png`、`page-4-390-dark.png`；`capture-report.json` 附實際
+resource gate 前後三站 3 樣本、load、private guard 與 PID/socket/build identity。
+原 guessed slug `/blogs/gogojp.tw/` 為 404：0 圖，保持 missing／失敗證據；
+canonical-attempt2 的 probe adapter 錯把 array 當 `.probes`，9 筆實測皆合格但
+未啟動 browser，0 圖；後改同工具的測試接線，原檔保留。canonical-attempt3
+採 API 已發布 `gogojp-tw-535` 200，沒有改產品程式或重建。
+
+全文旗標仍關閉，F3 full-text 不因 bounded/off 空態可讀而通過；共同標籤與
+文字相似亦維持關閉。344 個 contrast sample unknown，不稱 WCAG pass；
+手機表格右欄／下方、展開方法與證據、hover／鍵盤／期間／權限／空與錯誤
+狀態仍 pending。主要圖通過僅符合人類「先部署、逐頁 review 之後補」的
+有限 candidate 視覺條件。原權威 24 項 pass0／fixed2／issues9／pending11／n/a-ui2
+不變；不是全部 UI scope 完成。正式仍 green/gen9，切換需 babysit 核對 exact
+command／fresh probe，本文件不授權切換。
+
+B0 同 BUILD_ID 的 53 barrier／60 sequence 已通過；17 個 HTML/RSC/API/XML
+200/no-store。100/100 排序、score、posts、blogs、matchingPolicy 相同，首頁
+8 筆等於前 8 筆，原始證據 `.reviews/sm-build-9888ebf/blue43-http-parity-recheck-1791965198079.json`。
+舊 9888 空排行先前審查及回滾紀錄一律保留，不冒称已完成正式重新驗收。
+
+---
+
+
 ## 2026-10-14 標題顯示 source 修正：待同產物重拍
 
 同一既有 Opus 5.5 作者 session `6e17a454-0623-4006-8aa4-f733dcde31a9` 完成
