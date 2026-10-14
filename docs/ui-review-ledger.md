@@ -1,39 +1,38 @@
 # UI 逐頁審查紀錄
 
-## 目前狀態（2026-10-14 UTC16:22正式驗收後）
+## 現況更正（UTC2026-10-14T20:27:33.445Z）
 
-- 正式：**blue／gen16／af0e73ccc3c5ace88dc8fb6f45d7d76123c218da**，UTC16:14:07.167切換。
-  BUILD_ID **LdOP5yqOhKdYbIlHZVfoN**。green／76a90e7保持在線回滾。依[使用者核准的滾動保留政策](release-retention.md)清理舊release／建置checkout；備份、正式資料、一般worktree與review證據保留。
-- 建置位置：**Steam Machine（SM）**。本批只有gateway SQL改動，web tree與兩份lockfile完全相同，
-  沿用f77已build/review的前端產物，沒有新的Next build；新APP＋同frontend compose後跑完新SHA的B0。
-  Mint／gen5／SM禁止build的舊段落只代表當時狀態，不代表現行流程。
-- 已由人類正式驗收：gen12（43d）的話題非空與HTML entity修正；gen13（76a）的首頁三區塊移除＋正文引用；
-  **gen16 UTC16:22**的30詞雲、保留景點、排除人氣／傳承／每天／Uncategorized／未分類、
-  「文字雜想」同文兩網域合成一卡與GA0。未提供人類capture路徑／viewport，不補造資料。
-- 效能：gen14 f77於15:49:10.762因三次median **6.188152s**回滾green／gen15／76a。
-  gen16正式五次median **2.679479s**；人類三次4.19／2.84／2.63，median **2.84s**。
-  這是公開網址HTML完整回應時間，非純origin render或TTFB；no-store／DYNAMIC、HSTS86400不變。
-- 技術驗收：新APP af0的 **53 barrier＋60 SSR/RSC**、386 topic tests、18查詢比較／6 fresh-read barrier，
-  B3兩suites47checks通過；正式21項HTTP驗收、三站200／OAuth302／SSRF400／404／no-store通過。
-- F1關係：正式共用標籤區塊與本地快照已接入；worker目前也是af0，6小時排程、每日40次wire上限。
-  UTC16:17的blogs-shared-labels已實際完成，relations與visual各13個ready快照；空結果不是缺資料。
-  柯文哲上位分類政治人物＋相關／別名／圖示「尚未收錄」已有候選actual圖review，正式專項瀏覽器回報仍待補。
-- UI證據：f77前端的home／shared／topics共12張1280／390 light/dark＋6張tag參照，由非作者Sol實際看圖。
-  frontend與af0完全相同，但**不把f77的APP screenshot metadata改寫成af0**；af0尚無新capture，僅同產物技術與人類正式驗收。
-  reviewer原檔：/home/deck/.t3/userdata/ui-review-blog-20261013/home-perf-independent/f77-home-cloud-independent-actual-ui-review.json。
-  source效能review：同目錄compact-ranking-independent-source-review.json；author／model／UTC／逐圖hash／raw transcript均保留。
-- 未完成：**F3歷史全文搜尋／蛤蜊絲瓜、所有route和重要狀態逐頁review（admin、空／錯／權限、展開／手機表格右欄／belowfold／精確contrast）、
-  真人Google登入、F1正式專項畫面證據**。不以本次首頁驗收宣稱完整scope完成。Cloudflare兩條規則維持Disabled。
-- 待評估詞（不擋目前上線，不另造詞名黑名單）：**壓力／生日／保險**有至少一站crawler topic角色／topic種類的原始標籤佐證，
-  因此依同一個保留景點的規則保留；**眼睛**32站39篇，但每站最高2篇，未達tag broad的peak≥3。
-  長期基準title/matched依序壓力0/69、生日7/47、保險6/53、眼睛1/46；資料讀取時間相異，不冒稱同一交易快照。
-  是否應改採tag early qualification或顯示上位主題留待後續評估，這批不為移除四個名字而調門檻。
+目前正式是 **blue／gen18／af0e73c**，worker也恢復af0。gen17的回填guard取得500，取消後正式首頁仍逾時／超閘門，因此回滾；沒有移除任何隱私或資源斷言。F3新功能目前暫時退回inactive green，後續需修好索引寫入與公開查詢資源競爭再上線。
+下列gen17正式截圖／review為當時真實版本，不能當成gen18的驗收。
+完整絕對路徑與SHA256見 [F3 gen17證據](f3-gen17-evidence.md)，其中保留切換／回滾原始transition、source與隱私review、12張正式首屏、手機歷史結果捲動圖及raw network。
 
-證據位置：
-/home/deck/.cache/blog-home-cloud-b3-20261014/.reviews/home-cloud-b3/formal-acceptance-af0.json、formal-five-samples-af0.json、
-formal-performance-parts-f77.json、f77-performance-followup-gate.json、lifestyle-word-audit-af0.json、lifestyle-baseline-af0.json。
-新B0：/home/deck/.t3/projects/blog-observe-tw/.reviews/b0-final-barrier/af0e73ccc3c5ace88dc8fb6f45d7d76123c218da/runner-result.json
-與同目錄barrier-result.json／sequence-result.json，實際APP/tree/BUILD_ID／DB18169／HTTP18176、18177／UTC在原檔。
+## 目前狀態（2026-10-14 UTC20:00正式切換後）
+
+- 正式 **green／gen17／APP 7ffd036fd7a968f228e0f8ebf7539d2dd94edc63**，切換 UTC20:00:27.606Z；Next **BUILD_ID F_zSp1Bg_oZWzezesLRmQ**。blue af0e73c 維持在線回滾。建置在 **SM**，不是 Mint；沿用單次建好的同一份前端產物，新 backend SHA 另有完整 B0／全文 HTTP barrier 證據。
+- no-store／DYNAMIC、HSTS86400、Cloudflare 兩條快取規則 Disabled 維持。F3 網站歷史正文搜尋已上線；公開 v1 `q` 仍是既有標題＋時間窗口搜尋，不稱為全文 API。
+- 正式六模板各 1280／390 light，共12張圖，由自己的 Playwright 工具取得；實際 HTTP DNT1、navigator DNT1、GPC=null、導航前傳輸層阻擋 Google／GTM、analytics allowed=0，raw network 在各 manifest。candidate 與正式兩次獨立看圖 review 分開；沒有把 candidate 圖改標成正式圖。
+- 本批首屏 reviewer 是非作者 **GPT-6.1 Sol**，UTC20:14:56.433920，原始 transcript：`/home/deck/.cache/blog-home-cloud-b3-20261014/.reviews/f3-fulltext/formal-ui-independent-review.json`。actual model／finish_reason、逐圖 SHA256、APP／BUILD_ID 與參照圖路徑在原檔。結論只限入鏡，不能取代完整頁面、互動／空／錯／权限／深色／全部動態 route 的驗收。
+- 首屏搜尋的桌機已見2009歷史文章；手機首屏只見較新結果，歷史文章在下方。另拍手機捲動證據並獨立 review；原始首屏保留、不回寫。手機話題表格局部橫捲屬預期容器行為，但最右欄、表頭／首欄固定與縮小仍待互動驗收。
+- 全部 scope **仍未完成**：未建索引的歷史文章回填、各頁完整逐頁／狀態 review、F1專項正式證據、真人Google登入及其他既有 ledger pending 都保留。不以此批6模板的首屏 review 宣稱全站 pass。
+
+### 本批正式畫面（與 candidate 分開）
+
+各列受審 APP／BUILD_ID 都是上列 gen17；每個截圖目录都有 `capture-report.json`。
+
+| route／正式範例 | 桌機1280截圖（repo外私有） | 手機390截圖（repo外私有） | reviewer／狀態與待驗 | tag偏離與理由 |
+| --- | --- | --- | --- | --- |
+| https://blog.observe.tw/ | /home/deck/.t3/userdata/blog-f3-fulltext-20261015/formal-home-topics/page-1-1280-light.png | /home/deck/.t3/userdata/blog-f3-fulltext-20261015/formal-home-topics/page-2-390-light.png | GPT-6.1 Sol；pending（首屏pass；下方／menu／theme互動未驗） | 綠色品牌與部落格正文引用取代新聞焦點，首頁品牌由hero承擔。 |
+| https://blog.observe.tw/topics/ | /home/deck/.t3/userdata/blog-f3-fulltext-20261015/formal-home-topics/page-3-1280-light.png | /home/deck/.t3/userdata/blog-f3-fulltext-20261015/formal-home-topics/page-4-390-light.png | GPT-6.1 Sol；issues（手機右欄未操作；並非整頁溢出） | 沿用tag表格容器，統計母體為部落格；橫捲仍需實際驗收。 |
+| https://blog.observe.tw/tech/ | /home/deck/.t3/userdata/blog-f3-fulltext-20261015/formal-tech-relations/page-1-1280-light.png | /home/deck/.t3/userdata/blog-f3-fulltext-20261015/formal-tech-relations/page-2-390-light.png | GPT-6.1 Sol；pending（首屏pass；版本完整值／下方列表未驗） | 被動技術觀測無新聞流量月份口徑，卡片層次沿用。 |
+| https://blog.observe.tw/relations/ | /home/deck/.t3/userdata/blog-f3-fulltext-20261015/formal-tech-relations/page-3-1280-light.png | /home/deck/.t3/userdata/blog-f3-fulltext-20261015/formal-tech-relations/page-4-390-light.png | GPT-6.1 Sol；pending（首屏pass；graph互動／下方證據未驗） | 只顯示正文直接連結，不作新聞相似或抄襲推論。 |
+| https://blog.observe.tw/blogs/anise-tw-534/ | /home/deck/.t3/userdata/blog-f3-fulltext-20261015/formal-blog-search/retry-correct-published-slug/page-1-1280-light.png | /home/deck/.t3/userdata/blog-f3-fulltext-20261015/formal-blog-search/retry-correct-published-slug/page-2-390-light.png | GPT-6.1 Sol；pending（首屏pass；手機來源展開未驗） | 站名與作者獨立，已取得內文狀態不等於本站展示全文。 |
+| https://blog.observe.tw/articles/?q=蛤蜊絲瓜 | /home/deck/.t3/userdata/blog-f3-fulltext-20261015/formal-blog-search/retry-correct-published-slug/page-3-1280-light.png | /home/deck/.t3/userdata/blog-f3-fulltext-20261015/formal-blog-search/retry-correct-published-slug/page-4-390-light.png | GPT-6.1 Sol；issues（首屏手機未含歷史文章；另有捲動證據） | 正文片段、文章ID與版本為全文搜尋必要證據；全文連回原站。 |
+
+Candidate 非作者實圖 review：`/home/deck/.cache/blog-home-cloud-b3-20261014/.reviews/f3-fulltext/candidate-ui-independent-review.json`；
+candidate 圖 `/home/deck/.t3/userdata/blog-f3-fulltext-20261015/candidate-final/`，同 APP／BUILD_ID；四張1280／390 home/search，無阻擋。
+正式捲動圖与manifest：`/home/deck/.t3/userdata/blog-f3-fulltext-20261015/formal-search-history-mobile/history-card/`；
+其 review transcript（實際GPT-6.1 Sol，UTC2026-10-14T20:21，入鏡歷史卡無阻擋；僅該捲動範圍）:`/home/deck/.cache/blog-home-cloud-b3-20261014/.reviews/f3-fulltext/formal-history-mobile-independent-review.json`。
+首次scroll800只見歷史卡尾端，保留在上層目錄，不當成完整歷史卡通過證據。
 
 ## 歷史紀錄（以下保留原文；版本、Mint與資源狀態以各段當時時間為準）
 
@@ -804,3 +803,40 @@ Babysit人類在UTC14:01正式1280/390 opt-out/GA0驗收通過：三區已移除
 文章→網域/時間/核對列存在、手機無横向捲動；無Uncategorized/未分類/每天。
 未提供新正式截圖路徑，不捏造model看圖。後續cloud恢復30詞、同文章多target合併、
 泛詞品質與F1接入是下一批，尚非已完成。
+
+## gen16頂端狀態存檔（保留原文，非現況）
+
+## 目前狀態（2026-10-14 UTC16:22正式驗收後）
+
+- 正式：**blue／gen16／af0e73ccc3c5ace88dc8fb6f45d7d76123c218da**，UTC16:14:07.167切換。
+  BUILD_ID **LdOP5yqOhKdYbIlHZVfoN**。green／76a90e7保持在線回滾。依[使用者核准的滾動保留政策](release-retention.md)清理舊release／建置checkout；備份、正式資料、一般worktree與review證據保留。
+- 建置位置：**Steam Machine（SM）**。本批只有gateway SQL改動，web tree與兩份lockfile完全相同，
+  沿用f77已build/review的前端產物，沒有新的Next build；新APP＋同frontend compose後跑完新SHA的B0。
+  Mint／gen5／SM禁止build的舊段落只代表當時狀態，不代表現行流程。
+- 已由人類正式驗收：gen12（43d）的話題非空與HTML entity修正；gen13（76a）的首頁三區塊移除＋正文引用；
+  **gen16 UTC16:22**的30詞雲、保留景點、排除人氣／傳承／每天／Uncategorized／未分類、
+  「文字雜想」同文兩網域合成一卡與GA0。未提供人類capture路徑／viewport，不補造資料。
+- 效能：gen14 f77於15:49:10.762因三次median **6.188152s**回滾green／gen15／76a。
+  gen16正式五次median **2.679479s**；人類三次4.19／2.84／2.63，median **2.84s**。
+  這是公開網址HTML完整回應時間，非純origin render或TTFB；no-store／DYNAMIC、HSTS86400不變。
+- 技術驗收：新APP af0的 **53 barrier＋60 SSR/RSC**、386 topic tests、18查詢比較／6 fresh-read barrier，
+  B3兩suites47checks通過；正式21項HTTP驗收、三站200／OAuth302／SSRF400／404／no-store通過。
+- F1關係：正式共用標籤區塊與本地快照已接入；worker目前也是af0，6小時排程、每日40次wire上限。
+  UTC16:17的blogs-shared-labels已實際完成，relations與visual各13個ready快照；空結果不是缺資料。
+  柯文哲上位分類政治人物＋相關／別名／圖示「尚未收錄」已有候選actual圖review，正式專項瀏覽器回報仍待補。
+- UI證據：f77前端的home／shared／topics共12張1280／390 light/dark＋6張tag參照，由非作者Sol實際看圖。
+  frontend與af0完全相同，但**不把f77的APP screenshot metadata改寫成af0**；af0尚無新capture，僅同產物技術與人類正式驗收。
+  reviewer原檔：/home/deck/.t3/userdata/ui-review-blog-20261013/home-perf-independent/f77-home-cloud-independent-actual-ui-review.json。
+  source效能review：同目錄compact-ranking-independent-source-review.json；author／model／UTC／逐圖hash／raw transcript均保留。
+- 未完成：**F3歷史全文搜尋／蛤蜊絲瓜、所有route和重要狀態逐頁review（admin、空／錯／權限、展開／手機表格右欄／belowfold／精確contrast）、
+  真人Google登入、F1正式專項畫面證據**。不以本次首頁驗收宣稱完整scope完成。Cloudflare兩條規則維持Disabled。
+- 待評估詞（不擋目前上線，不另造詞名黑名單）：**壓力／生日／保險**有至少一站crawler topic角色／topic種類的原始標籤佐證，
+  因此依同一個保留景點的規則保留；**眼睛**32站39篇，但每站最高2篇，未達tag broad的peak≥3。
+  長期基準title/matched依序壓力0/69、生日7/47、保險6/53、眼睛1/46；資料讀取時間相異，不冒稱同一交易快照。
+  是否應改採tag early qualification或顯示上位主題留待後續評估，這批不為移除四個名字而調門檻。
+
+證據位置：
+/home/deck/.cache/blog-home-cloud-b3-20261014/.reviews/home-cloud-b3/formal-acceptance-af0.json、formal-five-samples-af0.json、
+formal-performance-parts-f77.json、f77-performance-followup-gate.json、lifestyle-word-audit-af0.json、lifestyle-baseline-af0.json。
+新B0：/home/deck/.t3/projects/blog-observe-tw/.reviews/b0-final-barrier/af0e73ccc3c5ace88dc8fb6f45d7d76123c218da/runner-result.json
+與同目錄barrier-result.json／sequence-result.json，實際APP/tree/BUILD_ID／DB18169／HTTP18176、18177／UTC在原檔。

@@ -20,7 +20,7 @@
 
 每個查詢最多兩個 SQL statement，每個 server timeout 1 秒；最多讀 200 個候選、候選上限固定公開，原始候選數／過期數／截斷狀態不對外提供，以免舊正文索引成為探測工具。公開 counts 只計當前驗證通過的結果。每頁最多 20 筆，只處理有界 ID 集合，沒有對全站歷史正文做 LIKE 掃描。
 
-`tools/index-historical-search.ts --after <ID> --batches <N>` 每批 10 篇、批間五秒、pool size=1；每篇 upsert 後保留 cursor，可續跑、可重複，不發 HTTP。不把文章全文或金鑰寫進 stdout。worker 每五分鐘以獨立 high-water keyset 處理 5 個新文章，再循環核對 5 個歷史文章；hash／版本未變時跳過寫入，不持續重建 FULLTEXT。刪除文章透過 FK 同步清掉衍生 document，歷史核對會刪除已撤下文章的 document；正文 durable commit 後的既有 adoption job 可立即更新索引。只有一個 blog worker，不啟動第二個。
+`tools/index-historical-search.ts --after <ID> --batches <N>` 每批 10 篇、批間五秒、pool size=1；每篇 upsert 後保留 cursor，可續跑、可重複；只對正式首頁發 DNT 健康檢查 GET，不增加對來源站的抓取。不把文章全文或金鑰寫進 stdout。worker 每五分鐘以獨立 high-water keyset 處理 5 個新文章，再循環核對 5 個歷史文章；hash／版本未變時跳過寫入，不持續重建 FULLTEXT。刪除文章透過 FK 同步清掉衍生 document，歷史核對會刪除已撤下文章的 document；正文 durable commit 後的既有 adoption job 可立即更新索引。只有一個 blog worker，不啟動第二個。
 
 回滾關閉新旗標或切回 af0；保留 additive table 與索引，不需要 down migration。正式遷移前保留 streamed gzip 備份，既有備份不刪。建置、candidate 和正式截圖各自記錄 SHA／BUILD_ID；正式 DNT/傳輸層 Google 阻擋與 raw network 不拿 candidate review 代替。
 
@@ -29,3 +29,24 @@ source review：既有 Opus 5.5 指出公開候選計數側通道、反向 anti-
 19:34 UTC 正式 overview 發生500，與建置／首次大量回填重疊；web log 沒有保留當時 DB driver error code，不能斷言唯一根因。19:42 停止回填後才繼續量測。CLI 已改10篇／五秒、pool1、nice19/ionice3；每批間用 DNT GET 正式首頁，非200或超過6.17秒便取消並保存cursor，沒有SIGSTOP或自動重試。worker 索引工作也先檢查首頁，並降至5+5篇／五分鐘，durable change job最多10篇；不把背景成本轉嫁給公開請求。
 
 節流delta review釐清：大量初次回填由CLI執行，worker仍有每輪5篇的歷史對帳，並非宣稱歷史工作只由CLI執行。舊prefix與新whole-body adoption的所有實際寫入路徑都先檢查首頁，不只新fulltext旗標。最後一批的健康檢查仍保留，若已完成SQL但首頁不健康，stdout cursor可續跑而exit非0，避免把故障標成成功。
+
+## 公開 v1 與網站搜尋的差別
+
+`/api/v1/articles?q=...` 與 `/api/v1/blogs/{slug}/articles?q=...` 的 `q` **只比對文章標題**，預設窗口為 720 小時（30 天）；也可指定 `hours` 或成對 `since`／`until`，單一窗口最多 90 天。這是既有公開 v1 合約，OpenAPI 的摘要為「最新文章與標題搜尋」，不是正文或全歷史搜尋。這次不改變其查詢行為。
+
+網站 `/articles/?q=蛤蜊絲瓜` 使用 `/api/search` 的歷史正文索引，因此正文含有查詢但標題沒有的文章可命中。`/api/search` 是網站使用的介面，尚未納入公開 v1 的穩定端點清單；不把它誤稱為新的公開 v1 契約。公開結果仍只有短片段，全文在原站閱讀。
+
+## 正式交付（2026-10-14）
+
+- 正式切換 UTC **20:00:27.606Z**：green／generation 17／APP `7ffd036fd7a968f228e0f8ebf7539d2dd94edc63`，Next BUILD_ID `F_zSp1Bg_oZWzezesLRmQ`。回滾為 `tools/deploy-blue-green.sh rollback blue`，blue `af0e73c` 保持在線。
+- 正式 HTTP 23 項通過，包括歷史搜尋的文章 ID、正文片段與比對版本、no-store／DYNAMIC、HSTS、OAuth 起始、404 與 SSRF。隔離資料庫 29 項全文測試、53 barrier＋60 SSR/RSC、額外 28 項實際全文 HTTP 隱私斷言通過；各自的旗標與身份證據分別記錄，不把 legacy B0 等同全文旗標測試。
+- 正式六模板的 1280／390 截圖與 candidate 看圖 review 分開保留；見 `docs/ui-review-ledger.md`。首次手機首屏沒有涵蓋下方歷史結果，額外捲動證據另列，不回寫首屏檔案。
+- 批次回填曾與 overview 500 重疊，不能憑時間重疊判定唯一 DB 根因；目前使用小批次及逐批正式首頁 guard。未建索引的歷史文章仍是未完成資料 coverage，不宣稱全站原文已抓齊。
+
+私有驗收：`/home/deck/.cache/blog-home-cloud-b3-20261014/.reviews/f3-fulltext/formal-acceptance-final.json`；
+隔離全文 HTTP：同目錄 `isolated-api-runtime-final-result.json`；
+B0：`/home/deck/.t3/projects/blog-observe-tw/.reviews/b0-final-barrier/7ffd036fd7a968f228e0f8ebf7539d2dd94edc63/`。
+
+### 後續健康回滾（同日UTC20:27）
+
+小批次回填在第14批取得首頁500，guard自動取消，cursor24418；其後curl exit28／中位數超閘門，UTC20:27:33.445Z切回blue/gen18/af0。worker也恢復af0，不讓producer繼續寫入。gen17真實功能與證據保留在inactive green，不把歷史成功驗收宣稱為目前仍在線。需要先處理DB寫入資源競爭；完整證據與每個檔案的hash見 `docs/f3-gen17-evidence.md`。
