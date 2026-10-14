@@ -25,11 +25,25 @@ backend-opus-delta-review.json，採納與不適用建議理由在設計文件�
 /home/deck/.t3/projects/blog-observe-tw/.reviews/b0-final-barrier/f77a1fe43ccd5110e7982bfec07e997af4cb0e27/runner-result.json
 以及同目錄barrier-result.json／sequence-result.json，DB18169／HTTP18176、18177。
 
-本批home、topics、shared-topic模板的1280／390 light/dark仍pending實圖。
-/home/deck/.t3/userdata/blog-home-cloud-f77-20261014/home/capture-report.json
-及attempt2／attempt3／attempt4原檔保留：前三批未啟動browser；第四批page navigation後host load17.43，
-沒有保存圖片，不宣稱UI通過；configured與observed DNT／GPC分開，GA0僅代表capture範圍。
-其餘全route、空／權限／錯誤／互動／admin／F3全文仍照下方pending，不將source review升為UIpass。
+本批home、topics、shared-topic三模板各1280／390 light/dark已實際review，共12圖＋6個tag參照：
+/home/deck/.t3/userdata/ui-review-blog-20261013/home-perf-independent/f77-home-cloud-independent-actual-ui-review.json
+SHA256 bed9535ccad0dd16f8151d3b8ff18646d1858a476c2fc0d8f5a156ba6cb3478a，
+actual model gpt-6.1-sol，逐圖工具input／UTC／SHA／viewport與原始transcript在receipt。
+圖片/home/deck/.t3/userdata/blog-home-cloud-f77-20261014/home/attempt5、shared、topics；
+各有capture-report.json與4PNG，actualDNT1／navigatorDNT1／GPCnull／GAallowed0。
+入鏡範圍無blocker；展開、belowfold、表格右欄互動、空／錯／權限狀態與精確對比仍pending。
+原attempt1–4全部保留，不把失敗擷取算pass。拍攝用OPS5a65c83修正三次中位數與較長transport timeout，
+所有HTTP錯誤仍fail，原54個capture測試通過；APP/build沒有改動或重建。
+
+正式曾於UTC2026-10-14T15:43:51.029Z切blue/gen14，同產物f77；21項HTTP驗收通過，
+/no-store/DYNAMIC/HSTS86400、30詞/8排行、品質規則、shared parent與空狀態、OAuth302、SSRF400、404、三站200。
+/home/deck/.cache/blog-home-cloud-b3-20261014/.reviews/home-cloud-b3/formal-acceptance-f77.json
+後續首頁5次中位6.421920秒；確認3次9.475220/6.188152/4.702862，中位6.188152超過6.17，
+UTC15:49:10.762Z立即rollback green/gen15/76a，f77留inactive blue，不宣稱此批持續正式上線。
+同目錄formal-performance-parts-f77.json／f77-performance-followup-gate.json／rollback-performance-f77.log。
+當時SQL拆量topics home中位3.000882秒、overview home0.185990秒，繼續查排行重複彙總。
+F1 worker實際read-only選取遇250ms SQL cap，因此producer旗標仍false，不把queue實作當已排程生效。
+其他全route／F3全文仍pending。沒有CF/WAF調整、正式migration或新全庫備份；所有release與rollback保留。
 
 ---
 
