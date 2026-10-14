@@ -1,3 +1,42 @@
+# UI 逐頁審查紀錄
+
+## 目前狀態（2026-10-14 UTC16:22正式驗收後）
+
+- 正式：**blue／gen16／af0e73ccc3c5ace88dc8fb6f45d7d76123c218da**，UTC16:14:07.167切換。
+  BUILD_ID **LdOP5yqOhKdYbIlHZVfoN**。green／76a90e7保持在線回滾；所有release、備份、worktree保留。
+- 建置位置：**Steam Machine（SM）**。本批只有gateway SQL改動，web tree與兩份lockfile完全相同，
+  沿用f77已build/review的前端產物，沒有新的Next build；新APP＋同frontend compose後跑完新SHA的B0。
+  Mint／gen5／SM禁止build的舊段落只代表當時狀態，不代表現行流程。
+- 已由人類正式驗收：gen12（43d）的話題非空與HTML entity修正；gen13（76a）的首頁三區塊移除＋正文引用；
+  **gen16 UTC16:22**的30詞雲、保留景點、排除人氣／傳承／每天／Uncategorized／未分類、
+  「文字雜想」同文兩網域合成一卡與GA0。未提供人類capture路徑／viewport，不補造資料。
+- 效能：gen14 f77於15:49:10.762因三次median **6.188152s**回滾green／gen15／76a。
+  gen16正式五次median **2.679479s**；人類三次4.19／2.84／2.63，median **2.84s**。
+  這是公開網址HTML完整回應時間，非純origin render或TTFB；no-store／DYNAMIC、HSTS86400不變。
+- 技術驗收：新APP af0的 **53 barrier＋60 SSR/RSC**、386 topic tests、18查詢比較／6 fresh-read barrier，
+  B3兩suites47checks通過；正式21項HTTP驗收、三站200／OAuth302／SSRF400／404／no-store通過。
+- F1關係：正式共用標籤區塊與本地快照已接入；worker目前也是af0，6小時排程、每日40次wire上限。
+  UTC16:17的blogs-shared-labels已實際完成，relations與visual各13個ready快照；空結果不是缺資料。
+  柯文哲上位分類政治人物＋相關／別名／圖示「尚未收錄」已有候選actual圖review，正式專項瀏覽器回報仍待補。
+- UI證據：f77前端的home／shared／topics共12張1280／390 light/dark＋6張tag參照，由非作者Sol實際看圖。
+  frontend與af0完全相同，但**不把f77的APP screenshot metadata改寫成af0**；af0尚無新capture，僅同產物技術與人類正式驗收。
+  reviewer原檔：/home/deck/.t3/userdata/ui-review-blog-20261013/home-perf-independent/f77-home-cloud-independent-actual-ui-review.json。
+  source效能review：同目錄compact-ranking-independent-source-review.json；author／model／UTC／逐圖hash／raw transcript均保留。
+- 未完成：**F3歷史全文搜尋／蛤蜊絲瓜、所有route和重要狀態逐頁review（admin、空／錯／權限、展開／手機表格右欄／belowfold／精確contrast）、
+  真人Google登入、F1正式專項畫面證據**。不以本次首頁驗收宣稱完整scope完成。Cloudflare兩條規則維持Disabled。
+- 待評估詞（不擋目前上線，不另造詞名黑名單）：**壓力／生日／保險**有至少一站crawler topic角色／topic種類的原始標籤佐證，
+  因此依同一個保留景點的規則保留；**眼睛**32站39篇，但每站最高2篇，未達tag broad的peak≥3。
+  長期基準title/matched依序壓力0/69、生日7/47、保險6/53、眼睛1/46；資料讀取時間相異，不冒稱同一交易快照。
+  是否應改採tag early qualification或顯示上位主題留待後續評估，這批不為移除四個名字而調門檻。
+
+證據位置：
+/home/deck/.cache/blog-home-cloud-b3-20261014/.reviews/home-cloud-b3/formal-acceptance-af0.json、formal-five-samples-af0.json、
+formal-performance-parts-f77.json、f77-performance-followup-gate.json、lifestyle-word-audit-af0.json、lifestyle-baseline-af0.json。
+新B0：/home/deck/.t3/projects/blog-observe-tw/.reviews/b0-final-barrier/af0e73ccc3c5ace88dc8fb6f45d7d76123c218da/runner-result.json
+與同目錄barrier-result.json／sequence-result.json，實際APP/tree/BUILD_ID／DB18169／HTTP18176、18177／UTC在原檔。
+
+## 歷史紀錄（以下保留原文；版本、Mint與資源狀態以各段當時時間為準）
+
 ## 2026-10-14：gen13正式接受／f77下一批候選（實圖pending）
 
 babysit UTC14:01正式驗收green/gen13/76a90e7，BUILD_ID 1VV772sbyYBRdL9ur6l9f：
