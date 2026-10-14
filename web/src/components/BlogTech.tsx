@@ -29,7 +29,7 @@ import {
 } from '@/lib/tech';
 
 const box = 'rounded-lg border border-zinc-200 p-3 text-xs dark:border-zinc-800';
-const muted = 'text-zinc-500 dark:text-zinc-400';
+const muted = 'text-zinc-600 dark:text-zinc-400';
 const link = 'text-brand-700 hover:underline dark:text-brand-400';
 const recorded = (value: string | null) => (value ? taipei(value) : '尚未記錄');
 
@@ -44,13 +44,13 @@ function Detection({ detection }: { detection: TechDetection }) {
   const version = shownVersion(detection);
   return (
     <li className="border-t border-zinc-200 pt-2 first:border-t-0 first:pt-0 dark:border-zinc-800">
-      <div className="flex items-baseline justify-between gap-2">
+      <div className="flex items-center justify-between gap-2">
         <Link
           href={techHref({ technology: detection.id })}
-          className={`min-w-0 truncate font-medium ${link}`}
+          className={`inline-flex min-h-11 min-w-0 items-center font-medium ${link}`}
           title={`看其他保留證據中有 ${detection.name} 的部落格`}
         >
-          {detection.name}
+          <span className="truncate">{detection.name}</span>
         </Link>
         <span className={`shrink-0 text-[11px] ${muted}`}>{categoryText[detection.category] ?? detection.category}</span>
       </div>

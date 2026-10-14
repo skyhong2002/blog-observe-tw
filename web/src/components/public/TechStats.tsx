@@ -50,7 +50,7 @@ type Status = 'ready' | 'pending' | 'error';
 type Filters = { q: string; technology: string; status: string; cursor?: string };
 
 const card = 'rounded-xl border border-zinc-300 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900';
-const muted = 'text-zinc-500 dark:text-zinc-400';
+const muted = 'text-zinc-600 dark:text-zinc-400';
 const link = 'text-brand-700 hover:underline dark:text-brand-400';
 // SiteFooter's methodHeading; not imported, since that module reads the catalog on the server.
 const methodHeading = 'font-medium text-zinc-900 dark:text-zinc-100';
@@ -78,15 +78,15 @@ function RankCard({
             const versions = explicitVersions(tech);
             return (
               <li key={tech.id}>
-                <div className="grid grid-cols-[minmax(0,1fr)_auto] items-baseline gap-2">
+                <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
                   <Link
                     href={techHref({ q: filters.q, status: filters.status, technology: current ? undefined : tech.id })}
                     scroll={false}
                     aria-current={current ? 'true' : undefined}
-                    className={`-mx-1 block truncate rounded px-1 ${current ? 'bg-brand-50 font-semibold text-brand-800 dark:bg-brand-950 dark:text-brand-300' : link}`}
+                    className={`-mx-1 flex min-h-11 min-w-0 items-center rounded px-1 ${current ? 'bg-brand-50 font-semibold text-brand-800 dark:bg-brand-950 dark:text-brand-300' : link}`}
                     title={current ? `取消篩選 ${tech.name}` : `看保留證據中有 ${tech.name} 的部落格`}
                   >
-                    {tech.name}
+                    <span className="truncate">{tech.name}</span>
                   </Link>
                   <span className="whitespace-nowrap text-right text-xs tabular-nums text-zinc-600 dark:text-zinc-400">
                     {n(tech.blogs)} 站<span className={`ml-1.5 ${muted}`}>{share(tech.blogs, scanned)}</span>
@@ -209,7 +209,7 @@ export default function TechStatsView({
   const software = SOFTWARE_CATEGORIES.filter((c) => byCategory(c).length);
   const infra = INFRA_CATEGORIES.filter((c) => byCategory(c).length);
   const chip =
-    'inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-zinc-900 px-3 py-1 text-white dark:bg-zinc-100 dark:text-zinc-900';
+    'inline-flex min-h-11 items-center gap-1 whitespace-nowrap rounded-full bg-zinc-900 px-3 text-white dark:bg-zinc-100 dark:text-zinc-900';
   return (
     <div className="space-y-5 pb-8">
       <header>
@@ -318,23 +318,24 @@ export default function TechStatsView({
         </h2>
         <form action="/tech/" className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex min-w-0 flex-wrap items-center gap-2">
-            <label htmlFor="tech-query" className="sr-only">
+            <label htmlFor="tech-query" className="text-xs font-medium text-zinc-600 dark:text-zinc-400">
               搜尋部落格名稱或網址
             </label>
             <input
               key={filters.q}
               id="tech-query"
               name="q"
+              type="search"
               defaultValue={filters.q}
               maxLength={100}
               placeholder="搜尋名稱或網址"
-              className="min-h-8 w-48 min-w-0 rounded-lg border border-zinc-300 bg-white px-3 text-xs dark:border-zinc-700 dark:bg-zinc-900"
+              className="min-h-11 w-48 min-w-0 rounded-lg border border-zinc-300 bg-white px-3 text-sm dark:border-zinc-700 dark:bg-zinc-900"
             />
             {filters.technology && <input type="hidden" name="technology" value={filters.technology} />}
             {activeStatus && <input type="hidden" name="status" value={activeStatus} />}
             <button
               type="submit"
-              className="min-h-8 rounded-lg border border-zinc-300 px-3 text-xs hover:text-brand-700 dark:border-zinc-700 dark:hover:text-brand-400"
+              className="min-h-11 rounded-lg bg-brand-700 px-4 text-sm text-white hover:bg-brand-800"
             >
               搜尋
             </button>
@@ -353,7 +354,7 @@ export default function TechStatsView({
               </Link>
             )}
           </div>
-          <span role="status" className="text-xs text-zinc-500">
+          <span role="status" className={`text-xs ${muted}`}>
             {ready
               ? `共 ${n(data.pagination.total)} 個部落格符合`
               : status === 'pending'
@@ -430,7 +431,7 @@ export default function TechStatsView({
                             )}
                             {blog.sourceUrl && (
                               <span
-                                className={`${table.leadExtra} ${table.leadText} shrink-[999] text-xs text-zinc-500 sm:max-w-40 dark:text-zinc-400`}
+                                className={`${table.leadExtra} ${table.leadText} shrink-[999] text-xs text-zinc-600 sm:max-w-40 dark:text-zinc-400`}
                                 title={blog.sourceUrl}
                               >
                                 {hostOf(blog.sourceUrl)}
@@ -452,10 +453,10 @@ export default function TechStatsView({
                             {scope}
                           </span>
                         </td>
-                        <td className={`${table.cell} text-xs tabular-nums text-zinc-500`}>
+                        <td className={`${table.cell} text-xs tabular-nums ${muted}`}>
                           {blog.observedAt ? taipei(blog.observedAt) : '尚無成功觀測'}
                         </td>
-                        <td className={`${table.cell} text-xs tabular-nums text-zinc-500`}>
+                        <td className={`${table.cell} text-xs tabular-nums ${muted}`}>
                           {blog.lastAttemptAt ? taipei(blog.lastAttemptAt) : '尚未嘗試'}
                         </td>
                       </tr>
@@ -465,7 +466,7 @@ export default function TechStatsView({
               </table>
             </TableScroller>
             {!data.items.length && (
-              <p className="py-8 text-zinc-500">
+              <p className={`py-8 ${muted}`}>
                 沒有符合條件的部落格。
                 {filters.technology &&
                   ' 技術篩選只列出目前保留的觀測證據中有該技術的部落格（包含最近一次觀測失敗或被阻擋、但仍保留上次成功結果的部落格）；未辨識、未觀測或沒有保留結果的部落格不會出現在這裡。'}
@@ -482,7 +483,7 @@ export default function TechStatsView({
               ) : (
                 <span />
               )}
-              <span className="py-2 text-zinc-500 tabular-nums">
+              <span className={`py-2 tabular-nums ${muted}`}>
                 本頁 {data.items.length} 筆 · 共 {n(data.pagination.total)} 筆
               </span>
               {data.pagination.nextCursor ? (
@@ -505,7 +506,7 @@ export default function TechStatsView({
         ) : status === 'pending' ? (
           <p
             aria-busy="true"
-            className="rounded-xl border border-zinc-300 p-6 text-sm text-zinc-500 dark:border-zinc-800 dark:text-zinc-400"
+            className="rounded-xl border border-zinc-300 p-6 text-sm text-zinc-600 dark:border-zinc-800 dark:text-zinc-400"
           >
             正在載入符合條件的部落格…
           </p>

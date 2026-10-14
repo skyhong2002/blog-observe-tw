@@ -58,7 +58,10 @@ export function plan(config) {
     if (!Number.isSafeInteger(scrollY) || scrollY < 0 || scrollY > 20000) throw Error('invalid_scroll');
     const theme = page.theme ?? 'light';
     if (!['light', 'dark'].includes(theme)) throw Error('invalid_theme');
-    return { url: url.href, width: page.width, height: 900, scrollY, theme, name: `page-${index + 1}-${page.width}-${theme}.png` };
+    const interaction = page.interaction ?? null;
+    if (interaction !== null && !['table-scroll', 'expand-method'].includes(interaction)) throw Error('invalid_interaction');
+    if (interaction && scrollY) throw Error('ambiguous_capture_area');
+    return { url: url.href, width: page.width, height: 900, scrollY, interaction, theme, name: `page-${index + 1}-${page.width}-${theme}.png` };
   });
   const estimatedBytes = pages.reduce((sum, page) => sum + page.width * page.height * 4, 0);
   if (estimatedBytes > LIMITS.bytes) throw Error('artifact_budget');
@@ -71,6 +74,67 @@ export async function captureScroll(page, requestedY) {
     return { requestedY: y, actualY: window.scrollY, viewportWidth: window.innerWidth,
       documentWidth: document.documentElement.scrollWidth, capturedArea: 'scrolled-viewport' };
   }, requestedY);
+}
+/** Only public, read-only interactions: no arbitrary selector, navigation or form submission. */
+export async function captureInteraction(page, action) {
+  if (!['table-scroll', 'expand-method'].includes(action)) throw Error('invalid_interaction');
+  return page.evaluate(async kind => {
+    const frame = () => new Promise(resolve => requestAnimationFrame(resolve));
+    const settle = async () => { for (let i = 0; i < 16; i++) await frame(); };
+    const viewport = () => ({ viewportWidth: innerWidth, documentWidth: document.documentElement.scrollWidth, actualY: scrollY });
+    if (kind === 'expand-method') {
+      const content = document.querySelector('#method');
+      const details = content?.closest('details');
+      const summary = details?.querySelector(':scope > summary');
+      if (!details || !summary) throw Error('method_interaction_missing');
+      const wasOpen = details.open;
+      if (!wasOpen) summary.click();
+      details.scrollIntoView({ block: 'start', behavior: 'instant' });
+      window.scrollBy({ top: -(document.querySelector('[data-site-header]')?.getBoundingClientRect().height ?? 0) - 16,
+        behavior: 'instant' });
+      await settle();
+      const bounds = content.getBoundingClientRect(), style = getComputedStyle(content);
+      return { action: kind, wasOpen, open: details.open, contentLayoutHeight: bounds.height,
+        contentVisible: details.open && style.display !== 'none' && style.visibility === 'visible' && Number(style.opacity) > 0 &&
+          bounds.height > 0 && bounds.width > 0 && bounds.bottom > 0 && bounds.top < innerHeight && bounds.right > 0 && bounds.left < innerWidth,
+        ...viewport(), capturedArea: 'expanded-method-viewport' };
+    }
+    const scroller = document.querySelector('main .table-scroller');
+    const table = scroller?.querySelector('table');
+    const head = table?.querySelector('thead');
+    if (!scroller || !table || !head) throw Error('table_interaction_missing');
+    const measure = () => {
+      const lead = table.querySelector('tbody .table-lead');
+      const box = lead?.querySelector('.table-lead-box');
+      const last = head.querySelector('th:last-child');
+      const bounds = scroller.getBoundingClientRect();
+      const rect = node => node ? { left: node.getBoundingClientRect().left, top: node.getBoundingClientRect().top,
+        width: node.getBoundingClientRect().width, right: node.getBoundingClientRect().right } : null;
+      return { ...viewport(), scrollLeft: scroller.scrollLeft, scrollWidth: scroller.scrollWidth,
+        clientWidth: scroller.clientWidth, scrollState: scroller.dataset.scrollX,
+        scroller: rect(scroller), header: rect(head), lastHeader: rect(last),
+        lastHeaderVisible: !!last && last.getBoundingClientRect().width > 0 && last.getBoundingClientRect().height > 0 &&
+          last.getBoundingClientRect().left >= Math.max(bounds.left, 0, lead?.getBoundingClientRect().right ?? 0) - 1 &&
+          last.getBoundingClientRect().right <= Math.min(bounds.right, innerWidth) + 1 &&
+          last.getBoundingClientRect().top >= 0 && last.getBoundingClientRect().bottom <= innerHeight,
+        lead: rect(lead), leadPosition: lead ? getComputedStyle(lead).position : null,
+        leadBoxMaxWidth: box ? getComputedStyle(box).maxWidth : null,
+        extrasHidden: [...table.querySelectorAll('tbody .table-lead-extra')].every(el => getComputedStyle(el).display === 'none'),
+        cellWhiteSpace: [...new Set([...table.querySelectorAll('tbody tr:nth-child(-n+5) td')].map(el => getComputedStyle(el).whiteSpace))],
+        siteHeaderHeight: document.querySelector('[data-site-header]')?.getBoundingClientRect().height ?? 0,
+        headerText: [...head.querySelectorAll('th')].map(el => (el.textContent ?? '').trim().slice(0, 80)) };
+    };
+    scroller.scrollLeft = 0;
+    await settle();
+    const before = measure();
+    window.scrollTo({ top: table.getBoundingClientRect().top + scrollY + 150, behavior: 'instant' });
+    scroller.scrollLeft = scroller.scrollWidth;
+    await settle();
+    // The first-column transition changes the final scroll extent after the scroll event.
+    scroller.scrollLeft = scroller.scrollWidth;
+    await settle();
+    return { action: kind, before, after: measure(), capturedArea: 'horizontally-scrolled-table-viewport' };
+  }, action);
 }
 export function verifyGate({ load, browserRoots, available }, estimate) {
   if (!Number.isFinite(load) || load > LIMITS.load || !Number.isSafeInteger(browserRoots) || browserRoots < 0 || browserRoots >= 2 || !Number.isFinite(available) || available - estimate < LIMITS.reserve) throw Error('gate_closed');
@@ -585,11 +649,13 @@ export async function capture(config, deps) {
       requireDNT(privacy);
       if (report.network.guardFailures || report.network.analyticsEvidence?.allowed) throw Error('network_guard_unverified');
       const scroll = item.scrollY ? await captureScroll(page, item.scrollY) : null;
+      const interaction = item.interaction ? await captureInteraction(page, item.interaction) : null;
+      if (identityFailure || page.url() !== item.url || report.network.guardFailures || report.network.analyticsEvidence?.allowed) throw Error('interaction_identity_changed');
       const contrastSamples = (await page.evaluate(collectSecondaryContrastDOM)).map(sample => sample.ancestorLimitReached ? { ...sample, ratio: null, result: 'unknown', reason: 'ancestor_limit' } : assessContrast(sample));
       const png = await page.screenshot({ fullPage: false });
       if (png.length > item.width * item.height * 4 || report.pages.reduce((sum, row) => sum + row.bytes, 0) + png.length > LIMITS.bytes) throw Error('actual_artifact_budget');
       await deps.saveImage(item.name, png);
-      report.pages.push({ scroll, privacyObservation: { source: 'actual-document-request-and-navigator', navigatorDNTSource: 'observed-value; init-script-override-configured', navigatorGPCSource: 'observed-value; runner-does-not-override' }, privacy, contrastSamples, contrastLimitation: 'Visible main secondary-class DOM samples only; unsupported CSS colors/backgrounds/group opacity remain unknown, not a full WCAG scan.', name: item.name, pathname: new URL(item.url).pathname, viewport: [item.width, item.height], theme: observedTheme.theme, darkMedia: observedTheme.darkMedia, utc: deps.now(), identity: config.localIdentity ? { ...identity, sha: report.localIdentity.sha, sourceTreeHash: report.localIdentity.sourceTreeHash } : identity, bytes: png.length, sha256: createHash('sha256').update(png).digest('hex'), status: 'captured-unreviewed' });
+      report.pages.push({ scroll, interaction, privacyObservation: { source: 'actual-document-request-and-navigator', navigatorDNTSource: 'observed-value; init-script-override-configured', navigatorGPCSource: 'observed-value; runner-does-not-override' }, privacy, contrastSamples, contrastLimitation: 'Visible main secondary-class DOM samples only; unsupported CSS colors/backgrounds/group opacity remain unknown, not a full WCAG scan.', name: item.name, pathname: new URL(item.url).pathname, viewport: [item.width, item.height], theme: observedTheme.theme, darkMedia: observedTheme.darkMedia, utc: deps.now(), identity: config.localIdentity ? { ...identity, sha: report.localIdentity.sha, sourceTreeHash: report.localIdentity.sourceTreeHash } : identity, bytes: png.length, sha256: createHash('sha256').update(png).digest('hex'), status: 'captured-unreviewed' });
       await page.close();
     }
     if (report.network.guardFailures || report.network.analyticsEvidence?.allowed) throw Error('network_guard_unverified');

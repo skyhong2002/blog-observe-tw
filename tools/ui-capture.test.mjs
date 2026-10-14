@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { EventEmitter } from 'node:events';
 import { PassThrough } from 'node:stream';
-import { capture, captureScroll, observePrivacy, requireDNT, assessContrast, collectSecondaryContrastDOM, verifyPrivateArtifactDirectory, verifyLatencyGate, installGuards, LIMITS, plan, requestDecision, verifyGate, verifyIdentity, browserRootInventory, quotaLeaseFromProcess, localProcessIdentity, listenerInodes, acquireHostBrowserQuota, recordNetworkAttempt, recordNetworkOutcome, NETWORK_GUARD_RULES, privateCapturePath, globalHomepageProbe, processInventory } from './ui-capture.mjs';
+import { capture, captureInteraction, captureScroll, observePrivacy, requireDNT, assessContrast, collectSecondaryContrastDOM, verifyPrivateArtifactDirectory, verifyLatencyGate, installGuards, LIMITS, plan, requestDecision, verifyGate, verifyIdentity, browserRootInventory, quotaLeaseFromProcess, localProcessIdentity, listenerInodes, acquireHostBrowserQuota, recordNetworkAttempt, recordNetworkOutcome, NETWORK_GUARD_RULES, privateCapturePath, globalHomepageProbe, processInventory } from './ui-capture.mjs';
 
 const config = { targetOrigin: 'http://127.0.0.1:18174', expectedSHA: 'a'.repeat(40), expectedBuildId: 'fixture-build', buildIdHeader: 'x-build-id', pages: [{ path: '/', width: 1280 }, { path: '/articles/', width: 390 }] };
 const gate = { load: 1, browserRoots: 0, rawPgrepCount: 10, available: LIMITS.reserve + 100 * 1024 ** 2 };
@@ -505,4 +505,14 @@ test('below-fold evidence validates bounded coordinates and records actual scrol
   } }, 800);
   assert.equal(result.actualY, 730);
   assert.equal(result.capturedArea, 'scrolled-viewport');
+});
+
+test('interaction plans are bounded read-only states and cannot ambiguously mix scrolling', async () => {
+  const page = {path:'/tech/',width:390};
+  for (const interaction of ['table-scroll','expand-method']) assert.equal(plan({...config,pages:[{...page,interaction}]}).pages[0].interaction,interaction);
+  for (const interaction of ['click','submit','/auth/google',{},42]) assert.throws(() => plan({...config,pages:[{...page,interaction}]}),/invalid_interaction/);
+  assert.throws(() => plan({...config,pages:[{...page,interaction:'table-scroll',scrollY:400}]}),/ambiguous_capture_area/);
+  let evaluated=false;
+  await assert.rejects(captureInteraction({evaluate:async()=>{evaluated=true;}},'submit'),/invalid_interaction/);
+  assert.equal(evaluated,false);
 });
