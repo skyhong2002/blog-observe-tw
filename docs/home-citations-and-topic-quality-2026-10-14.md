@@ -147,3 +147,15 @@ SHA-256 4270c309c484c3ad149856751c70f9a8fc46a3859e16fcb312bfb4377fce9d5a。
 兩項 fixture review 建議也採納：SQL integration 入口先驗證拋棄 schema，
 A 的 early SQL failure 會 reject，不讓 barrier 卡住；cleanup drain 不跳過 restore。
 以上是 source/mock review，沒有任何新 BUILD_ID／截圖／正式切換。
+
+
+## 真 SQL 執行補證
+
+2026-10-14隔離18169的home-display suite先抓到完整coverage查詢的排序欄位
+blogs歧義（ER_NON_UNIQ_ERROR）。修正為ranked.blogs/score/posts/topic_id；
+保留失敗log，沒有切正式站。修後4個suite全通過：2%上下界oracle9 assertions、
+persisted namespace compatibility、relation visibility69 assertions（首頁6種
+commit/barrier）、ranking freshness11次SQL比較＋6種commit/barrier。
+原始log在本worktree的 .reviews/display-noise/isolated-home-display-sort-qualified.log。
+這是拋棄schema真SQL，不是正式DB或畫面驗收；新source須用新的產物SHA建置，
+不變造先前f091的BUILD_ID。

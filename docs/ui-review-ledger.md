@@ -671,3 +671,12 @@ capture manifest `/home/deck/.t3/userdata/blog-release-9888ebf-candidate-2026101
 非UI技術檢查（n/a-ui）：`tests/integration/visibility-barrier.mjs`／`tools/test-visibility-barrier.mjs`，same-release existing runner raw evidence `/home/deck/.t3/projects/blog-observe-tw/.reviews/b0-final-barrier/9888ebf36229400c2323ae12334d72280cbe699a/{runner-result,barrier-result,sequence-result}.json`，53barrier＋60sequence；isolatedDB18169/HTTP18176/18177。Liveblue17 HTML/RSC/API/sitemap GET全部200及no-store，raw `/home/deck/.t3/projects/blog-observe-tw/.reviews/sm-build-9888ebf/blue-http-9888ebf-recheck.json`。首次任意 `_rsc`307與缺techflag404兩次失敗原log保留；只用existing cache-busting helper及blue旗標true精確匹配green，沒有放寬斷言／改source。
 
 操作狀態：switch前fresh曾blog median7.284s/load12.17而暫停；原量測 `/home/deck/.t3/projects/blog-observe-tw/.reviews/sm-build-9888ebf/switch-submission-fresh.json` 保留，不能當通過。switch／rollback尚未執行，no-store與CF Disabled維持。
+
+
+## 2026-10-14 下一批執行中
+
+使用者已取消逐命令等babysit核對／密集小步review。f091首次build完成，但
+真SQL發現coverage排序欄位歧義，未進正式；修為ranked欄位後四個隔離suite通過，
+新candidate需要新commit/build。正式仍blue/gen12/43d。前述source GO仍適用
+已審的UI；排序qualification僅後端一行，已正常測試／自檢。
+新actual viewport、model看圖、release/build和部署證据仍待補，不將舊圖當新圖。

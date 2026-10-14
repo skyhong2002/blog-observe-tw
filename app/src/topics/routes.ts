@@ -174,7 +174,7 @@ export async function ranking(
     LEFT JOIN topic_current tc ON tc.source=${literal(SOURCE)}
     LEFT JOIN topic_frequency_runs fr ON fr.snapshot_id=tc.snapshot_id AND fr.policy_version=${literal(FREQUENCY_POLICY.version)}
     LEFT JOIN topic_term_frequencies f ON f.snapshot_id=fr.snapshot_id AND f.term_id=SUBSTRING(ranked.topic_id,5)
-    ORDER BY ${includeMatchedPosts ? `(blogs>=${slug ? 1 : 2}) DESC,` : ''}score DESC,blogs DESC,posts DESC,topic_id LIMIT ${boundedLimit + 1}`,
+    ORDER BY ${includeMatchedPosts ? `(ranked.blogs>=${slug ? 1 : 2}) DESC,` : ''}ranked.score DESC,ranked.blogs DESC,ranked.posts DESC,ranked.topic_id LIMIT ${boundedLimit + 1}`,
     args,
   );
   // Count each evidence article exactly once before the minimum-blog filter.
