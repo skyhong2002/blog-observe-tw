@@ -113,6 +113,9 @@ export function periodOf(query: QueryReader, fallback: Period): Period {
 export const topicsApiPath = (days: Period) => `/api/topics?days=${days}`;
 /** The homepage's bounded projections (view=home): their own kinds and contracts, never the full pages' payloads. */
 export const HOME_OVERVIEW_PATH = '/api/overview?view=home';
+/** A profile's topics over its original 90-day period: one path, so its list and its word cloud share one read. */
+export const BLOG_TOPICS_PERIOD: Period = '90';
+export const blogTopicsApiPath = (slug: string) => `/api/blogs/${encodeURIComponent(slug)}/topics?days=${BLOG_TOPICS_PERIOD}`;
 export const homeTopicsApiPath = (days: Period) => `/api/topics?days=${days}&view=home`;
 export const relationsApiPath = (days: Period) => `/api/relations?days=${days}`;
 /** `id` is always the stable topic id (never the readable canonical path); `historyCursor` asks for the next history page. */

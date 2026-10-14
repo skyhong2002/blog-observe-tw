@@ -1,4 +1,5 @@
 import { publicPost } from './public-post.ts';
+import { loadHomeMentions } from './relations/home-feed.ts';
 import { TopicResponseCache } from './topics/cache.ts';
 import { iconManifest } from './v1/favicon-routes.ts';
 import { iconUrl } from './v1/icons.ts';
@@ -34,21 +35,13 @@ const blogDto = (row, icons) => {
   };
 };
 
-/** Homepage needs seven articles, thirty cloud labels, eight authors and ten recent blogs.
+/** Homepage needs bounded body-link evidence, eight authors and ten recent blogs.
  * Keep the full overview contract available, but do not collect unused catalog/description rows.
  * Compact recentBlogs intentionally omit description and postCount: the home sidebar only
  * renders identity, the latest article and its timestamp. Full overview retains those fields.
  * All SQL reads remain fresh and use the same admission boundary as the full projection. */
 async function loadHomeProjection(pool) {
-  const [postRows, tagRows] = await Promise.all([
-    pool.query(`SELECT p.id,p.guid,p.title,p.url,p.summary,p.author,p.published_at AS publishedAt,p.image_url AS imageUrl,
-      b.slug AS blogSlug,b.name AS blogName FROM posts p JOIN blogs b ON b.id=p.blog_id
-      WHERE b.status='verified' AND (p.published_at IS NULL OR p.published_at<=UTC_TIMESTAMP()) ORDER BY p.published_at DESC,p.id DESC LIMIT 7`),
-    pool.query(`SELECT t.slug,t.label,COUNT(DISTINCT p.id) AS postCount,COUNT(DISTINCT p.blog_id) AS blogCount
-      FROM tags t JOIN post_tags pt ON pt.tag_id=t.id JOIN posts p ON p.id=pt.post_id JOIN blogs b ON b.id=p.blog_id
-      WHERE b.status='verified' AND t.visibility='public' AND t.status='active' AND pt.status='active' AND (p.published_at IS NULL OR p.published_at<=UTC_TIMESTAMP())
-      GROUP BY t.id,t.slug,t.label ORDER BY blogCount DESC,postCount DESC,t.slug LIMIT 30`),
-  ]);
+  const mentions = await loadHomeMentions(pool);
   const [authorRows, totalRows] = await Promise.all([
     pool.query(`SELECT a.id,a.display_name AS displayName,b.slug AS blogSlug,b.name AS blogName,
       COUNT(DISTINCT p.id) AS postCount FROM authors a
@@ -71,8 +64,9 @@ async function loadHomeProjection(pool) {
     view: 'home',
     generatedAt: new Date().toISOString(),
     cacheSeconds: 0,
-    posts: postRows[0].map(publicPost),
-    tags: tagRows[0],
+    posts: [],
+    tags: [],
+    mentions,
     authors: authorRows[0],
     blogs: [],
     recentBlogs: recentRows.map(({ latestPostId, latestPostTitle, latestPostUrl, latestPostPublishedAt, ...blog }) => ({

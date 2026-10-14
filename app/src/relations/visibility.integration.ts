@@ -3,12 +3,15 @@ import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import Fastify from 'fastify';
 import type { Pool, ResultSetHeader, RowDataPacket } from 'mysql2/promise';
+import { assertEphemeralDatabase } from '../../../tests/integration/guard.mjs';
 import { installPrivateCachePolicy } from '../cache-policy.ts';
+import { HOME_MENTIONS_SQL, loadHomeMentions } from './home-feed.ts';
 import { parseArticleLinks } from './parser.ts';
 import { invalidateRelationCache, loadRelationCoverage, loadRelations, readRelationSnapshot, registerRelationRoutes } from './routes.ts';
 import { loadAliases, saveObservation } from './store.ts';
 
 export async function runRelationVisibilityIntegration(pool: Pool) {
+  assertEphemeralDatabase(pool);
   const suffix = Date.now().toString(36);
   const now = new Date();
   const blogIds: number[] = [],
@@ -70,6 +73,92 @@ export async function runRelationVisibilityIntegration(pool: Pool) {
     await save(postIds[0], a, aUrl + 'one', aBody);
     await save(postIds[1], a, aUrl + 'two', `<article><a href="${bUrl}one">B</a></article>`);
     await save(postIds[2], b, bUrl + 'one', `<article><a href="${aUrl}one">A</a></article>`);
+    const homeInitial = await loadHomeMentions(pool, now);
+    check(homeInitial.items.filter((row) => row.postId === postIds[0] && row.targetBlogId === b).length === 1);
+    check(homeInitial.items.every((row) => row.location === 'body' && row.contextSource === 'body'));
+    check(!homeInitial.items.some((row) => row.targetDomain === new URL(unknown).hostname));
+    // Production home SQL, real commit/read barriers; never wait for sleep, retry, or TTL.
+    const homeBarriers: string[][] = [];
+    for (const mutation of ['seed', 'rejected', 'moved', 'future', 'delete', 'owner'] as const) {
+      let arrived!: () => void, release!: () => void;
+      let first = true;
+      const held = new Promise<void>((r) => (release = r)),
+        reached = new Promise<void>((r) => (arrived = r));
+      const order: string[] = [];
+      const wrapped = new Proxy(pool, {
+        get(target, key) {
+          if (key === 'query')
+            return async (...args: unknown[]) => {
+              const result = await Reflect.apply(target.query, target, args);
+              if (first && args[0] === HOME_MENTIONS_SQL) {
+                first = false;
+                order.push('A-read');
+                arrived();
+                await held;
+                order.push('A-release');
+              }
+              return result;
+            };
+          const value = Reflect.get(target, key);
+          return typeof value === 'function' ? value.bind(target) : value;
+        },
+      }) as Pool;
+      const oldRead = loadHomeMentions(wrapped, now);
+      try {
+        // Early SQL failure must reject rather than leave the fixture waiting forever.
+        await Promise.race([
+          reached,
+          oldRead.then(() => {
+            throw Error('home_barrier_not_reached');
+          }),
+        ]);
+        const transaction = await pool.getConnection();
+        try {
+          await transaction.beginTransaction();
+          if (mutation === 'seed' || mutation === 'rejected' || mutation === 'moved')
+            await transaction.execute('UPDATE blogs SET status=? WHERE id=?', [mutation, b]);
+          else if (mutation === 'future')
+            await transaction.execute('UPDATE posts SET published_at=? WHERE id=?', [new Date(now.getTime() + 60_000), postIds[2]]);
+          else if (mutation === 'owner') await transaction.execute('UPDATE posts SET blog_id=? WHERE id=?', [c, postIds[2]]);
+          else await transaction.execute('DELETE FROM posts WHERE id=?', [postIds[2]]);
+          await transaction.commit();
+          order.push('commit');
+        } catch (error) {
+          await transaction.rollback();
+          throw error;
+        } finally {
+          transaction.release();
+        }
+        const fresh = await loadHomeMentions(pool, now);
+        order.push('B-complete');
+        check(!fresh.items.some((row) => row.targetBlogId === b));
+        check(fresh.items.some((row) => row.sourceBlogId === a && row.targetBlogId === c));
+        release();
+        check((await oldRead).items.some((row) => row.targetBlogId === b));
+        order.push('A-complete');
+        assert.deepEqual(order, ['A-read', 'commit', 'B-complete', 'A-release', 'A-complete']);
+        homeBarriers.push([mutation, ...order]);
+      } finally {
+        release();
+        // Drain A without letting a cleanup rejection skip restoration below;
+        // the original failure already propagates through the try block/race.
+        await oldRead.catch(() => {});
+        await pool.execute("UPDATE blogs SET status='verified' WHERE id=?", [b]);
+        if (mutation === 'delete') {
+          await pool.execute('INSERT INTO posts (id,blog_id,guid,url,title,published_at,created_at) VALUES (?,?,?,?,?,?,?)', [
+            postIds[2],
+            b,
+            bUrl + 'one',
+            bUrl + 'one',
+            'Visibility fixture',
+            now,
+            now,
+          ]);
+          // The deleted post's outgoing rows remain query-joined safely; restore its observation for the original fixture.
+          await save(postIds[2], b, bUrl + 'one', `<article><a href="${aUrl}one">A</a></article>`);
+        } else await pool.execute('UPDATE posts SET blog_id=?,published_at=? WHERE id=?', [b, now, postIds[2]]);
+      }
+    }
     const override = async (postId: number, targetUrl: string, location: string, hidden: boolean) => {
       await pool.query(
         `INSERT INTO admin_relation_overrides (fingerprint,source_post_id,target_url_hash,target_url,location,hidden,reason,actor_user_id,updated_at)
@@ -125,6 +214,7 @@ export async function runRelationVisibilityIntegration(pool: Pool) {
     check(Number(currentSnapshot.count) === 0); // Public reads no longer write/cache worker DTOs.
 
     const hidden = (await app.inject('/api/relations?days=90')).json();
+    check(!(await loadHomeMentions(pool, now)).items.some((row) => row.postId === postIds[0] && row.targetBlogId === b));
     check(edge(hidden, a, b)?.count === 1 && edge(hidden, a, b)?.share === 0.5 && edge(hidden, a, c)?.share === 0.5);
     check(hidden.mostMentioned.find((r: { blogId: number; mentions: number }) => r.blogId === b)?.mentions === 1);
     const incomingProfile = (await app.inject(`/api/blogs/visibility-b-${suffix}/relations`)).json();
@@ -232,7 +322,14 @@ export async function runRelationVisibilityIntegration(pool: Pool) {
       unblock();
       await limitedApp.close();
     }
-    return { assertions, cacheInvalidation: true, stableFingerprint: true, rawEvidencePreserved: true, ratiosConsistent: true };
+    return {
+      assertions,
+      homeBarriers,
+      cacheInvalidation: true,
+      stableFingerprint: true,
+      rawEvidencePreserved: true,
+      ratiosConsistent: true,
+    };
   } finally {
     await app.close();
     await invalidateRelationCache(pool);

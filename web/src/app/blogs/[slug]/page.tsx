@@ -5,7 +5,9 @@ import BlogContentSources from '@/components/BlogContentSources';
 import BlogInference from '@/components/BlogInference';
 import BlogRelations from '@/components/BlogRelations';
 import BlogTech, { BlogTechPending } from '@/components/BlogTech';
+import BlogTopicCloud from '@/components/BlogTopicCloud';
 import BlogTopics from '@/components/BlogTopics';
+import { MediaWordCloudPending } from '@/components/MediaWordCloud';
 import SimilarwebTraffic from '@/components/SimilarwebTraffic';
 import SourceProfile from '@/components/SourceProfile';
 import { plainText } from '@/lib/api';
@@ -49,6 +51,11 @@ export default async function BlogDetailPage({ params }: Props) {
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: serializeJsonLd(breadcrumb) }} />
       <SourceProfile
         blog={{ ...blog, canonicalPath: page.canonicalPath }}
+        cloud={
+          <Suspense fallback={<MediaWordCloudPending />}>
+            <BlogTopicCloud slug={blog.slug} />
+          </Suspense>
+        }
         sidebar={
           <>
             <BlogContentSources slug={blog.slug} />

@@ -1,9 +1,11 @@
 import { topicLink } from '@/lib/page-links';
 import { publicJsonOrNull } from '@/lib/public-api';
+import { BLOG_TOPICS_PERIOD, blogTopicsApiPath } from '@/lib/public-query';
 import type { Topics } from '@/lib/topics';
 import Link from './NoPrefetchLink';
+// Same 90-day path as BlogTopicCloud: one per-request read for the list and the profile's word cloud.
 export default async function BlogTopics({ slug }: { slug: string }) {
-  const data = await publicJsonOrNull<Topics>(`/api/blogs/${encodeURIComponent(slug)}/topics?days=90`);
+  const data = await publicJsonOrNull<Topics>(blogTopicsApiPath(slug));
   return (
     <section className="mt-8 space-y-3">
       <h2 className="text-lg font-semibold">最近常寫的話題</h2>
@@ -17,7 +19,7 @@ export default async function BlogTopics({ slug }: { slug: string }) {
           {data.items.slice(0, 20).map((t) => (
             <li key={t.id}>
               <Link
-                {...topicLink(t.id, t.canonicalPath, '90')}
+                {...topicLink(t.id, t.canonicalPath, BLOG_TOPICS_PERIOD)}
                 className="inline-flex rounded-md border border-zinc-300 px-3 py-2 text-sm hover:bg-zinc-100 dark:border-zinc-700 dark:hover:bg-zinc-800"
               >
                 {t.label} · {t.posts} 篇

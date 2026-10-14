@@ -25,6 +25,7 @@
 - 變更紀錄（2026-10-13）：話題詳情新增選用 history 累積歷史清單與 historyCursor 分頁。話題曾有有效比對證據就保留，不因退出每日詞庫窗口消失；只公開標題、原文連結及觀測狀態，絕不提供全文。全部證據明確撤銷時回 410，合併網頁一次 301 到最終話題。
 - 正文提及是交流訊號，不是抄襲或背書判斷。引用占比的分母為來源站在窗口內所有已解析、指向已收錄目標的「文章—目標部落格」提及數；一篇提及三站會計三筆，不是占全站文章的百分比。覆蓋與截斷欄位應與排行一起閱讀。
 - 話題詞條以新文易數維護的標籤池為唯一來源；目前 observed-article-window 僅代表觀測窗口內出現的詞，不代表完整詞庫。NFKC 與大小寫正規化後合併，顯示文字取同快照中上游文章出現次數最多的寫法。只比對標題與清理後正文；同篇取標題權重 2 或正文權重 1，依權重由高到低排列後，同站後續文章貢獻依序乘上 0.5。只命中正文時即 1、0.5、0.25…；2 篇標題加 1 篇正文合計 3.25。排除詞保留原始資料與原因，可透過話題詳情查詢；RSS 分類不另建排行詞庫。
+- 排行另使用新文易數 broad 門檻（至少三站、兩站各兩篇且一站三篇），配合既有文件頻率門檻。若詞在查詢窗口內超過 2% 公開文章命中，排行只計標題證據；原詞、正文命中與歷史話題頁保留。`matchingPolicy.displayGate` 記錄門檻與來源，`matchingReason=high-window-document-frequency-title-only` 可查核正文降權原因；此規則不改原 matcher／policy 版本，也不是另建通用詞黑名單。
 
 ## 快速開始
 
@@ -547,6 +548,15 @@ curl --fail-with-body -sS 'https://blog.observe.tw/api/v1/topics'
 | `matchingPolicy.recentBackfillHours` | integer |  |
 | `matchingPolicy.frequency` | object |  |
 | `matchingPolicy.publicationNoiseVersion` | string | 公開呈現的純標點雜訊規則版本；不改原始詞條 ID |
+| `matchingPolicy.displayGate` | object | 選用的排行展示品質門檻 |
+| `matchingPolicy.displayGate.version` | string | 展示門檻版本；不取代 matcher／policy 版本 |
+| `matchingPolicy.displayGate.upstream` | string | 移植的 tag 跨站 broad 門檻來源 |
+| `matchingPolicy.displayGate.minimumSources` | integer | 至少三個部落格 |
+| `matchingPolicy.displayGate.minimumTwiceSources` | integer | 至少兩站各兩篇 |
+| `matchingPolicy.displayGate.minimumPeakPosts` | integer | 至少一站三篇 |
+| `matchingPolicy.displayGate.documentFrequencyRatio` | number | 查詢窗口內高文件頻率門檻，目前 0.02 |
+| `matchingPolicy.displayGate.reason` | string | high-window-document-frequency-title-only |
+| `matchingPolicy.displayGate.effect` | string | 只影響排行的正文貢獻；保留來源池及歷史證據 |
 | `minimumBlogs` | integer |  |
 | `generatedAt` | string (ISO 時間) |  |
 | `truncated` | boolean |  |
@@ -639,6 +649,15 @@ curl --fail-with-body -sS 'https://blog.observe.tw/api/v1/topics/rss%3A1'
 | `matchingPolicy.recentBackfillHours` | integer |  |
 | `matchingPolicy.frequency` | object |  |
 | `matchingPolicy.publicationNoiseVersion` | string | 公開呈現的純標點雜訊規則版本；不改原始詞條 ID |
+| `matchingPolicy.displayGate` | object | 選用的排行展示品質門檻 |
+| `matchingPolicy.displayGate.version` | string | 展示門檻版本；不取代 matcher／policy 版本 |
+| `matchingPolicy.displayGate.upstream` | string | 移植的 tag 跨站 broad 門檻來源 |
+| `matchingPolicy.displayGate.minimumSources` | integer | 至少三個部落格 |
+| `matchingPolicy.displayGate.minimumTwiceSources` | integer | 至少兩站各兩篇 |
+| `matchingPolicy.displayGate.minimumPeakPosts` | integer | 至少一站三篇 |
+| `matchingPolicy.displayGate.documentFrequencyRatio` | number | 查詢窗口內高文件頻率門檻，目前 0.02 |
+| `matchingPolicy.displayGate.reason` | string | high-window-document-frequency-title-only |
+| `matchingPolicy.displayGate.effect` | string | 只影響排行的正文貢獻；保留來源池及歷史證據 |
 | `blogs` | object[] |  |
 | `blogs[].id` | integer |  |
 | `blogs[].slug` | string |  |

@@ -6,6 +6,7 @@ import { VocabularyMethod } from '@/components/VocabularyNotice';
 import { taipei } from '@/lib/api';
 import { SHARED_LABEL_SHOWN, type SharedLabelsView } from '@/lib/shared-labels';
 import {
+  displayGateText,
   formatPercent,
   liftExplanation,
   type MatchingPolicy,
@@ -17,6 +18,8 @@ import {
 
 // SiteFooter's methodHeading; not imported, since that module reads the catalog on the server.
 const methodHeading = 'font-medium text-zinc-900 dark:text-zinc-100';
+// The window display gate's reason (matchingPolicy.displayGate.reason); its matchingRule is the existing title-only.
+const WINDOW_REASON = 'high-window-document-frequency-title-only';
 
 /** Threshold and baseline period behind a title-only term, from whichever the payload recorded. */
 function frequencyBasis(vocabulary: VocabularyStatus, policy: MatchingPolicy | undefined) {
@@ -52,7 +55,13 @@ export default function TopicMethod({
         {matchingPolicyText(matchingPolicy)}
         {ranking ? `排行仍依加權貢獻排序。${liftExplanation(matchingPolicy?.frequency?.baselineDays)}` : ''}
       </p>
-      {matchingReason ? (
+      {ranking && displayGateText(matchingPolicy) ? <p>{displayGateText(matchingPolicy)}</p> : null}
+      {matchingReason === WINDOW_REASON ? (
+        <p>
+          {matchingReasonLabel(matchingReason)}：
+          {displayGateText(matchingPolicy) ?? '這個詞在所選期間出現得很普遍，排行只計標題命中；詞仍在詞庫，話題頁與歷史文章保留。'}
+        </p>
+      ) : matchingReason ? (
         <p>
           {matchingReasonLabel(matchingReason)}
           ：這個詞在長期文章中出現得很普遍，排行與升溫倍率只計標題命中；正文命中仍留在頻率統計，詞也沒有從詞庫刪除。

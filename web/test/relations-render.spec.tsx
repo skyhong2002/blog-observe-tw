@@ -882,7 +882,7 @@ describe("F3's method lives in the footer's one 本頁的資料來源與計算�
       expect($('#method h3').last().text(), pathname).toBe('引用與交流');
       expect($('#method').text(), pathname).toContain(shareExplanation);
     }
-    for (const pathname of ['/', '/blogs/', '/blogs', '/blogs/a/feed/', '/tags/x/', '/relations/extra/']) {
+    for (const pathname of ['/blogs/', '/blogs', '/blogs/a/feed/', '/tags/x/', '/relations/extra/']) {
       const $ = footerOnly(pathname);
       expect(methodBlocks($).length, pathname).toBe(1);
       expect(
@@ -893,6 +893,15 @@ describe("F3's method lives in the footer's one 本頁的資料來源與計算�
       ).toEqual(['資料來源']);
       expect($('#method').text(), pathname).not.toContain('引用占比');
     }
+    // The homepage carries its own citation-row method instead, still without the F3 share paragraphs.
+    const $ = footerOnly('/');
+    expect(methodBlocks($).length).toBe(1);
+    expect(
+      $('#method h3')
+        .map((_, el) => $(el).text())
+        .get(),
+    ).toEqual(['資料來源', '首頁的正文引用與話題']);
+    expect($('#method').text()).not.toContain('引用占比');
   });
 
   test('/tech/ and topic pages keep their own block: none from the footer, and no F3 paragraphs in theirs', () => {

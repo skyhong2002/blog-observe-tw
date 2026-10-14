@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import type { Pool, RowDataPacket } from 'mysql2/promise';
 import { topicBodyHash, topicBodyJoins } from './body.ts';
 import { TopicResponseCache } from './cache.ts';
+import { DISPLAY_GATE, windowGateCtes, windowGateSql } from './display-gate.ts';
 import { FREQUENCY_POLICY } from './frequency.ts';
 import { historyReadsEnabled } from './history-contracts.ts';
 import { durableTopicDetail } from './history-read.ts';
@@ -20,6 +21,7 @@ export const matchingPolicy = {
   sources: ['title', 'body'],
   recentBackfillHours: 48,
   frequency: FREQUENCY_POLICY,
+  displayGate: DISPLAY_GATE,
 };
 const literal = (value: string) => `'${value.replaceAll("'", "''")}'`;
 // Feed categories retain their provenance, but never create an independent ranking dictionary.
@@ -27,6 +29,7 @@ const literal = (value: string) => `'${value.replaceAll("'", "''")}'`;
 export const evidence = (
   blogScoped = false,
   _verifiedOnly = true,
+  displayGate = false,
 ) => `scoped_posts AS (SELECT p.id,p.blog_id,p.published_at,p.content_hash FROM posts p JOIN blogs b ON b.id=p.blog_id WHERE p.published_at>=? AND p.published_at<=? AND b.status='verified' ${blogScoped ? 'AND b.slug=?' : ''}), fresh_posts AS (
  SELECT DISTINCT p.id,p.blog_id,p.published_at,i.snapshot_id FROM scoped_posts p
  JOIN topic_current c ON c.source=${literal(SOURCE)}
@@ -44,7 +47,7 @@ export const evidence = (
  AND t.exclusion_reason IS NULL AND t.inactive_reason IS NULL AND ${publicationLabelSql('t.label')} AND m.source IN ('title','body')
  AND (m.source='title' OR fr.snapshot_id IS NULL OR COALESCE(f.high_frequency,0)=0)
  GROUP BY p.id,p.blog_id,p.published_at,t.id,t.label
-), recent AS (SELECT * FROM evidence)`;
+), ${displayGate ? windowGateCtes() : 'recent AS (SELECT * FROM evidence)'}`;
 export const weightedScore = (titleCount: string, bodyCount: string) =>
   `(4*(1-POW(0.5,${titleCount}))+2*POW(0.5,${titleCount})*(1-POW(0.5,${bodyCount})))`;
 const daysValue = (raw: unknown) =>
@@ -136,7 +139,11 @@ const item = (r: RowDataPacket) => {
     baselineShare,
     lift: recentShare !== null && baselineShare !== null && baselineShare > 0 ? recentShare / baselineShare : null,
     matchingRule: Number(r.high_frequency) ? 'title-only' : 'title-and-body',
-    matchingReason: Number(r.high_frequency) ? 'high-document-frequency-title-only' : null,
+    matchingReason: Number(r.window_high_frequency)
+      ? DISPLAY_GATE.reason
+      : Number(r.high_frequency)
+        ? 'high-document-frequency-title-only'
+        : null,
   };
 };
 export async function ranking(
@@ -152,16 +159,18 @@ export async function ranking(
   if (slug) args.push(slug);
   const boundedLimit = Math.min(200, Math.max(1, Math.floor(limit)));
   const [rows] = await pool.query<RowDataPacket[]>(
-    `WITH ${evidence(Boolean(slug), verifiedOnly)},
+    `WITH ${evidence(Boolean(slug), verifiedOnly, true)},
     ${includeMatchedPosts ? 'marked AS (SELECT recent.*,ROW_NUMBER() OVER (PARTITION BY post_id ORDER BY topic_id)=1 first_match FROM recent),' : ''}
     per_blog AS (
     SELECT r.topic_id,r.label,r.source,r.blog_id,COUNT(*) n,SUM(title_hit) title_n,SUM(1-title_hit) body_n${includeMatchedPosts ? ',SUM(first_match) matched_n' : ''} FROM ${includeMatchedPosts ? 'marked' : 'recent'} r
     GROUP BY r.topic_id,r.label,r.source,r.blog_id)
     SELECT ranked.*${includeMatchedPosts ? ',SUM(ranked.matched_n) OVER () matched_posts' : ''},(SELECT COUNT(*) FROM scoped_posts) recent_total,
-      fr.total_posts baseline_total,IF(fr.snapshot_id IS NOT NULL,COALESCE(f.high_frequency,0),0) high_frequency,
-      IF(f.high_frequency=1,f.title_posts,f.matched_posts) baseline_matched
+      fr.total_posts baseline_total,${windowGateSql()} window_high_frequency,
+      (IF(fr.snapshot_id IS NOT NULL,COALESCE(f.high_frequency,0),0) OR ${windowGateSql()}) high_frequency,
+      IF(f.high_frequency=1 OR ${windowGateSql()},f.title_posts,f.matched_posts) baseline_matched
     FROM (SELECT topic_id,label,source,SUM(${weightedScore('title_n', 'body_n')}) score,SUM(n) posts,COUNT(*) blogs,SUM(title_n) title_posts,SUM(body_n) body_posts${includeMatchedPosts ? ',SUM(matched_n) matched_n' : ''} FROM per_blog
     GROUP BY topic_id,label,source ${includeMatchedPosts ? '' : `HAVING COUNT(*)>=${slug ? 1 : 2}`}) ranked
+    LEFT JOIN window_frequencies wf ON wf.topic_id=ranked.topic_id
     LEFT JOIN topic_current tc ON tc.source=${literal(SOURCE)}
     LEFT JOIN topic_frequency_runs fr ON fr.snapshot_id=tc.snapshot_id AND fr.policy_version=${literal(FREQUENCY_POLICY.version)}
     LEFT JOIN topic_term_frequencies f ON f.snapshot_id=fr.snapshot_id AND f.term_id=SUBSTRING(ranked.topic_id,5)

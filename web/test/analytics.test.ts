@@ -766,15 +766,14 @@ test('unmounted before gtag.js loads: a private round trip back to the SAME URL 
 
 test('homepage original-article links carry the open_original marker, the /blogs/ fallback does not', () => {
   const page = readFileSync(new URL('../src/app/page.tsx', import.meta.url), 'utf8');
-  assert.match(
-    page,
-    /const original = \(post: \{ url\?: string \| null \}\) => \(externalHref\(post\.url\) \? 'open_original' : undefined\);/,
-  );
-  // Hero title, hero "到原站閱讀" and story titles; plus the hero and story images.
-  assert.equal(page.match(/data-analytics=\{original\((lead|post)\)\}/g)?.length, 3);
-  assert.equal(page.match(/analytics=\{original\((lead|post)\)\}/g)?.length, 5);
   // The recent-blogs entry only renders as a link for an external URL.
   assert.match(page, /<a\s+href=\{href\}\s+data-analytics="open_original"\s+rel="noopener noreferrer"/);
+  // The body-citation rows: the source article links out only for a safe external URL; blog links never carry it.
+  const mentions = readFileSync(new URL('../src/app/_home/HomeMentions.tsx', import.meta.url), 'utf8');
+  assert.match(mentions, /const original = externalHref\(m\.postUrl\);/);
+  assert.match(mentions, /<a href=\{original\} data-analytics="open_original" rel="noopener noreferrer">/);
+  assert.equal(mentions.match(/data-analytics=/g)?.length, 1);
+  // The retired hero/story image component keeps its marker should it be reused.
   const image = readFileSync(new URL('../src/app/_home/NewsImage.tsx', import.meta.url), 'utf8');
   assert.match(image, /data-analytics=\{analytics\}/);
 });

@@ -80,14 +80,15 @@ test('displayTitle: the raw Post is not changed; summaries keep plainText', () =
 });
 
 test('displayTitle: every public article-title consumer goes through the shared helper', () => {
+  // The homepage no longer lists articles with summaries (no hero/story, so no plainText): its titles are the
+  // recent-blog sidebar and the body-citation rows, both through displayTitle (rendered in home-title-render.spec).
   const page = source('app/page.tsx');
-  assert.match(page, /import \{ displayTitle, plainText, taipei \} from '@\/lib\/api';/);
-  assert.match(page, /title=\{displayTitle\(lead\.title\)\}\s+variant="hero"/);
-  assert.match(page, /\{displayTitle\(lead\.title\)\}\s*<\/a>/);
-  assert.match(page, /\{displayTitle\(post\.title\)\}\s*<\/a>/);
-  assert.match(page, /title=\{displayTitle\(post\.title\)\}\s*variant="thumbnail"/);
+  assert.match(page, /import \{ displayTitle, taipei \} from '@\/lib\/api';/);
   assert.match(page, /const title = displayTitle\(latest\?\.title\)\.trim\(\) \|\| '未提供標題';/);
-  assert.doesNotMatch(page, /\{(lead|post)\.title\}/);
+  assert.doesNotMatch(page, /\{(lead|post|latest)\??\.title\}/);
+  const mentions = source('app/_home/HomeMentions.tsx');
+  assert.match(mentions, /const title = displayTitle\(m\.postTitle\)\.trim\(\) \|\| '未提供標題';/);
+  assert.doesNotMatch(mentions, /\{m\.postTitle\}/);
   const list = source('components/ArticleListItem.tsx');
   assert.match(list, /const shownTitle = displayTitle\(post\.title\);/);
   assert.doesNotMatch(list, /exec\(article\.title\)/);
@@ -100,6 +101,7 @@ test('displayTitle: every public article-title consumer goes through the shared 
   // Text only: no HTML injection or DOM parsing for titles.
   for (const path of [
     'app/page.tsx',
+    'app/_home/HomeMentions.tsx',
     'components/ArticleListItem.tsx',
     'components/public/TopicDetail.tsx',
     'components/BlogRelations.tsx',

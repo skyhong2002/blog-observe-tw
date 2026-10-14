@@ -8,9 +8,12 @@ import { type Blog, taipei } from '@/lib/api';
 import { blogHref } from '@/lib/page-links';
 import FollowButton from './follow-button';
 import MediaSidebar from './MediaSidebar';
-import MediaWordCloud from './MediaWordCloud';
 import SectionTabs from './SectionTabs';
-export default function SourceProfile({ blog, sidebar }: { blog: Blog; sidebar?: ReactNode }) {
+/**
+ * `cloud` is a server-rendered slot (the page passes BlogTopicCloud in its own Suspense): the profile's word cloud
+ * is drawn from the blog's local topic ranking, never from its raw tags, and this component never fetches it.
+ */
+export default function SourceProfile({ blog, sidebar, cloud }: { blog: Blog; sidebar?: ReactNode; cloud?: ReactNode }) {
   const allPosts = blog.posts ?? [];
   const owner = { slug: blog.slug, name: blog.name, canonicalPath: blog.canonicalPath };
   return (
@@ -121,7 +124,7 @@ export default function SourceProfile({ blog, sidebar }: { blog: Blog; sidebar?:
           </section>
         </MediaSidebar>
         <section className="min-w-0 space-y-4 lg:col-start-1 lg:row-start-1">
-          <MediaWordCloud tags={blog.tags ?? []} />
+          {cloud}
           <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
             <h2 className="text-sm font-semibold">最新收錄</h2>
             <p className="text-xs text-zinc-500">依發文時間排列 · 完整內容請至原站閱讀</p>

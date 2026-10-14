@@ -4,6 +4,7 @@ import Fastify, { type LightMyRequestResponse } from 'fastify';
 import type { Pool, ResultSetHeader, RowDataPacket } from 'mysql2/promise';
 import { assertEphemeralDatabase } from '../../../tests/integration/guard.mjs';
 import { topicBodyHash, topicBodyJoins } from './body.ts';
+import { windowGateCtes } from './display-gate.ts';
 import { FREQUENCY_POLICY } from './frequency.ts';
 import { CLEANUP_VERSION } from './matching-body.ts';
 import { digest, MATCHER_VERSION, POLICY_VERSION } from './policy.ts';
@@ -37,10 +38,16 @@ export async function runRankingFreshnessIntegration(pool: Pool) {
   const explain: { variant: string; plan: unknown }[] = [];
   const wrapped: Pool = Object.create(pool);
   wrapped.query = (async (sql: string, args: unknown[] = []) => {
-    const scoped = sql.startsWith(`WITH ${evidence(true)}`);
-    const current = evidence(scoped);
+    const scoped = sql.startsWith(`WITH ${evidence(true)}`) || sql.startsWith(`WITH ${evidence(true, true, true)}`);
+    const gated = sql.startsWith(`WITH ${evidence(scoped, true, true)}`);
+    const current = evidence(scoped, true, gated);
     if (!sql.startsWith(`WITH ${current}`)) return pool.query(sql, args);
-    const old = sql.replace(current, legacyEvidence(scoped));
+    // Compare materialization only: apply the same display gate to both query plans.
+    // The independent 2% SQL threshold oracle is run by display-gate.integration.ts.
+    const previous = gated
+      ? legacyEvidence(scoped).replace('recent AS (SELECT * FROM evidence)', windowGateCtes())
+      : legacyEvidence(scoped);
+    const old = sql.replace(current, previous);
     const result = await pool.query<RowDataPacket[]>(sql, args);
     const [before] = await pool.query<RowDataPacket[]>(old, args);
     assert.deepEqual(result[0], before, 'fresh-post materialization must preserve exact ranking/detail rows');

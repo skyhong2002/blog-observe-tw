@@ -28,7 +28,6 @@ const rows = (value: unknown, checks: Record<string, (value: unknown) => boolean
   list(value) && value.every((row) => shape(row, checks));
 
 const pagination = (value: unknown) => shape(value, { page: number, pages: number, pageSize: number, total: number });
-const topicItems = (value: unknown) => rows(value, { id: text, label: text });
 const relationCoverage = (value: unknown) => shape(value, { nonBodyLinks: object });
 const boolean = (value: unknown) => typeof value === 'boolean';
 const count = (value: unknown) => Number.isSafeInteger(value) && (value as number) >= 0;
@@ -36,6 +35,27 @@ const oneOf =
   (...values: string[]) =>
   (value: unknown) =>
     values.includes(value as string);
+/** A ranked topic row: the counts lists and word clouds show, and its provenance (the two accepted source kinds). */
+const topicSource = oneOf('rss-category', 'tag-vocabulary');
+const topicItems = (value: unknown) => rows(value, { id: text, label: text, source: topicSource, posts: count, blogs: count });
+const nonEmpty = (value: unknown) => typeof value === 'string' && value.trim().length > 0;
+const positive = (value: unknown) => Number.isSafeInteger(value) && (value as number) > 0;
+/**
+ * matchingPolicy.displayGate (topics/routes.ts): optional; when sent, every field the method notes state must be
+ * present and in range, so a malformed gate is a failed read rather than a made-up rule description.
+ */
+const displayGate = (value: unknown) =>
+  shape(value, {
+    version: nonEmpty,
+    upstream: nonEmpty,
+    reason: nonEmpty,
+    effect: nonEmpty,
+    minimumSources: positive,
+    minimumTwiceSources: positive,
+    minimumPeakPosts: positive,
+    documentFrequencyRatio: (v) => number(v) && (v as number) > 0 && (v as number) <= 1,
+  });
+const matchingPolicy = optional((value) => object(value) && optional(displayGate)(value.displayGate));
 
 /**
  * One link row of readBlogRelations (projectEvidence). The five keys every gateway sent (postTitle, postUrl,
@@ -118,6 +138,48 @@ const atMost = (max: number) => (value: unknown) => list(value) && value.length 
  */
 const recentPost = (value: unknown) => shape(value, { id: optional(count), title: text, url: nullable(text), publishedAt: nullable(text) });
 /**
+ * One homepage body citation (app/src/relations/home-feed.ts loadHomeMentions): every key the row renders, with
+ * the single evidence kind it may be. A row of another kind (shared tag, similarity, sidebar) is not this answer.
+ */
+const homeMention = {
+  postId: count,
+  postTitle: text,
+  postUrl: nullable(text),
+  publishedAt: nullable(text),
+  sourceBlogId: count,
+  sourceBlogSlug: text,
+  sourceBlogName: text,
+  // Readable page paths added by the gateway's generic enrichment; absent on older answers (slug paths are used).
+  sourceBlogCanonicalPath: optional(text),
+  sourceIconUrl: nullable(text),
+  targetBlogId: count,
+  targetBlogSlug: text,
+  targetBlogName: text,
+  targetBlogCanonicalPath: optional(text),
+  targetHomeUrl: nullable(text),
+  targetDomain: nullable(text),
+  targetIconUrl: nullable(text),
+  evidenceType: (v: unknown) => v === 'direct-link',
+  location: (v: unknown) => v === 'body',
+  anchor: text,
+  context: (v: unknown) => typeof v === 'string' && v.length <= 240,
+  observedAt: nullable(text),
+  matchVersion: text,
+  // A public enum, never an internal extraction id or digest.
+  contextSource: (v: unknown) => v === 'body',
+};
+/** Required on the home overview: missing or malformed is a failed read, never an empty list. */
+const homeMentions = (value: unknown) =>
+  shape(value, {
+    days: (v) => v === 90,
+    evidenceType: (v) => v === 'direct-link',
+    location: (v) => v === 'body',
+    limit: (v) => v === 8,
+    truncated: boolean,
+    generatedAt: text,
+    items: (items) => rows(items, homeMention) && atMost(8)(items),
+  });
+/**
  * /api/overview?view=home (loadHomeProjection): marked view 'home', the overview's shape at the homepage's bounds,
  * recentBlogs always sent and no directory rows. A full overview (no mark, 200 posts, its blogs) is not this answer.
  */
@@ -125,6 +187,7 @@ const homeOverview = (raw: unknown) =>
   shape(raw, overviewShape) &&
   shape(raw, {
     view: (v) => v === 'home',
+    mentions: homeMentions,
     posts: atMost(7),
     tags: atMost(30),
     authors: atMost(8),
@@ -149,10 +212,11 @@ const homeTopics = (raw: unknown) => {
           id: text,
           label: text,
           canonicalPath: optional(text),
-          source: oneOf('rss-category', 'tag-vocabulary'),
+          source: topicSource,
           posts: count,
           blogs: count,
         }),
+      matchingPolicy,
       truncated: boolean,
       minimumBlogs: (v) => v === 2,
       limit: (v) => v === 8,
@@ -284,10 +348,11 @@ export const PUBLIC_CONTRACTS: Record<PublicKind, (raw: unknown) => boolean> = {
     }),
   search: (raw) => shape(raw, { items: list }),
   // The full ranking: vocabulary stays required (the homepage's view=home answer is homeTopics).
-  topics: (raw) => shape(raw, { items: topicItems, vocabulary: object }),
+  topics: (raw) => shape(raw, { items: topicItems, vocabulary: object, matchingPolicy }),
   topic: (raw) =>
     shape(raw, {
       topic: (value) => shape(value, { id: text, label: text }),
+      matchingPolicy,
       blogs: rows,
       articles: rows,
       vocabulary: object,
@@ -322,7 +387,7 @@ export const PUBLIC_CONTRACTS: Record<PublicKind, (raw: unknown) => boolean> = {
       textSimilarity: optional((value) => shape(value, { status: text })),
       coverage: object,
     }),
-  blogTopics: (raw) => shape(raw, { items: topicItems, vocabulary: object }),
+  blogTopics: (raw) => shape(raw, { items: topicItems, vocabulary: object, matchingPolicy }),
   blogInference: (raw) =>
     shape(raw, {
       label: text,

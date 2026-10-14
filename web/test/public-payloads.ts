@@ -130,6 +130,16 @@ export const EMPTY: Record<PublicKind, unknown> = {
     recentBlogs: [],
     totals: { blogs: 0, posts: 0 },
     updatedAt: null,
+    // app/src/relations/home-feed.ts: a bounded 90-day window with no body citations is a valid empty answer.
+    mentions: {
+      days: 90,
+      evidenceType: 'direct-link',
+      location: 'body',
+      limit: 8,
+      truncated: false,
+      generatedAt: '2026-10-12T00:00:00.000Z',
+      items: [],
+    },
   },
   homeTopics: {
     view: 'home',

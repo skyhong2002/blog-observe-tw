@@ -25,6 +25,7 @@ try {
           'staged-scan-v2',
           'topic-body-owner',
           'topic-policy-compat',
+          'home-display',
           'topic-fingerprint-sql',
           'staged-scan-proof',
           'staged-proof-inspector',
@@ -71,6 +72,7 @@ try {
       await store.pool.query(sql);
   }
   const suites = [
+    ['home-display', '../app/src/topics/display-gate.integration.ts', 'runDisplayGateIntegration'],
     ['topic-policy-compat', '../app/src/topics/policy-compat.integration.ts', 'runTopicPolicyCompatibilityIntegration'],
     ['topic-fingerprint-sql', '../app/src/topics/provenance-fingerprint-sql.integration.ts', 'runProvenanceFingerprintSqlIntegration'],
     ['staged-scan-proof', '../app/src/topics/staged-scan-proof.integration.ts', 'runStagedScanProofIntegration'],
@@ -117,33 +119,41 @@ try {
     ['tech-fetch-batch', '../app/src/tech/fetch-batch.integration.ts', 'runTechFetchBatchIntegration'],
   ];
   const selected =
-    process.argv[5] === 'topic-policy-compat'
-      ? suites.filter(([label]) => label === 'topic-policy-compat' || label === 'home-ranking-freshness')
-      : process.argv[5] === 'f3-f4'
-        ? suites.filter(
-            ([label]) =>
-              label === 'search-recall' ||
-              label === 'profile-evidence' ||
-              label === 'shared-tags' ||
-              label === 'text-similarity' ||
-              label === 'home-ranking-freshness' ||
-              label.startsWith('tech-'),
-          )
-        : process.argv[5] === 'b3'
-          ? suites.filter(([label]) => label.startsWith('shared-label-'))
-          : process.argv[5] === 'vocabulary-snapshot'
-            ? suites.filter(([label]) => label === 'snapshot-import')
-            : process.argv[5] === 'staged-scan-v2'
-              ? suites.filter(([label]) => label === 'staged-scan-v2')
-              : process.argv[5] === 'topic-body-owner'
-                ? suites.filter(([label]) => label === 'topic-body-owner')
-                : process.argv[5] === 'topic-fingerprint-sql'
-                  ? suites.filter(([label]) => label === 'topic-fingerprint-sql')
-                  : process.argv[5] === 'staged-scan-proof'
-                    ? suites.filter(([label]) => label === 'staged-scan-proof')
-                    : process.argv[5] === 'staged-proof-inspector'
-                      ? suites.filter(([label]) => label === 'staged-proof-inspector')
-                      : suites;
+    process.argv[5] === 'home-display'
+      ? suites.filter(
+          ([label]) =>
+            label === 'home-display' ||
+            label === 'topic-policy-compat' ||
+            label === 'home-ranking-freshness' ||
+            label === 'relation-visibility',
+        )
+      : process.argv[5] === 'topic-policy-compat'
+        ? suites.filter(([label]) => label === 'topic-policy-compat' || label === 'home-ranking-freshness')
+        : process.argv[5] === 'f3-f4'
+          ? suites.filter(
+              ([label]) =>
+                label === 'search-recall' ||
+                label === 'profile-evidence' ||
+                label === 'shared-tags' ||
+                label === 'text-similarity' ||
+                label === 'home-ranking-freshness' ||
+                label.startsWith('tech-'),
+            )
+          : process.argv[5] === 'b3'
+            ? suites.filter(([label]) => label.startsWith('shared-label-'))
+            : process.argv[5] === 'vocabulary-snapshot'
+              ? suites.filter(([label]) => label === 'snapshot-import')
+              : process.argv[5] === 'staged-scan-v2'
+                ? suites.filter(([label]) => label === 'staged-scan-v2')
+                : process.argv[5] === 'topic-body-owner'
+                  ? suites.filter(([label]) => label === 'topic-body-owner')
+                  : process.argv[5] === 'topic-fingerprint-sql'
+                    ? suites.filter(([label]) => label === 'topic-fingerprint-sql')
+                    : process.argv[5] === 'staged-scan-proof'
+                      ? suites.filter(([label]) => label === 'staged-scan-proof')
+                      : process.argv[5] === 'staged-proof-inspector'
+                        ? suites.filter(([label]) => label === 'staged-proof-inspector')
+                        : suites;
   for (const [label, module, entry] of selected) {
     phase = label;
     const result = await (await import(module))[entry](store.pool);

@@ -6,7 +6,7 @@ Created in [T3 Code](https://t3.codes).
 
 ## 目前版本
 
-目前服務使用 Steam Machine 上分離的 edge、gateway、web、worker user services：edge 對外監聽 `127.0.0.1:18160`，指向 active blue/green slot；最後確認的 gen5 green 為 gateway `18175`、Next web `18173`，由 Cloudflare Tunnel 提供 `https://blog.observe.tw`。舊 `18162` blog web 已停用，不能當成部署來源。實際切換以 active.json／部署 receipt 為準。目前版本提供：
+目前服務使用 Steam Machine 上分離的 edge、gateway、web、worker user services：edge 對外監聽 `127.0.0.1:18160`，指向 active blue/green slot；最後確認的 gen12 blue（43d17900）為 gateway `18174`、Next web `18172`，green 18175／18173 保留在線回滾，由 Cloudflare Tunnel 提供 `https://blog.observe.tw`。舊 `18162` blog web 已停用，不能當成部署來源。實際切換以 active.json／部署 receipt 為準。目前版本提供：
 
 - 前端直接移植新文易數的 Tailwind 4 版面、分組導覽、來源頁、文章列表、手機選單、深淺色與 PWA 元件；首頁顯示收錄排行、標籤與文章，詳見 [`docs/frontend-parity.md`](docs/frontend-parity.md)。
 - 135 個原始 seed 與通過 RSS 自動驗證的新收錄部落格，網址核對與收錄統計見 [種子處理紀錄](docs/seed-resolution-2026-10-12.md)；支援分類搜尋、個別網站頁與原站連結。
@@ -40,7 +40,7 @@ npm run blogs:merge -- old-slug new-slug --apply
 
 完整的來源探索設計（`blogblog.club`、Similarweb Similar Sites、速率限制與和 tag 的協調方式）見 [`docs/discovery.md`](docs/discovery.md)。正式 Google 帳號登入仍需使用者本人在瀏覽器完成；Similarweb 方案一已接成 tag 的 loopback API client：只提交核准網域，每日最多 30 次、六小時輪詢、配額與退避持久化，預設 `BLOG_SIMILARWEB_ENABLED=false`。契約與回滾見 [`docs/similarweb-coordination-proposal.md`](docs/similarweb-coordination-proposal.md)。圖示抓取、私人 runtime catalog 與每月刷新見 [`docs/favicons.md`](docs/favicons.md)。
 
-最新正式 release `4cc7bcd` 的同產物切換、首頁量測與 F3／F4 已審範圍見 [2026-10-13 部署紀錄](docs/deployment-2026-10-13-4cc7bcd.md)；完整 UI 尚未驗收完畢，依 [逐頁 ledger](docs/ui-review-ledger.md) 保留 pending。favicon 歷史全批數量及真人驗收項目見 [2026-10-12 部署紀錄](docs/deployment-2026-10-12.md)。
+目前正式 release `43d17900`（gen12）；新首頁正文引用／詞庫品質 source 設計見 [2026-10-14 批次](docs/home-citations-and-topic-quality-2026-10-14.md)，尚未建置部署。前一版 `4cc7bcd` 的同產物切換、首頁量測與 F3／F4 已審範圍見 [2026-10-13 部署紀錄](docs/deployment-2026-10-13-4cc7bcd.md)；完整 UI 尚未驗收完畢，依 [逐頁 ledger](docs/ui-review-ledger.md) 保留 pending。favicon 歷史全批數量及真人驗收項目見 [2026-10-12 部署紀錄](docs/deployment-2026-10-12.md)。
 
 ## 開發與發版
 

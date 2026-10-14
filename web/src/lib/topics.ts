@@ -58,6 +58,20 @@ export type MatchingPolicy = {
   /** Hours of recent articles re-matched first when new terms arrive; absent on older gateways. */
   recentBackfillHours?: number;
   frequency?: { baselineDays: number; highFrequencyRatio: number; reason: string; version: string };
+  /**
+   * Window display gate (presentation only; POLICY/MATCHER versions unchanged): a term broadly used inside the
+   * requested window contributes only title hits to the ranking. Topic pages, history and raw source terms stay.
+   */
+  displayGate?: {
+    version: string;
+    upstream: string;
+    minimumSources: number;
+    minimumTwiceSources: number;
+    minimumPeakPosts: number;
+    documentFrequencyRatio: number;
+    reason: string;
+    effect: string;
+  };
 };
 export type MatchingRule = 'title-only' | 'title-and-body';
 export type Topic = {
@@ -187,8 +201,21 @@ export const inactiveReasonLabel = (reason: string) => inactiveLabels[reason] ??
 /** Why an active term counts differently in the ranking; not an exclusion. */
 const matchingReasonLabels: Record<string, string> = {
   'high-document-frequency-title-only': '高頻詞，只計標題命中',
+  // displayGate.reason: the same title-only matchingRule, decided on the requested window rather than the baseline.
+  'high-window-document-frequency-title-only': '本期間高頻詞，排行只計標題命中',
 };
-export const matchingReasonLabel = (reason: string) => matchingReasonLabels[reason] ?? `其他比對規則（${reason}）`;
+export const matchingReasonLabel = (reason: string) =>
+  Object.hasOwn(matchingReasonLabels, reason) ? matchingReasonLabels[reason] : `其他比對規則（${reason}）`;
+/** The window display gate in one sentence; null when the gateway does not report one. */
+export function displayGateText(policy: MatchingPolicy | undefined): string | null {
+  const g = policy?.displayGate;
+  if (!g) return null;
+  return (
+    `本期間高頻詞：期間內至少 ${g.minimumSources} 個部落格使用、其中 ${g.minimumTwiceSources} 個各有 2 篇以上且有一站達 ${g.minimumPeakPosts} 篇，` +
+    `並且期間內命中文章占比超過 ${formatPercent(g.documentFrequencyRatio)} 的詞，排行只計標題命中、不計正文貢獻。` +
+    '這只依所選期間判斷，與 365 日基準的高頻詞規則分開；詞仍在詞庫，話題頁、歷史文章與原始 RSS 分類都保留。'
+  );
+}
 
 /** Ratio as a percentage without trailing zeros, e.g. 0.02 → 2%; — when not recorded. */
 export function formatPercent(ratio: number | null | undefined) {

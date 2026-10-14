@@ -40,7 +40,8 @@
     "test:topic-ui": "npx vitest run --config vitest.topic-ui.config.ts",
     "docs:api": "node tools/gen-api-docs.ts",
     "docs:api:check": "node tools/gen-api-docs.ts --check",
-    "api:check": "node tools/check-openapi.ts"
+    "api:check": "node tools/check-openapi.ts",
+    "topics:display-audit": "node --env-file-if-exists=.env tools/audit-topic-display.ts"
   },
   "dependencies": {
     "@fastify/rate-limit": "^11.2.0",

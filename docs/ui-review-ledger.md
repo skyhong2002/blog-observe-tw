@@ -1,5 +1,141 @@
 # UI 逐頁審查紀錄
 
+## 2026-10-14 UTC12:05：人類gen12有限正式驗收與下一批source
+
+使用者代轉babysit：正式blue/gen12/43d、BUILD_ID zwqhLTfWMBRUuDn6YP5Tr，
+1280／390首頁版面正常，共同話題8筆非空、entity顯示正常，opt-out GA0。
+這是人類明確回報，沒有提供截圖/log絕對路徑；不捏造capture或model transcript，
+也不將有限首屏檢查升為全部route/狀態pass。下方12:00技術receipt維持原樣。
+
+下一批本分支基底origin/main43d：首頁正文article→domain、移除三個區塊、
+文字雲改tag-vocabulary排行源、rank displayGate（tagbroad＋既有2%），
+作者為既有Opus5.5 session6e17，backend rootCodex。原始author logs：
+/home/deck/.cache/blog-display-noise-20261014/.reviews/display-noise/opus-home-author.jsonl
+及opus-home-author-followup.jsonl、opus-home-author-dn2.jsonl，三次actual5.5/success；原作者沒有自審。
+獨立Sol初審原檔：
+/home/deck/.t3/userdata/ui-review-blog-20261013/home-perf-independent/display-noise-home-independent-source-review.json
+UTC2026-10-14T13:07:19Z，base43d，actual model gpt-6.1-sol，原始transcript/逐檔hash在JSON。
+初審DN1/DN2與fixture兩項finding已修，修後GO：
+/home/deck/.t3/userdata/ui-review-blog-20261013/home-perf-independent/display-noise-home-independent-source-followup.json
+SHAfea3bc9f9b2430806a8278f5c4e22cbe4cc94858c0a4473f0cf87312e0e607fc，49逐檔hash、model/UTC/raw log。
+新增guard test獨立GO：
+/home/deck/.t3/userdata/ui-review-blog-20261013/home-perf-independent/display-noise-home-guard-delta-review.json
+SHA4270c309c484c3ad149856751c70f9a8fc46a3859e16fcb312bfb4377fce9d5a。actualImagesViewed=0，
+不能把source review列作頁面pass。Opus只審root backend、finishstop原檔：
+/home/deck/.cache/blog-display-noise-20261014/.reviews/display-noise/opus-backend-review-short.json
+及同目錄opus-backend-review-resolution.json（條件式建議的採納／不採納理由）。首次truncated review未計入。
+本批未有BUILD_ID或新截圖，桌機1280／手機390 light/dark全部待重拍；
+不能用gen12舊圖當新UI已通過。完整scope/F3fulltext仍pending。新首頁、
+部落格profile cloud、/topics方法說明需實際candidate看圖後更新，來源與
+readonly前後20名見 [本批設計](home-citations-and-topic-quality-2026-10-14.md)。
+
+---
+
+
+## 2026-10-14 UTC11:58：43d 同產物正式 blue/gen12（瀏覽器複驗待 babysit）
+
+正式 APP `43d17900c24efae6879bf075d1c576ba74d6a3e8`、
+BUILD_ID `zwqhLTfWMBRUuDn6YP5Tr`（primary/standalone 相同）；
+transition12 的 UTC `2026-10-14T11:58:57.687Z`；核准流程驗證完成
+UTC `2026-10-14T12:00:33.529273+00:00`。原 built43d 與 origin/main不變、沒有重建。
+文件 OPS commit 不作為 APP/build identity。active.json 為 blue／gen12／43d；
+green4cc仍在線可立即 `rollback green`，兩slot/所有release/backup/worktree保留。
+
+原 packet `/tmp/babysit/mint-queue/blog43-blue-switch-command.json` SHA009bacea...
+未覆寫。第一次 UTC11:52:09.553Z切blue/gen10，postSwitch19項通過但後續YT
+探針exit28/5.002344s/0bytes（UTC11:53:02.498–11:53:07.509）而立即回滾
+green/gen11，UTC11:53:17.862Z。Babysit告知YT也在部署，核准等待3min後重切；
+第二次preflight從11:58:35.718Z開始，超過notBefore11:57:52.552Z。只expected
+generation9/10改11/12；必需的output paths分開以保存原failedfiles；其餘所有
+斷言、APP/runtime/flag/CF均不改。exactargv與diff於
+`/home/deck/.t3/projects/blog-observe-tw/.reviews/sm-build-9888ebf/approved-reswitch43-gen12-command-proof.json`
+和同目錄 `approved-reswitch43-gen12-command.diff`，不是重寫成功的舊紀錄。
+
+技術HTTP檢查19項通過：正式話題100筆與green完整ordereditems／policy一致，
+home8為前8；HTML/API/RSC current43d/build/gen12、private no-store／DYNAMIC、
+HSTS精確max-age=86400、404、SSRF400、OAuth起始302/S256/正確callback；
+static favicon200/image/png/HSTS，但不將cached immutable header當runtime版本。
+正式19項log `/home/deck/.t3/projects/blog-observe-tw/.reviews/sm-build-9888ebf/approved-reswitch43-gen12/formal-http-acceptance.json`；原始部署receipt
+`/home/deck/.t3/projects/blog-observe-tw/.reviews/sm-build-9888ebf/approved-reswitch43-gen12/deployment-receipt.json`。原同artifactB0的53barrier/60sequence未被
+拿掉；沒有再次改runtime、正式migration、worker或cache/privacy規則。
+
+效能原始紀錄 `/home/deck/.t3/projects/blog-observe-tw/.reviews/sm-build-9888ebf/approved-reswitch43-gen12/formal-performance.json`：首頁五次完整HTML回應
+時間[2.522866, 2.69502, 2.560887, 2.649546, 2.451865]秒，中位
+2.560887秒；不是TTFB、origin純渲染或瀏覽器load。
+三站各3次median blog3.112564s／
+tag0.351371s／YT0.250446s，
+皆200/exit0且在6.17/2/2s門檻內。Load1 4.48，
+/home 48.14GiB、MemAvailable 3.18GiB。
+DNT1，只HTML/JSON與manualredirect，不執行GA、JS或真人OAuth，不是Realtime驗收。
+
+**正式實際畫面仍待 babysit：**本節只有正式HTTP/SSR/RSC與同產物候選28張
+actualmodelreview，沒有新正式1280/390截圖，不填不存在路徑。首頁話題與
+`&#038;` 正常顯示需由human指定正式瀏覽器複驗後補證。整頁UI、互動、
+對比unknown與F3歷史全文仍pending；歷史正文旗標關閉，蛤蜊絲瓜未命中，
+本批不宣稱全部scope完成。
+
+先前所稱07:56green首頁500，existingjournal確認 `PublicGatewayError:
+Public gateway read failed: /api/topics?days=30 (network)`，cause為
+`TimeoutError`；發生在改inactiveblue／切換前。只確認舊green讀取話題API
+逾時，不推論未量到的DB/CPU深層原因。去識別原始摘要
+`/home/deck/.t3/projects/blog-observe-tw/.reviews/sm-build-9888ebf/approved-reswitch43-gen12/green500-confirmed-cause.json`。
+
+---
+
+
+## 2026-10-14：43d 修正版候選實際看圖（正式仍 green/gen9）
+
+APP `43d17900c24efae6879bf075d1c576ba74d6a3e8`、tree `a335ed943d4b7682394be43a1db14a2e7cf05aaa`，
+primary/standalone BUILD_ID `zwqhLTfWMBRUuDn6YP5Tr`。本節為同產物 candidate
+實際看圖紀錄，OPS 文件 commit 不會變更 APP、build 或正式 active。
+記錄 UTC `2026-10-14T08:35:40.777994+00:00`；28 張／7 個模板（1280、390，各 light/dark）由既有
+非作者 GPT-6.1 Sol `/root/home_perf` 逐張 actual view，另看 10 張 tag 參考。
+未增加 agent，沒有把捕圖、source review 或 Done 訊息當看圖證據。
+
+唯一 actual manifest：`/home/deck/.t3/userdata/blog-release-43d1790-candidate-20261014/submission-manifest.json`
+SHA-256 `6f162fec3303e6c3ae8efb0087b13c1b293d85d83dfe5d4724ef9828fb13d1a3`。每張含 viewport、PNG hash、image UTC、SHA/build/tree、
+實際 DNT=1、navigator DNT=1、GPC=null（沒有改寫為 true）、網路計數；
+GA/GTM 路由放行 0，before-navigation guard installed；每批 browser closed。
+
+獨立 reviewer 原始 JSON：`/home/deck/.t3/userdata/ui-review-blog-20261013/home-perf-independent/43d1790-candidate-actual-ui-review.json`
+SHA-256 `e75dbe31cd73f0bafd56f24651587e7bbc1b3c9f1eccda20f718d092d9c3c062`；逐圖 actual model／工具輸入／UTC／raw line 在 JSON；
+log：`/home/deck/.t3/userdata/ui-review-blog-20261013/home-perf-independent/43d1790-candidate-actual-ui-review.log`；完整原始 transcript：
+`/home/deck/.codex/sessions/2026/10/13/rollout-2026-10-13T13-12-51-01a133ad-8034-7e81-a619-c9d28bd4ff5f.jsonl`。同目錄 first8／first16／original24 歷史保留。
+
+| route／真實 candidate URL | 桌機／手機／兩色圖片目錄 | 跟 tag 的偏離與理由 | 發現、修正與重驗 | 本批狀態 |
+| --- | --- | --- | --- | --- |
+| `/` | `/home/deck/.t3/userdata/blog-release-43d1790-candidate-20261014/home/` | tag新聞焦點卡/橙色 vs blog綠色生活/公開文章/共同話題，沒有新聞專用charts。 | `&` 顯示正常、排行非空；修正 43d／5ae7；100 筆 exact parity。 未驗：phone共同話題sidebar belowframe；empty/pending/lateerror/menu/search/theme interactions；completebelowfold/methodopened/third+article states | fixed 部分問題／整頁 pending |
+| `/topics/` | `/home/deck/.t3/userdata/blog-release-43d1790-candidate-20261014/topics/` | tagtraffic serves dense tablelayoutreference only; blogtopics counts/weightedcontribution/lift notmedia monthlytraffic. | `&` 顯示正常、排行非空；修正 43d／5ae7；100 筆 exact parity。 未驗：390weighted/lift rightcolumns/horizontal scrolling notviewed；rowclick/tabperiod/select/frequency/details/methodopened notoperated；full100rows/footer notvisible | fixed 部分問題／整頁 pending |
+| `/tech/` | `/home/deck/.t3/userdata/blog-release-43d1790-candidate-20261014/tech/` | tagtraffic reference for dense borderedtable/search only, not monthlytraffic/sparkline functionparity. | 入鏡未見重大視覺 blocker。 未驗：390listing andplugins/CDNbelowframe；desktoprightmostsuccessdates clipped bytablecontainer; horizontalscroll nottested；filter/search/methodopened/notviewedrestofpage；WCAGcontrastunknown LAB | fixed 部分問題／整頁 pending |
+| `/relations/` | `/home/deck/.t3/userdata/blog-release-43d1790-candidate-20261014/relations/` | tagmultikindnewsgraph/zoom/ranking vs blogonlybodydirectlinks/fewobservednodes intentionaldifferentdata/controlscope. | 入鏡未見重大視覺 blocker。 未驗：graphhover/click/periodcontrols notoperated；390reciprocallistbelowframe andremainingrows；darkfineprintcontrast unknown/nodarktagreference；allbodyevidencecorrectness notprovedbyraster | fixed 部分問題／整頁 pending |
+| `/blogs/gogojp-tw-535/` | `/home/deck/.t3/userdata/blog-release-43d1790-candidate-20261014/blog-profile-canonical-attempt3/` | tagmediaprofile orange/news/reportkeywords vs bloggreen/travel+verifiedwebsite/contentcollectionevidence. Canonicalslug fromrealAPI, notguessedname. | 入鏡未見重大視覺 blocker。 未驗：mobile metadataaccordionopened/provenance/tech andfollow/tabs/searchoperations；full50articlelist/footer/methodopened unseen；darkfineprint/WCAGunknown andnodarktagreference | fixed 部分問題／整頁 pending |
+| `/blogs/gogojp-tw-535/#relations` | `/home/deck/.t3/userdata/blog-release-43d1790-candidate-20261014/blog-exchanges-canonical-attempt3/` | tagnewsreference relationtypes notidentical; blogdirectbodyproof/nonbodyseparated. DisabledcomparisonnotpopulatedB2acceptance. | 入鏡未見重大視覺 blocker。 未驗：body/nonbodyevidencedetailsclosed notactualviewed；390textsimilarity/method/topiclist below900frame partlyunseen；anchorintroaboveframe/stickyoffset notcompletelyseen；alllink/expand/graphactions/WCAGunknown | fixed 部分問題／整頁 pending |
+| `/articles/?q=蛤蜊絲瓜` | `/home/deck/.t3/userdata/blog-release-43d1790-candidate-20261014/articles-search/` | tagarticlesref shows populatednewsfocuscards/periods; blogsearch uses metadataform andboundedempty state, notsameeventfeatures or samequeryfixture. | 只限最近 1,000 metadata、歷史正文關閉、搜尋 0 筆；F3 全文未驗收。 未驗：actualhistorical/bodyhit/fullindexedcorpus/readiness/coverage claims；nonempty results/snippets/id/version/evidence/perhitURL/malformedfailurestates；formsubmit/keyboard/tabs/menu/methodopened notoperated；darkfineprint/contrastunknown | fixed 部分問題／整頁 pending |
+
+各目錄固定 `page-1-1280-light.png`、`page-2-390-light.png`、
+`page-3-1280-dark.png`、`page-4-390-dark.png`；`capture-report.json` 附實際
+resource gate 前後三站 3 樣本、load、private guard 與 PID/socket/build identity。
+原 guessed slug `/blogs/gogojp.tw/` 為 404：0 圖，保持 missing／失敗證據；
+canonical-attempt2 的 probe adapter 錯把 array 當 `.probes`，9 筆實測皆合格但
+未啟動 browser，0 圖；後改同工具的測試接線，原檔保留。canonical-attempt3
+採 API 已發布 `gogojp-tw-535` 200，沒有改產品程式或重建。
+
+全文旗標仍關閉，F3 full-text 不因 bounded/off 空態可讀而通過；共同標籤與
+文字相似亦維持關閉。344 個 contrast sample unknown，不稱 WCAG pass；
+手機表格右欄／下方、展開方法與證據、hover／鍵盤／期間／權限／空與錯誤
+狀態仍 pending。主要圖通過僅符合人類「先部署、逐頁 review 之後補」的
+有限 candidate 視覺條件。原權威 24 項 pass0／fixed2／issues9／pending11／n/a-ui2
+不變；不是全部 UI scope 完成。正式仍 green/gen9，切換需 babysit 核對 exact
+command／fresh probe，本文件不授權切換。
+
+B0 同 BUILD_ID 的 53 barrier／60 sequence 已通過；17 個 HTML/RSC/API/XML
+200/no-store。100/100 排序、score、posts、blogs、matchingPolicy 相同，首頁
+8 筆等於前 8 筆，原始證據 `.reviews/sm-build-9888ebf/blue43-http-parity-recheck-1791965198079.json`。
+舊 9888 空排行先前審查及回滾紀錄一律保留，不冒称已完成正式重新驗收。
+
+---
+
+
 ## 2026-10-14 標題顯示 source 修正：待同產物重拍
 
 同一既有 Opus 5.5 作者 session `6e17a454-0623-4006-8aa4-f733dcde31a9` 完成

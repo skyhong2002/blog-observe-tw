@@ -18,17 +18,21 @@ describe('read-only frontend projection', () => {
       },
     };
     const data = await loadOverview(pool, { home: true });
-    expect(statements).toHaveLength(5);
+    expect(statements).toHaveLength(4);
     expect(peak).toBe(2);
-    expect(statements.filter((sql) => sql.includes('LIMIT 7'))).toHaveLength(1);
-    expect(statements.filter((sql) => sql.includes('LIMIT 30'))).toHaveLength(1);
+    expect(statements.filter((sql) => sql.includes('LIMIT 7'))).toHaveLength(0);
+    expect(statements.filter((sql) => sql.includes('visible_mentions'))).toHaveLength(1);
+    expect(statements.filter((sql) => sql.includes('LIMIT 30'))).toHaveLength(0);
     expect(statements.filter((sql) => sql.includes('LIMIT 8'))).toHaveLength(1);
     expect(statements.filter((sql) => sql.includes('LIMIT 10'))).toHaveLength(1);
     expect(statements.some((sql) => sql.includes('b.description'))).toBe(false);
     expect(statements.some((sql) => sql.includes('ORDER BY postCount DESC'))).toBe(false);
     expect(statements.every((sql) => sql.includes("status='verified'"))).toBe(true);
-    expect(statements[1]).toContain("t.visibility='public'");
-    expect(statements[1]).toContain("pt.status='active'");
+    expect(statements[0]).toContain("l.location='body'");
+    expect(statements[0]).toContain("b.status='verified'");
+    expect(data.posts).toEqual([]);
+    expect(data.tags).toEqual([]);
+    expect(data.mentions).toMatchObject({ items: [], days: 90, evidenceType: 'direct-link' });
     expect(data.blogs).toEqual([]);
     expect(data.view).toBe('home');
     expect(data.cacheSeconds).toBe(0);
@@ -41,8 +45,23 @@ describe('read-only frontend projection', () => {
       release = resolve;
     });
     const query = vi.fn(async (sql: string) => {
-      if (sql.includes('p.summary')) {
-        const rows = hidden ? [] : [{ title: 'old visible', publishedAt: null }];
+      if (sql.includes('visible_mentions')) {
+        const rows = hidden
+          ? []
+          : [
+              {
+                postId: 1,
+                postTitle: 'old visible',
+                publishedAt: '2026-10-14T01:00:00Z',
+                sourceBlogId: 1,
+                sourceBlogSlug: 'a',
+                sourceBlogName: 'A',
+                targetBlogId: 2,
+                targetBlogSlug: 'b',
+                targetBlogName: 'B',
+                matchVersion: 'relations-v2',
+              },
+            ];
         if (first) {
           first = false;
           await barrier;
@@ -56,10 +75,11 @@ describe('read-only frontend projection', () => {
     hidden = true;
     const b = await loadOverview(pool, { home: true });
     expect(b.posts).toEqual([]);
+    expect(b.mentions.items).toEqual([]);
     expect(b.totals.blogs).toBe(0);
     release();
-    expect((await a).posts).toHaveLength(1);
-    expect(query).toHaveBeenCalledTimes(10);
+    expect((await a).mentions.items).toHaveLength(1);
+    expect(query).toHaveBeenCalledTimes(8);
   });
   it('overview view input is bounded and all outcomes stay no-store', async () => {
     const query = vi.fn(async (sql: string) => [sql.includes('AS blogs,') ? [{ blogs: 0, posts: 0, updatedAt: null }] : []]);
@@ -79,11 +99,11 @@ describe('read-only frontend projection', () => {
       expect(home.statusCode).toBe(200);
       expect(home.json().view).toBe('home');
       expect(home.headers['cache-control']).toContain('no-store');
-      expect(query).toHaveBeenCalledTimes(5);
+      expect(query).toHaveBeenCalledTimes(4);
       const full = await app.inject('/api/overview');
       expect(full.statusCode).toBe(200);
       expect(full.json()).not.toHaveProperty('view');
-      expect(query).toHaveBeenCalledTimes(11);
+      expect(query).toHaveBeenCalledTimes(10);
     } finally {
       await app.close();
     }

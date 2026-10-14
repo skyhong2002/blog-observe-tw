@@ -5,6 +5,7 @@ import { withJobLease } from '../jobs/lease.ts';
 import { publicSummary } from '../public-post.ts';
 import { iconManifest } from '../v1/favicon-routes.ts';
 import { iconUrl } from '../v1/icons.ts';
+import { PUBLIC_RELATION } from './public-relation.ts';
 import { loadSharedTags } from './shared-tags.ts';
 import { loadProfileTextSimilarity } from './text-similarity-profile.ts';
 import { registerTextSimilarityRoute } from './text-similarity-routes.ts';
@@ -42,12 +43,6 @@ export type RelationDTO = {
   mutual: { sourceBlogId: number; targetBlogId: number; forwardCount: number; reverseCount: number }[];
   coverage: RelationCoverage;
 };
-// Stable source-post / exact target / location identity survives crawler ordinal changes.
-// This only filters public presentation; original observations/discovery evidence are never mutated.
-const PUBLIC_RELATION = `EXISTS (SELECT 1 FROM posts visible_post JOIN blogs visible_blog ON visible_blog.id=visible_post.blog_id
-  WHERE visible_post.id=l.source_post_id AND visible_post.blog_id=l.source_blog_id AND visible_blog.status='verified') AND EXISTS (SELECT 1 FROM relation_observations public_o WHERE public_o.post_id=l.source_post_id AND public_o.last_success_at IS NOT NULL AND public_o.status<>'reparse-pending') AND NOT EXISTS (SELECT 1 FROM admin_relation_overrides hidden_link
-  WHERE hidden_link.source_post_id=l.source_post_id AND hidden_link.target_url_hash=SHA2(l.target_url,256)
-  AND BINARY hidden_link.target_url=BINARY l.target_url AND hidden_link.location=l.location AND hidden_link.hidden=TRUE)`;
 type RelationCache = { revision: number; active: number };
 const relationCaches = new WeakMap<Pool, RelationCache>();
 function cacheFor(pool: Pool): RelationCache {

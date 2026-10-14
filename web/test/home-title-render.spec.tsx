@@ -1,15 +1,21 @@
 /**
- * The real HomePage server component rendered with react-dom/server, to check how publisher article titles are
- * shown: entity references decoded once for display, the result still escaped as text, and the overview payload
- * itself untouched. homeOverview is mocked (no HTTP); the topic ranking, word cloud, blog icons and image element
- * are stubbed because they are not what this checks. Synthetic payload; not a UI or production acceptance.
+ * The real HomePage server component and the masthead's real topic cloud, rendered with react-dom/server and read
+ * back with cheerio. homeOverview and publicJson go through the real readPublic and public-contracts.ts over a fake
+ * gateway (no HTTP), so a malformed or missing `mentions` fails exactly as a gateway 200 would. The left ranking and
+ * the cloud are async Suspense children of the page and are stubbed there; the cloud is then rendered on its own.
+ * Blog icons are stubbed. Synthetic payloads; not a UI or production acceptance.
  */
-import { load } from 'cheerio';
+import { type CheerioAPI, load } from 'cheerio';
 import { renderToString } from 'react-dom/server';
-import { describe, expect, test, vi } from 'vitest';
-import type { Overview } from '@/lib/api';
+import { beforeEach, describe, expect, test, vi } from 'vitest';
+import { taipei } from '@/lib/api';
+import { PublicGatewayError } from '@/lib/public-read';
+import { EMPTY } from './public-payloads.ts';
 
-const overview = vi.hoisted(() => ({ data: null as unknown, calls: 0 }));
+const gateway = vi.hoisted(() => ({
+  bodies: new Map<string, { status: number; body: unknown }>(),
+  paths: [] as string[],
+}));
 
 vi.mock('next/link', async () => {
   const { createElement } = await import('react');
@@ -19,82 +25,318 @@ vi.mock('next/link', async () => {
     useLinkStatus: () => ({ pending: false }),
   };
 });
-vi.mock('@/app/_home/home.module.css', () => ({ default: new Proxy({}, { get: (_, key) => String(key) }) }));
-vi.mock('@/lib/public-api', () => ({
-  homeOverview: async () => {
-    overview.calls++;
-    return overview.data;
-  },
+vi.mock('next/navigation', () => ({
+  usePathname: () => '/',
+  useSearchParams: () => new URLSearchParams(),
+  useRouter: () => ({ push: () => {}, refresh: () => {} }),
 }));
-vi.mock('@/app/_home/HomeTopics', () => ({ default: () => null, HomeTopicsPending: () => null }));
-vi.mock('@/app/_home/MastheadCloud', () => ({ default: () => null }));
+vi.mock('@/app/_home/home.module.css', () => ({ default: new Proxy({}, { get: (_, key) => String(key) }) }));
+vi.mock('@/components/WordCloudView.module.css', () => ({ default: new Proxy({}, { get: (_, key) => String(key) }) }));
+// public-api.ts without `server-only` and the gateway origin: the same publicJson rules over a fake fetch.
+vi.mock('@/lib/public-api', async () => {
+  const { PublicGatewayError, readPublic } = await import('@/lib/public-read');
+  const publicJson = async (path: string) => {
+    gateway.paths.push(path);
+    const result = await readPublic(
+      'https://gateway.invalid',
+      path,
+      async () => {
+        const answer = gateway.bodies.get(path) ?? { status: 404, body: { error: 'not found' } };
+        return new Response(JSON.stringify(answer.body), { status: answer.status, headers: { 'content-type': 'application/json' } });
+      },
+      () => Promise.resolve(),
+    );
+    if (!result.found) throw new PublicGatewayError(path, 404);
+    return result.body;
+  };
+  return { publicJson, homeOverview: () => publicJson('/api/overview?view=home') };
+});
 vi.mock('@/components/BlogIcon', () => ({ default: () => null }));
-vi.mock('@/components/SafeImage', async () => {
-  const { createElement } = await import('react');
-  return { default: ({ src }: { src: string }) => createElement('img', { src, alt: '' }) };
+
+const stubs = vi.hoisted(() => ({ cloud: true }));
+vi.mock('@/app/_home/HomeTopics', async (original) => ({
+  ...(await original<object>()),
+  default: () => null,
+  HomeTopicsPending: () => null,
+}));
+vi.mock('@/app/_home/HomeTopicCloud', async (original) => {
+  const real = await original<{ default: () => Promise<unknown> }>();
+  return { default: (...args: []) => (stubs.cloud ? null : real.default(...args)) };
 });
 
+import HomeTopicCloud from '@/app/_home/HomeTopicCloud';
 import HomePage from '@/app/page';
 
+const OVERVIEW = '/api/overview?view=home';
+const TOPICS = '/api/topics?days=30&view=home';
 const REPORTED = 'She Rarely Reaches Out But Our Chemistry &#038; Sex Are Great';
 const SHOWN = 'She Rarely Reaches Out But Our Chemistry & Sex Are Great';
-const post = (id: number, title: string) => ({
-  id,
-  title,
-  url: `https://a.example/p/${id}`,
-  summary: '摘要',
-  author: '甲',
-  publishedAt: '2026-10-13T00:00:00.000Z',
-  imageUrl: `https://a.example/i/${id}.jpg`,
-  blogSlug: 'a',
-  blogName: '甲',
+const PUBLISHED = '2026-10-13T00:00:00.000Z';
+const mention = (patch: object = {}) => ({
+  postId: 20875,
+  postTitle: REPORTED,
+  postUrl: 'https://a.example/p/1',
+  publishedAt: PUBLISHED,
+  sourceBlogId: 1,
+  sourceBlogSlug: 'a',
+  sourceBlogName: '甲',
+  sourceIconUrl: null,
+  targetBlogId: 2,
+  targetBlogSlug: 'b',
+  targetBlogName: '乙',
+  targetHomeUrl: 'https://b.example/',
+  targetDomain: 'b.example',
+  targetIconUrl: null,
+  evidenceType: 'direct-link',
+  location: 'body',
+  anchor: '乙的文章 <b>x</b>',
+  context: '這裡提到乙 <script>alert(1)</script>。',
+  observedAt: '2026-10-13T06:00:00.000Z',
+  matchVersion: 'relations-v3',
+  contextSource: 'body',
+  ...patch,
 });
-const data = (): Overview =>
-  ({
-    view: 'home',
-    posts: [post(1, REPORTED), post(2, `${REPORTED} <b>2</b>`)],
-    tags: [],
-    authors: [],
-    blogs: [],
-    recentBlogs: [
-      {
-        slug: 'a',
-        name: '甲',
-        latestPost: { id: 3, title: `${REPORTED} &amp;#038;`, url: 'https://a.example/p/3', publishedAt: '2026-10-13T00:00:00.000Z' },
-      },
-    ],
-    totals: { blogs: 1, posts: 3 },
-    updatedAt: null,
-  }) as unknown as Overview;
+const mentions = (items: object[], patch: object = {}) => ({
+  ...(EMPTY.homeOverview as { mentions: object }).mentions,
+  items,
+  ...patch,
+});
+const overview = (patch: object = {}) => ({
+  ...(EMPTY.homeOverview as object),
+  recentBlogs: [
+    {
+      slug: 'c',
+      name: '丙',
+      latestPost: { id: 3, title: `${REPORTED} &amp;#038;`, url: 'https://c.example/p/3', publishedAt: PUBLISHED },
+    },
+  ],
+  totals: { blogs: 3, posts: 30 },
+  ...patch,
+});
+const answer = (path: string, body: unknown, status = 200) => gateway.bodies.set(path, { status, body });
+const renderHome = async () => load(renderToString(await HomePage()));
+const headings = ($: CheerioAPI) =>
+  $('h2')
+    .map((_, el) => $(el).text())
+    .get();
 
-describe('homepage article titles', () => {
-  test('lead, story and recent-blog titles (and their image labels) are decoded once and stay escaped text', async () => {
-    overview.data = data();
-    const before = structuredClone(overview.data);
-    const $ = load(renderToString(await HomePage()));
-    expect(overview.calls).toBe(1);
+beforeEach(() => {
+  gateway.bodies.clear();
+  gateway.paths = [];
+  stubs.cloud = true;
+});
 
-    // Lead: heading link and the hero image's aria-label.
-    const lead = $('a[href="https://a.example/p/1"]');
-    expect(lead.filter((_, el) => $(el).text() === SHOWN).length).toBe(1);
-    expect(lead.filter((_, el) => $(el).attr('aria-label') === `閱讀：${SHOWN}`).length).toBe(1);
+describe('homepage centre: body citations', () => {
+  test('one row per article→blog link: decoded title linked out, target blog and domain, label, date; details as text', async () => {
+    const before = overview({
+      mentions: mentions([
+        mention(),
+        // The reverse direction is its own row with its own date, never merged into an exchange.
+        mention({
+          postId: 30001,
+          postTitle: '乙回應甲',
+          postUrl: 'https://b.example/p/9',
+          publishedAt: '2026-07-01T00:00:00.000Z',
+          sourceBlogId: 2,
+          sourceBlogSlug: 'b',
+          sourceBlogName: '乙',
+          targetBlogId: 1,
+          targetBlogSlug: 'a',
+          targetBlogName: '甲',
+          targetHomeUrl: 'https://a.example/',
+          targetDomain: 'a.example',
+        }),
+        // No safe URL from the gateway: the title is text, never a link.
+        mention({ postId: 40001, postTitle: 'Unsafe', postUrl: null, publishedAt: null }),
+      ]),
+    });
+    answer(OVERVIEW, before);
+    const snapshot = structuredClone(before);
+    const $ = await renderHome();
+    expect(gateway.paths).toEqual([OVERVIEW]);
+    const rows = $('[data-mention]');
+    expect(rows.length).toBe(3);
 
-    // Story: literal markup in the title stays visible text, not an element.
-    const story = $('a[href="https://a.example/p/2"]');
-    expect(story.filter((_, el) => $(el).text() === `${SHOWN} <b>2</b>`).length).toBe(1);
-    expect(story.find('b').length).toBe(0);
-    expect(story.filter((_, el) => $(el).attr('aria-label') === `閱讀：${SHOWN} <b>2</b>`).length).toBe(1);
+    const first = rows.eq(0);
+    const title = first.find('h3 a');
+    expect(title.text()).toBe(SHOWN);
+    expect(title.attr('href')).toBe('https://a.example/p/1');
+    expect(title.attr('data-analytics')).toBe('open_original');
+    expect(title.attr('rel')).toBe('noopener noreferrer');
+    const meta = first.find('p').filter((_, el) => $(el).text().includes('正文直接連結'));
+    expect(meta.text()).toContain('乙');
+    expect(first.find('[data-target-domain]').text()).toBe('b.example');
+    expect(first.find(`time[datetime="${PUBLISHED}"]`).text()).toBe(taipei(PUBLISHED));
+    // Internal blog links keep the stable slug path, never prefetch.
+    expect(first.find('a[href="/blogs/a/"]').attr('data-prefetch')).toBe('false');
+    expect(first.find('a[href="/blogs/b/"]').attr('data-prefetch')).toBe('false');
+    // Evidence details are closed, plain text: no anchor/context markup becomes an element.
+    const details = first.find('details');
+    expect(details.attr('open')).toBeUndefined();
+    expect(details.text()).toContain('連結文字：「乙的文章 <b>x</b>」');
+    expect(details.text()).toContain('上下文：「這裡提到乙 <script>alert(1)</script>。」');
+    expect(details.text()).toContain(`觀測 ${taipei('2026-10-13T06:00:00.000Z')} · 解析版本 relations-v3 · 上下文來源 文章正文`);
+    expect(details.find('b, script').length).toBe(0);
 
-    // Recent blogs: text and title attribute, decoded exactly once.
-    const recent = $('a[href="https://a.example/p/3"]');
+    expect(rows.eq(1).find('h3 a').attr('href')).toBe('https://b.example/p/9');
+    expect(rows.eq(1).find('[data-target-domain]').text()).toBe('a.example');
+    expect(rows.eq(1).find('time').attr('datetime')).toBe('2026-07-01T00:00:00.000Z');
+    expect(rows.eq(2).find('h3 a').length).toBe(0);
+    expect(rows.eq(2).find('h3').text()).toBe('Unsafe');
+    expect(rows.eq(2).text()).toContain('發文日期不明');
+
+    // The rows come first: the long method text lives in the page's method disclosure (FooterMethod, tested below).
+    const centre = $('section[aria-label="最近的正文引用"]');
+    expect(centre.children().eq(1).hasClass('storyList')).toBe(true);
+    expect(centre.text()).not.toMatch(/交流|互惠|抄襲|側欄、Blogroll/);
+    expect(centre.text()).not.toContain('只列最近');
+    // The payload is untouched.
+    expect(before).toEqual(snapshot);
+  });
+
+  test('the three retired blocks are gone; the right sidebar and its recent-blog title stay', async () => {
+    answer(OVERVIEW, overview({ mentions: mentions([mention()]) }));
+    const $ = await renderHome();
+    const h2 = headings($);
+    for (const gone of ['最新文章', '我的閱讀', '沿著連結，認識新部落格']) expect(h2, gone).not.toContain(gone);
+    expect($('body').text()).not.toContain('最近發文');
+    expect($('[class~="hero"], [class~="band"]').length).toBe(0);
+    expect(h2).toEqual(expect.arrayContaining(['最近共同話題', '作者動態', '最近的正文引用', '部落格觀察', '最新更新的部落格']));
+    // The left column now lists only the shared vocabulary's rank, so the old RSS/vocabulary split line is gone.
+    expect($('body').text()).toContain('只列共同關鍵字詞庫的話題。');
+    expect($('body').text()).not.toContain('RSS 標籤與共同詞彙分開列出');
+    const recent = $('a[href="https://c.example/p/3"]');
     expect(recent.text()).toBe(`${SHOWN} &#038;`);
     expect(recent.attr('title')).toBe(`${SHOWN} &#038;`);
+    // The mark and tagline render with the overview, before any topic read.
+    expect($('h1#masthead').length).toBe(1);
+    expect($('body').text()).toContain('每一種生活，各自怎麼寫');
+  });
 
-    const html = $.html();
-    expect(html).not.toContain('&amp;#038; Sex');
-    expect(html).toContain('&lt;b&gt;2&lt;/b&gt;');
-    // The payload a later read or search would use is unchanged.
-    expect(overview.data).toEqual(before);
-    expect((overview.data as Overview).posts[0].title).toBe(REPORTED);
+  test('truncated says only the latest 8; a true empty 90-day window is said as such, not as no links at all', async () => {
+    answer(OVERVIEW, overview({ mentions: mentions([mention()], { truncated: true }) }));
+    expect((await renderHome())('section[aria-label="最近的正文引用"] a.more').text()).toContain('只列最近 8 筆 · 看全站關係圖');
+    answer(OVERVIEW, overview());
+    const $ = await renderHome();
+    expect($('[data-mention]').length).toBe(0);
+    expect($('section[aria-label="最近的正文引用"] p.notice').text()).toBe('近 90 天沒有可列出的正文直接引用；這不代表各站之間沒有連結。');
+  });
+
+  const failures: Array<[string, () => void]> = [
+    ['missing mentions', () => answer(OVERVIEW, { ...overview(), mentions: undefined })],
+    ['mentions without items', () => answer(OVERVIEW, overview({ mentions: mentions([], { items: undefined }) }))],
+    ['a shared-tag row', () => answer(OVERVIEW, overview({ mentions: mentions([mention({ evidenceType: 'shared-tag' })]) }))],
+    ['a sidebar row', () => answer(OVERVIEW, overview({ mentions: mentions([mention({ location: 'sidebar' })]) }))],
+    ['a numeric title', () => answer(OVERVIEW, overview({ mentions: mentions([mention({ postTitle: 1 })]) }))],
+    // contextSource is the public enum 'body'; an internal extraction id or digest is not a public answer.
+    [
+      'an internal extraction contextSource',
+      () => answer(OVERVIEW, overview({ mentions: mentions([mention({ contextSource: 'article-html' })]) })),
+    ],
+    ['a digest contextSource', () => answer(OVERVIEW, overview({ mentions: mentions([mention({ contextSource: 'a'.repeat(64) })]) }))],
+    ['a non-text canonical path', () => answer(OVERVIEW, overview({ mentions: mentions([mention({ targetBlogCanonicalPath: 1 })]) }))],
+    ['a 503 twice', () => answer(OVERVIEW, { error: 'busy' }, 503)],
+  ];
+  for (const [name, setup] of failures)
+    test(`${name}: the page read throws, never an empty centre`, async () => {
+      setup();
+      await expect(HomePage()).rejects.toBeInstanceOf(PublicGatewayError);
+    });
+
+  test("readable canonical paths, when sent, are both rows' blog links; absent keeps the slug path", async () => {
+    answer(
+      OVERVIEW,
+      overview({
+        mentions: mentions([
+          mention({ sourceBlogCanonicalPath: '/blogs/a.example/', targetBlogCanonicalPath: '/blogs/b.example/' }),
+          mention({ postId: 2, targetBlogId: 3, targetBlogSlug: 'c', targetBlogName: '丙', targetDomain: 'c.example' }),
+        ]),
+      }),
+    );
+    const $ = await renderHome();
+    const [withPaths, legacy] = [$('[data-mention="20875:2"]'), $('[data-mention="2:3"]')];
+    expect(withPaths.find('a[href="/blogs/a.example/"]').text()).toBe('甲');
+    expect(withPaths.find('a[href="/blogs/b.example/"]').text()).toBe('乙');
+    expect(withPaths.find('a[href="/blogs/a/"], a[href="/blogs/b/"]').length).toBe(0);
+    expect(legacy.find('a[href="/blogs/a/"]').text()).toBe('甲');
+    expect(legacy.find('a[href="/blogs/c/"]').text()).toBe('丙');
+    $('[data-mention] a[href^="/"]').each((_, el) => {
+      expect($(el).attr('data-prefetch')).toBe('false');
+    });
+  });
+});
+
+describe('homepage method disclosure', () => {
+  test("the citation rows' selection rules live in the closed 本頁的資料來源與計算方式 block", async () => {
+    const { default: FooterMethod } = await import('@/components/FooterMethod');
+    const $ = load(renderToString(<FooterMethod />));
+    const block = $('details');
+    expect(block.length).toBe(1);
+    expect(block.attr('open')).toBeUndefined();
+    expect(block.children('summary').text()).toContain('本頁的資料來源與計算方式');
+    const text = $('#method').text();
+    expect(text).toContain('近 90 天文章正文裡直接連到其他已收錄部落格的連結，依發文時間列出最近 8 筆');
+    expect(text).toContain('兩個方向各自成列並保留各自的日期');
+    expect(text).toContain('側欄、Blogroll、留言、共同標籤與文字相似都不列入，也不代表雙方交流');
+    expect(text).toContain('最近共同話題與首頁文字雲只取近 30 天共同關鍵字詞庫的排行');
+  });
+});
+
+describe('masthead cloud: the local 30-day topic ranking only', () => {
+  const topic = (i: number, patch: object = {}) => ({
+    id: `tag:${String(i).padStart(64, '0')}`,
+    label: `話題${i}`,
+    source: 'tag-vocabulary',
+    score: 1,
+    posts: i + 2,
+    blogs: 2,
+    ...patch,
+  });
+  const topics = (items: object[]) => ({ ...(EMPTY.homeTopics as object), items });
+
+  test('words link to topics (canonical path when sent), from the same path as the ranking; no raw tag links', async () => {
+    stubs.cloud = false;
+    answer(
+      TOPICS,
+      topics([
+        topic(1, { canonicalPath: '/topics/%E8%A9%B1%E9%A1%8C1/' }),
+        topic(2),
+        // The home contract accepts these rows, but only the approved tag pool may become words.
+        topic(3, { id: 'rss:3', label: 'RSS分類詞', source: 'rss-category' }),
+      ]),
+    );
+    const $ = load(renderToString(await HomeTopicCloud()));
+    expect(gateway.paths).toEqual([TOPICS]);
+    expect($('body').text()).not.toContain('RSS分類詞');
+    expect($('a[aria-label^="RSS分類詞"]').length).toBe(0);
+    const hrefs = $('a')
+      .map((_, el) => $(el).attr('href'))
+      .get();
+    expect(hrefs).toContain('/topics/%E8%A9%B1%E9%A1%8C1/');
+    expect(hrefs.some((h) => h.startsWith('/topics/'))).toBe(true);
+    expect(hrefs.some((h) => h.includes('/tags/?tag='))).toBe(false);
+    expect($('a[aria-label^="話題1，近 30 天 3 篇文章"]').length).toBeGreaterThan(0);
+  });
+
+  test('an empty ranking is said as empty (no words, no fallback); a failed read throws like the ranking', async () => {
+    stubs.cloud = false;
+    answer(TOPICS, topics([]));
+    const $ = load(renderToString(await HomeTopicCloud()));
+    expect($('[data-cloud-state="empty"]').text()).toBe('近 30 天尚無足夠的共同話題可以畫成文字雲。');
+    expect($('a, svg').length).toBe(0);
+    answer(TOPICS, { error: 'busy' }, 503);
+    await expect(HomeTopicCloud()).rejects.toBeInstanceOf(PublicGatewayError);
+    answer(TOPICS, EMPTY.topics);
+    await expect(HomeTopicCloud()).rejects.toBeInstanceOf(PublicGatewayError);
+    // Malformed counts, provenance or display gate: a failed read, not a fake empty cloud.
+    for (const body of [
+      topics([topic(1, { posts: -1 })]),
+      topics([topic(1, { blogs: '2' })]),
+      topics([topic(1, { source: 'other' })]),
+      { ...topics([topic(1)]), matchingPolicy: { version: 'm', displayGate: { reason: 'x' } } },
+    ]) {
+      answer(TOPICS, body);
+      await expect(HomeTopicCloud(), JSON.stringify(body)).rejects.toBeInstanceOf(PublicGatewayError);
+    }
   });
 });

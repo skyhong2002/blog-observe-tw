@@ -68,6 +68,49 @@ export type Overview = {
   totals: { blogs: number; posts: number };
   updatedAt: string | null;
 };
+/**
+ * One row of the homepage's body citations (app/src/relations/home-feed.ts loadHomeMentions): an article that
+ * links, in its body, to another collected blog. Only direct body links; never shared tags or text similarity.
+ * The target is a blog (and its domain), not a guessed target article. anchor/context are plain text.
+ */
+export type HomeMention = {
+  postId: number;
+  postTitle: string;
+  postUrl: string | null;
+  publishedAt: string | null;
+  sourceBlogId: number;
+  sourceBlogSlug: string;
+  sourceBlogName: string;
+  /** Readable page paths from the gateway's enrichment; absent on older answers (blogLink falls back to the slug). */
+  sourceBlogCanonicalPath?: string;
+  sourceIconUrl: string | null;
+  targetBlogId: number;
+  targetBlogSlug: string;
+  targetBlogName: string;
+  targetBlogCanonicalPath?: string;
+  targetHomeUrl: string | null;
+  targetDomain: string | null;
+  targetIconUrl: string | null;
+  evidenceType: 'direct-link';
+  location: 'body';
+  anchor: string;
+  context: string;
+  observedAt: string | null;
+  matchVersion: string;
+  /** Public enum: the context was taken from the article body. Never an internal extraction id. */
+  contextSource: 'body';
+};
+export type HomeMentions = {
+  days: 90;
+  evidenceType: 'direct-link';
+  location: 'body';
+  limit: 8;
+  truncated: boolean;
+  generatedAt: string;
+  items: HomeMention[];
+};
+/** /api/overview?view=home: the overview's shape (posts and tags now empty) plus the body citations. */
+export type HomeOverview = Overview & { view: 'home'; mentions: HomeMentions };
 export type CatalogQuery = { q?: string; category?: string; status?: string; sort?: string; dir?: string; page?: string; limit?: string };
 export type Catalog = {
   blogs: Blog[];

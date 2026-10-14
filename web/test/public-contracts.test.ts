@@ -279,6 +279,155 @@ test('contracts: the homepage answers are their own kinds, full at their bounds'
   assert.equal(validPublicPayload('topics', homeTopics), false);
 });
 
+// Synthetic body citation (app/src/relations/home-feed.ts row shape); no real article or blog.
+const HOME_MENTION = {
+  postId: 20875,
+  postTitle: 'Chemistry &#038; Sex',
+  postUrl: 'https://a.example/p/1',
+  publishedAt: '2026-10-10T00:00:00.000Z',
+  sourceBlogId: 1,
+  sourceBlogSlug: 'a',
+  sourceBlogName: '甲',
+  sourceIconUrl: null,
+  targetBlogId: 2,
+  targetBlogSlug: 'b',
+  targetBlogName: '乙',
+  targetHomeUrl: 'https://b.example/',
+  targetDomain: 'b.example',
+  targetIconUrl: '/favicons/b.png',
+  evidenceType: 'direct-link',
+  location: 'body',
+  anchor: '乙',
+  context: '提到乙。',
+  observedAt: '2026-10-11T00:00:00.000Z',
+  matchVersion: 'relations-v3',
+  contextSource: 'body',
+};
+const MENTIONS = (EMPTY.homeOverview as { mentions: Record<string, unknown> }).mentions;
+
+test('contracts: the home overview requires its body citations; empty is valid, missing or malformed is not', () => {
+  const full = with_('homeOverview', 'mentions', { ...MENTIONS, items: many(8, HOME_MENTION), truncated: true });
+  assert.equal(validPublicPayload('homeOverview', full), true);
+  assert.equal(validPublicPayload('homeOverview', with_('homeOverview', 'mentions', MENTIONS)), true, 'a true empty window');
+  // Nullable public fields (no safe URL, unknown date, no icon/domain) still pass.
+  const nulls = {
+    ...HOME_MENTION,
+    postUrl: null,
+    publishedAt: null,
+    targetHomeUrl: null,
+    targetDomain: null,
+    targetIconUrl: null,
+    observedAt: null,
+  };
+  assert.equal(validPublicPayload('homeOverview', with_('homeOverview', 'mentions', { ...MENTIONS, items: [nulls] })), true);
+  // Readable page paths from the gateway's enrichment are optional text.
+  const paths = { ...HOME_MENTION, sourceBlogCanonicalPath: '/blogs/a.example/', targetBlogCanonicalPath: '/blogs/b.example/' };
+  assert.equal(validPublicPayload('homeOverview', with_('homeOverview', 'mentions', { ...MENTIONS, items: [paths] })), true);
+  const bad: unknown[] = [
+    undefined,
+    null,
+    [],
+    { ...MENTIONS, items: undefined },
+    { ...MENTIONS, items: {} },
+    { ...MENTIONS, items: many(9, HOME_MENTION) },
+    { ...MENTIONS, days: 30 },
+    { ...MENTIONS, limit: 20 },
+    { ...MENTIONS, evidenceType: 'shared-tag' },
+    { ...MENTIONS, location: 'sidebar' },
+    { ...MENTIONS, truncated: 'false' },
+    { ...MENTIONS, generatedAt: undefined },
+    ...[
+      { evidenceType: 'shared-tag' },
+      { evidenceType: 'text-similarity' },
+      { location: 'blogroll' },
+      { postId: '20875' },
+      { postTitle: null },
+      { postUrl: 1 },
+      { sourceBlogSlug: undefined },
+      { targetBlogName: undefined },
+      { targetDomain: {} },
+      { anchor: undefined },
+      { context: 'x'.repeat(241) },
+      { context: null },
+      { matchVersion: undefined },
+      { contextSource: undefined },
+      // Public enum only: not an internal extraction id or a digest.
+      { contextSource: 'article-html' },
+      { contextSource: 'a'.repeat(64) },
+      { sourceBlogCanonicalPath: 1 },
+      { targetBlogCanonicalPath: null },
+    ].map((patch) => ({ ...MENTIONS, items: [{ ...HOME_MENTION, ...patch }] })),
+  ];
+  for (const mentions of bad)
+    assert.equal(validPublicPayload('homeOverview', with_('homeOverview', 'mentions', mentions)), false, JSON.stringify(mentions));
+  // The full overview never had citations and is still valid without them.
+  assert.equal(validPublicPayload('overview', EMPTY.overview), true);
+});
+
+// matchingPolicy.displayGate as topics/routes.ts reports it (synthetic copy).
+const DISPLAY_GATE = {
+  version: 'tag-broad-window-title-only-v1',
+  upstream: 'tag.observe.tw/qualifyTagMedia/broad',
+  minimumSources: 3,
+  minimumTwiceSources: 2,
+  minimumPeakPosts: 3,
+  documentFrequencyRatio: 0.02,
+  reason: 'high-window-document-frequency-title-only',
+  effect: 'ranking-body-evidence-only;source-pool-and-historical-pages-retained',
+};
+const TOPIC_ROW = { id: 'tag:1', label: '旅行', source: 'tag-vocabulary', score: 1, posts: 2, blogs: 2 };
+
+test('contracts: topic rows carry valid counts and provenance; a sent display gate is complete and in range', () => {
+  for (const kind of ['topics', 'blogTopics', 'homeTopics'] as const) {
+    assert.equal(
+      validPublicPayload(kind, with_(kind, 'items', [TOPIC_ROW, { ...TOPIC_ROW, id: 'rss:1', source: 'rss-category' }])),
+      true,
+      kind,
+    );
+    // Legacy: no matchingPolicy, or one without a gate.
+    assert.equal(validPublicPayload(kind, with_(kind, 'matchingPolicy', undefined)), true, kind);
+    assert.equal(validPublicPayload(kind, with_(kind, 'matchingPolicy', { version: 'm' })), true, kind);
+    assert.equal(validPublicPayload(kind, with_(kind, 'matchingPolicy', { version: 'm', displayGate: DISPLAY_GATE })), true, kind);
+    for (const row of [
+      { ...TOPIC_ROW, posts: -1 },
+      { ...TOPIC_ROW, posts: 1.5 },
+      { ...TOPIC_ROW, posts: '2' },
+      { ...TOPIC_ROW, blogs: undefined },
+      { ...TOPIC_ROW, blogs: Number.NaN },
+      { ...TOPIC_ROW, source: undefined },
+      { ...TOPIC_ROW, source: 'unknown' },
+    ])
+      assert.equal(validPublicPayload(kind, with_(kind, 'items', [row])), false, `${kind} ${JSON.stringify(row)}`);
+    for (const gate of [
+      null,
+      'gate',
+      { ...DISPLAY_GATE, version: '' },
+      { ...DISPLAY_GATE, upstream: '  ' },
+      { ...DISPLAY_GATE, reason: undefined },
+      { ...DISPLAY_GATE, effect: 1 },
+      { ...DISPLAY_GATE, minimumSources: 0 },
+      { ...DISPLAY_GATE, minimumTwiceSources: -2 },
+      { ...DISPLAY_GATE, minimumPeakPosts: 2.5 },
+      { ...DISPLAY_GATE, documentFrequencyRatio: 0 },
+      { ...DISPLAY_GATE, documentFrequencyRatio: 1.5 },
+      { ...DISPLAY_GATE, documentFrequencyRatio: Number.POSITIVE_INFINITY },
+      { ...DISPLAY_GATE, documentFrequencyRatio: '0.02' },
+    ])
+      assert.equal(
+        validPublicPayload(kind, with_(kind, 'matchingPolicy', { version: 'm', displayGate: gate })),
+        false,
+        `${kind} ${JSON.stringify(gate)}`,
+      );
+    assert.equal(validPublicPayload(kind, with_(kind, 'matchingPolicy', 'policy')), false, kind);
+  }
+  // The topic detail page states the same gate, so it is checked there too.
+  assert.equal(validPublicPayload('topic', with_('topic', 'matchingPolicy', { version: 'm', displayGate: DISPLAY_GATE })), true);
+  assert.equal(
+    validPublicPayload('topic', with_('topic', 'matchingPolicy', { displayGate: { ...DISPLAY_GATE, minimumSources: 0 } })),
+    false,
+  );
+});
+
 test('contracts: a full payload cannot pass for a homepage one, nor a malformed compact one', () => {
   // The full answers, as /api/overview and /api/topics?days=30 send them: no view mark, full bounds, vocabulary.
   assert.equal(validPublicPayload('homeOverview', EMPTY.overview), false);

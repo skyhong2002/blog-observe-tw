@@ -45,12 +45,40 @@ test('home: the topic list reads view=home itself, lets failures throw, and keep
   const api = source('lib/public-api.ts');
   assert.match(api, /const read = cache\(\(path: string\) => readPublic\(gatewayOrigin\(\), path\)\);/);
   assert.match(api, /export const overview = \(\) => publicJson<Overview>\('\/api\/overview'\);/);
-  assert.match(api, /export const homeOverview = \(\) => publicJson<Overview>\(HOME_OVERVIEW_PATH\);/);
+  assert.match(api, /export const homeOverview = \(\) => publicJson<HomeOverview>\(HOME_OVERVIEW_PATH\);/);
   assert.doesNotMatch(api, /unstable_cache|revalidate|new Map/);
   // The full pages keep the full reads.
   for (const page of ['app/ranking/page.tsx', 'app/articles/page.tsx', 'app/tags/page.tsx'])
     assert.match(source(page), /await overview\(\)/, page);
   assert.doesNotMatch(source('components/public/TopicRanking.tsx'), /view=home|homeTopicsApiPath/);
+});
+
+test('clouds: drawn from the local topic ranking only, one shared path each, streamed without holding the masthead', () => {
+  const page = source('app/page.tsx');
+  // The mark/tagline render with the overview; the cloud is a Suspense slot, not awaited by the page.
+  assert.match(
+    page,
+    /<MastheadCloud\s+edition=\{updated\}\s+cloud=\{\s*<Suspense fallback=\{null\}>\s*<HomeTopicCloud \/>\s*<\/Suspense>\s*\}\s*\/>/,
+  );
+  assert.doesNotMatch(page, /data\.tags|data\.posts|NewsImage/);
+  const masthead = source('app/_home/MastheadCloud.tsx');
+  assert.doesNotMatch(masthead, /\/tags\/\?tag=|Overview\['tags'\]|postCount|blogCount|publicJson|await/);
+  // Homepage cloud and ranking read the identical path, so public-api.ts's per-request cache makes one read.
+  const cloud = source('app/_home/HomeTopicCloud.tsx');
+  assert.match(cloud, /const topics = await publicJson<HomeTopics>\(homeTopicsApiPath\('30'\)\);/);
+  assert.match(source('app/_home/HomeTopics.tsx'), /publicJson<HomeTopics>\(homeTopicsApiPath\('30'\)\)/);
+  assert.doesNotMatch(cloud, /\btry\b|\.catch\(|data\.tags|\/tags\//);
+  // Profile: list and cloud share blogTopicsApiPath; the client profile only receives a server slot.
+  assert.match(source('components/BlogTopicCloud.tsx'), /publicJsonOrNull<Topics>\(blogTopicsApiPath\(slug\)\)/);
+  assert.match(source('components/BlogTopics.tsx'), /publicJsonOrNull<Topics>\(blogTopicsApiPath\(slug\)\)/);
+  const profile = source('components/SourceProfile.tsx');
+  assert.doesNotMatch(profile, /MediaWordCloud|publicJson|blogTopicsApiPath/);
+  assert.match(
+    source('app/blogs/[slug]/page.tsx'),
+    /cloud=\{\s*<Suspense fallback=\{<MediaWordCloudPending \/>\}>\s*<BlogTopicCloud slug=\{blog\.slug\} \/>\s*<\/Suspense>\s*\}/,
+  );
+  for (const path of ['components/MediaWordCloud.tsx', 'lib/topic-cloud.ts'])
+    assert.doesNotMatch(source(path), /\/tags\/\?tag=|postCount|Tag\b/, path);
 });
 
 /** Every class string that sets text-zinc-500 also sets a dark text colour (dark:text-zinc-400 where it was missing). */

@@ -1,7 +1,8 @@
+import type { ReactNode } from 'react';
 import Logo from '@/components/Logo';
 import Link from '@/components/NoPrefetchLink';
 import WordCloud from '@/components/WordCloud';
-import type { Overview } from '@/lib/api';
+import type { TopicCloudWord } from '@/lib/topic-cloud';
 
 import styles from './home.module.css';
 
@@ -98,31 +99,19 @@ const frameVars = Object.fromEntries(
   ]),
 ) as React.CSSProperties;
 
-/** The home page's opening: the site mark in the middle of the 正在發酵 cloud,
- *  the day's rising keywords packed around it. SiteHeader hides its own
- *  wordmark while #masthead is in view, so one logo shows at a time. */
-export default function MastheadCloud({ edition, tags }: { edition: string; tags: Overview['tags'] }) {
+/** The words around the mark: the 30-day local topic ranking only (HomeTopicCloud), never raw RSS tags. */
+export function MastheadWords({ words }: { words: TopicCloudWord[] }) {
+  return <WordCloud canvases={layouts} label="近 30 天共同話題文字雲" title="依近 30 天共同話題的文章數呈現" words={words} />;
+}
+
+/** The home page's opening: the site mark in the middle of the topic cloud. The mark, tagline and edition line
+ *  render at once; `cloud` is an optional streamed slot (a Suspense around HomeTopicCloud), so the masthead never
+ *  waits for the topic read. SiteHeader hides its own wordmark while #masthead is in view. */
+export default function MastheadCloud({ edition, cloud }: { edition: string; cloud?: ReactNode }) {
   return (
     <div className={styles.mastheadCloud}>
       <div className={styles.mastheadCloudFrame} style={frameVars} data-vital-region="home-growth-cloud">
-        <WordCloud
-          canvases={layouts}
-          label="部落格標籤文字雲"
-          title="依已收錄文章與部落格數呈現"
-          words={tags.slice(0, 30).map((tag) => ({
-            label: tag.label,
-            ariaLabel: `${tag.label}，${tag.postCount} 篇文章，${tag.blogCount} 個部落格`,
-            count: Math.max(tag.postCount, tag.blogCount, 1),
-            href: `/tags/?tag=${encodeURIComponent(tag.slug)}`,
-            tone: 'brand',
-            card: {
-              rows: [
-                ['收錄文章', `${tag.postCount} 篇`],
-                ['部落格', `${tag.blogCount} 個`],
-              ],
-            },
-          }))}
-        />
+        {cloud}
         <div className={styles.mastheadCloudCentre}>
           <h1 id="masthead">
             <Logo className={styles.mastheadCloudMark} />
