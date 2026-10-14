@@ -41,6 +41,8 @@ export const API_INTRO = {
     '正文提及是交流訊號，不是抄襲或背書判斷。引用占比的分母為來源站在窗口內所有已解析、指向已收錄目標的「文章—目標部落格」提及數；一篇提及三站會計三筆，不是占全站文章的百分比。覆蓋與截斷欄位應與排行一起閱讀。',
     '話題詞條以新文易數維護的標籤池為唯一來源；目前 observed-article-window 僅代表觀測窗口內出現的詞，不代表完整詞庫。NFKC 與大小寫正規化後合併，顯示文字取同快照中上游文章出現次數最多的寫法。只比對標題與清理後正文；同篇取標題權重 2 或正文權重 1，依權重由高到低排列後，同站後續文章貢獻依序乘上 0.5。只命中正文時即 1、0.5、0.25…；2 篇標題加 1 篇正文合計 3.25。排除詞保留原始資料與原因，可透過話題詳情查詢；RSS 分類不另建排行詞庫。',
     '排行另使用新文易數 broad 門檻（至少三站、兩站各兩篇且一站三篇），配合既有文件頻率門檻。若詞在查詢窗口內超過 2% 公開文章命中，排行只計標題證據；原詞、正文命中與歷史話題頁保留。`matchingPolicy.displayGate` 記錄門檻與來源，`matchingReason=high-window-document-frequency-title-only` 可查核正文降權原因；此規則不改原 matcher／policy 版本，也不是另建通用詞黑名單。',
+    '若跨站詞在長期基準中少於三分之一命中文章出現在標題，熱門排行另要求至少兩個公開部落格的文章原站標籤／分類明確使用該詞；否則僅退出排行和文字雲，保留詞庫、比對、話題頁與歷史證據。`matchingPolicy.displayGate.background` 記錄門檻。這是全詞統一的背景詞品質規則，不含硬編的排除詞清單。',
+    'coverage.matchedPosts 是依既有高頻詞標題／正文規則認定的有效比對文章數，包含因跨站不足或背景詞品質退出熱門排行的文章；不是所有原始 topic_matches 紀錄數。高頻詞僅正文命中不計入此有效比對統計，但原索引與歷史證據仍保留。',
   ],
   quickstart: [
     {
@@ -364,8 +366,18 @@ topicDetailProperties.history = ref('TopicHistory');
     documentFrequencyRatio: num('查詢窗口內高文件頻率門檻，目前 0.02'),
     reason: str('high-window-document-frequency-title-only'),
     effect: str('只影響排行的正文貢獻；保留來源池及歷史證據'),
+    background: obj(
+      {
+        maximumTitleShare: num('長期基準標題命中占比門檻，目前三分之一'),
+        minimumBaselinePosts: int('至少三篇基準命中文章'),
+        minimumNativeBlogs: int('至少兩個公開部落格的原站分類／標籤'),
+        reason: str('body-dominant-without-native-label-consensus'),
+      },
+      '選用的背景詞原站分類佐證門檻',
+    ),
   },
   '選用的排行展示品質門檻',
+  ['background'],
 );
 for (const [schema, pathField] of [
   [topicDetailProperties.topic, 'canonicalPath'],

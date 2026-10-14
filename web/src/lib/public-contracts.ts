@@ -54,6 +54,15 @@ const displayGate = (value: unknown) =>
     minimumTwiceSources: positive,
     minimumPeakPosts: positive,
     documentFrequencyRatio: (v) => number(v) && (v as number) > 0 && (v as number) <= 1,
+    // Optional on older gateways; when sent, every field the method notes state is present and in range.
+    background: optional((v) =>
+      shape(v, {
+        maximumTitleShare: (r) => number(r) && (r as number) >= 0 && (r as number) <= 1,
+        minimumBaselinePosts: positive,
+        minimumNativeBlogs: positive,
+        reason: nonEmpty,
+      }),
+    ),
   });
 const matchingPolicy = optional((value) => object(value) && optional(displayGate)(value.displayGate));
 
@@ -199,6 +208,9 @@ const homeOverview = (raw: unknown) =>
  * /api/topics?view=home (topics/routes.ts): marked view 'home', the top `limit` (8) of the shared vocabulary with
  * at least two blogs, and none of the full ranking's vocabulary or coverage, so a full payload cannot pass for it.
  */
+const homeTopicRow = { id: text, label: text, canonicalPath: optional(text), source: topicSource, posts: count, blogs: count };
+/** The masthead cloud's longer slice of the same ranked pool (at most 30); absent on older gateways. */
+const HOME_CLOUD_LIMIT = 30;
 const homeTopics = (raw: unknown) => {
   if (
     !shape(raw, {
@@ -207,15 +219,9 @@ const homeTopics = (raw: unknown) => {
       cacheSeconds: (v) => v === 0,
       days: count,
       source: (v) => v === 'tag-vocabulary',
-      items: (items) =>
-        rows(items, {
-          id: text,
-          label: text,
-          canonicalPath: optional(text),
-          source: topicSource,
-          posts: count,
-          blogs: count,
-        }),
+      items: (items) => rows(items, homeTopicRow),
+      cloudItems: optional((items) => rows(items, homeTopicRow) && atMost(HOME_CLOUD_LIMIT)(items)),
+      cloudTruncated: optional(boolean),
       matchingPolicy,
       truncated: boolean,
       minimumBlogs: (v) => v === 2,

@@ -375,6 +375,12 @@ const DISPLAY_GATE = {
   reason: 'high-window-document-frequency-title-only',
   effect: 'ranking-body-evidence-only;source-pool-and-historical-pages-retained',
 };
+const BACKGROUND = {
+  maximumTitleShare: 1 / 3,
+  minimumBaselinePosts: 3,
+  minimumNativeBlogs: 2,
+  reason: 'body-dominant-without-native-label-consensus',
+};
 const TOPIC_ROW = { id: 'tag:1', label: '旅行', source: 'tag-vocabulary', score: 1, posts: 2, blogs: 2 };
 
 test('contracts: topic rows carry valid counts and provenance; a sent display gate is complete and in range', () => {
@@ -388,6 +394,12 @@ test('contracts: topic rows carry valid counts and provenance; a sent display ga
     assert.equal(validPublicPayload(kind, with_(kind, 'matchingPolicy', undefined)), true, kind);
     assert.equal(validPublicPayload(kind, with_(kind, 'matchingPolicy', { version: 'm' })), true, kind);
     assert.equal(validPublicPayload(kind, with_(kind, 'matchingPolicy', { version: 'm', displayGate: DISPLAY_GATE })), true, kind);
+    // The background-term rule is optional; when sent it is complete.
+    assert.equal(
+      validPublicPayload(kind, with_(kind, 'matchingPolicy', { version: 'm', displayGate: { ...DISPLAY_GATE, background: BACKGROUND } })),
+      true,
+      kind,
+    );
     for (const row of [
       { ...TOPIC_ROW, posts: -1 },
       { ...TOPIC_ROW, posts: 1.5 },
@@ -412,6 +424,20 @@ test('contracts: topic rows carry valid counts and provenance; a sent display ga
       { ...DISPLAY_GATE, documentFrequencyRatio: 1.5 },
       { ...DISPLAY_GATE, documentFrequencyRatio: Number.POSITIVE_INFINITY },
       { ...DISPLAY_GATE, documentFrequencyRatio: '0.02' },
+      ...[
+        null,
+        'bg',
+        { ...BACKGROUND, maximumTitleShare: 1.5 },
+        { ...BACKGROUND, maximumTitleShare: -0.1 },
+        { ...BACKGROUND, maximumTitleShare: Number.NaN },
+        { ...BACKGROUND, maximumTitleShare: '0.33' },
+        { ...BACKGROUND, minimumBaselinePosts: 0 },
+        { ...BACKGROUND, minimumBaselinePosts: 2.5 },
+        { ...BACKGROUND, minimumNativeBlogs: -1 },
+        { ...BACKGROUND, minimumNativeBlogs: undefined },
+        { ...BACKGROUND, reason: '' },
+        { ...BACKGROUND, reason: undefined },
+      ].map((background) => ({ ...DISPLAY_GATE, background })),
     ])
       assert.equal(
         validPublicPayload(kind, with_(kind, 'matchingPolicy', { version: 'm', displayGate: gate })),
@@ -426,6 +452,28 @@ test('contracts: topic rows carry valid counts and provenance; a sent display ga
     validPublicPayload('topic', with_('topic', 'matchingPolicy', { displayGate: { ...DISPLAY_GATE, minimumSources: 0 } })),
     false,
   );
+});
+
+test('contracts: optional home cloudItems are the same row shape, at most 30, with an optional boolean cloudTruncated', () => {
+  const row = { id: 'tag:1', label: '旅行', source: 'tag-vocabulary', score: 1, posts: 2, blogs: 2 };
+  const thirty = Array.from({ length: 30 }, (_, i) => ({ ...row, id: `tag:${i}` }));
+  for (const patch of [{}, { cloudItems: [] }, { cloudItems: thirty, cloudTruncated: true }, { cloudItems: thirty.slice(0, 9) }])
+    assert.equal(validPublicPayload('homeTopics', { ...(EMPTY.homeTopics as object), ...patch }), true, JSON.stringify(patch).slice(0, 60));
+  for (const patch of [
+    { cloudItems: [...thirty, row] },
+    { cloudItems: [{ ...row, posts: '2' }] },
+    { cloudItems: [{ ...row, blogs: -1 }] },
+    { cloudItems: [{ ...row, source: 'other' }] },
+    { cloudItems: [{ ...row, label: undefined }] },
+    { cloudItems: {} },
+    { cloudItems: null },
+    { cloudTruncated: 'false' },
+  ])
+    assert.equal(
+      validPublicPayload('homeTopics', { ...(EMPTY.homeTopics as object), ...patch }),
+      false,
+      JSON.stringify(patch).slice(0, 60),
+    );
 });
 
 test('contracts: a full payload cannot pass for a homepage one, nor a malformed compact one', () => {

@@ -154,36 +154,40 @@ describe('homepage centre: body citations', () => {
     const snapshot = structuredClone(before);
     const $ = await renderHome();
     expect(gateway.paths).toEqual([OVERVIEW]);
-    const rows = $('[data-mention]');
-    expect(rows.length).toBe(3);
+    // Three different source articles: three cards, each with its one target.
+    const cards = $('[data-mention-card]');
+    expect(cards.map((_, el) => $(el).attr('data-mention-card')).get()).toEqual(['1:20875', '2:30001', '1:40001']);
+    expect($('[data-mention]').length).toBe(3);
 
-    const first = rows.eq(0);
+    const first = cards.eq(0);
     const title = first.find('h3 a');
     expect(title.text()).toBe(SHOWN);
     expect(title.attr('href')).toBe('https://a.example/p/1');
     expect(title.attr('data-analytics')).toBe('open_original');
     expect(title.attr('rel')).toBe('noopener noreferrer');
-    const meta = first.find('p').filter((_, el) => $(el).text().includes('正文直接連結'));
-    expect(meta.text()).toContain('乙');
-    expect(first.find('[data-target-domain]').text()).toBe('b.example');
     expect(first.find(`time[datetime="${PUBLISHED}"]`).text()).toBe(taipei(PUBLISHED));
+    const target = first.find('[data-mention="20875:2"]');
+    const meta = target.find('p').filter((_, el) => $(el).text().includes('正文直接連結'));
+    expect(meta.text()).toContain('乙');
+    expect(target.find('[data-target-domain]').text()).toBe('b.example');
     // Internal blog links keep the stable slug path, never prefetch.
     expect(first.find('a[href="/blogs/a/"]').attr('data-prefetch')).toBe('false');
-    expect(first.find('a[href="/blogs/b/"]').attr('data-prefetch')).toBe('false');
-    // Evidence details are closed, plain text: no anchor/context markup becomes an element.
-    const details = first.find('details');
+    expect(target.find('a[href="/blogs/b/"]').attr('data-prefetch')).toBe('false');
+    // Evidence details are per target, closed, plain text: no anchor/context markup becomes an element.
+    const details = target.find('details');
     expect(details.attr('open')).toBeUndefined();
     expect(details.text()).toContain('連結文字：「乙的文章 <b>x</b>」');
     expect(details.text()).toContain('上下文：「這裡提到乙 <script>alert(1)</script>。」');
     expect(details.text()).toContain(`觀測 ${taipei('2026-10-13T06:00:00.000Z')} · 解析版本 relations-v3 · 上下文來源 文章正文`);
     expect(details.find('b, script').length).toBe(0);
 
-    expect(rows.eq(1).find('h3 a').attr('href')).toBe('https://b.example/p/9');
-    expect(rows.eq(1).find('[data-target-domain]').text()).toBe('a.example');
-    expect(rows.eq(1).find('time').attr('datetime')).toBe('2026-07-01T00:00:00.000Z');
-    expect(rows.eq(2).find('h3 a').length).toBe(0);
-    expect(rows.eq(2).find('h3').text()).toBe('Unsafe');
-    expect(rows.eq(2).text()).toContain('發文日期不明');
+    // The reverse direction is a different source article: its own card and its own date.
+    expect(cards.eq(1).find('h3 a').attr('href')).toBe('https://b.example/p/9');
+    expect(cards.eq(1).find('[data-target-domain]').text()).toBe('a.example');
+    expect(cards.eq(1).find('time').attr('datetime')).toBe('2026-07-01T00:00:00.000Z');
+    expect(cards.eq(2).find('h3 a').length).toBe(0);
+    expect(cards.eq(2).find('h3').text()).toBe('Unsafe');
+    expect(cards.eq(2).text()).toContain('發文日期不明');
 
     // The rows come first: the long method text lives in the page's method disclosure (FooterMethod, tested below).
     const centre = $('section[aria-label="最近的正文引用"]');
@@ -192,6 +196,53 @@ describe('homepage centre: body citations', () => {
     expect(centre.text()).not.toContain('只列最近');
     // The payload is untouched.
     expect(before).toEqual(snapshot);
+  });
+
+  test('one article citing two blogs is one title card listing both targets, each with its own evidence', async () => {
+    answer(
+      OVERVIEW,
+      overview({
+        mentions: mentions([
+          mention({ anchor: '乙', context: '提到乙。', observedAt: '2026-10-13T06:00:00.000Z', matchVersion: 'relations-v3' }),
+          mention({
+            targetBlogId: 3,
+            targetBlogSlug: 'c',
+            targetBlogName: '丙',
+            targetHomeUrl: 'https://c.example/',
+            targetDomain: 'c.example',
+            targetBlogCanonicalPath: '/blogs/c.example/',
+            targetIconUrl: '/favicons/c.png',
+            anchor: '丙',
+            context: '也提到丙。',
+            observedAt: '2026-10-12T06:00:00.000Z',
+            matchVersion: 'relations-v4',
+          }),
+          // A repeated target for the same article keeps its first row only.
+          mention({ anchor: '重複的乙' }),
+          // Same title, different article id: a separate card, never merged by title.
+          mention({ postId: 20876, postUrl: 'https://a.example/p/2' }),
+        ]),
+      }),
+    );
+    const $ = await renderHome();
+    const cards = $('[data-mention-card]');
+    expect(cards.map((_, el) => $(el).attr('data-mention-card')).get()).toEqual(['1:20875', '1:20876']);
+    const card = cards.eq(0);
+    expect(card.find('h3').length).toBe(1);
+    expect(card.find('h3 a').text()).toBe(SHOWN);
+    expect(card.find('time').length).toBe(1);
+    const targets = card.find('[data-mention]');
+    expect(targets.map((_, el) => $(el).attr('data-mention')).get()).toEqual(['20875:2', '20875:3']);
+    expect(targets.eq(0).find('[data-target-domain]').text()).toBe('b.example');
+    expect(targets.eq(0).find('details').text()).toContain('連結文字：「乙」');
+    expect(targets.eq(0).find('details').text()).toContain(`觀測 ${taipei('2026-10-13T06:00:00.000Z')} · 解析版本 relations-v3`);
+    expect(targets.eq(1).find('a[href="/blogs/c.example/"]').text()).toBe('丙');
+    expect(targets.eq(1).find('[data-target-domain]').text()).toBe('c.example');
+    expect(targets.eq(1).find('details').text()).toContain('上下文：「也提到丙。」');
+    expect(targets.eq(1).find('details').text()).toContain(`觀測 ${taipei('2026-10-12T06:00:00.000Z')} · 解析版本 relations-v4`);
+    expect(card.text()).not.toContain('重複的乙');
+    expect(cards.eq(1).find('h3 a').attr('href')).toBe('https://a.example/p/2');
+    expect(cards.eq(1).find('h3 a').text()).toBe(SHOWN);
   });
 
   test('the three retired blocks are gone; the right sidebar and its recent-blog title stay', async () => {
@@ -215,7 +266,7 @@ describe('homepage centre: body citations', () => {
 
   test('truncated says only the latest 8; a true empty 90-day window is said as such, not as no links at all', async () => {
     answer(OVERVIEW, overview({ mentions: mentions([mention()], { truncated: true }) }));
-    expect((await renderHome())('section[aria-label="最近的正文引用"] a.more').text()).toContain('只列最近 8 筆 · 看全站關係圖');
+    expect((await renderHome())('section[aria-label="最近的正文引用"] a.more').text()).toContain('只列最近 8 筆連結 · 看全站關係圖');
     answer(OVERVIEW, overview());
     const $ = await renderHome();
     expect($('[data-mention]').length).toBe(0);
@@ -254,13 +305,22 @@ describe('homepage centre: body citations', () => {
       }),
     );
     const $ = await renderHome();
-    const [withPaths, legacy] = [$('[data-mention="20875:2"]'), $('[data-mention="2:3"]')];
-    expect(withPaths.find('a[href="/blogs/a.example/"]').text()).toBe('甲');
-    expect(withPaths.find('a[href="/blogs/b.example/"]').text()).toBe('乙');
+    // Two different source articles (20875 with paths, 2 without), so two cards: each card's own source path is
+    // checked on the card, each target's path on its own target row.
+    const [withPaths, legacy] = [$('[data-mention-card="1:20875"]'), $('[data-mention-card="1:2"]')];
+    expect(withPaths.length).toBe(1);
+    expect(legacy.length).toBe(1);
+    expect(withPaths.find('[data-mention]').length).toBe(1);
+    // Source: in the card header, outside the target rows.
+    expect(withPaths.children().first().find('p').first().find('a[href="/blogs/a.example/"]').text()).toBe('甲');
+    expect(withPaths.find('[data-mention="20875:2"] a[href="/blogs/b.example/"]').text()).toBe('乙');
     expect(withPaths.find('a[href="/blogs/a/"], a[href="/blogs/b/"]').length).toBe(0);
-    expect(legacy.find('a[href="/blogs/a/"]').text()).toBe('甲');
-    expect(legacy.find('a[href="/blogs/c/"]').text()).toBe('丙');
-    $('[data-mention] a[href^="/"]').each((_, el) => {
+    expect(legacy.children().first().find('p').first().find('a[href="/blogs/a/"]').text()).toBe('甲');
+    expect(legacy.find('[data-mention="2:3"] a[href="/blogs/c/"]').text()).toBe('丙');
+    expect(legacy.find('[data-mention] a[href="/blogs/a/"]').length).toBe(0);
+    const internal = $('[data-mention-card] a[href^="/"]');
+    expect(internal.length).toBe(4);
+    internal.each((_, el) => {
       expect($(el).attr('data-prefetch')).toBe('false');
     });
   });
@@ -276,9 +336,14 @@ describe('homepage method disclosure', () => {
     expect(block.children('summary').text()).toContain('本頁的資料來源與計算方式');
     const text = $('#method').text();
     expect(text).toContain('近 90 天文章正文裡直接連到其他已收錄部落格的連結，依發文時間列出最近 8 筆');
-    expect(text).toContain('兩個方向各自成列並保留各自的日期');
+    expect(text).toContain('同一篇文章連到幾個部落格就在同一張卡片列出幾筆，兩個方向是不同的文章、各自保留日期');
     expect(text).toContain('側欄、Blogroll、留言、共同標籤與文字相似都不列入，也不代表雙方交流');
-    expect(text).toContain('最近共同話題與首頁文字雲只取近 30 天共同關鍵字詞庫的排行');
+    expect(text).toContain('最近共同話題（前 8 名）與首頁文字雲（同一份排行，最多 30 個）只取近 30 天共同關鍵字詞庫的排行');
+    expect(text).toContain('排行另略過背景詞');
+    expect(text).toContain('長期基準與近 30 天分開計算');
+    expect(text).toContain('仍保留在詞庫、話題頁與歷史文章，也沒有另設詞彙清單');
+    // The method stays in the closed block, not in the homepage body.
+    expect(text).not.toMatch(/人氣|傳承/);
   });
 });
 
@@ -316,6 +381,72 @@ describe('masthead cloud: the local 30-day topic ranking only', () => {
     expect(hrefs.some((h) => h.startsWith('/topics/'))).toBe(true);
     expect(hrefs.some((h) => h.includes('/tags/?tag='))).toBe(false);
     expect($('a[aria-label^="話題1，近 30 天 3 篇文章"]').length).toBeGreaterThan(0);
+  });
+
+  test('cloudItems: up to 30 words from the same one response; the left list stays its 8; legacy falls back to items', async () => {
+    stubs.cloud = false;
+    const pool = Array.from({ length: 30 }, (_, i) => topic(i + 1));
+    answer(TOPICS, { ...topics(pool.slice(0, 8)), cloudItems: pool, cloudTruncated: true });
+    const $ = load(renderToString(await HomeTopicCloud()));
+    expect(gateway.paths).toEqual([TOPICS]);
+    const words = new Set(
+      $('a[aria-label]')
+        .map((_, el) => $(el).attr('aria-label')?.split('，')[0])
+        .get(),
+    );
+    expect(words.size).toBeGreaterThan(8);
+    expect(words.has('話題30')).toBe(true);
+    // The real left ranking over the same answer still lists only its 8 rows.
+    const { default: RealRanking } = await vi.importActual<{ default: () => Promise<Parameters<typeof renderToString>[0]> }>(
+      '@/app/_home/HomeTopics',
+    );
+    const ranking = load(renderToString(await RealRanking()));
+    expect(ranking('ol.ranking > li').length).toBe(8);
+    expect(ranking('body').text()).not.toContain('話題9');
+    // An older gateway without cloudItems: the cloud draws the same items as before.
+    answer(TOPICS, topics(pool.slice(0, 8)));
+    const legacy = load(renderToString(await HomeTopicCloud()));
+    const legacyWords = new Set(
+      legacy('a[aria-label]')
+        .map((_, el) => legacy(el).attr('aria-label')?.split('，')[0])
+        .get(),
+    );
+    expect(legacyWords.has('話題9')).toBe(false);
+    expect(legacyWords.size).toBeGreaterThan(0);
+  });
+
+  test('malformed cloudItems are a failed read, not a shorter cloud', async () => {
+    stubs.cloud = false;
+    const pool = Array.from({ length: 31 }, (_, i) => topic(i + 1));
+    for (const body of [
+      { ...topics(pool.slice(0, 8)), cloudItems: pool },
+      { ...topics(pool.slice(0, 8)), cloudItems: [topic(1, { posts: '3' })] },
+      { ...topics(pool.slice(0, 8)), cloudItems: [topic(1, { blogs: -1 })] },
+      { ...topics(pool.slice(0, 8)), cloudItems: [topic(1, { source: 'other' })] },
+      { ...topics(pool.slice(0, 8)), cloudItems: 'pool' },
+      { ...topics(pool.slice(0, 8)), cloudItems: pool.slice(0, 30), cloudTruncated: 'yes' },
+      // A sent background rule must be complete: a malformed one is a failed read, not a guessed description.
+      {
+        ...topics(pool.slice(0, 8)),
+        matchingPolicy: {
+          version: 'm',
+          displayGate: {
+            version: 'tag-broad-window-title-only-v1',
+            upstream: 'tag.observe.tw/qualifyTagMedia/broad',
+            minimumSources: 3,
+            minimumTwiceSources: 2,
+            minimumPeakPosts: 3,
+            documentFrequencyRatio: 0.02,
+            reason: 'high-window-document-frequency-title-only',
+            effect: 'ranking-body-evidence-only;source-pool-and-historical-pages-retained',
+            background: { maximumTitleShare: 3, minimumBaselinePosts: 3, minimumNativeBlogs: 2, reason: 'x' },
+          },
+        },
+      },
+    ]) {
+      answer(TOPICS, body);
+      await expect(HomeTopicCloud(), JSON.stringify(body).slice(0, 80)).rejects.toBeInstanceOf(PublicGatewayError);
+    }
   });
 
   test('an empty ranking is said as empty (no words, no fallback); a failed read throws like the ranking', async () => {

@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { createHash, randomBytes } from 'node:crypto';
 import type { Pool, ResultSetHeader } from 'mysql2/promise';
 import { assertEphemeralDatabase } from '../../../tests/integration/guard.mjs';
+import { selectSharedLabelCandidates } from './shared-label-job.ts';
 import { isPublicSharedLabelTopic } from './shared-label-selection.ts';
 
 /** Small synthetic SQL fixture. No upstream traffic, real publisher data or production schema. */
@@ -17,6 +18,14 @@ export async function runSharedLabelSelectionIntegration(pool: Pool) {
   const check = async (expected: boolean, value = label) => {
     assert.equal(await isPublicSharedLabelTopic(pool, value), expected);
     checks++;
+    if (value === label) {
+      assert.equal(
+        (await selectSharedLabelCandidates(pool)).includes(label),
+        expected,
+        'worker LIMIT admission agrees with public evidence validation',
+      );
+      checks++;
+    }
   };
   try {
     await check(false);

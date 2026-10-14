@@ -49,7 +49,8 @@ describe('tag transport isolation and wire budget', () => {
       expect(new URL(String(url)).origin).toBe(origin);
       expect(init?.redirect).toBe('error');
       const headers = new Headers(init?.headers);
-      expect([...headers.keys()].sort()).toEqual(['accept', 'user-agent']);
+      expect(headers.get('dnt')).toBe('1');
+      expect([...headers.keys()].sort()).toEqual(['accept', 'dnt', 'user-agent']);
       for (const key of ['authorization', 'cookie', 'cf-connecting-ip', 'x-forwarded-for']) expect(headers.has(key)).toBe(false);
     }
   });

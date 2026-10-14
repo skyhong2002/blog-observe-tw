@@ -4,7 +4,7 @@
     "title": "部落格觀察 API",
     "version": "1",
     "summary": "公開取用最新文章、部落格目錄、正文提及關係與話題排行；資料只涵蓋已收錄且驗證的部落格。",
-    "description": "- 基底網址 `https://blog.observe.tw`。公開查詢使用 `GET`（也接受 `HEAD`），回傳 UTF-8 JSON。\n- API 狀態頁：`/api/status`。瀏覽器以 HTML 顯示；以 `Accept: application/json` 取得 JSON，只顯示 API 狀態與端點用途。狀態包含 `ok` 或 `degraded`，以有界可用性檢查確認公開查詢的資料依賴可連線，最多快取 5 秒；不是每個端點逐筆測試。JSON 欄位為 `status`、`version`、`endpoints`（每項 `path`、`summary`）與 `updatedAt`；這是狀態回應產生時間，不是文章資料更新時間。此回應為 `no-store`，不提供內部主機或爬蟲維運資訊。\n- 公開查詢不需要金鑰。每個 IP 每分鐘最多 60 次，超過回 `429`；回應帶 `x-ratelimit-limit`、`x-ratelimit-remaining`、`x-ratelimit-reset`。登入後可在 `/my/` 建立個人 API 金鑰（每人最多 3 把），以 `x-api-key: blog_…` 傳送，每把每分鐘 1000 次；伺服器只存 SHA-256 摘要，完整金鑰只顯示一次。無效或撤銷的金鑰回 `401`。為防止隨機金鑰探測，首次出現或未快取的金鑰須先通過每 IP 每分鐘 60 次的匿名／驗證桶；若該桶已用完會先回 `429`，請等窗口重設後重試。已快取且有效的金鑰不受此 IP 桶限制，每把每分鐘 1000 次額度不變。金鑰不能用來登入、管理或讀取私人資料，`Authorization` 不是本 API 的金鑰認證方式。\n- 允許跨網域：`Access-Control-Allow-Origin: *`，不接受跨域 cookie 認證。瀏覽器可讀取限流標頭與 `Retry-After`；遇 `429` 請依 `Retry-After` 秒數退避。限流標頭表示產生回應時的額度；來源站對實際到站請求計額。\n- 時間一律使用 UTC ISO 8601（例如 `2026-10-12T00:00:00.000Z`）；「一天」指台北時間（UTC+8）的日曆日，`hours` 則是連續經過的小時數。未知日期回 `null`，不以抓取日期冒充發文日期。\n- 部落格 `slug` 與話題 `id` 是穩定 API 識別碼，不因網頁網址改名而變動。已建立可讀網頁網址時，項目另附選用的 `canonicalPath`，文章附 `blogCanonicalPath`；以基底網址加上此相對路徑即可分享。欄位暫缺時仍可使用原識別碼網址，網頁會 301 到正式網址；不要拿可讀 slug 取代 API 參數。\n- 匿名成功回應帶 `cache-control: no-store`。文章依各站 RSS／抓取排程分批更新，查詢不保留跨請求結果快取，讓隱藏或刪除內容可即時反映；低頻部落格不因久未發文而失效。請至少間隔 120 秒輪詢，關係以 5 分鐘以上為宜。更新與歷史回補有延遲，不保證每輪都有新資料。\n- 帶 `x-api-key` 或 `Authorization` 的請求與錯誤回應為 `private, no-store` 或 `no-store`，不得進共享快取。快取標頭不代表 CDN 已快取該端點；目前 Cloudflare 的專用 HTML 規則只涵蓋首頁。\n- 錯誤格式為 `{\"error\":\"...\"}`：`400` 參數／游標錯誤、`401` 無效金鑰、`404` 找不到、`410` 話題證據已全部撤銷、`405` 不支援的方法、`429` 太頻繁、`503` 暫時無法提供服務。未知參數、重複參數與不合法的時間窗口會回 `400`。\n- 路徑參數請 URL 編碼（例如話題 `rss:1` 寫成 `rss%3A1`），路徑結尾不要加 `/`。文章與目錄使用 `limit`、`cursor`／`nextCursor`；游標是不透明字串，請原樣傳回並保持原查詢條件。`nextCursor: null` 表示這個結果已到尾頁。\n- 變更紀錄（2026-10-12，已核准的破壞性變更）：`GET /api/v1/blogs` 的 `items[].url` 與 `GET /api/v1/blogs/{slug}` 的 `blog.url` 改為本站可讀網頁絕對網址；原站首頁移至同物件的 `sourceUrl`（可為 null）。原先使用 blog.url 前往原站的程式請改讀 sourceUrl。`GET /api/v1/topics` 的 `items[].url` 及 `GET /api/v1/topics/{id}` 的 `topic.url` 為新增的本站網頁網址。ID／slug／favicon 識別碼不變，文章 url 仍是原文；內部 /api/* 的原站 url 不改。缺少 registry 時，本站 url 暫用可轉址的舊識別碼路徑；純標點話題不提供網址。不提供 pageUrl 系列欄位。\n- 除上述明列的已核准變更外，`v1` 內只做向後相容的變更（新增欄位、新增端點）；移除或改名會先公告。客戶端應忽略未知的新欄位。既有站內 `/api/*` 介面保留給網站使用，不是本文件的穩定公開契約；本站沒有舊版 PHP API。\n- 部落格文章、標題與圖片著作權屬原作者。API 只提供標題、原文連結、統計及最多 500 字元的短摘要，不提供全文；私人追蹤、個人 RSS、候選證據、管理及 AI 原始輸入不在公開 API。使用統計請註明「資料來源：部落格觀察 blog.observe.tw」，閱讀文章請連回原站。\n- 不寫程式也能追：訂閱各部落格原站提供的 RSS／Atom；登入 `/my/` 可管理追蹤與匯出 `/me/opml` 給閱讀器，OPML 只包含已成功抓取的 RSS／Atom，沒有可用 feed 的站會略過，請到原站確認訂閱方式。`/me/feed.xml` 是需要瀏覽器登入 session 的私人摘要 RSS，不是可公開分享或以 API 金鑰讀取的 feed。\n- 變更紀錄（2026-10-13）：話題詳情新增選用 history 累積歷史清單與 historyCursor 分頁。話題曾有有效比對證據就保留，不因退出每日詞庫窗口消失；只公開標題、原文連結及觀測狀態，絕不提供全文。全部證據明確撤銷時回 410，合併網頁一次 301 到最終話題。\n- 正文提及是交流訊號，不是抄襲或背書判斷。引用占比的分母為來源站在窗口內所有已解析、指向已收錄目標的「文章—目標部落格」提及數；一篇提及三站會計三筆，不是占全站文章的百分比。覆蓋與截斷欄位應與排行一起閱讀。\n- 話題詞條以新文易數維護的標籤池為唯一來源；目前 observed-article-window 僅代表觀測窗口內出現的詞，不代表完整詞庫。NFKC 與大小寫正規化後合併，顯示文字取同快照中上游文章出現次數最多的寫法。只比對標題與清理後正文；同篇取標題權重 2 或正文權重 1，依權重由高到低排列後，同站後續文章貢獻依序乘上 0.5。只命中正文時即 1、0.5、0.25…；2 篇標題加 1 篇正文合計 3.25。排除詞保留原始資料與原因，可透過話題詳情查詢；RSS 分類不另建排行詞庫。\n- 排行另使用新文易數 broad 門檻（至少三站、兩站各兩篇且一站三篇），配合既有文件頻率門檻。若詞在查詢窗口內超過 2% 公開文章命中，排行只計標題證據；原詞、正文命中與歷史話題頁保留。`matchingPolicy.displayGate` 記錄門檻與來源，`matchingReason=high-window-document-frequency-title-only` 可查核正文降權原因；此規則不改原 matcher／policy 版本，也不是另建通用詞黑名單。",
+    "description": "- 基底網址 `https://blog.observe.tw`。公開查詢使用 `GET`（也接受 `HEAD`），回傳 UTF-8 JSON。\n- API 狀態頁：`/api/status`。瀏覽器以 HTML 顯示；以 `Accept: application/json` 取得 JSON，只顯示 API 狀態與端點用途。狀態包含 `ok` 或 `degraded`，以有界可用性檢查確認公開查詢的資料依賴可連線，最多快取 5 秒；不是每個端點逐筆測試。JSON 欄位為 `status`、`version`、`endpoints`（每項 `path`、`summary`）與 `updatedAt`；這是狀態回應產生時間，不是文章資料更新時間。此回應為 `no-store`，不提供內部主機或爬蟲維運資訊。\n- 公開查詢不需要金鑰。每個 IP 每分鐘最多 60 次，超過回 `429`；回應帶 `x-ratelimit-limit`、`x-ratelimit-remaining`、`x-ratelimit-reset`。登入後可在 `/my/` 建立個人 API 金鑰（每人最多 3 把），以 `x-api-key: blog_…` 傳送，每把每分鐘 1000 次；伺服器只存 SHA-256 摘要，完整金鑰只顯示一次。無效或撤銷的金鑰回 `401`。為防止隨機金鑰探測，首次出現或未快取的金鑰須先通過每 IP 每分鐘 60 次的匿名／驗證桶；若該桶已用完會先回 `429`，請等窗口重設後重試。已快取且有效的金鑰不受此 IP 桶限制，每把每分鐘 1000 次額度不變。金鑰不能用來登入、管理或讀取私人資料，`Authorization` 不是本 API 的金鑰認證方式。\n- 允許跨網域：`Access-Control-Allow-Origin: *`，不接受跨域 cookie 認證。瀏覽器可讀取限流標頭與 `Retry-After`；遇 `429` 請依 `Retry-After` 秒數退避。限流標頭表示產生回應時的額度；來源站對實際到站請求計額。\n- 時間一律使用 UTC ISO 8601（例如 `2026-10-12T00:00:00.000Z`）；「一天」指台北時間（UTC+8）的日曆日，`hours` 則是連續經過的小時數。未知日期回 `null`，不以抓取日期冒充發文日期。\n- 部落格 `slug` 與話題 `id` 是穩定 API 識別碼，不因網頁網址改名而變動。已建立可讀網頁網址時，項目另附選用的 `canonicalPath`，文章附 `blogCanonicalPath`；以基底網址加上此相對路徑即可分享。欄位暫缺時仍可使用原識別碼網址，網頁會 301 到正式網址；不要拿可讀 slug 取代 API 參數。\n- 匿名成功回應帶 `cache-control: no-store`。文章依各站 RSS／抓取排程分批更新，查詢不保留跨請求結果快取，讓隱藏或刪除內容可即時反映；低頻部落格不因久未發文而失效。請至少間隔 120 秒輪詢，關係以 5 分鐘以上為宜。更新與歷史回補有延遲，不保證每輪都有新資料。\n- 帶 `x-api-key` 或 `Authorization` 的請求與錯誤回應為 `private, no-store` 或 `no-store`，不得進共享快取。快取標頭不代表 CDN 已快取該端點；目前 Cloudflare 的專用 HTML 規則只涵蓋首頁。\n- 錯誤格式為 `{\"error\":\"...\"}`：`400` 參數／游標錯誤、`401` 無效金鑰、`404` 找不到、`410` 話題證據已全部撤銷、`405` 不支援的方法、`429` 太頻繁、`503` 暫時無法提供服務。未知參數、重複參數與不合法的時間窗口會回 `400`。\n- 路徑參數請 URL 編碼（例如話題 `rss:1` 寫成 `rss%3A1`），路徑結尾不要加 `/`。文章與目錄使用 `limit`、`cursor`／`nextCursor`；游標是不透明字串，請原樣傳回並保持原查詢條件。`nextCursor: null` 表示這個結果已到尾頁。\n- 變更紀錄（2026-10-12，已核准的破壞性變更）：`GET /api/v1/blogs` 的 `items[].url` 與 `GET /api/v1/blogs/{slug}` 的 `blog.url` 改為本站可讀網頁絕對網址；原站首頁移至同物件的 `sourceUrl`（可為 null）。原先使用 blog.url 前往原站的程式請改讀 sourceUrl。`GET /api/v1/topics` 的 `items[].url` 及 `GET /api/v1/topics/{id}` 的 `topic.url` 為新增的本站網頁網址。ID／slug／favicon 識別碼不變，文章 url 仍是原文；內部 /api/* 的原站 url 不改。缺少 registry 時，本站 url 暫用可轉址的舊識別碼路徑；純標點話題不提供網址。不提供 pageUrl 系列欄位。\n- 除上述明列的已核准變更外，`v1` 內只做向後相容的變更（新增欄位、新增端點）；移除或改名會先公告。客戶端應忽略未知的新欄位。既有站內 `/api/*` 介面保留給網站使用，不是本文件的穩定公開契約；本站沒有舊版 PHP API。\n- 部落格文章、標題與圖片著作權屬原作者。API 只提供標題、原文連結、統計及最多 500 字元的短摘要，不提供全文；私人追蹤、個人 RSS、候選證據、管理及 AI 原始輸入不在公開 API。使用統計請註明「資料來源：部落格觀察 blog.observe.tw」，閱讀文章請連回原站。\n- 不寫程式也能追：訂閱各部落格原站提供的 RSS／Atom；登入 `/my/` 可管理追蹤與匯出 `/me/opml` 給閱讀器，OPML 只包含已成功抓取的 RSS／Atom，沒有可用 feed 的站會略過，請到原站確認訂閱方式。`/me/feed.xml` 是需要瀏覽器登入 session 的私人摘要 RSS，不是可公開分享或以 API 金鑰讀取的 feed。\n- 變更紀錄（2026-10-13）：話題詳情新增選用 history 累積歷史清單與 historyCursor 分頁。話題曾有有效比對證據就保留，不因退出每日詞庫窗口消失；只公開標題、原文連結及觀測狀態，絕不提供全文。全部證據明確撤銷時回 410，合併網頁一次 301 到最終話題。\n- 正文提及是交流訊號，不是抄襲或背書判斷。引用占比的分母為來源站在窗口內所有已解析、指向已收錄目標的「文章—目標部落格」提及數；一篇提及三站會計三筆，不是占全站文章的百分比。覆蓋與截斷欄位應與排行一起閱讀。\n- 話題詞條以新文易數維護的標籤池為唯一來源；目前 observed-article-window 僅代表觀測窗口內出現的詞，不代表完整詞庫。NFKC 與大小寫正規化後合併，顯示文字取同快照中上游文章出現次數最多的寫法。只比對標題與清理後正文；同篇取標題權重 2 或正文權重 1，依權重由高到低排列後，同站後續文章貢獻依序乘上 0.5。只命中正文時即 1、0.5、0.25…；2 篇標題加 1 篇正文合計 3.25。排除詞保留原始資料與原因，可透過話題詳情查詢；RSS 分類不另建排行詞庫。\n- 排行另使用新文易數 broad 門檻（至少三站、兩站各兩篇且一站三篇），配合既有文件頻率門檻。若詞在查詢窗口內超過 2% 公開文章命中，排行只計標題證據；原詞、正文命中與歷史話題頁保留。`matchingPolicy.displayGate` 記錄門檻與來源，`matchingReason=high-window-document-frequency-title-only` 可查核正文降權原因；此規則不改原 matcher／policy 版本，也不是另建通用詞黑名單。\n- 若跨站詞在長期基準中少於三分之一命中文章出現在標題，熱門排行另要求至少兩個公開部落格的文章原站標籤／分類明確使用該詞；否則僅退出排行和文字雲，保留詞庫、比對、話題頁與歷史證據。`matchingPolicy.displayGate.background` 記錄門檻。這是全詞統一的背景詞品質規則，不含硬編的排除詞清單。\n- coverage.matchedPosts 是依既有高頻詞標題／正文規則認定的有效比對文章數，包含因跨站不足或背景詞品質退出熱門排行的文章；不是所有原始 topic_matches 紀錄數。高頻詞僅正文命中不計入此有效比對統計，但原索引與歷史證據仍保留。",
     "contact": {
       "name": "部落格觀察",
       "url": "https://blog.observe.tw/api/"
@@ -3691,6 +3691,34 @@
               "effect": {
                 "type": "string",
                 "description": "只影響排行的正文貢獻；保留來源池及歷史證據"
+              },
+              "background": {
+                "type": "object",
+                "description": "選用的背景詞原站分類佐證門檻",
+                "properties": {
+                  "maximumTitleShare": {
+                    "type": "number",
+                    "description": "長期基準標題命中占比門檻，目前三分之一"
+                  },
+                  "minimumBaselinePosts": {
+                    "type": "integer",
+                    "description": "至少三篇基準命中文章"
+                  },
+                  "minimumNativeBlogs": {
+                    "type": "integer",
+                    "description": "至少兩個公開部落格的原站分類／標籤"
+                  },
+                  "reason": {
+                    "type": "string",
+                    "description": "body-dominant-without-native-label-consensus"
+                  }
+                },
+                "required": [
+                  "maximumTitleShare",
+                  "minimumBaselinePosts",
+                  "minimumNativeBlogs",
+                  "reason"
+                ]
               }
             },
             "required": [

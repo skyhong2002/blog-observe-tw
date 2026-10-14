@@ -3,7 +3,7 @@
 import { FREQUENCY_POLICY } from './frequency.ts';
 
 export const DISPLAY_GATE = Object.freeze({
-  version: 'tag-broad-window-title-only-v1',
+  version: 'tag-broad-window-and-native-label-v2',
   upstream: 'tag.observe.tw/qualifyTagMedia/broad',
   minimumSources: 3,
   minimumTwiceSources: 2,
@@ -11,7 +11,32 @@ export const DISPLAY_GATE = Object.freeze({
   documentFrequencyRatio: FREQUENCY_POLICY.highFrequencyRatio,
   reason: 'high-window-document-frequency-title-only',
   effect: 'ranking-body-evidence-only; source-pool-and-historical-pages-retained',
+  background: {
+    maximumTitleShare: 1 / 3,
+    minimumBaselinePosts: 3,
+    minimumNativeBlogs: 1,
+    reason: 'body-dominant-without-native-label-consensus',
+  },
 });
+
+/** Existing tag broad qualification, independent of the window-frequency threshold. */
+export const broadTopicSql = (alias = 'wf') => `(${alias}.blogs>=3 AND ${alias}.twice_sources>=2 AND ${alias}.peak_posts>=3)`;
+
+/** Original site tags corroborate background-heavy words; this never creates a new dictionary term. */
+export const nativeLabelCte = `native_labels AS (
+ SELECT SHA2(native_tag.normalized_label,256) label_hash,COUNT(DISTINCT native_post.blog_id) blogs
+ FROM scoped_posts native_post JOIN post_tags native_pt ON native_pt.post_id=native_post.id
+ JOIN tags native_tag ON native_tag.id=native_pt.tag_id
+ WHERE native_tag.status='active' AND native_tag.visibility='public'
+ AND native_pt.status='active' AND native_pt.source_type='crawler' AND native_pt.role='topic'
+ AND native_tag.kind='topic' GROUP BY SHA2(native_tag.normalized_label,256)
+)`;
+export const nativeLabelJoin = 'LEFT JOIN native_labels native_label ON native_label.label_hash=SHA2(display_term.normalized_label,256)';
+export const nativeLabelConsensusSql = `(COALESCE(native_label.blogs,0)>=${DISPLAY_GATE.background.minimumNativeBlogs})`;
+
+export const backgroundExcludedSql = `(${broadTopicSql()} AND fr.snapshot_id IS NOT NULL
+ AND f.matched_posts>=3 AND f.title_posts/f.matched_posts<${DISPLAY_GATE.background.maximumTitleShare}
+ AND NOT (${nativeLabelConsensusSql}))`;
 
 /** The exact tag early/broad qualification on article counts, applied to blog sources. */
 export function qualifyTopicSources(countsByBlog: Record<string, number>) {

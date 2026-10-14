@@ -130,6 +130,7 @@ export class TagApiTransport {
       const spacing = Math.max(this.activeOrigin === LOCAL_TAG_ORIGIN ? 500 : 1100, this.options.delayMs ?? 0);
       if (this.lastRequest !== null) await this.wait(Math.max(0, this.lastRequest + spacing - this.clock()));
       const headers: Record<string, string> = {
+        DNT: '1',
         Accept: 'application/json',
         'User-Agent': 'BlogObserve/1.0 (+https://blog.observe.tw/about/; contact https://skyhong.tw/)',
       };

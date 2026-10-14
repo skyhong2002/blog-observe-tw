@@ -253,7 +253,9 @@ export const relationSourceLabel = (source: keyof typeof relationSourceLabels) =
 export type RelationGroup = { type: SharedLabelRelationType; label: string; rows: SharedLabelRelations['relations'] };
 /**
  * At most SHARED_LABEL_SHOWN relations in upstream order, one row per relation id, grouped is-a, related,
- * alias. `total` counts distinct ids in the snapshot; `truncated` is the upstream's own flag.
+ * alias. All three groups are always returned, an empty one with no rows, so a ready snapshot can say for each
+ * kind that nothing is recorded (not hide it). `total` counts distinct ids in the snapshot; `truncated` is the
+ * upstream's own flag.
  */
 export function relationGroups(data: SharedLabelRelations) {
   const seen = new Set<string>();
@@ -263,9 +265,11 @@ export function relationGroups(data: SharedLabelRelations) {
     return true;
   });
   const shown = distinct.slice(0, SHARED_LABEL_SHOWN);
-  const groups: RelationGroup[] = (['is-a', 'related', 'alias'] as const)
-    .map((type) => ({ type, label: relationTypeLabel[type], rows: shown.filter((r) => r.type === type) }))
-    .filter((g) => g.rows.length);
+  const groups: RelationGroup[] = (['is-a', 'related', 'alias'] as const).map((type) => ({
+    type,
+    label: relationTypeLabel[type],
+    rows: shown.filter((r) => r.type === type),
+  }));
   return { groups, shown: shown.length, total: distinct.length, truncated: data.truncated };
 }
 

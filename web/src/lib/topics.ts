@@ -71,6 +71,16 @@ export type MatchingPolicy = {
     documentFrequencyRatio: number;
     reason: string;
     effect: string;
+    /**
+     * Background-term rule, applied before the ranking's limit: a term that passes the cross-site rule but whose
+     * long-baseline matches are mostly body-only needs native tag/category consensus to be ranked. Optional.
+     */
+    background?: {
+      maximumTitleShare: number;
+      minimumBaselinePosts: number;
+      minimumNativeBlogs: number;
+      reason: string;
+    };
   };
 };
 export type MatchingRule = 'title-only' | 'title-and-body';
@@ -214,6 +224,20 @@ export function displayGateText(policy: MatchingPolicy | undefined): string | nu
     `本期間高頻詞：期間內至少 ${g.minimumSources} 個部落格使用、其中 ${g.minimumTwiceSources} 個各有 2 篇以上且有一站達 ${g.minimumPeakPosts} 篇，` +
     `並且期間內命中文章占比超過 ${formatPercent(g.documentFrequencyRatio)} 的詞，排行只計標題命中、不計正文貢獻。` +
     '這只依所選期間判斷，與 365 日基準的高頻詞規則分開；詞仍在詞庫，話題頁、歷史文章與原始 RSS 分類都保留。'
+  );
+}
+
+/** The background-term rule in one sentence; null when the gateway does not report one. */
+export function backgroundGateText(policy: MatchingPolicy | undefined): string | null {
+  const g = policy?.displayGate;
+  const b = g?.background;
+  if (!g || !b) return null;
+  const baseline = policy?.frequency?.baselineDays ? `長期基準（近 ${policy.frequency.baselineDays} 天）` : '長期基準期間';
+  return (
+    `背景詞：符合上述跨站門檻（${g.minimumSources} 個部落格、${g.minimumTwiceSources} 個各 2 篇以上、一站達 ${g.minimumPeakPosts} 篇）的詞，` +
+    `若在${baseline}命中至少 ${b.minimumBaselinePosts} 篇、而其中標題命中不到 ${formatPercent(b.maximumTitleShare)}，` +
+    `必須有至少 ${b.minimumNativeBlogs} 個不同部落格在自己公開文章的標籤或分類寫了這個詞，才列入熱門排行與文字雲。` +
+    '長期基準與所選期間分開計算；不符合時只從排行與文字雲略過，詞仍在詞庫，話題頁與歷史文章照常保留，也沒有另設詞彙清單。'
   );
 }
 

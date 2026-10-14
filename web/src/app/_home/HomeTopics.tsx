@@ -16,6 +16,9 @@ export type HomeTopics = {
   days: number;
   source: 'tag-vocabulary';
   items: Array<Pick<Topic, 'id' | 'label' | 'canonicalPath' | 'source' | 'posts' | 'blogs'>>;
+  /** The same ranked, quality-filtered pool at the cloud's length (at most 30); absent on older gateways. */
+  cloudItems?: Array<Pick<Topic, 'id' | 'label' | 'canonicalPath' | 'source' | 'posts' | 'blogs'>>;
+  cloudTruncated?: boolean;
   truncated: boolean;
   minimumBlogs: number;
   limit: number;

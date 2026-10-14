@@ -6,6 +6,7 @@ import { VocabularyMethod } from '@/components/VocabularyNotice';
 import { taipei } from '@/lib/api';
 import { SHARED_LABEL_SHOWN, type SharedLabelsView } from '@/lib/shared-labels';
 import {
+  backgroundGateText,
   displayGateText,
   formatPercent,
   liftExplanation,
@@ -56,6 +57,7 @@ export default function TopicMethod({
         {ranking ? `排行仍依加權貢獻排序。${liftExplanation(matchingPolicy?.frequency?.baselineDays)}` : ''}
       </p>
       {ranking && displayGateText(matchingPolicy) ? <p>{displayGateText(matchingPolicy)}</p> : null}
+      {ranking && backgroundGateText(matchingPolicy) ? <p data-method="background-gate">{backgroundGateText(matchingPolicy)}</p> : null}
       {matchingReason === WINDOW_REASON ? (
         <p>
           {matchingReasonLabel(matchingReason)}：

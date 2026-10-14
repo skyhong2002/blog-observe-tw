@@ -11,7 +11,8 @@ import { MastheadWords } from './MastheadCloud';
 
 export default async function HomeTopicCloud() {
   const topics = await publicJson<HomeTopics>(homeTopicsApiPath('30'));
-  const words = topicCloudWords(topics.items, '30');
+  // cloudItems: the same ranked pool, up to 30, in this one response; older gateways send only the left list's items.
+  const words = topicCloudWords(topics.cloudItems ?? topics.items, '30');
   return words.length ? (
     <MastheadWords words={words} />
   ) : (

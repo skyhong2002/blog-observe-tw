@@ -324,7 +324,9 @@ describe('ready', () => {
     expect(shared($).text()).toContain('上游未提供圖片。');
     $ = page(enabled(undefined, snap(visualData(null))));
     expect(outsideImages($).length).toBe(0);
-    expect(shared($).text()).toContain('上游回覆此標籤沒有代表圖示。');
+    expect(shared($).find('img, [role="img"]').length).toBe(0);
+    expect(shared($).find('[data-visual-empty]').text()).toBe('尚未收錄代表圖示');
+    expect(shared($).text()).not.toContain('上游回覆此標籤沒有代表圖示');
   });
 });
 
@@ -338,8 +340,43 @@ describe('states', () => {
     text = page(enabled(snap(undefined, { status: 'unavailable' }), snap(undefined, { status: 'unavailable' })))('main').text();
     expect(text).toContain('標籤關係暫時無法使用。');
     expect(text).toContain('代表圖示暫時無法使用。');
-    text = page(enabled(snap(relationsData([]))))('main').text();
-    expect(text).toContain('上游回覆此標籤目前沒有已核准的關係。');
+    // Ready and empty: every kind is shown and each says 尚未收錄 (not hidden, not "not fetched").
+    let $ = page(enabled(snap(relationsData([]))));
+    const groups = shared($).find('[data-relation-group]');
+    expect(groups.map((_, el) => $(el).attr('data-relation-group')).get()).toEqual(['is-a', 'related', 'alias']);
+    expect(
+      groups
+        .find('h4')
+        .map((_, el) => $(el).text())
+        .get(),
+    ).toEqual(['上位分類', '相關詞', '別名']);
+    expect(
+      groups
+        .find('[data-relation-empty]')
+        .map((_, el) => $(el).text())
+        .get(),
+    ).toEqual(['尚未收錄', '尚未收錄', '尚未收錄']);
+    expect(shared($).find('li').length).toBe(0);
+    expect(shared($).text()).not.toContain('尚未取得標籤關係');
+    // One kind present: the others still appear as 尚未收錄, with the present row's inherited/source/depth kept.
+    $ = page(enabled(snap(relationsData([relation('r1', 'related', '露營車', { inherited: true, depth: 2 })]))));
+    const byType = (type: string) => shared($).find(`[data-relation-group="${type}"]`);
+    expect(byType('is-a').find('[data-relation-empty]').text()).toBe('尚未收錄');
+    expect(byType('alias').find('[data-relation-empty]').text()).toBe('尚未收錄');
+    expect(byType('related').find('li').length).toBe(1);
+    expect(byType('related').find('li').text()).toContain('繼承（第 2 層）');
+    // Missing and unavailable stay their own states, never 尚未收錄.
+    $ = page(enabled(snap(undefined, { status: 'missing', fetchedAt: null })));
+    expect(shared($).find('[data-relation-group]').length).toBe(0);
+    expect(shared($).text()).not.toContain('尚未收錄');
+    $ = page(enabled(snap(undefined, { status: 'unavailable' })));
+    expect(shared($).find('[data-relation-group]').length).toBe(0);
+  });
+
+  test('a truncated or partly shown list does not call an empty kind 尚未收錄', () => {
+    const rows = Array.from({ length: 30 }, (_, i) => relation(`r${i}`, 'related', `詞${i}`));
+    const $ = page(enabled(snap(relationsData(rows, { truncated: true }))));
+    expect(shared($).find('[data-relation-group="is-a"] [data-relation-empty]').text()).toBe('本頁顯示的關係中沒有這一類。');
   });
 
   test('more than 24 relations: 24 rows, one per id, with the total and the truncation kept', () => {

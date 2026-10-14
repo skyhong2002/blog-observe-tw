@@ -39,7 +39,7 @@ describe('fresh topic ranking coverage', () => {
       expect(response.json()).not.toHaveProperty('vocabulary');
       expect(queries).toHaveLength(1);
       expect(queries[0]).not.toContain('ROW_NUMBER');
-      expect(queries[0]).toContain('LIMIT 9');
+      expect(queries[0]).toContain('LIMIT 31');
       expect(queries[0]).toContain('SELECT DISTINCT p.id,p.blog_id,p.published_at,i.snapshot_id');
       expect(queries[0]).toContain("b.status='verified'");
       expect(queries[0]).toContain('(i.post_hash<=>p.content_hash)');
@@ -106,14 +106,28 @@ describe('fresh topic ranking coverage', () => {
     expect(result).toEqual({ items: [], truncated: false, matchedPosts: 5 });
     expect(queries).toHaveLength(1);
     expect(queries[0]).toContain('ROW_NUMBER() OVER (PARTITION BY post_id ORDER BY topic_id)=1 first_match');
-    expect(queries[0]).toContain('SUM(ranked.matched_n) OVER () matched_posts');
-    expect(queries[0]).toContain('ORDER BY (ranked.blogs>=2) DESC,ranked.score DESC');
+    expect(queries[0]).toContain('(SELECT COUNT(DISTINCT post_id) FROM recent) matched_posts');
+    expect(queries[0]).toContain('ORDER BY (ranked.blogs>=2 AND background_excluded=0) DESC,ranked.score DESC');
     expect(queries[0]).not.toContain('HAVING COUNT(*)>=2');
     expect(queries[0]).toContain("b.status='verified'");
     expect(queries[0]).toContain('p.published_at>=? AND p.published_at<=?');
     expect(queries[0]).toContain('(i.post_hash<=>p.content_hash)');
     expect(queries[0]).toContain('(i.body_hash<=>');
     expect(queries[0]).toContain('t.exclusion_reason IS NULL AND t.inactive_reason IS NULL');
+  });
+  it('retains policy-qualified coverage when every topic is excluded from display as background', async () => {
+    const queries: string[] = [];
+    const pool = {
+      query: async (sql: string) => {
+        queries.push(sql);
+        return [[{ ...topicRow('tag:background', 3), background_excluded: 1 }]];
+      },
+    } as unknown as Pool;
+    const result = await ranking(pool, 30, undefined, true, 100, new Date('2026-10-13T00:00:00Z'), true);
+    expect(result).toEqual({ items: [], truncated: false, matchedPosts: 5 });
+    expect(queries).toHaveLength(1);
+    expect(queries[0]).not.toContain('WHERE NOT COALESCE');
+    expect(queries[0]).toContain('background_excluded=0');
   });
 
   it('counts the extra eligible row for truncation and removes coverage-only rows', async () => {

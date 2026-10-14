@@ -46,3 +46,16 @@ describe('single-term display audit', () => {
     await expect(auditTopicDisplay(pool, `tag:${'a'.repeat(64)}`, 30)).rejects.toThrow('query_timeout');
   });
 });
+
+it('keeps raw audit evidence but reports zero ranking articles when the whole background term is excluded', async () => {
+  const pool = {
+    query: async () => [
+      [{ publicPosts: 200, evidencePosts: 10, titlePosts: 2, sourceBlogs: 3, titleOnly: 1, backgroundExcluded: 1, nativeConsensus: 0 }],
+    ],
+  } as unknown as Pool;
+  const audit = await auditTopicDisplay(pool, `tag:${'a'.repeat(64)}`, 30);
+  expect(audit.evidencePosts).toBe(10);
+  expect(audit.titlePosts).toBe(2);
+  expect(audit.eligibleRankingPosts).toBe(0);
+  expect(audit.reason).toBe('body-dominant-without-native-label-consensus');
+});

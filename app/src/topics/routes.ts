@@ -2,7 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import type { Pool, RowDataPacket } from 'mysql2/promise';
 import { topicBodyHash, topicBodyJoins } from './body.ts';
 import { TopicResponseCache } from './cache.ts';
-import { DISPLAY_GATE, windowGateCtes, windowGateSql } from './display-gate.ts';
+import { backgroundExcludedSql, DISPLAY_GATE, nativeLabelCte, nativeLabelJoin, windowGateCtes, windowGateSql } from './display-gate.ts';
 import { FREQUENCY_POLICY } from './frequency.ts';
 import { historyReadsEnabled } from './history-contracts.ts';
 import { durableTopicDetail } from './history-read.ts';
@@ -160,11 +160,13 @@ export async function ranking(
   const boundedLimit = Math.min(200, Math.max(1, Math.floor(limit)));
   const [rows] = await pool.query<RowDataPacket[]>(
     `WITH ${evidence(Boolean(slug), verifiedOnly, true)},
+    ${nativeLabelCte},
     ${includeMatchedPosts ? 'marked AS (SELECT recent.*,ROW_NUMBER() OVER (PARTITION BY post_id ORDER BY topic_id)=1 first_match FROM recent),' : ''}
     per_blog AS (
     SELECT r.topic_id,r.label,r.source,r.blog_id,COUNT(*) n,SUM(title_hit) title_n,SUM(1-title_hit) body_n${includeMatchedPosts ? ',SUM(first_match) matched_n' : ''} FROM ${includeMatchedPosts ? 'marked' : 'recent'} r
     GROUP BY r.topic_id,r.label,r.source,r.blog_id)
-    SELECT ranked.*${includeMatchedPosts ? ',SUM(ranked.matched_n) OVER () matched_posts' : ''},(SELECT COUNT(*) FROM scoped_posts) recent_total,
+    SELECT ranked.*${includeMatchedPosts ? ',(SELECT COUNT(DISTINCT post_id) FROM recent) matched_posts' : ''},(SELECT COUNT(*) FROM scoped_posts) recent_total,
+      COALESCE(${backgroundExcludedSql},FALSE) background_excluded,
       fr.total_posts baseline_total,${windowGateSql()} window_high_frequency,
       (IF(fr.snapshot_id IS NOT NULL,COALESCE(f.high_frequency,0),0) OR ${windowGateSql()}) high_frequency,
       IF(f.high_frequency=1 OR ${windowGateSql()},f.title_posts,f.matched_posts) baseline_matched
@@ -174,12 +176,17 @@ export async function ranking(
     LEFT JOIN topic_current tc ON tc.source=${literal(SOURCE)}
     LEFT JOIN topic_frequency_runs fr ON fr.snapshot_id=tc.snapshot_id AND fr.policy_version=${literal(FREQUENCY_POLICY.version)}
     LEFT JOIN topic_term_frequencies f ON f.snapshot_id=fr.snapshot_id AND f.term_id=SUBSTRING(ranked.topic_id,5)
-    ORDER BY ${includeMatchedPosts ? `(ranked.blogs>=${slug ? 1 : 2}) DESC,` : ''}ranked.score DESC,ranked.blogs DESC,ranked.posts DESC,ranked.topic_id LIMIT ${boundedLimit + 1}`,
+    LEFT JOIN topic_canonical_terms_v3 display_term ON display_term.snapshot_id=tc.snapshot_id AND display_term.id=SUBSTRING(ranked.topic_id,5)
+    ${nativeLabelJoin}
+    ${includeMatchedPosts ? '' : `WHERE NOT COALESCE(${backgroundExcludedSql},FALSE)`}
+    ORDER BY ${includeMatchedPosts ? `(ranked.blogs>=${slug ? 1 : 2} AND background_excluded=0) DESC,` : ''}ranked.score DESC,ranked.blogs DESC,ranked.posts DESC,ranked.topic_id LIMIT ${boundedLimit + 1}`,
     args,
   );
   // Count each evidence article exactly once before the minimum-blog filter.
   // Ineligible topic rows remain last so an empty ranking still carries coverage.
-  const eligible = includeMatchedPosts ? rows.filter((row) => Number(row.blogs) >= (slug ? 1 : 2)) : rows;
+  const eligible = includeMatchedPosts
+    ? rows.filter((row) => Number(row.blogs) >= (slug ? 1 : 2) && !Number(row.background_excluded))
+    : rows;
   return {
     ...(includeMatchedPosts ? { matchedPosts: Number(rows[0]?.matched_posts ?? 0) } : {}),
     items: eligible.slice(0, boundedLimit).map((row) => ({ ...item(row), ...(slug || !verifiedOnly ? { lift: null } : {}) })),
@@ -300,14 +307,17 @@ export function registerTopicRoutes(app: FastifyInstance, pool: Pool) {
     if (req.query.view !== undefined && req.query.view !== 'home') return reply.code(400).send({ error: 'invalid_view' });
     if (req.query.view === 'home')
       return cache.get(`rank:${days}:home`, async () => {
-        const results = await ranking(pool, days, undefined, true, 8, new Date(), false);
+        // One fresh ranking read serves both the compact list and the larger masthead cloud.
+        const results = await ranking(pool, days, undefined, true, 30, new Date(), false);
         return {
           ...metadata(),
           view: 'home',
           days,
           source: 'tag-vocabulary',
-          items: results.items,
-          truncated: results.truncated,
+          items: results.items.slice(0, 8),
+          truncated: results.items.length > 8 || results.truncated,
+          cloudItems: results.items,
+          cloudTruncated: results.truncated,
           minimumBlogs: 2,
           limit: 8,
         };

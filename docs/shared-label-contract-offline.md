@@ -1,3 +1,27 @@
+# 共用標籤關係與圖片接入
+
+## 2026-10-14 接入更新
+
+基底為fetch後origin/main b5e20b8；正式暫為green/gen13/76a90e7。
+tag aff5c028已上線，實際GET柯文哲relations/visual通過既有b8d030c parser：
+政治人物上位分類1筆、代表圖示null。parser contract SHA不是上游runtime或資料版本，
+不虛構payload版本。0021/0022表已實際確認存在；本輪沒有migration或刪除。
+
+已手動producer同步3個有本站公開文章證據的詞、共6個kind；台灣exact label
+沒有公開topic證據而跳過，沒有硬造新頁。首次lease失敗log保留，後續原CLI成功；
+不把失敗改寫成成功。頁面只讀fresh本地快照；不在訪客請求時呼叫tag。
+後續6小時worker取最多10個缺漏／即將到期的公開詞，UTC每天40wire（含retry/
+fallback），沿用既有lease/30s deadline/500ms local spacing/429退避。
+從未嘗試／最早嘗試優先，避免失敗熱門詞占滿名額。每次I/O前後重驗公開證據。
+快照24h；ready/missing未到期不重抓，unavailable重試仍受排序、期限與預算限制。
+
+新UI將上位分類／相關詞／別名分開，ready真正空資料顯示「尚未收錄」；
+missing未取得與unavailable錯誤分開，截斷的空組不誤稱完整空集合。
+圖片null不顯示佔位圖。正式開關／candidate實際畫面與worker新版本尚待本批部署，
+不是所有話題都已有F1資料。以下舊紀錄保留其歷史時點，不能覆蓋本節。
+
+---
+
 # F1 共用標籤離線契約
 
 ## 現況與歷史紀錄（2026-10-13）

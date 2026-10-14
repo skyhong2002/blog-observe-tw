@@ -23,6 +23,7 @@ import { refreshTopicFrequencies } from './topics/frequency.ts';
 import { backfillTopicHistory } from './topics/history-backfill.ts';
 import { historyWritesEnabled } from './topics/history-contracts.ts';
 import { revalidateTopicHistory } from './topics/history-worker.ts';
+import { runSharedLabelBatch } from './topics/shared-label-job.ts';
 import { syncVocabulary } from './topics/sync.ts';
 
 const config = loadConfig();
@@ -77,6 +78,7 @@ for (const [name, every, enabled] of [
   ['blogs-topics', 10 * 60_000, topicsEnabled],
   ['blogs-topic-history', 5 * 60_000, historyWritesEnabled()],
   ['blogs-topic-frequencies', 60 * 60_000, topicsEnabled],
+  ['blogs-shared-labels', 6 * 60 * 60_000, process.env.BLOG_SHARED_LABEL_SYNC_ENABLED === 'true'],
   ['blogs-vocabulary', 15 * 60_000, vocabularyEnabled],
   ['blogs-history', 5 * 60_000, historyEnabled],
   ['blogs-candidate-review', 30 * 60_000, candidateReviewEnabled],
@@ -137,6 +139,7 @@ const worker = new Worker(
       return { capture, revalidation };
     }
     if (job.name === 'blogs-topic-frequencies') return topicsEnabled ? refreshTopicFrequencies(store.pool) : { skipped: 'disabled' };
+    if (job.name === 'blogs-shared-labels') return runSharedLabelBatch(store.pool);
     if (job.name === 'blogs-vocabulary')
       return vocabularyEnabled
         ? syncVocabulary(store.pool, { ...batchOptions, enabled: true, mode: 'window', maxPages: 10 })

@@ -43,39 +43,38 @@ function Relations({ view }: { view: SnapshotView<SharedLabelRelations> }) {
   if (view.state === 'missing') return <p className={`text-sm ${muted}`}>尚未取得標籤關係；這不代表沒有關係。</p>;
   if (view.state === 'unavailable') return <p className={`text-sm ${muted}`}>標籤關係暫時無法使用。</p>;
   const list = relationGroups(view.data);
+  // A ready snapshot says for each kind what the upstream recorded. When only part of the list is shown (or the
+  // upstream cut it), an empty kind may still have rows further on, so it is not called 尚未收錄 there.
+  const partial = list.shown < list.total || list.truncated;
   return (
     <>
-      {list.total ? (
-        <>
-          <p className={`text-xs ${muted}`}>{relationCountText(list)}</p>
-          {list.groups.map((g) => (
-            <div key={g.type}>
-              <h4 className="text-sm font-medium">{g.label}</h4>
-              {g.type === 'alias' ? <p className={`text-xs ${muted}`}>上游標示的同義寫法；本站話題不因此合併，也不共用頁面。</p> : null}
-              <ul className="mt-1 grid gap-x-4 sm:grid-cols-2">
-                {g.rows.map((r) => (
-                  <li key={r.id} className="min-w-0 break-words py-1.5 text-sm">
-                    <External href={sharedLabelUrl(r.target.href)} className={tagLink}>
-                      {r.target.id.startsWith('group:') ? r.target.label : `#${r.target.label}`}
-                    </External>
-                    <span className={`ml-1 text-xs ${muted}`}>
-                      {[
-                        relationDepthText(r),
-                        `${relationSourceLabel(r.source)}（${r.sourceDetail}）`,
-                        r.createdAt ? taipei(r.createdAt) : '',
-                      ]
-                        .filter(Boolean)
-                        .join(' · ')}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ))}
-        </>
-      ) : (
-        <p className={`text-sm ${muted}`}>上游回覆此標籤目前沒有已核准的關係。</p>
-      )}
+      {list.total ? <p className={`text-xs ${muted}`}>{relationCountText(list)}</p> : null}
+      {list.groups.map((g) => (
+        <div key={g.type} data-relation-group={g.type}>
+          <h4 className="text-sm font-medium">{g.label}</h4>
+          {g.type === 'alias' ? <p className={`text-xs ${muted}`}>上游標示的同義寫法；本站話題不因此合併，也不共用頁面。</p> : null}
+          {g.rows.length ? (
+            <ul className="mt-1 grid gap-x-4 sm:grid-cols-2">
+              {g.rows.map((r) => (
+                <li key={r.id} className="min-w-0 break-words py-1.5 text-sm">
+                  <External href={sharedLabelUrl(r.target.href)} className={tagLink}>
+                    {r.target.id.startsWith('group:') ? r.target.label : `#${r.target.label}`}
+                  </External>
+                  <span className={`ml-1 text-xs ${muted}`}>
+                    {[relationDepthText(r), `${relationSourceLabel(r.source)}（${r.sourceDetail}）`, r.createdAt ? taipei(r.createdAt) : '']
+                      .filter(Boolean)
+                      .join(' · ')}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className={`mt-1 text-sm ${muted}`} data-relation-empty="">
+              {partial ? '本頁顯示的關係中沒有這一類。' : '尚未收錄'}
+            </p>
+          )}
+        </div>
+      ))}
       <Fetched at={view.fetchedAt} />
     </>
   );
@@ -98,7 +97,16 @@ function Visual({ view, tag }: { view: SnapshotView<SharedLabelVisual>; tag: str
   if (view.state === 'missing') return <p className={`text-sm ${muted}`}>尚未取得代表圖示。</p>;
   if (view.state === 'unavailable') return <p className={`text-sm ${muted}`}>代表圖示暫時無法使用。</p>;
   const visual = view.data.visual;
-  if (!visual) return <p className={`text-sm ${muted}`}>上游回覆此標籤沒有代表圖示。</p>;
+  // Ready with no visual: the upstream's own answer. No picture and no placeholder; the fetch time stays.
+  if (!visual)
+    return (
+      <>
+        <p className={`text-sm ${muted}`} data-visual-empty="">
+          尚未收錄代表圖示
+        </p>
+        <Fetched at={view.fetchedAt} />
+      </>
+    );
   const src = visualImage(visual);
   const name = visual.label ?? tag;
   return (
