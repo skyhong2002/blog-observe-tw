@@ -10,7 +10,7 @@ import { CLEANUP_VERSION } from './matching-body.ts';
 import { digest, MATCHER_VERSION, POLICY_VERSION } from './policy.ts';
 import { publicationLabelSql } from './publication-noise.ts';
 import { runTopicRankingIntegration } from './ranking.integration.ts';
-import { evidence, registerTopicRoutes } from './routes.ts';
+import { compactHomeRanking, evidence, ranking, registerTopicRoutes } from './routes.ts';
 import { SOURCE } from './snapshot-client.ts';
 
 const literal = (value: string) => `'${value.replaceAll("'", "''")}'`;
@@ -52,6 +52,12 @@ export async function runRankingFreshnessIntegration(pool: Pool) {
     const [before] = await pool.query<RowDataPacket[]>(old, args);
     assert.deepEqual(result[0], before, 'fresh-post materialization must preserve exact ranking/detail rows');
     comparisons++;
+    if (sql.includes('per_blog AS') && sql.includes('LIMIT 101') && !scoped) {
+      const compact = await compactHomeRanking(pool, 30, args[1] as Date);
+      const standard = await ranking(pool, 30, undefined, true, 30, args[1] as Date, false);
+      assert.deepEqual(compact, standard, 'compact home must preserve public counts, weights, native-label admission and ordering');
+      comparisons++;
+    }
     if (!dateCases && sql.includes('per_blog AS')) {
       dateCases = true;
       for (const [variant, text] of [

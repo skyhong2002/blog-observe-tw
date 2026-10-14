@@ -193,6 +193,46 @@ export async function ranking(
     truncated: eligible.length > boundedLimit,
   };
 }
+/** Compact home projection: aggregate article evidence once, then apply the exact same public quality gates.
+ * Window functions keep the original per-topic source counts alongside each blog's counts; no duplicate
+ * evidence/window_frequencies joins and no data retained between anonymous requests. */
+export async function compactHomeRanking(pool: Pool, days: number, now = new Date()) {
+  const [rows] = await pool.query<RowDataPacket[]>(
+    `WITH ${evidence(false, true, false)}, ${nativeLabelCte},
+     per_blog AS (
+       SELECT topic_id,label,source,blog_id,COUNT(*) n,SUM(title_hit) title_n
+       FROM evidence GROUP BY topic_id,label,source,blog_id
+     ), source_counts AS (
+       SELECT per_blog.*,SUM(n) OVER (PARTITION BY topic_id) matched_posts,
+         COUNT(*) OVER (PARTITION BY topic_id) blogs,
+         SUM(n>=2) OVER (PARTITION BY topic_id) twice_sources,
+         MAX(n) OVER (PARTITION BY topic_id) peak_posts FROM per_blog
+     ), qualified AS (
+       SELECT wf.*,${windowGateSql()} window_high_frequency,
+         (IF(fr.snapshot_id IS NOT NULL,COALESCE(f.high_frequency,0),0) OR ${windowGateSql()}) high_frequency,
+         fr.total_posts baseline_total,
+         IF(f.high_frequency=1 OR ${windowGateSql()},f.title_posts,f.matched_posts) baseline_matched
+       FROM source_counts wf LEFT JOIN topic_current tc ON tc.source=?
+       LEFT JOIN topic_frequency_runs fr ON fr.snapshot_id=tc.snapshot_id AND fr.policy_version=?
+       LEFT JOIN topic_term_frequencies f ON f.snapshot_id=fr.snapshot_id AND f.term_id=SUBSTRING(wf.topic_id,5)
+       LEFT JOIN topic_canonical_terms_v3 display_term ON display_term.snapshot_id=tc.snapshot_id AND display_term.id=SUBSTRING(wf.topic_id,5)
+       ${nativeLabelJoin}
+       WHERE NOT COALESCE(${backgroundExcludedSql},FALSE)
+     ) SELECT topic_id,label,source,
+       SUM(${weightedScore('title_n', 'IF(window_high_frequency,0,n-title_n)')}) score,
+       SUM(IF(window_high_frequency,title_n,n)) posts,COUNT(*) blogs,
+       SUM(title_n) title_posts,SUM(IF(window_high_frequency,0,n-title_n)) body_posts,
+       MAX(high_frequency) high_frequency,MAX(window_high_frequency) window_high_frequency,
+       MAX(baseline_total) baseline_total,MAX(baseline_matched) baseline_matched,
+       (SELECT COUNT(*) FROM scoped_posts) recent_total
+     FROM qualified WHERE title_n>0 OR NOT window_high_frequency
+     GROUP BY topic_id,label,source HAVING COUNT(*)>=2
+     ORDER BY score DESC,blogs DESC,posts DESC,topic_id LIMIT 31`,
+    [...range(days, now), SOURCE, FREQUENCY_POLICY.version],
+  );
+  return { items: rows.slice(0, 30).map(item), truncated: rows.length > 30 };
+}
+
 /** Resolve retained source IDs without allowing native feed categories to extend the tag dictionary. */
 export async function resolveTopic(pool: Pool, id: string) {
   if (id.startsWith('rss:')) {
@@ -308,7 +348,7 @@ export function registerTopicRoutes(app: FastifyInstance, pool: Pool) {
     if (req.query.view === 'home')
       return cache.get(`rank:${days}:home`, async () => {
         // One fresh ranking read serves both the compact list and the larger masthead cloud.
-        const results = await ranking(pool, days, undefined, true, 30, new Date(), false);
+        const results = await compactHomeRanking(pool, days);
         return {
           ...metadata(),
           view: 'home',

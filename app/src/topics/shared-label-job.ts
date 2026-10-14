@@ -1,14 +1,12 @@
 import type { Pool, RowDataPacket } from 'mysql2/promise';
-import { runTechRead } from '../tech/read-resource.ts';
 import { historyPublicTopicSql } from './history-read.ts';
 import { isPublicSharedLabelTopic, publicSharedLabelEvidenceSql } from './shared-label-selection.ts';
 import { sharedLabelSyncClientFactory, syncSharedLabels } from './shared-label-sync.ts';
 
 /** Same bounded producer selection used by the worker and isolated SQL tests. */
 export async function selectSharedLabelCandidates(pool: Pool) {
-  return await runTechRead(pool, async (reader) => {
-    const [rows] = await reader.query<RowDataPacket[]>(
-      `SELECT t.label FROM topic_pages t
+  const [rows] = await pool.query<RowDataPacket[]>(
+    `SET STATEMENT max_statement_time=1 FOR SELECT t.label FROM topic_pages t
        WHERE t.state IN ('active','pending') AND ${historyPublicTopicSql('t')}
        AND ${publicSharedLabelEvidenceSql}
        AND CHAR_LENGTH(t.label) BETWEEN 1 AND 60
@@ -21,9 +19,8 @@ export async function selectSharedLabelCandidates(pool: Pool) {
        ORDER BY COALESCE((SELECT MAX(attempt.fetched_at) FROM topic_shared_label_snapshots attempt
                  WHERE attempt.label_hash=SHA2(t.label,256) AND BINARY attempt.exact_label=BINARY t.label),FROM_UNIXTIME(0)),
                 t.last_article_at DESC,t.canonical_id LIMIT 10`,
-    );
-    return [...new Set(rows.map((row) => String(row.label)))];
-  });
+  );
+  return [...new Set(rows.map((row) => String(row.label)))];
 }
 
 /** Refresh only public blog topics with missing/expiring metadata, never the entire tag vocabulary. */
