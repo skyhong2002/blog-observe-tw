@@ -1,5 +1,22 @@
 # UI 逐頁審查紀錄
 
+## 現況（UTC2026-10-14T20:49:04.958Z，gen19）
+
+正式 **green／gen19／46c074c1f7c0871ec7526c9b8e79559c0963602e**，Next **F_zSp1Bg_oZWzezesLRmQ**；blue af0保留在線回滾。F3歷史搜尋已恢復。worker仍是af0，新的全文producer保持停用，回填以一篇／60秒方式另做小量驗證，尚未宣稱歷史coverage全部完成。
+首頁作者SQL在正式DB readonly transaction中三次rows/hash相同，median221.24→3.67ms；正式首頁五次median1.968656s，candidate1.895654s。公開網址時間含網路／edge，不當成純origin rendering時間。正式23項HTTP、53 barrier＋60 SSR/RSC、28全文HTTPprivacy仍通過；header/private/no-store、DNT及CF Disabled不变。
+
+Candidate raw看圖review：`/home/deck/.cache/blog-home-cloud-b3-20261014/.reviews/f3-fulltext/candidate-budget-independent-review.json`；實際非作者GPT-6.1 Sol、4圖＋2tag參照，入鏡無阻擋。
+正式同模型獨立review：`/home/deck/.cache/blog-home-cloud-b3-20261014/.reviews/f3-fulltext/formal-gen19-independent-review.json`，12圖＋6參照，actual model、UTC、逐圖hash與raw transcript在原檔。沒有把gen17 review改標gen19。
+六模板每一組有 `capture-report.json`（raw network在network.requests、導航前Google/GTM阻擋、DNT1/GPCnull、allowed0）及四張圖，依序 `page-1-1280-light.png`／`page-2-390-light.png`、另一route `page-3-1280-light.png`／`page-4-390-light.png`：
+
+| route／實際範例 | 正式1280／390目錄（repo外私有） | review狀態與待驗 |
+| --- | --- | --- |
+| `/`、`/topics/` | `/home/deck/.t3/userdata/blog-f3-fulltext-20261015/formal-gen19/formal-home-topics/` | pending／issues；首屏無阻擋，topics手機表格最右欄需橫捲互動驗證。 |
+| `/tech/`、`/relations/` | `/home/deck/.t3/userdata/blog-f3-fulltext-20261015/formal-gen19/formal-tech-relations/` | pending；入鏡正常，版本省略資訊、graph互動／完整名稱、下方資料尚未驗。 |
+| `/blogs/anise-tw-534/`、`/articles/?q=蛤蜊絲瓜` | `/home/deck/.t3/userdata/blog-f3-fulltext-20261015/formal-gen19/formal-blog-search-correct/` | pending；桌機與手機都見2009歷史結果；方法展開／其他搜尋狀態未驗。 |
+
+品牌綠色、部落格正文引用、tech被動觀測與短片段搜尋為既有產品目標的差異；其餘視覺基準沿tag。T-ref `ff511870` 已讀，後續F4依 `/home/deck/Projects/tag-sm-f1-release/docs/cross-site-consistency.md` 對齊，不宣稱本批已完成全面F4重驗。所有非入鏡狀態及既有其他route pending保留。
+
 ## 現況更正（UTC2026-10-14T20:27:33.445Z）
 
 目前正式是 **blue／gen18／af0e73c**，worker也恢復af0。gen17的回填guard取得500，取消後正式首頁仍逾時／超閘門，因此回滾；沒有移除任何隱私或資源斷言。F3新功能目前暫時退回inactive green，後續需修好索引寫入與公開查詢資源競爭再上線。

@@ -1,3 +1,4 @@
+import { PUBLIC_SEARCH_SQL } from '../search-bounds.ts';
 import type { Pool, RowDataPacket } from 'mysql2/promise';
 import { publicPost, publicSummary } from '../public-post.ts';
 import { type IconManifest, iconManifest } from '../v1/favicon-routes.ts';
@@ -65,7 +66,7 @@ export async function listArticles(pool: Pool, query: ReturnType<typeof articleQ
   }
   const [rows] = await pool.query<RowDataPacket[]>(
     `SELECT p.id,p.title,p.url,p.summary,p.author,p.published_at publishedAt,p.updated_at updatedAt,p.created_at observedAt,p.image_url imageUrl,b.slug blogSlug,b.name blogName,COALESCE(p.published_at,p.created_at) sortAt
-    FROM posts p JOIN blogs b ON b.id=p.blog_id WHERE b.status='verified' AND COALESCE(p.published_at,p.created_at)>=? AND COALESCE(p.published_at,p.created_at)<=? ${where.length ? `AND ${where.join(' AND ')}` : ''}
+    FROM posts p JOIN blogs b ON b.id=p.blog_id WHERE ${PUBLIC_SEARCH_SQL} AND COALESCE(p.published_at,p.created_at)>=? AND COALESCE(p.published_at,p.created_at)<=? ${where.length ? `AND ${where.join(' AND ')}` : ''}
     ORDER BY COALESCE(p.published_at,p.created_at) DESC,p.id DESC LIMIT ${query.limit + 1}`,
     args,
   );

@@ -60,3 +60,11 @@ B0：`/home/deck/.t3/projects/blog-observe-tw/.reviews/b0-final-barrier/7ffd036f
 既有Opus5.5 reviewer對本批backend source獨立審查通過，actual modelUsage=claude-opus-5-5、success且未截斷；採納null錯誤碼防護與generic503回應，確認blog_authors複合主鍵保证選八組不重複。沒有採用額外排序ID tie-breaker，因為本批維持既有排序合約，且三次SQL parity結果相同；可在另批釐清完全相同名稱的排序。這份review只涵蓋本次diff，不拿它取代先前全文reader、計數洩漏修正與HTTP privacy barrier的證據。
 
 新增／既有17項單元測試通過，含overview故障不回或記錄SQL/message，TypeScript通過。私有source review：`/home/deck/.cache/blog-home-cloud-b3-20261014/.reviews/f3-fulltext/home-query-budget-opus-review-final.json`；readonly parity：同目錄 `home-author-query-parity.json`。
+
+### gen19恢复與公開 v1 未發布邊界
+
+UTC20:49:04.958Z以同一份前端產物切到green/gen19/46c074c，homepage五次median1.968656秒，candidate1.895654秒；新source的53/60 B0與28全文HTTP隱私檢查、正式23項檢查通過。worker仍留af0，不同時啟用新producer。
+
+另核對到公開v1允許until有60秒clock skew容忍，不能讓它變成提早公開文章的權限。`listArticles` 改為重用 `PUBLIC_SEARCH_SQL`，除此之外維持窗口、分頁與q的標題搜尋合約。18169的public-api suite以真實SQL＋Fastify注入請求，測試40秒後發布／until55秒後的兩端點皆為0；有實際 `content_post_bodies` 正文與summary包含查詢但標題沒有的fixture，v1仍0。這不是socket端到端測試；正式body搜尋另有實際loopbackHTTP barrier證據。
+
+此純API變更為n/a-ui，前端git tree、data/openapi與lockfiles不變，不把gen19圖片改寫SHA。既有非作者Opus5.5看過source差異，actual modelUsage/success在 `.reviews/f3-fulltext/public-title-future-opus-review.json`；採納其建議補實際正文fixture，重跑integration-final通過。未額外改動其他端點或q搜尋語意。

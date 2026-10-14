@@ -20,6 +20,7 @@ try {
       (process.argv[4] !== '--suite' ||
         ![
           'f3-f4',
+          'public-api',
           'fulltext',
           'b3',
           'vocabulary-snapshot',
@@ -121,7 +122,9 @@ try {
     ['tech-fetch-batch', '../app/src/tech/fetch-batch.integration.ts', 'runTechFetchBatchIntegration'],
   ];
   const selected =
-    process.argv[5] === 'fulltext'
+    process.argv[5] === 'public-api'
+      ? suites.filter(([label]) => label === 'public-api')
+      : process.argv[5] === 'fulltext'
       ? suites.filter(([label]) => label === 'fulltext')
       : process.argv[5] === 'home-display'
         ? suites.filter(

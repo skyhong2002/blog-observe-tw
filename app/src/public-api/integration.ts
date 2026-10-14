@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import Fastify from 'fastify';
 import type { Pool, ResultSetHeader } from 'mysql2/promise';
 import { registerPublicApi } from '../v1/routes.ts';
@@ -74,6 +74,35 @@ export async function runPublicApiIntegration(pool: Pool) {
     }
     assert.deepEqual(ids, posts.slice(0, 4).reverse());
     assert.equal(new Set(ids).size, 4);
+    // An explicit until within the permitted clock-skew tolerance must not publish future posts.
+    const futureUrl = `https://fixture.example/${marker}/near-future`;
+    const [future] = await pool.query<ResultSetHeader>(
+      'INSERT INTO posts(blog_id,guid,url,title,summary,published_at,created_at) VALUES(?,?,?,?,?,?,?)',
+      [blogs[0], futureUrl, futureUrl, `${marker}-near-future`, '公開時間尚未到', new Date(Date.now() + 40000), now],
+    );
+    posts.push(future.insertId);
+    const window = `since=${encodeURIComponent(published.toISOString())}&until=${encodeURIComponent(new Date(Date.now() + 55000).toISOString())}`;
+    for (const path of ['/api/v1/articles', `/api/v1/blogs/${marker}-public-a/articles`]) {
+      const response = await app.inject(`${path}?q=${marker}-near-future&${window}`);
+      assert.equal(response.statusCode, 200);
+      assert.equal(response.json().items.length, 0, 'clock skew is not permission to reveal unpublished posts');
+    }
+    // v1 title search remains distinct from the website's historical body search.
+    const bodyUrl = `https://public-a.example/${marker}/body-only`;
+    const [bodyOnly] = await pool.query<ResultSetHeader>(
+      'INSERT INTO posts(blog_id,guid,url,title,summary,published_at,created_at) VALUES(?,?,?,?,?,?,?)',
+      [blogs[0], bodyUrl, bodyUrl, '不含搜尋詞的標題', `蛤蜊絲瓜-${marker}`, published, now],
+    );
+    posts.push(bodyOnly.insertId);
+    const bodyText = `只在正文與摘要出現蛤蜊絲瓜-${marker}`;
+    await pool.query(
+      `INSERT INTO content_post_bodies(post_id,blog_id,body_text,content_hash,completeness,status,source_kind,source_url,article_url,adapter_id,adapter_version,rule_revision,obtained_at,next_attempt_at,last_attempt_at,coverage)
+       VALUES(?,?,?,?,'full','ok','rss-content',?,?,'fixture','v1',1,UTC_TIMESTAMP(),UTC_TIMESTAMP(),UTC_TIMESTAMP(),'fixture')`,
+      [bodyOnly.insertId, blogs[0], bodyText, createHash('sha256').update(bodyText).digest('hex'), bodyUrl, bodyUrl],
+    );
+    const bodySearch = await app.inject(`/api/v1/articles?q=${encodeURIComponent(`蛤蜊絲瓜-${marker}`)}`);
+    assert.equal(bodySearch.statusCode, 200);
+    assert.equal(bodySearch.json().items.length, 0, 'v1 q matches title, not body or summary');
     const directory = await app.inject(`/api/v1/blogs?q=${marker}&limit=1`);
     assert.equal(directory.statusCode, 200);
     assert.equal(directory.json().items[0].id, blogs[0]);
@@ -101,6 +130,8 @@ export async function runPublicApiIntegration(pool: Pool) {
     assert.equal((await app.inject(`/api/v1/topics/rss%3A${tags[1]}`)).statusCode, 404);
     return {
       paginationRows: ids.length,
+      nearFutureExcluded: true,
+      titleOnlySearch: true,
       verifiedBlogs: 2,
       privateBlogsExcluded: 1,
       nativeDetailCompatible: true,
@@ -109,6 +140,7 @@ export async function runPublicApiIntegration(pool: Pool) {
   } finally {
     await app.close();
     if (posts.length) {
+      await pool.query('DELETE FROM content_post_bodies WHERE post_id IN (?)', [posts]);
       await pool.query('DELETE FROM post_tags WHERE post_id IN (?)', [posts]);
       await pool.query('DELETE FROM posts WHERE id IN (?)', [posts]);
     }
