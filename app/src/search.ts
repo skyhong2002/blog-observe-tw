@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import type { Pool, RowDataPacket } from 'mysql2/promise';
 import { publicPost, publicSummary } from './public-post.ts';
+import { loadFulltextSearch } from './search-fulltext.ts';
 import { loadIndexedBodySearch } from './search-body-index.ts';
 import {
   boundedSearchStatement,
@@ -30,6 +31,7 @@ export async function loadSearch(
   filters: NonNullable<ReturnType<typeof searchFilters>>,
   options = { historicalBody: process.env.BLOG_SEARCH_HISTORICAL_BODY_ENABLED === 'true' },
 ) {
+  if (process.env.BLOG_SEARCH_FULLTEXT_ENABLED === 'true' && Array.from(filters.q).length >= 2) return loadFulltextSearch(pool, filters);
   const { q, page, limit, blog } = filters;
   // IDs describe ingestion order, not article publication recency.
   const scope = `SELECT p.id FROM posts p FORCE INDEX (PRIMARY) STRAIGHT_JOIN blogs b ON b.id=p.blog_id WHERE ${PUBLIC_SEARCH_SQL} ${blog ? 'AND b.slug=?' : ''} ORDER BY p.id DESC LIMIT ${SEARCH_SCOPE_LIMIT + 1}`;

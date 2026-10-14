@@ -141,7 +141,7 @@ describe('search hit evidence', () => {
     expect(hit.text()).toContain('內文相符');
     expect(hit.text()).toContain(SNIPPET);
     expect(hit.find('[data-search-evidence]').text()).toBe(
-      '文章 #20875 · 比對版本 nfkc-lower-trigram-prefix-v1 · 片段來源 已建索引的正文前段 · 片段經 NFKC 與小寫正規化，大小寫可能與原文不同',
+      '文章 #20875 · 比對版本 nfkc-lower-trigram-prefix-v1 · 片段來源 已取得的文章正文 · 片段經 NFKC 與小寫正規化，大小寫可能與原文不同',
     );
     expect(hit.find('a[href="https://a.example/p/20875"]').length).toBeGreaterThan(0);
     // The metadata hit says where its snippet came from, and no normalization it did not get.

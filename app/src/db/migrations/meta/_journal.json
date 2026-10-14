@@ -190,6 +190,13 @@
       "when": 1791907426669,
       "tag": "0026_full_index_proof_sidecar",
       "breakpoints": true
+    },
+    {
+      "idx": 27,
+      "version": "5",
+      "when": 1792005404616,
+      "tag": "0027_historical_fulltext",
+      "breakpoints": true
     }
   ]
 }

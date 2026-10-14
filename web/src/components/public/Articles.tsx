@@ -11,6 +11,7 @@ import { blogHref } from '@/lib/page-links';
 import {
   bytesText,
   countText,
+  HISTORICAL_COVERAGE_TYPE,
   type HistoricalBodyCoverage,
   MISSING,
   normalizeSearch,
@@ -46,14 +47,22 @@ function Pager({ asked, result }: { asked: SearchParams; result: SearchResult })
   );
 }
 
+const WHOLE_BODY_INDEX = 'nfkc-bigram-whole-body-v1';
+const METADATA_FIELD_TEXT: Record<string, string> = { title: '標題', summary: '摘要', 'blog-name': '部落格名稱', 'public-tags': '公開標籤' };
+
 /** The historical-body part of the scope, in the gateway's own terms; no state is read as "none found" or "everything". */
-function historicalBodyText(body: HistoricalBodyCoverage | null) {
+function historicalBodyText(body: HistoricalBodyCoverage | null, wholeBody: boolean) {
   if (!body) return '歷史正文搜尋：此搜尋服務未提供正文索引的範圍，無法說明是否查過較早文章的正文。';
   switch (body.status) {
     case 'not-enabled':
       return '歷史正文搜尋目前未開啟：較早文章的正文沒有被搜尋。';
     case 'short-query':
-      return '關鍵字少於 3 個字，這次沒有使用歷史正文索引；這不代表較早文章的正文沒有提到它。';
+      // The older prefix index needed 3 characters; the whole-body bigram index needs 2.
+      return wholeBody
+        ? '關鍵字少於 2 個字，這次沒有使用正文索引；這不代表文章正文沒有提到它。'
+        : '關鍵字少於 3 個字，這次沒有使用歷史正文索引；這不代表較早文章的正文沒有提到它。';
+    case 'indexed':
+      return `正文：也搜尋已建索引文章（含歷史文章）的整篇已取得正文，每篇上限 ${bytesText(body.rawBodyByteLimit)}${body.candidateTruncated === true ? '；本次候選已達上限，可能還有未列出的文章' : ''}。尚未取得正文或尚未建索引的文章不在範圍內，並非原站全文的完整搜尋。`;
     case 'unavailable':
       return '歷史正文索引這次無法使用；這不代表較早文章的正文沒有提到它。';
     case 'partial':
@@ -63,17 +72,31 @@ function historicalBodyText(body: HistoricalBodyCoverage | null) {
   }
 }
 
+/** Metadata line: the older contract searched the latest N posts; the historical one all indexed public posts. */
+function metadataText({ limit, scannedPosts, truncated, metadataScope, metadataFields }: SearchResult['coverage']) {
+  if (metadataScope === 'all-indexed-public-posts') {
+    const fields = (metadataFields?.length ? metadataFields : ['title', 'summary', 'blog-name'])
+      .map((f) => METADATA_FIELD_TEXT[f] ?? f)
+      .join('、');
+    return `${fields}：搜尋所有已建索引的公開文章（含歷史文章）。${
+      truncated === true
+        ? `符合的文章超過 ${limit === null ? MISSING : limit.toLocaleString('zh-TW')} 篇候選上限，只列出其中一部分。`
+        : ''
+    }`;
+  }
+  return `標題、摘要、部落格名稱與公開標籤：${
+    limit === null ? `查找範圍${MISSING}` : `只查最近收錄的最多 ${limit.toLocaleString('zh-TW')} 篇`
+  }（本次查找 ${countText(scannedPosts)} 篇）${truncated === true ? '，更早收錄的文章不在這部分的範圍內' : ''}。`;
+}
+
 function Coverage({ result }: { result: SearchResult }) {
-  const { limit, scannedPosts, truncated, historicalBody: body } = result.coverage;
+  const { limit, metadataScope, historicalBody: body } = result.coverage;
+  const wholeBody =
+    body?.status === 'indexed' || body?.indexVersion === WHOLE_BODY_INDEX || result.coverage.type === HISTORICAL_COVERAGE_TYPE;
   return (
     <div className="space-y-1 text-xs leading-5 text-zinc-500 dark:text-zinc-400" data-search-coverage="">
-      <p>
-        標題、摘要、部落格名稱與公開標籤：
-        {limit === null ? `查找範圍${MISSING}` : `只查最近收錄的最多 ${limit.toLocaleString('zh-TW')} 篇`}
-        （本次查找 {countText(scannedPosts)} 篇）
-        {truncated === true ? '，更早收錄的文章不在這部分的範圍內' : ''}。
-      </p>
-      <p>{historicalBodyText(body)}</p>
+      <p>{metadataText(result.coverage)}</p>
+      <p>{historicalBodyText(body, wholeBody)}</p>
       <p>
         結果只顯示短片段，全文請至原站閱讀。
         {result.generatedAt && ` ${taipei(result.generatedAt)} 更新。`}
@@ -91,6 +114,29 @@ function Coverage({ result }: { result: SearchResult }) {
               {countText(body.prefixTruncatedCandidates)} 篇。
             </li>
             <li>未建索引的文章數：{body.unindexed === 'unknown' ? '未知' : countText(body.unindexed)}。</li>
+          </ul>
+        </details>
+      ) : null}
+      {body?.status === 'indexed' ? (
+        <details className="group">
+          <summary className="cursor-pointer text-brand-700 hover:underline dark:text-brand-400">搜尋範圍與比對細節</summary>
+          <ul className="mt-1 space-y-0.5">
+            <li>
+              索引版本 {body.indexVersion ?? MISSING} · 正規化 {body.normalization ?? MISSING} · 範圍 {body.scope ?? MISSING}
+            </li>
+            <li>
+              比對每篇已取得的整篇正文（不只前段），原始正文上限 {bytesText(body.rawBodyByteLimit)}；超過上限 {countText(body.overcap)}{' '}
+              篇、編碼無效 {countText(body.invalidUtf8)} 篇、過期或不符資格 {countText(body.staleOrIneligible)} 篇不列入。
+            </li>
+            <li>
+              正文候選上限 {countText(body.candidateLimit)} 篇，本次候選 {countText(body.candidates)} 篇
+              {body.candidateTruncated === true ? '（已達上限）' : ''}
+              {metadataScope === 'all-indexed-public-posts' ? `；結果候選上限 ${countText(limit)} 篇` : ''}。
+            </li>
+            <li>
+              正文索引可能仍在分批建立；未建索引的文章數：{body.unindexed === 'unknown' ? '未知' : countText(body.unindexed)}
+              。本站只比對已取得的正文，不保證已取得原站全文。
+            </li>
           </ul>
         </details>
       ) : null}

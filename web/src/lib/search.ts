@@ -1,7 +1,8 @@
 /**
- * Search via the gateway's /api/search (app/src/search.ts): a metadata match over
- * the latest ingested posts, plus, when the gateway enables it, a partial index
- * of collected article bodies (app/src/search-body-index.ts). The page shows the
+ * Search via the gateway's /api/search (app/src/search.ts). Older gateways match
+ * metadata over the latest ingested posts plus a partial body-prefix index; the
+ * historical contract (HISTORICAL_COVERAGE_TYPE) matches metadata over all indexed
+ * public posts plus the whole collected body of indexed articles. The page shows the
  * API's short snippet (≤240 characters) and never any further body text.
  * normalizeSearch keeps an explicit allowlist: no input key reaches the view
  * unless it is listed and typed here. Pure helpers only (node --test imports
@@ -24,7 +25,10 @@ export type SearchEvidence = {
   snippetNormalization: string | null;
 };
 export type SearchItem = Post & { snippet: string | null; matchSource: MatchSource | null } & SearchEvidence;
-export const HISTORICAL_STATUSES = ['not-enabled', 'short-query', 'partial', 'unavailable'] as const;
+/** `indexed`: the whole-body index (nfkc-bigram-whole-body-v1); `partial`: the older prefix index, still accepted. */
+export const HISTORICAL_STATUSES = ['not-enabled', 'short-query', 'partial', 'indexed', 'unavailable'] as const;
+/** coverage.type of the historical whole-body contract: metadata over all indexed public posts plus whole collected bodies. */
+export const HISTORICAL_COVERAGE_TYPE = 'historical-indexed-metadata-and-whole-body';
 /** coverage.historicalBody; `unrecognized` is a status this page does not know, shown as not provided. */
 export type HistoricalBodyCoverage = {
   status: (typeof HISTORICAL_STATUSES)[number] | 'unrecognized';
@@ -47,8 +51,13 @@ export type HistoricalBodyCoverage = {
 };
 export type SearchCoverage = {
   type: string | null;
-  /** The metadata scope: the latest `limit` ingested posts. null: not provided, never assumed. */
+  /**
+   * Older contract: the latest `limit` ingested posts. Historical contract (metadataScope all-indexed-public-posts):
+   * the cap on result candidates, not a recency window. null: not provided, never assumed.
+   */
   limit: number | null;
+  /** coverage.metadata.scope, e.g. 'latest-ingested-ids' or 'all-indexed-public-posts'; null when not sent. */
+  metadataScope: string | null;
   scannedPosts: number | null;
   truncated: boolean | null;
   metadataFields: string[] | null;
@@ -190,6 +199,7 @@ function coverageOf(value: unknown): SearchCoverage {
   return {
     type: label(coverage.type),
     limit: positive(coverage.limit),
+    metadataScope: metadata ? label(metadata.scope) : null,
     scannedPosts: count(coverage.scannedPosts),
     truncated: flag(coverage.truncated),
     metadataFields: fields,
@@ -233,7 +243,7 @@ const CONTEXT_LABELS: Record<ContextSource, string> = {
   summary: '公開摘要',
   'blog-name': '部落格名稱',
   tag: '公開標籤',
-  body: '已建索引的正文前段',
+  body: '已取得的文章正文',
   metadata: '標題或摘要',
 };
 /** Where the snippet came from, as the gateway said; never inferred from matchSource. */

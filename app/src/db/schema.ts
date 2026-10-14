@@ -1,5 +1,18 @@
 import { sql } from 'drizzle-orm';
-import { boolean, char, datetime, index, int, json, mysqlTable, primaryKey, text, uniqueIndex, varchar } from 'drizzle-orm/mysql-core';
+import {
+  boolean,
+  char,
+  datetime,
+  index,
+  int,
+  json,
+  mediumtext,
+  mysqlTable,
+  primaryKey,
+  text,
+  uniqueIndex,
+  varchar,
+} from 'drizzle-orm/mysql-core';
 import type { BlogrollLink } from '../crawl/blogroll-contract.ts';
 
 /**
@@ -489,3 +502,14 @@ export * from '../tech/schema.ts';
 export * from '../topics/history-schema.ts';
 export * from '../topics/schema.ts';
 export * from '../topics/shared-label-schema.ts';
+
+/** Encoded bigram FULLTEXT is created by additive migration 0027; Drizzle's MySQL
+ * index builder does not represent FULLTEXT, so do not replace it with a BTREE index. */
+export const postSearchDocuments = mysqlTable('post_search_documents', {
+  postId: int('post_id').primaryKey(),
+  indexVersion: varchar('index_version', { length: 64 }).notNull(),
+  metadataHash: char('metadata_hash', { length: 64 }).notNull(),
+  bodyHash: char('body_hash', { length: 64 }),
+  tokens: mediumtext('tokens').notNull(),
+  indexedAt: datetime('indexed_at').notNull(),
+});

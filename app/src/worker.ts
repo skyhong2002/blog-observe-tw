@@ -1,3 +1,4 @@
+import { runFulltextBatch, indexFulltextPosts, indexMissingFulltextPosts } from './search-fulltext.ts';
 import { Queue, Worker } from 'bullmq';
 import { Redis } from 'ioredis';
 import pino from 'pino';
@@ -56,7 +57,8 @@ const relationsEnabled = process.env.BLOG_RELATIONS_ENABLED === 'true';
 const aiEnabled = process.env.BLOG_AI_ENABLED === 'true';
 const topicsEnabled = process.env.BLOG_TOPICS_ENABLED === 'true';
 const vocabularyEnabled = process.env.BLOG_VOCABULARY_ENABLED === 'true';
-const indexAdoptionEnabled = process.env.BLOG_SEARCH_INDEX_ADOPTION_ENABLED === 'true';
+const indexAdoptionEnabled =
+  process.env.BLOG_SEARCH_INDEX_ADOPTION_ENABLED === 'true' || process.env.BLOG_SEARCH_FULLTEXT_ENABLED === 'true';
 const enqueueIndex = createIndexJobEnqueue((name, data, options) => queue.add(name, data, options));
 const claimIndex = createIndexJobClaim(async (key) => (await connection.set(key, 'claimed-not-indexed', 'NX')) === 'OK');
 const indexOptions = {
@@ -70,6 +72,7 @@ const contentEnabled = process.env.BLOG_CONTENT_ENABLED === 'true';
 const shutdown = new AbortController();
 const missingIconsEnabled = process.env.BLOG_MISSING_FAVICONS_ENABLED !== 'false';
 for (const [name, every, enabled] of [
+  ['blogs-fulltext', 60_000, process.env.BLOG_SEARCH_FULLTEXT_ENABLED === 'true'],
   ['blogs-content', 5 * 60_000, contentEnabled],
   ['blogs-relation-snapshots', 5 * 60_000, process.env.BLOG_RELATION_SNAPSHOTS_ENABLED !== 'false'],
   ['blogs-relations', 5 * 60_000, relationsEnabled],
@@ -108,6 +111,18 @@ const worker = new Worker(
       const aliases = await backfillTopicRouteAliases(store.pool, { limit: 100, missingOnly: true });
       return { blogs, topics, aliases };
     }
+    if (job.name === 'blogs-fulltext') {
+      const cursorKey = `${config.queueName}:fulltext-cursor`;
+      const after = Number((await connection.get(cursorKey)) || 0);
+      const newCursorKey = `${config.queueName}:fulltext-new-cursor`;
+      const missing = await indexMissingFulltextPosts(store.pool, Number((await connection.get(newCursorKey)) || 0), 50);
+      await connection.set(newCursorKey, String(missing.next));
+      const result = await runFulltextBatch(store.pool, { after, limit: 50, signal: shutdown.signal });
+      await connection.set(cursorKey, String(result.next));
+      return { processed: result.items.length, newPosts: missing.items.length, next: result.next, done: result.done };
+    }
+    if (job.name === SEARCH_INDEX_JOB && process.env.BLOG_SEARCH_FULLTEXT_ENABLED === 'true')
+      return indexFulltextPosts(store.pool, job.data.postIds);
     if (job.name === SEARCH_INDEX_JOB)
       return runSearchIndexJob(store.pool, job.data, {
         enabled: indexAdoptionEnabled,

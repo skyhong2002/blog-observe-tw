@@ -1,6 +1,14 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { clampSnippet, normalizeSearch, SNIPPET_MAX, searchHref, searchParamsOf, searchPath } from '../src/lib/search.ts';
+import {
+  clampSnippet,
+  contextSourceText,
+  normalizeSearch,
+  SNIPPET_MAX,
+  searchHref,
+  searchParamsOf,
+  searchPath,
+} from '../src/lib/search.ts';
 
 const asked = { q: '咖啡', page: 2, blog: null };
 /** Shape of the gateway's /api/search. */
@@ -257,6 +265,62 @@ test('every historical state is kept apart: off, short query, unavailable, parti
   const zero = normalizeSearch(current({ ...partial, candidates: 0, candidateTruncated: false }, []), q1);
   assert.equal(zero?.coverage.historicalBody?.candidates, 0, 'a reported 0 stays 0');
   assert.equal(zero?.coverage.historicalBody?.candidateTruncated, false);
+});
+
+test('historical whole-body contract: metadata over all indexed posts, indexed status, whole collected body', () => {
+  const indexed = {
+    status: 'indexed',
+    indexVersion: 'nfkc-bigram-whole-body-v1',
+    normalization: 'NFKC-then-lowercase',
+    scope: 'whole-collected-body',
+    rawBodyByteLimit: 131072,
+    candidateLimit: 200,
+    candidates: 12,
+    candidateTruncated: false,
+    staleOrIneligible: 0,
+    invalidUtf8: 0,
+    overcap: 1,
+    unindexed: 'unknown',
+    exhaustive: false,
+  };
+  const wholeHit = { ...bodyHit, matchVersion: 'nfkc-bigram-whole-body-v1' };
+  const raw = {
+    items: [wholeHit, metadataHit],
+    pagination: { page: 1, pageSize: 20, hasMore: false },
+    coverage: {
+      type: 'historical-indexed-metadata-and-whole-body',
+      limit: 200,
+      truncated: false,
+      metadata: { scope: 'all-indexed-public-posts', fields: ['title', 'summary', 'blog-name'], exhaustive: false },
+      historicalBody: indexed,
+    },
+    query: '蛤蜊絲瓜',
+    generatedAt: '2026-10-15T00:00:00.000Z',
+  };
+  const result = normalizeSearch(raw, q1);
+  assert.ok(result);
+  assert.equal(result.coverage.type, 'historical-indexed-metadata-and-whole-body');
+  assert.equal(result.coverage.metadataScope, 'all-indexed-public-posts');
+  assert.equal(result.coverage.limit, 200, 'the result-candidate cap, not a recency window');
+  assert.equal(result.coverage.truncated, false);
+  assert.equal(result.coverage.scannedPosts, null, 'not sent, not assumed');
+  assert.deepEqual(result.coverage.metadataFields, ['title', 'summary', 'blog-name']);
+  const body = result.coverage.historicalBody;
+  assert.ok(body);
+  assert.equal(body.status, 'indexed');
+  assert.equal(body.scope, 'whole-collected-body');
+  assert.equal(body.indexVersion, 'nfkc-bigram-whole-body-v1');
+  assert.equal(body.rawBodyByteLimit, 131072);
+  assert.equal(body.candidateLimit, 200);
+  assert.equal(body.prefixCodepoints, null, 'no prefix limit is reported or invented');
+  assert.equal(body.exhaustive, false);
+  const hit = result.items.find((item) => item.articleId === 20875);
+  assert.equal(hit?.contextSource, 'body');
+  assert.equal(hit?.matchVersion, 'nfkc-bigram-whole-body-v1');
+  assert.equal(hit?.snippet, BODY_SNIPPET);
+  assert.equal(contextSourceText('body'), '已取得的文章正文');
+  // The older contract still reads its own scope.
+  assert.equal(normalizeSearch(current(partial), q1)?.coverage.metadataScope, 'latest-ingested-ids');
 });
 
 test('clampSnippet', () => {
