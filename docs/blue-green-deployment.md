@@ -1,10 +1,11 @@
 # Blue/green 部署前置（尚未代表正式站已切換）
 
-**最新發版規則：**Mint一次建置、技術/B0與主要candidate頁面非作者看圖後，
+**目前發版與保留規則（2026-10-14）：**在 SM 建置；技術/B0與主要candidate頁面非作者看圖後，
 用 `record-built`／`prepare-built`／`switch` 部署同一份產物；SM不執行會重建的
 `prepare`。其餘頁面部署後逐頁review、ledger保留pending。備份須先於additive
 migration，完整閘門與立即回滾見 [下一批release](next-release-candidate.md)。
-下方含早期引入程序及歷史建置方式，不應當作本輪SM建置許可。
+release／build cache 採[滾動保留](release-retention.md)：正式版、一個回滾版及正在部署的候選；仍被 unit、slot 或程序引用的目錄不得刪除。備份、正式資料和一般 worktree 保留。
+下方含早期引入程序及歷史建置方式；Mint 和永久保留的舊描述不是目前規則。
 
 本方案新增固定 loopback edge，不修改 Cloudflare／Tunnel、tag、youtube、既有 blog units、資料表或 worker。正式啟用前必須經整合審查。既有 gateway 直接監聽 18160 的發版流程仍有 restart 空窗，不能稱為零停機。
 
@@ -79,7 +80,7 @@ bash tools/deploy-blue-green.sh switch blue
 
 首次接管前須對仍可能被 CF／瀏覽器引用的既有版本（至少 d6／f6）執行 `archive-static`。這個命令只把指定 SHA release 的 static append 進集合，不啟動／停止服務或切換 listener。
 
-這一版**沒有自動資產或 release 清理**。需觀察磁碟用量；容量政策應另行審查，不在發版時臨時刪除。Static union 僅保護 `/_next/static`；其他非版本化 public 檔案須保持向後相容，不能把改名刪檔當成已受此機制保護。
+工具**沒有自動資產或 release 清理**。release 與建置快取依目前的[滾動保留政策](release-retention.md)人工清理；本次未刪除 static union。Static union 僅保護 `/_next/static`；其他非版本化 public 檔案須保持向後相容，不能把改名刪檔當成已受此機制保護。
 
 ```bash
 # 舊 blue pair 必須仍在運作且其 ready/build ID 未變。

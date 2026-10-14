@@ -3,7 +3,7 @@
 ## 目前狀態（2026-10-14 UTC16:22正式驗收後）
 
 - 正式：**blue／gen16／af0e73ccc3c5ace88dc8fb6f45d7d76123c218da**，UTC16:14:07.167切換。
-  BUILD_ID **LdOP5yqOhKdYbIlHZVfoN**。green／76a90e7保持在線回滾；所有release、備份、worktree保留。
+  BUILD_ID **LdOP5yqOhKdYbIlHZVfoN**。green／76a90e7保持在線回滾。依[使用者核准的滾動保留政策](release-retention.md)清理舊release／建置checkout；備份、正式資料、一般worktree與review證據保留。
 - 建置位置：**Steam Machine（SM）**。本批只有gateway SQL改動，web tree與兩份lockfile完全相同，
   沿用f77已build/review的前端產物，沒有新的Next build；新APP＋同frontend compose後跑完新SHA的B0。
   Mint／gen5／SM禁止build的舊段落只代表當時狀態，不代表現行流程。
