@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import type { Pool, ResultSetHeader, RowDataPacket } from 'mysql2/promise';
+import { assertEphemeralDatabase } from '../../../tests/integration/guard.mjs';
 import { topicDetail as publicDetail } from '../public-api/topics.ts';
 import { CLEANUP_VERSION } from './matching-body.ts';
 import { digest, MATCHER_VERSION, POLICY_VERSION, projectTopicTerms } from './policy.ts';
@@ -8,7 +9,8 @@ import { ranking, resolveTopic, topicEvidenceDetail, vocabularyStatus } from './
 import { SOURCE } from './snapshot-client.ts';
 
 /** The golden fixture controls the corpus/time and exercises actual SQL, not a mirrored JS formula. */
-export async function runTopicRankingIntegration(pool: Pool) {
+export async function runTopicRankingIntegration(pool: Pool, persisted = { policy: POLICY_VERSION, matcher: MATCHER_VERSION }) {
+  assertEphemeralDatabase(pool);
   assert.equal((pool as unknown as { pool: { config: { connectionConfig: { port: number } } } }).pool.config.connectionConfig.port, 18169);
   const snapshot = randomUUID(),
     now = new Date('2037-10-12T12:00:00Z');
@@ -36,7 +38,7 @@ export async function runTopicRankingIntegration(pool: Pool) {
     for (const t of projected.terms)
       await pool.execute(
         'INSERT INTO topic_canonical_terms_v3(snapshot_id,id,normalized_label,label,exclusion_reason,occurrences,policy_version) VALUES (?,?,?,?,?,?,?)',
-        [snapshot, t.id, t.normalizedLabel, t.label, t.exclusionReason, t.occurrences, POLICY_VERSION],
+        [snapshot, t.id, t.normalizedLabel, t.label, t.exclusionReason, t.occurrences, persisted.policy],
       );
     for (const a of projected.aliases)
       await pool.execute('INSERT INTO topic_term_aliases_v3(snapshot_id,term_id,canonical_id) VALUES (?,?,?)', [
@@ -72,7 +74,7 @@ export async function runTopicRankingIntegration(pool: Pool) {
         );
         await pool.execute(
           "INSERT INTO topic_post_indexes_v3(post_id,snapshot_id,input_hash,post_hash,body_hash,matched_at,status,matcher_version,cleanup_version,body_kind) VALUES (?,?,?,?,?,?,'ok',?,?,?)",
-          [post.insertId, snapshot, digest('input'), postHash, hash, now, MATCHER_VERSION, CLEANUP_VERSION, 'text'],
+          [post.insertId, snapshot, digest('input'), postHash, hash, now, persisted.matcher, CLEANUP_VERSION, 'text'],
         );
         await pool.execute("INSERT INTO topic_matches_v3(post_id,term_id,snapshot_id,source) VALUES (?,?,?,'body')", [
           post.insertId,
@@ -121,7 +123,7 @@ export async function runTopicRankingIntegration(pool: Pool) {
     const extraId = digest('旅行');
     await pool.execute(
       'INSERT INTO topic_canonical_terms_v3(snapshot_id,id,normalized_label,label,occurrences,policy_version) VALUES (?,?,?,?,?,?)',
-      [snapshot, extraId, '旅行', '旅行', 10, POLICY_VERSION],
+      [snapshot, extraId, '旅行', '旅行', 10, persisted.policy],
     );
     for (const postId of [posts[0], posts[3]])
       await pool.execute("INSERT INTO topic_matches_v3(post_id,term_id,snapshot_id,source) VALUES (?,?,?,'body')", [
@@ -166,7 +168,17 @@ export async function runTopicRankingIntegration(pool: Pool) {
     await pool.execute('UPDATE posts SET content_hash=? WHERE id=?', [digest('changed'), posts[1]]);
     const changed = await ranking(pool, 30, undefined, true, 100, now);
     assert.equal(changed.items[0].posts, 4, 'changed title hash invalidates evidence');
+    await pool.execute('UPDATE topic_canonical_terms_v3 SET policy_version=? WHERE snapshot_id=?', ['unrecognized', snapshot]);
+    assert.deepEqual((await ranking(pool, 30, undefined, true, 100, now)).items, [], 'unknown/mixed policy evidence stays excluded');
+    await pool.execute('UPDATE topic_canonical_terms_v3 SET policy_version=? WHERE snapshot_id=?', [persisted.policy, snapshot]);
+    assert.equal(
+      (await ranking(pool, 30, undefined, true, 100, now)).items[0].posts,
+      4,
+      'restoring the exact pair restores only fresh evidence',
+    );
     return {
+      persisted,
+      unknownPolicyExcluded: true,
       mergedCanonical: true,
       titleBodyDedup: true,
       titleWeightedScore: 3.25,

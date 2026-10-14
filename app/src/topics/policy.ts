@@ -5,15 +5,24 @@ import { CLEANUP_VERSION } from './matching-body.ts';
 import { publicationExclusionReason } from './publication-noise.ts';
 import { isTagNoise } from './vendor/tag-noise.ts';
 
+/** One immutable process profile binds reader/writer algorithms to their persisted versions. */
+export function normalizationProfile(env: Record<string, string | undefined>) {
+  const format = env.BLOG_TOPIC_FORMAT_NORMALIZATION_ENABLED === 'true';
+  // New namespaces are not prepared in production yet. Keep this opt-in offline until cutover is supported.
+  if (format && env.NODE_ENV === 'production') throw Error('topic_format_normalization_not_ready_for_production');
+  return Object.freeze({
+    version: `nfkc-lower-en-US-${format ? 'strip-format-v1-' : ''}unicode-${process.versions.unicode}`,
+    normalize: (value: string) => {
+      const folded = value.normalize('NFKC').toLocaleLowerCase('en-US');
+      return (format ? folded.replace(/\p{Cf}/gu, '') : folded).replace(/\s+/gu, ' ').trim();
+    },
+    display: (value: string) => (format ? value.replace(/\p{Cf}/gu, '').trim() : value),
+  });
+}
+const NORMALIZATION_PROFILE = normalizationProfile(process.env);
 /** Derived matching identity only. Original exact-label IDs/payloads remain in the upstream pool. */
-export const normalizeTerm = (value: string) =>
-  value
-    .normalize('NFKC')
-    .toLocaleLowerCase('en-US')
-    .replace(/\p{Cf}/gu, '')
-    .replace(/\s+/gu, ' ')
-    .trim();
-export const displayTerm = (value: string) => value.replace(/\p{Cf}/gu, '').trim();
+export const normalizeTerm = NORMALIZATION_PROFILE.normalize;
+export const displayTerm = NORMALIZATION_PROFILE.display;
 /** Only derived VARCHAR lookup columns are shortened; canonical identity always hashes the complete normalization. */
 export const storedNormalizedLabel = (label: string) => [...normalizeTerm(label)].slice(0, 255).join('');
 export const digest = (value: string) => createHash('sha256').update(value).digest('hex');
@@ -29,7 +38,7 @@ export const ACTIVE_TOPIC_LIMITS = Object.freeze({
   minArticleCount: 3,
   recentDays: 180,
 });
-export const NORMALIZATION_VERSION = `nfkc-lower-en-US-strip-format-v1-unicode-${process.versions.unicode}`;
+export const NORMALIZATION_VERSION = NORMALIZATION_PROFILE.version;
 export const POLICY_VERSION = `topic-policy-v3:${digest(UPSTREAM_COMMIT + readFileSync(new URL('./vendor/tag-noise.ts', import.meta.url), 'utf8') + readFileSync(new URL('../../data/topic-no-equal-tags.json', import.meta.url), 'utf8') + NORMALIZATION_VERSION + JSON.stringify(ACTIVE_TOPIC_LIMITS) + ':max-alias-count-last-date-count-desc-id-desc:shadow-v3-per-snapshot')}`;
 export const MATCHER_VERSION = `topic-matcher-v3:${digest(POLICY_VERSION + CLEANUP_VERSION + ':nfkc-latin-boundaries-title2-body1')}`;
 

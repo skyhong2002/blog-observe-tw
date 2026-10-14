@@ -1,9 +1,18 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { TopicMatcher } from './matcher.ts';
-import { digest, displayTerm, exclusionReason, MATCHER_VERSION, normalizeTerm, POLICY_VERSION, projectTopicTerms } from './policy.ts';
+import { digest, exclusionReason, MATCHER_VERSION, normalizeTerm, POLICY_VERSION, projectTopicTerms } from './policy.ts';
 
 describe('crowdsourced vocabulary matching policy', () => {
-  it('merges zero-width/case/width variants in derived matching, preserving exact raw source labels and IDs', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.resetModules();
+  });
+  it('merges zero-width/case/width variants only in the explicitly selected new namespace, preserving raw labels and IDs', async () => {
+    vi.stubEnv('NODE_ENV', 'test');
+    vi.stubEnv('BLOG_TOPIC_FORMAT_NORMALIZATION_ENABLED', 'true');
+    vi.resetModules();
+    const { projectTopicTerms, displayTerm, exclusionReason } = await import('./policy.ts');
+    const { TopicMatcher } = await import('./matcher.ts');
     const raw = ['\u200BTPBL', 'tpbl', 'ＴＰＢＬ', 'T\u200cP\u200dBL', '\uFEFFTPBL', 'TP\u2060BL'];
     const input = raw.map((label, i) => ({ id: digest(label), label, payload: { articleCount: 10 - i } }));
     const result = projectTopicTerms(input);
