@@ -1,5 +1,16 @@
 # UI 逐頁審查紀錄
 
+## 現況（UTC2026-10-14T21:35:12.257Z，gen21）
+
+正式 **green／gen21／b8c1350e38a118c26a67fe67fc1336814e3685f0**，**Next BUILD_ID F_zSp1Bg_oZWzezesLRmQ**；blue af0在線回滾。gen19至gen21只是公開v1的未發布文章predicate修正，**n/a-ui**，web tree／兩份lockfile／data/openapi與同一份前端artifact完全相同。gen19正式看圖與gen17歷史證據保留原SHA，不改標成b8。
+
+本批source：既有非作者Opus5.5通過，實際modelUsage/success位於 `/home/deck/.cache/blog-home-cloud-b3-20261014/.reviews/f3-fulltext/public-title-future-opus-review.json`；其建議補真正body fixture已採納，18169真實SQL＋gateway inject regression位於同目錄 `public-title-future-integration-final.log`。此項不拿圖片代替API隐私测试。
+B8實際runtime的53 barrier＋60 SSR/RSC在 `/home/deck/.t3/projects/blog-observe-tw/.reviews/b0-final-barrier/b8c1350e38a118c26a67fe67fc1336814e3685f0/runner-result.json`；另28真正FT旗標HTTP隱私在 `/home/deck/.cache/blog-home-cloud-b3-20261014/.reviews/f3-fulltext/isolated-api-future-result.json`，正式23項 `formal-acceptance-future.json`。no-store／DYNAMIC、HSTS86400與三站200不變；CF/WAF未改。
+
+worker仍af0，避免新producer與CLI同時執行；只有一個Nice19／IO idle、pool1、一篇／60秒的小量CLI，從cursor24418續跑。逐批homepage guard非200／>6.17秒就取消，不自動重試。此仍是歷史索引coverage進行中，不宣稱全scope完成。rollback命令 `bash tools/deploy-blue-green.sh rollback blue`。
+
+完整gen17/19/21收據、review、正式圖與raw network的絕對路徑/hash另列 [F3證據總索引](f3-evidence-index.md)。下方gen19的12張正式1280/390為目前同前端產物的實際看圖證據；完整頁、手機表格互動、深色/空/錯/權限及其他route仍pending。
+
 ## 現況（UTC2026-10-14T20:49:04.958Z，gen19）
 
 正式 **green／gen19／46c074c1f7c0871ec7526c9b8e79559c0963602e**，Next **F_zSp1Bg_oZWzezesLRmQ**；blue af0保留在線回滾。F3歷史搜尋已恢復。worker仍是af0，新的全文producer保持停用，回填以一篇／60秒方式另做小量驗證，尚未宣稱歷史coverage全部完成。
