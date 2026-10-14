@@ -209,6 +209,21 @@ const historyArticle = (id: number, evidenceState: HistoryArticle['evidenceState
   observedAt: `2026-0${id}-15T00:00:00.000Z`,
 });
 
+describe('topic detail article titles', () => {
+  test('an entity-encoded title is decoded once for display, stays escaped text, and the payload is untouched', () => {
+    const encoded = 'She Rarely Reaches Out But Our Chemistry &#038; Sex Are Great <script>x</script> &amp;#038;';
+    const data = detail({ articles: [{ ...detail().articles[0], id: 12, title: encoded, url: 'https://a.example/chemistry' }] });
+    const before = structuredClone(data);
+    const $ = render(<TopicDetailView id={ID} path={PATH} days="30" load={ready(data)} />, PATH);
+    const link = $('a[href="https://a.example/chemistry"]');
+    expect(link.text()).toBe('She Rarely Reaches Out But Our Chemistry & Sex Are Great <script>x</script> &#038;');
+    expect(link.find('script').length).toBe(0);
+    expect($.html()).toContain('&lt;script&gt;x&lt;/script&gt;');
+    expect(data).toEqual(before);
+    expect(data.articles[0].title).toBe(encoded);
+  });
+});
+
 describe('topic detail', () => {
   test('articles, then which blogs, then one closed block holding the long record', () => {
     const $ = render(

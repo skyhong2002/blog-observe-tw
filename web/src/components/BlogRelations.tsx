@@ -3,6 +3,7 @@
 // text similarity are listed on their own and never added to those counts. A key an older gateway does not send
 // is said as 未提供, never rendered as an empty success.
 import ReloadButton from '@/components/public/ReloadButton';
+import { displayTitle } from '@/lib/api';
 import { publicJsonOrNull } from '@/lib/public-api';
 import { PublicGatewayError } from '@/lib/public-read';
 import {
@@ -83,7 +84,7 @@ function EvidenceItem({ e, blogId, name }: { e: RelationEvidence; blogId?: numbe
     <li className="min-w-0 break-words">
       <p>
         {direction ? <span className={`mr-2 ${muted}`}>{direction}：</span> : null}
-        <Outbound href={e.postUrl}>{e.postTitle || '（無標題）'}</Outbound>
+        <Outbound href={e.postUrl}>{displayTitle(e.postTitle) || '（無標題）'}</Outbound>
         <span className="mx-2">→</span>
         <Outbound href={e.targetUrl}>{e.anchor || '原始連結'}</Outbound>
       </p>
@@ -145,13 +146,13 @@ function SharedTagRow({ hit }: { hit: SharedTagHit }) {
     <li className="min-w-0 break-words">
       <p>
         <span className={muted}>本站：</span>
-        <Outbound href={hit.sourceArticleUrl}>{hit.sourceArticleTitle || '（無標題）'}</Outbound>
+        <Outbound href={hit.sourceArticleUrl}>{displayTitle(hit.sourceArticleTitle) || '（無標題）'}</Outbound>
         <span className={`ml-1 text-xs ${muted}`}>{dayText(hit.sourceArticlePublishedAt)}</span>
       </p>
       <p>
         {/* Name only: the gateway's slug is an API key, and a guessed /blogs/ path could be the wrong page. */}
         <span className={muted}>{hit.targetBlogName || `部落格 #${hit.targetBlogId}`}：</span>
-        <Outbound href={hit.targetArticleUrl}>{hit.targetArticleTitle || '（無標題）'}</Outbound>
+        <Outbound href={hit.targetArticleUrl}>{displayTitle(hit.targetArticleTitle) || '（無標題）'}</Outbound>
         <span className={`ml-1 text-xs ${muted}`}>{dayText(hit.targetArticlePublishedAt)}</span>
       </p>
       <p className={`mt-1 text-xs ${muted}`}>
@@ -242,7 +243,7 @@ function SimilaritySideRow({ label, side, id }: { label: string; side: Similarit
     <div>
       <p>
         <span className={muted}>{label}：</span>
-        <Outbound href={side.url}>{side.title || '（無標題）'}</Outbound>
+        <Outbound href={side.url}>{displayTitle(side.title) || '（無標題）'}</Outbound>
         <span className={`ml-1 text-xs ${muted}`}>發表 {dayText(side.publishedAt)}</span>
       </p>
       {side.excerpt ? (

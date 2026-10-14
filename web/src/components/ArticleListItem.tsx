@@ -2,7 +2,7 @@ import ArticleThumbnail from '@/components/ArticleThumbnail';
 import BlogIcon from '@/components/BlogIcon';
 import Link from '@/components/NoPrefetchLink';
 import SourceLink from '@/components/SourceLink';
-import { type Post, plainText, taipei } from '@/lib/api';
+import { displayTitle, type Post, plainText, taipei } from '@/lib/api';
 import { blogLink } from '@/lib/page-links';
 import { contextSourceText, MISSING, type SearchEvidence } from '@/lib/search';
 
@@ -34,8 +34,10 @@ export default function ArticleListItem({
   };
   const href = article.url;
   const showMedia = Boolean(article.media);
-  const match = /^\[([^\]]{1,20})\]\s*([\s\S]+)$/.exec(article.title);
-  const headline = match ? { section: match[1], title: match[2] } : { section: null, title: article.title || '未提供標題' };
+  // Display text only: entities are decoded once here; post.title itself is left as the gateway sent it.
+  const shownTitle = displayTitle(post.title);
+  const match = /^\[([^\]]{1,20})\]\s*([\s\S]+)$/.exec(shownTitle);
+  const headline = match ? { section: match[1], title: match[2] } : { section: null, title: shownTitle || '未提供標題' };
   const title = (
     <>
       {headline.section && <span className="mr-1.5 text-xs font-normal text-brand-700 dark:text-brand-400">{headline.section}</span>}

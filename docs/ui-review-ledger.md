@@ -1,5 +1,30 @@
 # UI 逐頁審查紀錄
 
+## 2026-10-14 標題顯示 source 修正：待同產物重拍
+
+同一既有 Opus 5.5 作者 session `6e17a454-0623-4006-8aa4-f733dcde31a9` 完成
+`&#038;` 等合法 numeric／hex 與常見 named entity 的單次顯示解碼；原始
+Post／API title、文章 hash、搜尋／比對證據、列 ID／URL 皆不變。SSR/client
+共用純 helper，React 繼續 escape 文字；未知、不合法與原型名稱保留原文，
+不使用 HTML sink。版型、CSS、summary、privacy predicate 和 no-store 未改。
+
+覆蓋首頁 lead／其他文章／右側最新文章及圖片 aria、ArticleListItem 共用列表、
+TopicDetail 文章、BlogRelations 引用／共同標籤／文字相似的文章標題。
+220 Node／140 SSR／web tsc 通過，包括真 HomePage、TopicDetailView 及圖片
+aria 的合成 render oracle；這些不是 browser 或正式實際畫面。
+
+作者原始 log：`/home/deck/.t3/projects/blog-observe-tw/.reviews/sm-build-9888ebf/title-entities-existing-opus-author.jsonl`
+與同目錄 `title-entities-existing-opus-{followup,assertion-followup,format-test-followup}.jsonl`。
+四份皆為相同 session、actual model `claude-opus-5-5`、success。
+非作者 GPT-6.1 Sol 原始 source review／UTC／檔案 hashes：
+`/home/deck/.t3/userdata/ui-review-blog-20261013/home-perf-independent/title-entities-independent-source-review.json`。
+TE1 prototype 名稱、TE2 真 consumer／強制 aria oracle、TE3 格式空白測試均已關閉。
+
+新 candidate 的首頁、文章列表、話題頁與引用明細需要以新 SHA／BUILD_ID 的
+1280／390 畫面確認 `&` 正常顯示，並驗非空話題與 green 相符。沒有新增 capture，
+不補造截圖、不提升任何整頁 pass；下方 gen8 regression／24項 pending scope 仍有效。
+
+
 ## 2026-10-14 gen8 功能回歸：已撤回部署，待修正版驗收
 
 正式驗收（使用者代轉，UTC06:27）發現首頁共同話題與 `/topics/` 全部變空，

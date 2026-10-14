@@ -113,6 +113,26 @@ function outsideText($: CheerioAPI) {
 }
 const row = ($: CheerioAPI, id: number) => $(`li#article-${id}`);
 
+describe('shared article list title', () => {
+  test('an entity-encoded title is decoded once for display; the thumbnail label matches; markup stays text', () => {
+    const encoded = {
+      ...metadataHit,
+      id: 40001,
+      articleId: 40001,
+      title: 'She Rarely Reaches Out But Our Chemistry &#038; Sex Are Great <b>',
+      imageUrl: 'https://b.example/i.jpg',
+    };
+    const $ = render(answer(partial, [encoded]));
+    const item = row($, 40001);
+    expect(item.find('h3').text()).toBe('She Rarely Reaches Out But Our Chemistry & Sex Are Great <b>');
+    expect(item.find('h3 b').length).toBe(0);
+    expect(item.html()).not.toContain('&amp;#038;');
+    const thumbnail = item.find('a[aria-label^="閱讀："]');
+    expect(thumbnail.length).toBe(1);
+    expect(thumbnail.attr('aria-label')).toBe('閱讀：She Rarely Reaches Out But Our Chemistry & Sex Are Great <b>');
+  });
+});
+
 describe('search hit evidence', () => {
   test('an indexed historical body hit shows its id, version, snippet source and normalization, as plain text', () => {
     const $ = render(answer(partial));

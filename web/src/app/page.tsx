@@ -3,7 +3,7 @@
 import { Suspense } from 'react';
 import BlogIcon from '@/components/BlogIcon';
 import Link from '@/components/NoPrefetchLink';
-import { plainText, taipei } from '@/lib/api';
+import { displayTitle, plainText, taipei } from '@/lib/api';
 import { recentBlogRows } from '@/lib/home';
 import { externalHref } from '@/lib/images';
 import { blogHref, blogLink } from '@/lib/page-links';
@@ -71,12 +71,18 @@ export default async function HomePage() {
             {lead ? (
               <>
                 <article className={styles.hero}>
-                  <NewsImage src={lead.imageUrl} href={postHref(lead)} analytics={original(lead)} title={lead.title} variant="hero" />
+                  <NewsImage
+                    src={lead.imageUrl}
+                    href={postHref(lead)}
+                    analytics={original(lead)}
+                    title={displayTitle(lead.title)}
+                    variant="hero"
+                  />
                   <div className={styles.heroContent}>
                     <span className={styles.heroBadge}>最近發文</span>
                     <h3>
                       <a href={postHref(lead)} data-analytics={original(lead)} className={styles.heroLink} rel="noopener noreferrer">
-                        {lead.title}
+                        {displayTitle(lead.title)}
                       </a>
                     </h3>
                     <p className={styles.source}>
@@ -108,7 +114,7 @@ export default async function HomePage() {
                         </p>
                         <h3>
                           <a href={postHref(post)} data-analytics={original(post)} rel="noopener noreferrer">
-                            {post.title}
+                            {displayTitle(post.title)}
                           </a>
                         </h3>
                         <p className={styles.source}>
@@ -123,7 +129,7 @@ export default async function HomePage() {
                         src={post.imageUrl}
                         href={postHref(post)}
                         analytics={original(post)}
-                        title={post.title}
+                        title={displayTitle(post.title)}
                         variant="thumbnail"
                       />
                     </article>
@@ -166,7 +172,7 @@ export default async function HomePage() {
                 <ol>
                   {recentBlogs.map(({ blog, latest, missing, publishedAt }) => {
                     const href = externalHref(latest?.url);
-                    const title = latest?.title.trim() || '未提供標題';
+                    const title = displayTitle(latest?.title).trim() || '未提供標題';
                     return (
                       <li key={blog.slug}>
                         <p className={styles.recentBlogName}>

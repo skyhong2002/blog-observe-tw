@@ -10,7 +10,7 @@ import FooterMethod from '@/components/FooterMethod';
 import Link from '@/components/NoPrefetchLink';
 import SectionTabs from '@/components/SectionTabs';
 import { VocabularySummary } from '@/components/VocabularyNotice';
-import { taipei } from '@/lib/api';
+import { displayTitle, taipei } from '@/lib/api';
 import { externalHref } from '@/lib/images';
 import { blogLink, TOPIC_DETAIL_PERIOD, topicHref, topicLink } from '@/lib/page-links';
 import { isHistoryCursor, type Period, periodOf, topicApiPath } from '@/lib/public-query';
@@ -43,7 +43,8 @@ function sourceActivity(topic: NonNullable<TopicDetail['topic']>) {
 }
 
 /** The original article, with SourceLink's open_original marker; a non-http(s) URL stays plain text. */
-function ArticleTitle({ url, title }: { url: string; title: string }) {
+function ArticleTitle({ url, title: raw }: { url: string; title: string }) {
+  const title = displayTitle(raw);
   const href = externalHref(url);
   if (!href) return <span className="font-medium">{title}</span>;
   return (

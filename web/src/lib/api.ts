@@ -112,6 +112,33 @@ export function plainText(value?: string | null) {
     .trim();
 }
 
+const TITLE_ENTITIES: Record<string, string> = { amp: '&', quot: '"', apos: "'", lt: '<', gt: '>', nbsp: ' ' };
+/**
+ * A publisher's article title as text: decodes HTML character references once (`&#038;`, `&#x26;`, and the
+ * named amp/quot/apos/lt/gt/nbsp) so "&#038;" reads as "&". Only for display; the stored title is unchanged.
+ * Unknown or invalid references stay as written, nothing is parsed as markup and the result is still React text
+ * (escaped on output), so a literal "<script>" in a title stays visible text. One pass: "&amp;#038;" -> "&#038;".
+ */
+export function displayTitle(value?: string | null): string {
+  if (typeof value !== 'string') return '';
+  return value.replace(/&(#[0-9]{1,8}|#[xX][0-9a-fA-F]{1,6}|[a-zA-Z]{2,8});/g, (entity, body: string) => {
+    // Own keys only: "&toString;" or "&constructor;" must not read Object.prototype.
+    if (body[0] !== '#') return Object.hasOwn(TITLE_ENTITIES, body) ? TITLE_ENTITIES[body] : entity;
+    const code = body[1] === 'x' || body[1] === 'X' ? Number.parseInt(body.slice(2), 16) : Number.parseInt(body.slice(1), 10);
+    // No NUL, surrogates, C0/C1 controls (except tab/newline/return) or values beyond Unicode: keep the text as is.
+    if (
+      !Number.isSafeInteger(code) ||
+      code > 0x10ffff ||
+      (code >= 0xd800 && code <= 0xdfff) ||
+      code === 0 ||
+      (code < 0x20 && code !== 0x09 && code !== 0x0a && code !== 0x0d) ||
+      (code >= 0x7f && code <= 0x9f)
+    )
+      return entity;
+    return String.fromCodePoint(code);
+  });
+}
+
 export type AuthorCatalogQuery = { author?: string; page?: string; limit?: string };
 export type AuthorCatalog = {
   authors: Author[];

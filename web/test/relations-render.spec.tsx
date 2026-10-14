@@ -423,6 +423,14 @@ describe('profile 引用與交流', () => {
     expect(row.find('a[href^="javascript"]').length).toBe(0);
     expect(row.text()).toContain('甲的一篇文章');
   });
+
+  test('an entity-encoded article title reads as text once; literal markup stays escaped text', async () => {
+    const $ = await renderProfile(profile({ evidence: [evidence({ postTitle: 'Chemistry &#038; Sex &amp;#038; <script>x</script>' })] }));
+    const row = part($, 'relations-body').find('details li');
+    expect(row.find('a').first().text()).toBe('Chemistry & Sex &#038; <script>x</script>');
+    expect(row.find('script').length).toBe(0);
+    expect($.html()).toContain('&lt;script&gt;x&lt;/script&gt;');
+  });
 });
 
 describe('shared tags (not citation)', () => {
