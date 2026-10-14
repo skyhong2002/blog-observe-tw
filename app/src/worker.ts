@@ -111,7 +111,10 @@ const worker = new Worker(
       const aliases = await backfillTopicRouteAliases(store.pool, { limit: 100, missingOnly: true });
       return { blogs, topics, aliases };
     }
-    if (process.env.BLOG_SEARCH_FULLTEXT_ENABLED === 'true' && (job.name === 'blogs-fulltext' || job.name === SEARCH_INDEX_JOB)) {
+    if (
+      (process.env.BLOG_SEARCH_FULLTEXT_ENABLED === 'true' && job.name === 'blogs-fulltext') ||
+      (indexAdoptionEnabled && job.name === SEARCH_INDEX_JOB)
+    ) {
       const start = performance.now();
       const response = await fetch(config.publicOrigin + '/', { headers: { DNT: '1' }, signal: AbortSignal.timeout(13000) });
       await response.arrayBuffer();

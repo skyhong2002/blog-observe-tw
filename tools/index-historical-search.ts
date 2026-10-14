@@ -1,4 +1,4 @@
-/** Small batches, resumable by --after. No HTTP, raw text, credentials or user identifiers in output. */
+/** Small batches, resumable by --after. Only a DNT homepage health GET; no source crawl, raw text, credentials or user identifiers in output. */
 import { setTimeout as delay } from 'node:timers/promises';
 import { createDb } from '../app/src/db/client.ts';
 import { runFulltextBatch } from '../app/src/search-fulltext.ts';

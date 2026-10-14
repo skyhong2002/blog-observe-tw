@@ -27,3 +27,5 @@
 source review：既有 Opus 5.5 指出公開候選計數側通道、反向 anti-join 成本、unchanged 重寫、adoption 旗標與空白比對。以上皆修正並加測試；GPT-6.1 Sol 對最後的全文讀寫／DDL／fixture source 審查 pass（沒有冒稱執行測試）。常見詞與長字串實際查詢成本須在資料補齊後量測；仍有 SQL timeout 與候選上限，不隱藏失敗為「沒有結果」。兩份初期 API Opus 回應遭截斷，不計成功 review。私人 logs 位於 `.reviews/f3-fulltext/`。
 
 19:34 UTC 正式 overview 發生500，與建置／首次大量回填重疊；web log 沒有保留當時 DB driver error code，不能斷言唯一根因。19:42 停止回填後才繼續量測。CLI 已改10篇／五秒、pool1、nice19/ionice3；每批間用 DNT GET 正式首頁，非200或超過6.17秒便取消並保存cursor，沒有SIGSTOP或自動重試。worker 索引工作也先檢查首頁，並降至5+5篇／五分鐘，durable change job最多10篇；不把背景成本轉嫁給公開請求。
+
+節流delta review釐清：大量初次回填由CLI執行，worker仍有每輪5篇的歷史對帳，並非宣稱歷史工作只由CLI執行。舊prefix與新whole-body adoption的所有實際寫入路徑都先檢查首頁，不只新fulltext旗標。最後一批的健康檢查仍保留，若已完成SQL但首頁不健康，stdout cursor可續跑而exit非0，避免把故障標成成功。
