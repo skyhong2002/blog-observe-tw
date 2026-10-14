@@ -34,7 +34,7 @@ F1接線見shared-label-contract-offline.md。真人Google登入、F3歷史全�
 review仍pending。no-store、DNT、CF兩規則Disabled、HSTS86400不改，
 既有release/回滾/備份/worktree全部保留。Code-only不新建全庫備份。
 
-本批測試：backend 388項、Node 224項、SSR173項、TypeScript兩層通過；
+本批測試：backend 386項、Node 224項、SSR173項、TypeScript兩層通過；
 隔離18169的home-display 4 suites（18品質SQL斷言、69關係斷言、6關係barrier、
 11排行比較及6 fresh-read barrier）與B3 2 suites／47 checks通過。
 獨立Sol source review三項P2均修正：LIMIT前套公開證據、audit整詞排除計0、

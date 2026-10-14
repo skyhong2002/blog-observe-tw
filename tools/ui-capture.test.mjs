@@ -473,3 +473,11 @@ test('reader routes are denied for case and encoded variants before navigation o
   }
   assert.equal(privateCapturePath('/articles/reader-guide/'), false);
 });
+
+await test('homepage gate uses three-sample median but never masks an HTTP error', async () => {
+ const {summarizeHomepageSamples}=await import('./ui-capture.mjs');
+ const samples=[1,8,2].map(totalSeconds=>({status:200,totalSeconds,ttfbSeconds:0.2}));
+ assert.equal(summarizeHomepageSamples('blog.observe.tw',samples).totalSeconds,2);
+ assert.throws(()=>summarizeHomepageSamples('blog.observe.tw',[...samples.slice(0,2),{status:500,totalSeconds:1}]),/ttfb_gate/);
+ assert.throws(()=>summarizeHomepageSamples('blog.observe.tw',samples.slice(0,2)),/ttfb_gate/);
+});

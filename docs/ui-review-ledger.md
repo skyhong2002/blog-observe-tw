@@ -1,3 +1,38 @@
+## 2026-10-14：gen13正式接受／f77下一批候選（實圖pending）
+
+babysit UTC14:01正式驗收green/gen13/76a90e7，BUILD_ID 1VV772sbyYBRdL9ur6l9f：
+1280/390首頁三區塊已移除、正文article→domain／日期／核對連結呈現、GA0 opt-out，
+無Uncategorized／未分類／每天。人類回報沒有截圖路徑，僅記human receipt，不捏造model review。
+
+下一批APP f77a1fe43ccd5110e7982bfec07e997af4cb0e27、tree f44b394074f03f8dc148483b0c08a05e46a930e8，
+BUILD_ID LdOP5yqOhKdYbIlHZVfoN；base origin/main b5e20b86d9250f83014a5a84e4e236e2f2582ea8。
+同產物inactive blue 18174／18172，正式green76a不動。首30詞、同文多網域合卡、
+F1上位分類／相關／別名與圖示空狀態。使用者決定native label門檻1站，保留景點，
+人氣／傳承body-dominant無native佐證時退出排行。詳細規則見home-cloud-and-shared-labels-2026-10-14.md。
+
+前端作者既有Opus5.5 session6e17，實際成功author transcripts：
+/home/deck/.cache/blog-home-cloud-b3-20261014/.reviews/home-cloud-b3/opus-ui-author.jsonl、
+opus-ui-author-fix.jsonl、opus-ui-author-background.jsonl；root Codex backend。
+非作者gpt-6.1-sol source review（不是看圖pass）：
+/home/deck/.t3/userdata/ui-review-blog-20261013/home-perf-independent/home-cloud-b3-independent-source-review.json
+及home-cloud-b3-independent-source-delta-review.json，原始finding／model／UTC／逐檔SHA在receipt，
+三項P2均採納。native grouping後改SHA256索引JOIN與同existing topicID精確規則一致。
+非作者Opus backend review finish stop：
+/home/deck/.cache/blog-home-cloud-b3-20261014/.reviews/home-cloud-b3/backend-opus-short-review.json、
+backend-opus-delta-review.json，採納與不適用建議理由在設計文件。首次truncated檔原樣保留、不計次數。
+
+同runtime/BID的B0 53 barrier＋60 sequence全部通過，沒有拿掉privacy/fresh-read/cap断言：
+/home/deck/.t3/projects/blog-observe-tw/.reviews/b0-final-barrier/f77a1fe43ccd5110e7982bfec07e997af4cb0e27/runner-result.json
+以及同目錄barrier-result.json／sequence-result.json，DB18169／HTTP18176、18177。
+
+本批home、topics、shared-topic模板的1280／390 light/dark仍pending實圖。
+/home/deck/.t3/userdata/blog-home-cloud-f77-20261014/home/capture-report.json
+及attempt2／attempt3／attempt4原檔保留：前三批未啟動browser；第四批page navigation後host load17.43，
+沒有保存圖片，不宣稱UI通過；configured與observed DNT／GPC分開，GA0僅代表capture範圍。
+其餘全route、空／權限／錯誤／互動／admin／F3全文仍照下方pending，不將source review升為UIpass。
+
+---
+
 # UI 逐頁審查紀錄
 
 ## 2026-10-14 UTC12:05：人類gen12有限正式驗收與下一批source

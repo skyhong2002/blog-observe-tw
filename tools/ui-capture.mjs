@@ -423,25 +423,34 @@ export const TTFB_LIMITS = HOMEPAGE_LIMIT_SECONDS;
 export function verifyLatencyGate(rows) {
   if (!Array.isArray(rows) || rows.length !== 3 || new Set(rows.map(row => row.host)).size !== 3 || rows.some(row => !Object.hasOwn(TTFB_LIMITS, row.host) || row.status !== 200 || !Number.isFinite(row.totalSeconds) || row.totalSeconds < 0 || row.totalSeconds > TTFB_LIMITS[row.host])) throw Error('ttfb_gate');
 }
+export function summarizeHomepageSamples(host, samples) {
+  if (samples.length !== 3 || samples.some(s => s.status !== 200 || !Number.isFinite(s.totalSeconds) || s.totalSeconds < 0)) throw Error('ttfb_gate');
+  const median = key => samples.map(s => s[key]).sort((a,b) => a-b)[1];
+  return { host, status: 200, totalSeconds: median('totalSeconds'), ttfbSeconds: median('ttfbSeconds'), samples };
+}
 async function formalTTFB(onAttempt = () => {}) {
   const rows = [];
   for (const host of ['blog.observe.tw', 'tag.observe.tw', 'youtube.observe.tw']) {
-    const start = performance.now();
-    onAttempt({ host, status: 'started', utc: new Date().toISOString() });
-    let response;
-    try {
-      response = await fetch(`https://${host}/`, { headers: { DNT: '1', Accept: 'text/html' }, redirect: 'error', signal: AbortSignal.timeout(TTFB_LIMITS[host] * 1000 + 500) });
-      const ttfbSeconds = (performance.now() - start) / 1000;
-      let bytes = 0;
-      const reader = response.body?.getReader();
-      if (reader) try { while (true) { const part = await reader.read(); if (part.done) break; bytes += part.value.length; if (bytes > 2 * MiB) throw Error('probe_body_limit'); } } finally { await reader.cancel().catch(() => undefined); }
-      const row = { host, totalSeconds: (performance.now() - start) / 1000, ttfbSeconds, status: response.status };
-      rows.push(row);
-      onAttempt({ host, status: 'completed', httpStatus: response.status, totalSeconds: row.totalSeconds, ttfbSeconds, utc: new Date().toISOString() });
-    } catch {
-      onAttempt({ host, status: 'failed', httpStatus: response?.status ?? null, utc: new Date().toISOString() });
-      throw Error('ttfb_gate');
+    const samples=[];
+    for (let sample=0;sample<3;sample++) {
+      const start = performance.now(), startedAt=new Date().toISOString();
+      onAttempt({ host, sample, status: 'started', utc: startedAt });
+      let response, bytes=0;
+      try {
+        response = await fetch(`https://${host}/`, { headers: { DNT: '1', Accept: 'text/html' }, redirect: 'error', signal: AbortSignal.timeout(Math.max(5000,TTFB_LIMITS[host]*2000+1000)) });
+        const ttfbSeconds = (performance.now() - start) / 1000;
+        const reader = response.body?.getReader();
+        if (reader) try { while (true) { const part = await reader.read(); if (part.done) break; bytes += part.value.length; if (bytes > 2 * MiB) throw Error('probe_body_limit'); } } finally { await reader.cancel().catch(() => undefined); }
+        const row = { startedAt, endedAt:new Date().toISOString(), totalSeconds: (performance.now() - start) / 1000, ttfbSeconds, status: response.status, bytes, cfCacheStatus:response.headers.get('cf-cache-status'), exit:0 };
+        samples.push(row);
+        onAttempt({ ...row, host, sample, status: 'completed', httpStatus: response.status, utc:row.endedAt });
+        if (response.status !== 200) throw Error('http_error');
+      } catch {
+        onAttempt({ host, sample, status: 'failed', httpStatus: response?.status ?? null, bytes, exit:1, utc: new Date().toISOString() });
+        throw Error('ttfb_gate');
+      }
     }
+    rows.push(summarizeHomepageSamples(host,samples));
   }
   return rows;
 }
@@ -459,15 +468,21 @@ export async function globalHomepageProbe(report, phase, deps) {
     if (!slot || !['started', 'completed', 'failed'].includes(event.status)) return;
     receipt.eventsSource = 'transport-attempt-events';
     slot.attempted = true; slot.status = event.status;
+    slot.events ??= [];
     slot.utc = typeof event.utc === 'string' && /^\d{4}-\d{2}-\d{2}T[0-9:.]+Z$/.test(event.utc) ? event.utc : null;
     if (event.httpStatus === null || Number.isInteger(event.httpStatus) && event.httpStatus >= 100 && event.httpStatus <= 599) slot.httpStatus = event.httpStatus;
     for (const field of ['totalSeconds', 'ttfbSeconds']) if (Number.isFinite(event[field]) && event[field] >= 0) slot[field] = event[field];
+    const safe = { status:event.status, utc:slot.utc, httpStatus:slot.httpStatus };
+    for (const field of ['sample','bytes','exit']) if (Number.isSafeInteger(event[field]) && event[field]>=0) safe[field]=event[field];
+    for (const field of ['totalSeconds','ttfbSeconds']) if (Number.isFinite(event[field]) && event[field]>=0) safe[field]=event[field];
+    if (['HIT','MISS','DYNAMIC','BYPASS','EXPIRED','REVALIDATED','UPDATING'].includes(event.cfCacheStatus)) safe.cfCacheStatus=event.cfCacheStatus;
+    slot.events.push(safe);
   };
   try {
     const rows = await deps.ttfb(observe);
     for (const row of Array.isArray(rows) ? rows : []) {
       const slot = receipt.attempts.find(item => item.host === row?.host);
-      if (slot) { slot.attempted = true; slot.status = row.status === 200 ? 'completed' : 'http-error';
+      if (slot) { if (row.samples) slot.samples=row.samples; slot.attempted = true; slot.status = row.status === 200 ? 'completed' : 'http-error';
         if (Number.isInteger(row.status) && row.status >= 100 && row.status <= 599) slot.httpStatus = row.status;
         for (const field of ['totalSeconds', 'ttfbSeconds']) if (Number.isFinite(row[field]) && row[field] >= 0) slot[field] = row[field]; }
     }
