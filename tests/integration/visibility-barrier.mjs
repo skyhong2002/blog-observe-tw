@@ -100,7 +100,7 @@ function observedPool(pool, context, event, current) {
 }
 
 function surfaces(f, withWeb) {
-  const articleRows = (_sql, rows) => rows.some((r) => r.title === f.titles[0] || r.postTitle === f.titles[0]);
+  const articleRows = (_sql, rows) => rows.some((r) => r.title === f.titles[0] || r.postTitle === f.titles[0] || r.latestPostTitle === f.titles[0]);
   const relationRows = (sql, rows) => sql.includes('sourceBlogId') && rows.some((r) => Number(r.sourceBlogId) === f.blogs[0]);
   const topicRows = (sql, rows) => sql.includes("r.kind='topic'") && rows.some((r) => r.entity_id === f.topicIds[1]);
   const result = [

@@ -107,7 +107,7 @@ describe('fresh topic ranking coverage', () => {
     expect(queries).toHaveLength(1);
     expect(queries[0]).toContain('ROW_NUMBER() OVER (PARTITION BY post_id ORDER BY topic_id)=1 first_match');
     expect(queries[0]).toContain('SUM(ranked.matched_n) OVER () matched_posts');
-    expect(queries[0]).toContain('ORDER BY (blogs>=2) DESC,score DESC');
+    expect(queries[0]).toContain('ORDER BY (ranked.blogs>=2) DESC,ranked.score DESC');
     expect(queries[0]).not.toContain('HAVING COUNT(*)>=2');
     expect(queries[0]).toContain("b.status='verified'");
     expect(queries[0]).toContain('p.published_at>=? AND p.published_at<=?');

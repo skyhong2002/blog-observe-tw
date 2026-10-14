@@ -680,3 +680,39 @@ capture manifest `/home/deck/.t3/userdata/blog-release-9888ebf-candidate-2026101
 新candidate需要新commit/build。正式仍blue/gen12/43d。前述source GO仍適用
 已審的UI；排序qualification僅後端一行，已正常測試／自檢。
 新actual viewport、model看圖、release/build和部署證据仍待補，不將舊圖當新圖。
+
+
+## 2026-10-14 正式 green/gen13：首頁正文引用與詞雲品質
+
+APP 76a90e7a4126832331761baca7c10d2133272b18 / tree396a5f3724376d3f66582a3fcd70223c26f03370 /
+BUILD_ID1VV772sbyYBRdL9ur6l9f。切換 UTC 2026-10-14T13:58:01.263271+00:00，
+正式16項驗證於 2026-10-14T13:58:59.022777+00:00 完成；no-store/DYNAMIC/HSTS、
+OAuth302 S256、SSRF400、話題100/home8、正文引用5、三站200通過。
+正式edge active.json=green/gen13；blue43d在線可立即rollback blue，原green4cc、
+f091未切換產物、所有backup/worktree皆保留。正式資料無migration／刪除。
+
+actual候選12張（home/topics/blog各1280/390、light/dark）唯一manifest：
+/home/deck/.t3/userdata/blog-home-display-76a-20261014/submission-manifest.json
+DNT1、navigatorDNT1、GPCnull；網路deny在首nav前裝好，analytics allowed0。
+既有非作者Sol實際逐圖＋6張tag参照的review：
+/home/deck/.t3/userdata/ui-review-blog-20261013/home-perf-independent/76a-home-display-independent-actual-ui-review.json
+SHAb16e9eac7d3186670ec4160968fd0d38af3c8d8b852bb252ed974d4587c60a85。
+只本次三模板入鏡範圍無blocker；互動、展開、空錯、其他route仍pending，
+不升完整route pass，也不冒稱精確對比度通過。
+
+B0同immutable76a的53barrier/60sequence：
+/home/deck/.cache/blog-display-noise-20261014/.reviews/display-noise/b0-final-76a-attempt3/runner-result.json
+同目錄barrier-result.json、sequence-result.json；DB18169/HTTP18176/18177，
+SHA/build/tree與driverhash在artifact。原失敗檔全部保留。
+測試driver僅補首頁仍保留的latestPostTitle觀測欄位，原assert/容量/commit/fresh-read
+不刪；imports與Next/process/build checks仍指向immutable76a。相對路徑搬移失敗
+attempt2也保留，不拿錯誤artifact當成功。此OPS僅test/docs，runtime未改或重建。
+
+首頁五次完整HTML：candidate中位3.600061s、部署前正式2.539592s，
+兩者含來源/edge/網路且不同hostname，不能當精確origin同條件速度提升。
+本批較慢的觀測照實保留，不用選最快一次當驗收。
+
+Babysit人類在UTC14:01正式1280/390 opt-out/GA0驗收通過：三區已移除、
+文章→網域/時間/核對列存在、手機無横向捲動；無Uncategorized/未分類/每天。
+未提供新正式截圖路徑，不捏造model看圖。後續cloud恢復30詞、同文章多target合併、
+泛詞品質與F1接入是下一批，尚非已完成。
