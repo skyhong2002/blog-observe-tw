@@ -50,3 +50,13 @@ B0：`/home/deck/.t3/projects/blog-observe-tw/.reviews/b0-final-barrier/7ffd036f
 ### 後續健康回滾（同日UTC20:27）
 
 小批次回填在第14批取得首頁500，guard自動取消，cursor24418；其後curl exit28／中位數超閘門，UTC20:27:33.445Z切回blue/gen18/af0。worker也恢復af0，不讓producer繼續寫入。gen17真實功能與證據保留在inactive green，不把歷史成功驗收宣稱為目前仍在線。需要先處理DB寫入資源競爭；完整證據與每個檔案的hash見 `docs/f3-gen17-evidence.md`。
+
+### 查詢成本與更慢的回填（待本批驗收）
+
+首頁作者查詢改為先選出八組公開author/blog profile，再統計其當前公開文章；沒有共用promise或cache。正式DB的唯讀交易三次比對結果／hash完全相同，舊查詢中位221.24ms、新查詢3.67ms。這只能證明該查詢成本降低，不能據此宣稱已確認19:34／20:25的500唯一根因。
+
+新的overview錯誤只記bounded MariaDB error code，回503 unavailable，不回傳或重拋SQL／message；既有no-store保留。CLI預設降至**一篇／60秒**，可用 `--batch-size`（1–10）和 `--delay-ms`（5000–3600000）配置，最大2000批與pool1不變。每批仍檢查正式首頁，出錯就停止並留cursor；沒有自動重試。先保持worker在af0，避免同時啟用新的producer與CLI。
+
+既有Opus5.5 reviewer對本批backend source獨立審查通過，actual modelUsage=claude-opus-5-5、success且未截斷；採納null錯誤碼防護與generic503回應，確認blog_authors複合主鍵保证選八組不重複。沒有採用額外排序ID tie-breaker，因為本批維持既有排序合約，且三次SQL parity結果相同；可在另批釐清完全相同名稱的排序。這份review只涵蓋本次diff，不拿它取代先前全文reader、計數洩漏修正與HTTP privacy barrier的證據。
+
+新增／既有17項單元測試通過，含overview故障不回或記錄SQL/message，TypeScript通過。私有source review：`/home/deck/.cache/blog-home-cloud-b3-20261014/.reviews/f3-fulltext/home-query-budget-opus-review-final.json`；readonly parity：同目錄 `home-author-query-parity.json`。

@@ -108,6 +108,27 @@ describe('read-only frontend projection', () => {
       await app.close();
     }
   });
+  it('overview failures keep no-store and expose/log only a bounded error code', async () => {
+    const failure = Object.assign(Error('private database text'), {
+      code: 'ER_STATEMENT_TIMEOUT', sql: 'private SQL text', sqlMessage: 'private query context',
+    });
+    const app = await buildApp(
+      { login: null, uiOrigin: 'http://127.0.0.1:1', port: 18165 },
+      {
+        // @ts-expect-error JS gateway accepts injected pool.
+        store: { pool: { query: async () => { throw failure; } } },
+      },
+    );
+    const logger = vi.spyOn(app.log, 'error');
+    try {
+      const response = await app.inject('/api/overview?view=home');
+      expect(response.statusCode).toBe(503);
+      expect(response.json()).toEqual({ error: 'unavailable' });
+      expect(response.headers['cache-control']).toContain('no-store');
+      expect(logger).toHaveBeenCalledWith({ operation: 'overview', databaseCode: 'ER_STATEMENT_TIMEOUT' }, 'public overview read failed');
+      expect(JSON.stringify(logger.mock.calls)).not.toContain('private');
+    } finally { await app.close(); }
+  });
   it('reads each homepage independently and rejects overflow without retaining completed content', async () => {
     let release!: () => void;
     const barrier = new Promise<void>((resolve) => {

@@ -5,8 +5,10 @@ import { runFulltextBatch } from '../app/src/search-fulltext.ts';
 const args = process.argv.slice(2);
 const number = (key: string, fallback: number) => (args.includes(key) ? Number(args[args.indexOf(key) + 1]) : fallback);
 const max = number('--batches', 1),
-  after = number('--after', 0);
-if (!Number.isInteger(max) || max < 1 || max > 2000 || !Number.isSafeInteger(after) || after < 0) throw Error('invalid_fulltext_run');
+  after = number('--after', 0),
+  batchSize = number('--batch-size', 1),
+  delayMs = number('--delay-ms', 60000);
+if (!Number.isInteger(batchSize) || batchSize < 1 || batchSize > 10 || !Number.isInteger(delayMs) || delayMs < 5000 || delayMs > 3600000 || !Number.isInteger(max) || max < 1 || max > 2000 || !Number.isSafeInteger(after) || after < 0) throw Error('invalid_fulltext_run');
 async function homepageGate() {
   const start = performance.now();
   const r = await fetch('https://blog.observe.tw/', { headers: { DNT: '1' }, signal: AbortSignal.timeout(13000) });
@@ -29,12 +31,12 @@ let cursor = after,
 try {
   await homepageGate();
   for (let n = 0; n < max; n++) {
-    const result = await runFulltextBatch(db.pool, { after: cursor, limit: 10 });
+    const result = await runFulltextBatch(db.pool, { after: cursor, limit: batchSize });
     cursor = result.next;
     count += result.items.length;
     console.log(JSON.stringify({ batch: n + 1, indexed: result.items.length, total: count, next: cursor, done: result.done }));
     if (result.done) break;
-    await delay(5000);
+    await delay(delayMs);
     await homepageGate();
   }
 } catch {
