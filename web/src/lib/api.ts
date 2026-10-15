@@ -18,6 +18,8 @@ export type Blog = {
   lastPublishedAt?: string | null;
   expectedIntervalHours?: number;
   postCount?: number;
+  /** /api/catalog: distinct active authors recorded for the blog. */
+  authorCount?: number;
   /** /api/overview: the blog's newest collected post; `null` means none. Absent on older gateways. */
   latestPost?: LatestPost | null;
 };

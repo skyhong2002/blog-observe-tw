@@ -25,7 +25,7 @@ test('home: only the compact overview is awaited; the topic list streams in its 
   // The ranking's rule is in the closed method block at the page foot, not under the list (FooterMethod).
   assert.match(
     page,
-    /<h2>最近共同話題<\/h2>\s*<Link href="\/topics\/">完整排行 →<\/Link>\s*<\/div>\s*<Suspense[\s\S]*?<\/Suspense>\s*<div className=/,
+    /<h2>最近共同話題<\/h2>\s*<Link href="\/topics\/">完整排行 →<\/Link>\s*<\/div>\s*<Suspense[\s\S]*?<\/Suspense>\s*<\/aside>/,
   );
   assert.doesNotMatch(page, /同站貢獻逐次遞減/);
   assert.match(page, /^import Link from '@\/components\/NoPrefetchLink';$/m);

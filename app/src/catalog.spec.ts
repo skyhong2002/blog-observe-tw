@@ -2,7 +2,10 @@ import { describe, expect, it, vi } from 'vitest';
 import { buildApp } from './app.js';
 import { catalogFilters, loadCatalog } from './catalog.js';
 
-function fixture(total = 275, rows: Record<string, unknown>[] = [{ id: 251, slug: 'after-200', name: '第 251 個站', postCount: '4' }]) {
+function fixture(
+  total = 275,
+  rows: Record<string, unknown>[] = [{ id: 251, slug: 'after-200', name: '第 251 個站', postCount: '4', authorCount: '2' }],
+) {
   const responses = [
     [{ blogs: '275', posts: '12000', withUrls: '264', authors: '230', updatedAt: '2026-10-12T00:00:00.000Z' }],
     [
@@ -25,7 +28,7 @@ describe('complete blog catalog', () => {
     const pool = fixture();
     const data = await loadCatalog(pool, { page: '999' });
     expect(data.pagination).toEqual({ page: 6, pages: 6, pageSize: 50, total: 275 });
-    expect(data.blogs).toEqual([{ id: 251, slug: 'after-200', name: '第 251 個站', postCount: 4, iconUrl: null }]);
+    expect(data.blogs).toEqual([{ id: 251, slug: 'after-200', name: '第 251 個站', postCount: 4, authorCount: 2, iconUrl: null }]);
     expect(data.totals).toEqual({ blogs: 275, posts: 12000, withUrls: 264, authors: 230 });
     expect(data.categories).toEqual([
       { value: '生活', count: 210 },
@@ -36,7 +39,10 @@ describe('complete blog catalog', () => {
       { value: '待核對', count: 11 },
     ]);
     expect(pool.query.mock.calls[4][1]).toEqual([50, 250]);
-    expect(pool.query.mock.calls[4][0]).toContain('ORDER BY b.name ASC,b.id ASC LIMIT ? OFFSET ?');
+    // The directory opens on the newest already-published post; future-dated feed entries are not the latest.
+    expect(pool.query.mock.calls[4][0]).toContain('ORDER BY lastPublishedAt DESC,b.id ASC LIMIT ? OFFSET ?');
+    expect(pool.query.mock.calls[4][0]).toContain('p.published_at<=UTC_TIMESTAMP()) AS lastPublishedAt');
+    expect(pool.query.mock.calls[4][0]).toContain("ba.status='active'");
     expect(pool.query.mock.calls[0][0]).toContain('COUNT(DISTINCT a.id)');
     expect(pool.query.mock.calls.slice(0, 3).every(([sql]) => !sql.includes('LIMIT'))).toBe(true);
     expect(pool.query.mock.calls.every(([sql]) => sql.includes("b.status='verified'"))).toBe(true);
@@ -75,7 +81,8 @@ describe('complete blog catalog', () => {
         sort: '__proto__',
         dir: 'DESC; DROP TABLE blogs',
       }),
-    ).toEqual({ q: '', category: '', status: '', page: 1, limit: 200, sort: 'name', dir: 'asc' });
+    ).toEqual({ q: '', category: '', status: '', page: 1, limit: 200, sort: 'latest', dir: 'desc' });
+    expect(catalogFilters({ sort: 'authors' })).toMatchObject({ sort: 'authors', dir: 'desc' });
     expect(catalogFilters({ sort: 'latest', page: '0', limit: '0', q: '字'.repeat(120) })).toMatchObject({
       sort: 'latest',
       dir: 'desc',

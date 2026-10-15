@@ -39,7 +39,7 @@ export default async function HomePage() {
           }
         />
         <div className={styles.columns}>
-          <aside className={styles.left} aria-label="標籤排行與作者">
+          <aside className={styles.left} aria-label="最近共同話題">
             <div className={styles.sectionHeading}>
               <h2>最近共同話題</h2>
               <Link href="/topics/">完整排行 →</Link>
@@ -47,24 +47,6 @@ export default async function HomePage() {
             <Suspense fallback={<HomeTopicsPending />}>
               <HomeTopicRanking />
             </Suspense>
-            <div className={`${styles.sectionHeading} ${styles.sectionHeadingLater}`}>
-              <h2>作者動態</h2>
-              <Link href="/authors/">全部作者 →</Link>
-            </div>
-            <ol className={styles.journalists}>
-              {data.authors.slice(0, 8).map((author) => (
-                <li key={`${author.id}-${author.blogSlug}`}>
-                  <Link href={`/authors/?author=${author.id}`}>
-                    <span className={`${styles.journalistName} inline-flex items-center gap-1.5`}>
-                      {author.blogSlug && <BlogIcon media={author.blogSlug} title={author.blogName} />}
-                      {author.displayName}
-                    </span>
-                    <span className={styles.journalistCount}>{author.postCount ?? 0} 篇</span>
-                  </Link>
-                </li>
-              ))}
-            </ol>
-            {!data.authors.length && <p className={styles.notice}>作者資料整理中。</p>}
           </aside>
           <HomeMentionsSection mentions={data.mentions} />
           <aside className={styles.right} aria-label="部落格收錄概況">

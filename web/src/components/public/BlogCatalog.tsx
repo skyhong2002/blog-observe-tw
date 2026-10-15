@@ -148,12 +148,13 @@ export default function BlogCatalogView({ catalog: data, filters, status }: { ca
       {ready ? (
         <>
           <TableScroller card label="部落格與文章數表格，可左右捲動">
-            <table className="w-full min-w-[52rem] whitespace-nowrap text-sm">
+            <table className="w-full min-w-[56rem] whitespace-nowrap text-sm">
               <thead className="bg-zinc-50 text-left text-xs text-zinc-600 dark:bg-zinc-950 dark:text-zinc-400">
                 <tr>
                   <Th col="name" label="部落格" className={table.leadHead} />
                   <Th col="category" label="分類" />
                   <Th col="posts" label="已收錄文章" className="text-right" />
+                  <Th col="authors" label="作者" className="text-right" />
                   <Th col="latest" label="最新文章" />
                   <Th col="crawl" label="抓取成功" />
                   <Th col="status" label="狀態" />
@@ -161,15 +162,18 @@ export default function BlogCatalogView({ catalog: data, filters, status }: { ca
               </thead>
               <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
                 {rows.map((blog) => (
-                  <tr key={blog.slug} className={table.row}>
+                  // Every cell sits on the row's text baseline, so names, URLs, counts and dates of different sizes line up.
+                  <tr key={blog.slug} className={`${table.row} [&>td]:align-baseline`}>
                     <td className={table.lead}>
                       {/* One line per row: name keeps its width, the URL takes what is left and is the first to truncate. */}
                       <div className={`${table.leadBox} flex items-baseline gap-2`}>
                         <Link
                           {...blogLink(blog.slug, blog.canonicalPath)}
-                          className="flex min-w-0 items-center gap-1.5 self-center font-medium text-brand-700 hover:underline dark:text-brand-400"
+                          className="flex min-w-0 items-baseline gap-1.5 font-medium text-brand-700 hover:underline dark:text-brand-400"
                         >
-                          <BlogIcon media={blog.slug} iconUrl={blog.iconUrl} title={blog.name} />
+                          <span className="shrink-0 self-center">
+                            <BlogIcon media={blog.slug} iconUrl={blog.iconUrl} title={blog.name} />
+                          </span>
                           <span className={`${table.leadText} sm:max-w-60`} title={blog.name}>
                             {blog.name}
                           </span>
@@ -190,6 +194,7 @@ export default function BlogCatalogView({ catalog: data, filters, status }: { ca
                       </span>
                     </td>
                     <td className={table.num}>{blog.postCount?.toLocaleString('zh-TW') ?? '—'}</td>
+                    <td className={table.num}>{blog.authorCount?.toLocaleString('zh-TW') ?? '—'}</td>
                     <td className={`${table.cell} text-xs tabular-nums text-zinc-500`}>{taipei(blog.lastPublishedAt)}</td>
                     <td className={`${table.cell} text-xs tabular-nums text-zinc-500`}>{taipei(blog.lastCrawlSuccessAt)}</td>
                     <td className={`${table.cell} text-xs`}>

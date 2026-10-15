@@ -7,13 +7,21 @@ import { recordCandidateCheck } from './candidate-promotion.ts';
 import { CANDIDATE_POLICY, type DiscoveryCandidate, validateCandidate } from './candidate-validation.ts';
 import type { FeedCrawlerOptions, FeedFetcher } from './feed.ts';
 
-/** Counts robots and each redirect immediately before the existing pinned dispatcher performs I/O. */
+/** Daily candidate-review requests in total and per host. */
+export const CANDIDATE_HTTP_DAILY = 1500,
+  CANDIDATE_HOST_DAILY = 20;
+/**
+ * Counts robots and each redirect immediately before the existing pinned dispatcher performs I/O. A spent total
+ * budget stops the batch; a spent per-host budget fails only the current candidate (`onHostBudget`), so one host can
+ * never hold the queue.
+ */
 export function budgetedCandidateFetcher(
   pool: Pool,
   options: FeedCrawlerOptions & { signal?: AbortSignal; now?: () => Date },
   assert: () => Promise<void>,
   deadline: number,
   onStop: () => void,
+  onHostBudget: () => void = onStop,
 ): FeedFetcher {
   const fetcher = options.fetcher ?? (undiciFetch as FeedFetcher);
   return async (input, init) => {
@@ -24,15 +32,12 @@ export function budgetedCandidateFetcher(
     await assert();
     const url = new URL(typeof input === 'string' ? input : input instanceof URL ? input.href : input.url);
     const host = createHash('sha256').update(url.hostname.toLowerCase()).digest('hex');
-    const allowed = await reserveBudget(
-      pool,
-      [
-        { scope: 'candidates:http', amount: 1, limit: 1500 },
-        { scope: `candidates:host:${host}`, amount: 1, limit: 20 },
-      ],
-      options.now?.() ?? new Date(),
-    );
-    if (!allowed) {
+    const day = options.now?.() ?? new Date();
+    if (!(await reserveBudget(pool, [{ scope: `candidates:host:${host}`, amount: 1, limit: CANDIDATE_HOST_DAILY }], day))) {
+      onHostBudget();
+      throw Error('candidate_host_budget');
+    }
+    if (!(await reserveBudget(pool, [{ scope: 'candidates:http', amount: 1, limit: CANDIDATE_HTTP_DAILY }], day))) {
       onStop();
       throw Error('candidate_http_budget');
     }
@@ -95,7 +100,8 @@ export async function runCandidateReviewBatch(
       [CANDIDATE_POLICY, new Date(Date.now() - 7 * 86400000).toISOString(), limit],
     );
     const results = [];
-    let stopped = false;
+    let stopped = false,
+      hostSpent = false;
     const boundedOptions =
       options.apply === true
         ? {
@@ -108,13 +114,19 @@ export async function runCandidateReviewBatch(
               () => {
                 stopped = true;
               },
+              () => {
+                hostSpent = true;
+              },
             ),
           }
         : options;
     for (const row of rows) {
       if (Date.now() >= deadline || options.signal?.aborted) break;
       await assertLease(connection);
+      hostSpent = false;
       const checked = await validateCandidate(row as DiscoveryCandidate, boundedOptions);
+      // Recorded (retried after the 7-day recheck) rather than deferred: deferring left it first in line every run.
+      if (hostSpent && !stopped) Object.assign(checked, { eligible: false, reason: 'candidate_host_budget_exhausted' });
       if (stopped) {
         results.push({ id: row.id, status: 'deferred', reason: 'candidate_http_budget_or_deadline' });
         break;

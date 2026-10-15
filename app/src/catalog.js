@@ -4,14 +4,22 @@ import { iconUrl } from './v1/icons.ts';
 /** Complete directory projection. Overview is deliberately a bounded homepage feed. */
 const categoryLabel = "COALESCE(NULLIF(b.category,''),'未分類')";
 const statusLabel = "COALESCE(NULLIF(b.status_label,''),'待核對')";
+// The newest post already published: feeds sometimes carry far-future dates (a 2115 post), which must neither show
+// as the latest article nor sort first. Counts and the latest date use the same not-in-the-future rule.
+const latestPublished = '(SELECT MAX(p.published_at) FROM posts p WHERE p.blog_id=b.id AND p.published_at<=UTC_TIMESTAMP())';
+const authorCount = `(SELECT COUNT(DISTINCT ba.author_id) FROM blog_authors ba JOIN authors a ON a.id=ba.author_id
+  WHERE ba.blog_id=b.id AND ba.status='active' AND a.status<>'rejected')`;
 const sortColumns = {
   name: 'b.name',
   category: categoryLabel,
   posts: 'postCount',
-  latest: 'b.last_published_at',
+  authors: 'authorCount',
+  latest: 'lastPublishedAt',
   crawl: 'b.last_crawl_success_at',
   status: statusLabel,
 };
+/** The directory opens on the most recently updated blogs. */
+const DEFAULT_SORT = 'latest';
 const text = (value, length) => (typeof value === 'string' ? Array.from(value.trim()).slice(0, length).join('') : '');
 const integer = (value, fallback) => {
   if (typeof value !== 'string' || !/^\d+$/.test(value)) return fallback;
@@ -19,7 +27,7 @@ const integer = (value, fallback) => {
   return Number.isSafeInteger(number) ? Math.max(1, number) : Number.MAX_SAFE_INTEGER;
 };
 export function catalogFilters(query = {}) {
-  const sort = typeof query.sort === 'string' && Object.hasOwn(sortColumns, query.sort) ? query.sort : 'name';
+  const sort = typeof query.sort === 'string' && Object.hasOwn(sortColumns, query.sort) ? query.sort : DEFAULT_SORT;
   return {
     q: text(query.q, 100),
     category: text(query.category, 255),
@@ -70,7 +78,7 @@ export async function loadCatalog(pool, query = {}) {
   const page = Math.min(filters.page, pages);
   const [blogs] = await pool.query(
     `SELECT b.id,b.slug,b.name,b.url,${categoryLabel} AS category,${statusLabel} AS statusLabel,
-      b.last_crawl_success_at AS lastCrawlSuccessAt,b.last_published_at AS lastPublishedAt,
+      b.last_crawl_success_at AS lastCrawlSuccessAt,${latestPublished} AS lastPublishedAt,${authorCount} AS authorCount,
       b.expected_interval_hours AS expectedIntervalHours,
       (SELECT COUNT(*) FROM posts p WHERE p.blog_id=b.id AND (p.published_at IS NULL OR p.published_at<=UTC_TIMESTAMP())) AS postCount
       FROM blogs b WHERE ${condition} ORDER BY ${sortColumns[filters.sort]} ${filters.dir.toUpperCase()},b.id ASC LIMIT ? OFFSET ?`,
@@ -80,7 +88,12 @@ export async function loadCatalog(pool, query = {}) {
   const totals = totalsResult[0][0];
   const facets = (rows) => rows.map((row) => ({ value: row.value, count: Number(row.count) }));
   return {
-    blogs: blogs.map((blog) => ({ ...blog, iconUrl: iconUrl(blog.slug, icons), postCount: Number(blog.postCount) })),
+    blogs: blogs.map((blog) => ({
+      ...blog,
+      iconUrl: iconUrl(blog.slug, icons),
+      postCount: Number(blog.postCount),
+      authorCount: Number(blog.authorCount),
+    })),
     totals: {
       blogs: Number(totals.blogs),
       posts: Number(totals.posts),

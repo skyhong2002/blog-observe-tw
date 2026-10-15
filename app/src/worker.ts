@@ -15,7 +15,7 @@ import { createTagSimilarSitesClient } from './crawl/similarweb-client.ts';
 import { createDb } from './db/client.ts';
 import { runPublicationDiscoveryBatch } from './relations/home.ts';
 import { runRelationSnapshotBatch } from './relations/routes.ts';
-import { runRelationBatch } from './relations/worker.ts';
+import { RELATION_STORED_PER_RUN, runRelationBatch } from './relations/worker.ts';
 import { indexFulltextPosts, indexMissingFulltextPosts, runFulltextBatch } from './search-fulltext.ts';
 import { createIndexJobClaim, createIndexJobEnqueue, runSearchIndexJob, SEARCH_INDEX_JOB } from './search-index-job.ts';
 import { backfillPublicRoutes, backfillTopicRouteAliases } from './seo/page-routes.ts';
@@ -86,7 +86,7 @@ for (const [name, every, enabled] of [
   ['blogs-shared-labels', 6 * 60 * 60_000, process.env.BLOG_SHARED_LABEL_SYNC_ENABLED === 'true'],
   ['blogs-vocabulary', 15 * 60_000, vocabularyEnabled],
   ['blogs-history', 5 * 60_000, historyEnabled],
-  ['blogs-candidate-review', 30 * 60_000, candidateReviewEnabled],
+  ['blogs-candidate-review', 5 * 60_000, candidateReviewEnabled],
   ['blogs-missing-icons', 15 * 60_000, missingIconsEnabled],
   ['blogs-public-routes', 15 * 60_000, true],
 ] as const) {
@@ -156,7 +156,9 @@ const worker = new Worker(
     if (job.name === 'blogs-publication-discovery')
       return relationsEnabled ? runPublicationDiscoveryBatch(store.pool, batchOptions) : { skipped: 'disabled' };
     if (job.name === 'blogs-relations')
-      return relationsEnabled ? runRelationBatch(store.pool, { ...batchOptions, ...indexOptions }) : { skipped: 'disabled' };
+      return relationsEnabled
+        ? runRelationBatch(store.pool, { ...batchOptions, ...indexOptions, storedLimit: RELATION_STORED_PER_RUN })
+        : { skipped: 'disabled' };
     if (job.name === 'blogs-ai') return aiEnabled ? runAiBatch(store.pool, { ...batchOptions, limit: 3 }) : { skipped: 'disabled' };
     if (job.name === 'blogs-topics') {
       if (!topicsEnabled) return { skipped: 'disabled' };

@@ -15,7 +15,7 @@ const value = (query: QueryReader, key: string) => query.get(key) ?? undefined;
 /* /blogs/ ---------------------------------------------------------------- */
 
 const CATALOG_KEYS = ['q', 'category', 'status', 'sort', 'dir', 'page', 'limit'] as const;
-const catalogSorts = ['name', 'category', 'posts', 'latest', 'crawl', 'status'] as const;
+const catalogSorts = ['name', 'category', 'posts', 'authors', 'latest', 'crawl', 'status'] as const;
 export type CatalogSort = (typeof catalogSorts)[number];
 export type CatalogFilters = {
   q: string;
@@ -47,7 +47,7 @@ const positive = (text: string | undefined, fallback: number) => {
 
 /** Mirrors the gateway's catalogFilters (app/src/catalog.js) so a pending view highlights what was asked. */
 export function catalogFiltersOf(query: CatalogQuery): CatalogFilters {
-  const sort = catalogSorts.includes(query.sort as CatalogSort) ? (query.sort as CatalogSort) : 'name';
+  const sort = catalogSorts.includes(query.sort as CatalogSort) ? (query.sort as CatalogSort) : 'latest';
   return {
     q: chars(query.q, 100),
     category: chars(query.category, 255),

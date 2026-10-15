@@ -270,7 +270,6 @@ const PUBLIC_DATA_PAGES = [
   'app/tech/page.tsx',
   'app/blogs/page.tsx',
   'app/blogs/[slug]/page.tsx',
-  'app/authors/page.tsx',
   'app/articles/page.tsx',
   'app/topics/page.tsx',
   'app/relations/page.tsx',
@@ -370,7 +369,6 @@ test('route contract: the browser keeps no public answer and reads again when a 
 test('route contract: query pages read the URL in the browser inside Suspense, with the baseline as fallback', () => {
   for (const page of [
     'app/blogs/page.tsx',
-    'app/authors/page.tsx',
     'app/articles/page.tsx',
     'app/topics/page.tsx',
     'app/relations/page.tsx',

@@ -208,11 +208,11 @@ export async function discoverCandidates(pool: Pool, post: ArticleRow, parsed: P
 }
 
 /** Resolve older unknown targets when a publication has since been admitted. No network is required. */
-export async function reconcileTargets(pool: Pool, aliases: PublicationAlias[], now: Date): Promise<number> {
+export async function reconcileTargets(pool: Pool, aliases: PublicationAlias[], now: Date, limit = 500): Promise<number> {
   const [rows] = await pool.query<RowDataPacket[]>(
     `SELECT l.source_post_id,l.ordinal,l.source_blog_id,l.target_url FROM relation_links l LEFT JOIN blogs b ON b.id=l.target_blog_id
-    WHERE (l.target_blog_id IS NULL OR b.status='moved') AND l.resolution_checked_at<? ORDER BY l.resolution_checked_at,l.source_post_id,l.ordinal LIMIT 500`,
-    [new Date(now.getTime() - 6 * 3600000)],
+    WHERE (l.target_blog_id IS NULL OR b.status='moved') AND l.resolution_checked_at<? ORDER BY l.resolution_checked_at,l.source_post_id,l.ordinal LIMIT ?`,
+    [new Date(now.getTime() - 6 * 3600000), Math.max(1, Math.min(500, Math.trunc(limit)))],
   );
   let resolved = 0;
   for (const row of rows) {

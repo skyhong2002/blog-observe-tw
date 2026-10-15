@@ -16,12 +16,24 @@ it('charges every actual robots/redirect request and forwards pinned dispatcher 
   await fetcher('https://writer.test/robots.txt', init);
   await fetcher('https://writer.test/redirected', init);
   expect(original).toHaveBeenCalledWith('https://writer.test/redirected', init);
-  expect(budget).toHaveBeenCalledTimes(2);
-  expect(budget.mock.calls[0][1]).toMatchObject([{ scope: 'candidates:http', limit: 1500 }, { limit: 20 }]);
-  budget.mockResolvedValue(false);
+  expect(budget).toHaveBeenCalledTimes(4);
+  expect(budget.mock.calls[0][1]).toMatchObject([{ limit: 20 }]);
+  expect(budget.mock.calls[1][1]).toMatchObject([{ scope: 'candidates:http', limit: 1500 }]);
+  budget.mockResolvedValueOnce(true).mockResolvedValueOnce(false);
   await expect(fetcher('https://writer.test/more', init)).rejects.toThrow('candidate_http_budget');
   expect(stop).toHaveBeenCalledOnce();
   expect(original).toHaveBeenCalledTimes(2);
+});
+it('a spent host budget fails only that candidate, never the batch', async () => {
+  const original = vi.fn(),
+    stop = vi.fn(),
+    host = vi.fn();
+  const fetcher = budgetedCandidateFetcher({} as Pool, { fetcher: original }, async () => {}, Date.now() + 60000, stop, host);
+  budget.mockResolvedValueOnce(false);
+  await expect(fetcher('https://archive.test/')).rejects.toThrow('candidate_host_budget');
+  expect(host).toHaveBeenCalledOnce();
+  expect(stop).not.toHaveBeenCalled();
+  expect(original).not.toHaveBeenCalled();
 });
 it('deadline prevents even budget writes or outbound requests', async () => {
   const original = vi.fn(),
@@ -39,6 +51,6 @@ it('rechecks lease/permission after reserving and before I/O', async () => {
   };
   const fetcher = budgetedCandidateFetcher({} as Pool, { fetcher: original }, assert, Date.now() + 60000, () => {});
   await expect(fetcher('https://writer.test/')).rejects.toThrow('revoked');
-  expect(budget).toHaveBeenCalledOnce();
+  expect(budget).toHaveBeenCalledTimes(2);
   expect(original).not.toHaveBeenCalled();
 });

@@ -26,6 +26,8 @@ type BudgetedFetcher = FeedFetcher & { lastFailure: 'budget-exhausted' | 'batch-
  * Daily UTC budgets shared by the relation and content crawlers: article pages fetched, every HTTP request (robots and
  * redirects too), and requests per origin, so no site is asked more than RELATION_HOST_DAILY times a day.
  */
+/** The scheduled job's cap on posts parsed from bodies the content crawler already stored (no request, no `limit`). */
+export const RELATION_STORED_PER_RUN = 40;
 export const RELATION_PAGES_DAILY = 2400,
   RELATION_HTTP_DAILY = 6000,
   RELATION_HOST_DAILY = 60;
@@ -90,7 +92,10 @@ export function relationFailureCode(error: unknown): string {
 }
 
 /** Called only by the explicitly enabled worker scheduler. One lease, bounded pages and durable UTC budgets. */
-export async function runRelationBatch(pool: Pool, options: BatchOptions & { blogId?: number } = {}): Promise<BatchResult> {
+export async function runRelationBatch(
+  pool: Pool,
+  options: BatchOptions & { blogId?: number; storedLimit?: number } = {},
+): Promise<BatchResult> {
   if (options.blogId !== undefined && (!Number.isSafeInteger(options.blogId) || options.blogId < 1)) throw Error('invalid blog id');
   const empty: BatchResult = { processed: 0, skipped: 0, truncated: false, reservedUnused: 0 };
   const stages = createBodyIndexStages(options, 'relations');
@@ -102,7 +107,8 @@ export async function runRelationBatch(pool: Pool, options: BatchOptions & { blo
         const deadline = Date.now() + Math.max(1000, Math.min(120000, options.maxDurationMs ?? 120000));
         const limit = Math.max(1, Math.min(5, Math.trunc(options.limit ?? 5)));
         const aliases = await loadAliases(pool);
-        const resolved = await reconcileTargets(pool, aliases, now());
+        // A small slice per run: the job now runs every minute, and each recheck is one write on the shared database.
+        const resolved = await reconcileTargets(pool, aliases, now(), 100);
         const [rows] = await pool.query<RowDataPacket[]>(
           `SELECT p.id,p.blog_id,p.url,p.published_at,b.url blog_url,COALESCE(rp.depth,0) depth,o.etag,o.last_modified,o.status,o.parser_version
       FROM posts p JOIN blogs b ON b.id=p.blog_id LEFT JOIN relation_observations o ON o.post_id=p.id
@@ -112,9 +118,12 @@ export async function runRelationBatch(pool: Pool, options: BatchOptions & { blo
           [options.blogId ?? null, options.blogId ?? null, now(), PARSER_VERSION, 50],
         );
         const fetcher = budgetedRelationFetcher(pool, options, assertLease, deadline);
-        let attempts = 0;
+        // Stored bodies need no request; unless the caller allows more, they share `limit` with fetched pages.
+        const storedLimit = Math.max(0, Math.min(50, Math.trunc(options.storedLimit ?? 0)));
+        let attempts = 0,
+          stored = 0;
         for (const raw of rows) {
-          if (attempts >= limit) break;
+          if (attempts >= limit || (storedLimit && stored >= storedLimit)) break;
           if (options.signal?.aborted || Date.now() >= deadline) {
             result.truncated = true;
             break;
@@ -126,7 +135,8 @@ export async function runRelationBatch(pool: Pool, options: BatchOptions & { blo
             await saveObservation(pool, post, cached.parsed, new Response(null), now());
             await discoverCandidates(pool, post, cached.parsed, now());
             result.processed++;
-            attempts++;
+            if (storedLimit) stored++;
+            else attempts++;
             continue;
           }
 

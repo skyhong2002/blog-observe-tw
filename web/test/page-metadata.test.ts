@@ -21,7 +21,8 @@ const routeOf = (file: string) => `/${relative(APP, file).replace(/page\.tsx$/, 
 const source = (file: string) => readFileSync(file, 'utf8');
 
 const PRIVATE_ROUTES = ['/my/', '/login/', '/admin/', '/observe/opt-out/'];
-const REDIRECT_ROUTES = ['/admin/discovery/'];
+// Retired pages kept only as permanent redirects (/authors/ → /blogs/).
+const REDIRECT_ROUTES = ['/admin/discovery/', '/authors/'];
 const DYNAMIC_PUBLIC = ['/blogs/[slug]/', '/topics/[id]/'];
 
 test('every static public page has a unique title, description and trailing-slash self canonical', () => {

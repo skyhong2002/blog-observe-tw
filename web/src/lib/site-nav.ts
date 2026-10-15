@@ -15,7 +15,6 @@ export const NAV_GROUPS: Array<{ label: string; links: NavLink[] }> = [
     label: '看部落格',
     links: [
       { href: '/blogs/', label: '部落格目錄', short: '部落格' },
-      { href: '/authors/', label: '文章作者', short: '作者' },
       { href: '/traffic/', label: '部落格流量', short: '流量' },
       { href: '/tech/', label: '使用的技術', short: '技術', feature: 'tech' },
     ],

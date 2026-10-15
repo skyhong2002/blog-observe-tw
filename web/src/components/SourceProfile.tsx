@@ -95,11 +95,7 @@ export default function SourceProfile({ blog, sidebar, cloud }: { blog: Blog; si
             {blog.authors?.length ? (
               <ul className="space-y-2">
                 {blog.authors.map((author) => (
-                  <li key={author.id}>
-                    <Link className="text-brand-700 hover:underline dark:text-brand-400" href={`/authors/?author=${author.id}`}>
-                      {author.displayName}
-                    </Link>
-                  </li>
+                  <li key={author.id}>{author.displayName}</li>
                 ))}
               </ul>
             ) : (

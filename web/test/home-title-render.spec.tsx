@@ -284,7 +284,9 @@ describe('homepage centre: body citations', () => {
     for (const gone of ['最新文章', '我的閱讀', '沿著連結，認識新部落格']) expect(h2, gone).not.toContain(gone);
     expect($('body').text()).not.toContain('最近發文');
     expect($('[class~="hero"], [class~="band"]').length).toBe(0);
-    expect(h2).toEqual(expect.arrayContaining(['最近共同話題', '作者動態', '最近的正文引用', '部落格觀察', '最新更新的部落格']));
+    expect(h2).toEqual(expect.arrayContaining(['最近共同話題', '最近的正文引用', '部落格觀察', '最新更新的部落格']));
+    // The author list page was retired (authors are counted per blog on /blogs/), so is its homepage block.
+    expect(h2).not.toContain('作者動態');
     // The ranking rule moved to the closed method block at the page foot; the list carries no inline note.
     expect($('body').text()).not.toContain('只列共同關鍵字詞庫的話題。');
     expect($('body').text()).not.toContain('同站貢獻逐次遞減');
