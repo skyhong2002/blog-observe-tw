@@ -24,27 +24,30 @@ export const matchingPolicy = {
   displayGate: DISPLAY_GATE,
 };
 const literal = (value: string) => `'${value.replaceAll("'", "''")}'`;
-// Feed categories retain their provenance, but never create an independent ranking dictionary.
-// Collapse title/body evidence per article before weighting; canonical labels merge source aliases.
-export const evidence = (
-  blogScoped = false,
-  _verifiedOnly = true,
-  displayGate = false,
+// Window posts whose current index row still matches their title/body hashes.
+// STRAIGHT_JOIN keeps the window (a few thousand posts) as the driver; letting the
+// optimizer start from the whole snapshot index made busy-host plans flip to seconds.
+const freshPosts = (
+  blogScoped: boolean,
 ) => `scoped_posts AS (SELECT p.id,p.blog_id,p.published_at,p.content_hash FROM posts p JOIN blogs b ON b.id=p.blog_id WHERE p.published_at>=? AND p.published_at<=? AND b.status='verified' ${blogScoped ? 'AND b.slug=?' : ''}), fresh_posts AS (
  SELECT DISTINCT p.id,p.blog_id,p.published_at,i.snapshot_id FROM scoped_posts p
  JOIN topic_current c ON c.source=${literal(SOURCE)}
- JOIN topic_post_indexes_v3 i ON i.post_id=p.id AND i.snapshot_id=c.snapshot_id
+ STRAIGHT_JOIN topic_post_indexes_v3 i ON i.post_id=p.id AND i.snapshot_id=c.snapshot_id
  ${topicBodyJoins}
  WHERE i.status='ok' AND (i.post_hash<=>p.content_hash) AND (i.body_hash<=>(${topicBodyHash}))
  AND i.matcher_version=${literal(MATCHER_VERSION)}
-), evidence AS (
+)`;
+const eligibleTermSql = `t.policy_version=${literal(POLICY_VERSION)}
+ AND t.exclusion_reason IS NULL AND t.inactive_reason IS NULL AND ${publicationLabelSql('t.label')}`;
+// Feed categories retain their provenance, but never create an independent ranking dictionary.
+// Collapse title/body evidence per article before weighting; canonical labels merge source aliases.
+export const evidence = (blogScoped = false, _verifiedOnly = true, displayGate = false) => `${freshPosts(blogScoped)}, evidence AS (
  SELECT p.id post_id,p.blog_id,p.published_at,CONCAT('tag:',t.id) topic_id,t.label,'tag-vocabulary' source,MAX(m.source='title') title_hit
  FROM fresh_posts p JOIN topic_matches_v3 m ON m.post_id=p.id AND m.snapshot_id=p.snapshot_id
  JOIN topic_canonical_terms_v3 t ON t.snapshot_id=m.snapshot_id AND t.id=m.term_id
  LEFT JOIN topic_term_frequencies f ON f.snapshot_id=t.snapshot_id AND f.term_id=t.id
  LEFT JOIN topic_frequency_runs fr ON fr.snapshot_id=t.snapshot_id AND fr.policy_version=${literal(FREQUENCY_POLICY.version)}
- WHERE t.policy_version=${literal(POLICY_VERSION)}
- AND t.exclusion_reason IS NULL AND t.inactive_reason IS NULL AND ${publicationLabelSql('t.label')} AND m.source IN ('title','body')
+ WHERE ${eligibleTermSql} AND m.source IN ('title','body')
  AND (m.source='title' OR fr.snapshot_id IS NULL OR COALESCE(f.high_frequency,0)=0)
  GROUP BY p.id,p.blog_id,p.published_at,t.id,t.label
 ), ${displayGate ? windowGateCtes() : 'recent AS (SELECT * FROM evidence)'}`;
@@ -195,13 +198,26 @@ export async function ranking(
 }
 /** Compact home projection: aggregate article evidence once, then apply the exact same public quality gates.
  * Window functions keep the original per-topic source counts alongside each blog's counts; no duplicate
- * evidence/window_frequencies joins and no data retained between anonymous requests. */
-export async function compactHomeRanking(pool: Pool, days: number, now = new Date()) {
+ * evidence/window_frequencies joins and no data retained between anonymous requests.
+ * Matches are counted per term and blog before the term tables are read: the same per_blog counts as
+ * grouping `evidence`, with one vocabulary/frequency lookup per (term, blog) instead of per (post, term).
+ * A high-frequency term counts only its title posts, exactly as `evidence` drops its body rows. */
+export async function compactHomeRanking(pool: Pool, days: number, now = new Date(), requestedLimit = 30) {
+  const limit = Math.min(100, Math.max(1, Math.floor(requestedLimit)));
   const [rows] = await pool.query<RowDataPacket[]>(
-    `WITH ${evidence(false, true, false)}, ${nativeLabelCte},
-     per_blog AS (
-       SELECT topic_id,label,source,blog_id,COUNT(*) n,SUM(title_hit) title_n
-       FROM evidence GROUP BY topic_id,label,source,blog_id
+    `WITH ${freshPosts(false)}, ${nativeLabelCte},
+     term_blog AS (
+       SELECT m.snapshot_id,m.term_id,p.blog_id,COUNT(DISTINCT p.id) all_n,COUNT(DISTINCT IF(m.source='title',p.id,NULL)) title_n
+       FROM fresh_posts p JOIN topic_matches_v3 m ON m.post_id=p.id AND m.snapshot_id=p.snapshot_id
+       WHERE m.source IN ('title','body') GROUP BY m.snapshot_id,m.term_id,p.blog_id
+     ), per_blog AS (
+       SELECT CONCAT('tag:',t.id) topic_id,t.label,'tag-vocabulary' source,tb.blog_id,
+         IF(fr.snapshot_id IS NULL OR COALESCE(f.high_frequency,0)=0,tb.all_n,tb.title_n) n,tb.title_n
+       FROM term_blog tb JOIN topic_canonical_terms_v3 t ON t.snapshot_id=tb.snapshot_id AND t.id=tb.term_id
+       LEFT JOIN topic_term_frequencies f ON f.snapshot_id=t.snapshot_id AND f.term_id=t.id
+       LEFT JOIN topic_frequency_runs fr ON fr.snapshot_id=t.snapshot_id AND fr.policy_version=${literal(FREQUENCY_POLICY.version)}
+       WHERE ${eligibleTermSql}
+       HAVING n>0
      ), source_counts AS (
        SELECT per_blog.*,SUM(n) OVER (PARTITION BY topic_id) matched_posts,
          COUNT(*) OVER (PARTITION BY topic_id) blogs,
@@ -227,10 +243,10 @@ export async function compactHomeRanking(pool: Pool, days: number, now = new Dat
        (SELECT COUNT(*) FROM scoped_posts) recent_total
      FROM qualified WHERE title_n>0 OR NOT window_high_frequency
      GROUP BY topic_id,label,source HAVING COUNT(*)>=2
-     ORDER BY score DESC,blogs DESC,posts DESC,topic_id LIMIT 31`,
+     ORDER BY score DESC,blogs DESC,posts DESC,topic_id LIMIT ${limit + 1}`,
     [...range(days, now), SOURCE, FREQUENCY_POLICY.version],
   );
-  return { items: rows.slice(0, 30).map(item), truncated: rows.length > 30 };
+  return { items: rows.slice(0, limit).map(item), truncated: rows.length > limit };
 }
 
 /** Resolve retained source IDs without allowing native feed categories to extend the tag dictionary. */
@@ -348,7 +364,9 @@ export function registerTopicRoutes(app: FastifyInstance, pool: Pool) {
     if (req.query.view === 'home')
       return cache.get(`rank:${days}:home`, async () => {
         // One fresh ranking read serves both the compact list and the larger masthead cloud.
-        const results = await compactHomeRanking(pool, days);
+        // The cloud draws 30 words but skips body-mention words (web topicCloudWords), so it
+        // gets twice that many ranked candidates.
+        const results = await compactHomeRanking(pool, days, undefined, 60);
         return {
           ...metadata(),
           view: 'home',

@@ -31,7 +31,9 @@ function Prose({ text, nowrap = false }: { text: string; nowrap?: boolean }) {
           <code
             // Text before this span plus the span itself: unique and stable for a fixed string.
             key={parts.slice(0, i + 1).join('')}
-            className={`${nowrap ? 'whitespace-nowrap' : 'break-all whitespace-normal'} rounded bg-zinc-100 px-1 py-0.5 text-[0.85em] dark:bg-zinc-800`}
+            // anywhere, not break-all: short tokens (`status`, `x-api-key`) move whole to the
+            // next line; only a token wider than the column is split.
+            className={`${nowrap ? 'whitespace-nowrap' : '[overflow-wrap:anywhere] whitespace-normal'} rounded bg-zinc-100 px-1 py-0.5 text-[0.85em] dark:bg-zinc-800`}
           >
             {part.slice(1, -1)}
           </code>

@@ -22,11 +22,12 @@ export const DISPLAY_GATE = Object.freeze({
 /** Existing tag broad qualification, independent of the window-frequency threshold. */
 export const broadTopicSql = (alias = 'wf') => `(${alias}.blogs>=3 AND ${alias}.twice_sources>=2 AND ${alias}.peak_posts>=3)`;
 
-/** Original site tags corroborate background-heavy words; this never creates a new dictionary term. */
+/** Original site tags corroborate background-heavy words; this never creates a new dictionary term.
+ * STRAIGHT_JOIN: start from the window's posts, never from every active tag (a plan seen taking seconds). */
 export const nativeLabelCte = `native_labels AS (
  SELECT SHA2(native_tag.normalized_label,256) label_hash,COUNT(DISTINCT native_post.blog_id) blogs
- FROM scoped_posts native_post JOIN post_tags native_pt ON native_pt.post_id=native_post.id
- JOIN tags native_tag ON native_tag.id=native_pt.tag_id
+ FROM scoped_posts native_post STRAIGHT_JOIN post_tags native_pt ON native_pt.post_id=native_post.id
+ STRAIGHT_JOIN tags native_tag ON native_tag.id=native_pt.tag_id
  WHERE native_tag.status='active' AND native_tag.visibility='public'
  AND native_pt.status='active' AND native_pt.source_type='crawler' AND native_pt.role='topic'
  AND native_tag.kind='topic' GROUP BY SHA2(native_tag.normalized_label,256)

@@ -339,6 +339,7 @@ describe('homepage method disclosure', () => {
     expect(text).toContain('同一篇文章連到幾個部落格就在同一張卡片列出幾筆，兩個方向是不同的文章、各自保留日期');
     expect(text).toContain('側欄、Blogroll、留言、共同標籤與文字相似都不列入，也不代表雙方交流');
     expect(text).toContain('最近共同話題（前 8 名）與首頁文字雲（同一份排行，最多 30 個）只取近 30 天共同關鍵字詞庫的排行');
+    expect(text).toContain('標題有寫到它的不到三分之一，表示多半只是在正文順帶提到，這個詞仍留在排行，但不畫進文字雲');
     expect(text).toContain('排行另略過背景詞');
     expect(text).toContain('長期基準與近 30 天分開計算');
     expect(text).toContain('仍保留在詞庫、話題頁與歷史文章，也沒有另設詞彙清單');
@@ -415,9 +416,36 @@ describe('masthead cloud: the local 30-day topic ranking only', () => {
     expect(legacyWords.size).toBeGreaterThan(0);
   });
 
+  test('body-mention words keep their ranking row but are not drawn; the cloud fills from later candidates', async () => {
+    stubs.cloud = false;
+    // 話題1–10 are mostly met in the body (a quarter of their articles in the title); the rest are title-led.
+    const pool = Array.from({ length: 45 }, (_, i) => topic(i + 1, i < 10 ? { posts: 8, titlePosts: 2 } : { posts: 9, titlePosts: 3 }));
+    answer(TOPICS, { ...topics(pool.slice(0, 8)), cloudItems: pool, cloudTruncated: true });
+    const $ = load(renderToString(await HomeTopicCloud()));
+    const words = new Set(
+      $('a[aria-label]')
+        .map((_, el) => $(el).attr('aria-label')?.split('，')[0])
+        .get(),
+    );
+    for (let i = 1; i <= 10; i++) expect(words.has(`話題${i}`)).toBe(false);
+    expect(words.has('話題11')).toBe(true);
+    // Beyond the old 30-row slice: later candidates fill the places of the skipped words.
+    expect(words.has('話題31')).toBe(true);
+    expect(words.size).toBeLessThanOrEqual(30);
+    // Exactly a third in the title is about the word; rows without titlePosts are not judged.
+    const { topicCloudWords } = await import('@/lib/topic-cloud');
+    expect(topicCloudWords([topic(1, { posts: 9, titlePosts: 3 }), topic(2)], '30').map((w) => w.label)).toEqual(['話題1', '話題2']);
+    expect(topicCloudWords([topic(1, { posts: 9, titlePosts: 2 })], '30')).toEqual([]);
+    // The left ranking over the same answer still lists the body-mention words.
+    const { default: RealRanking } = await vi.importActual<{ default: () => Promise<Parameters<typeof renderToString>[0]> }>(
+      '@/app/_home/HomeTopics',
+    );
+    expect(load(renderToString(await RealRanking()))('ol.ranking').text()).toContain('話題1');
+  });
+
   test('malformed cloudItems are a failed read, not a shorter cloud', async () => {
     stubs.cloud = false;
-    const pool = Array.from({ length: 31 }, (_, i) => topic(i + 1));
+    const pool = Array.from({ length: 61 }, (_, i) => topic(i + 1));
     for (const body of [
       { ...topics(pool.slice(0, 8)), cloudItems: pool },
       { ...topics(pool.slice(0, 8)), cloudItems: [topic(1, { posts: '3' })] },
@@ -425,6 +453,7 @@ describe('masthead cloud: the local 30-day topic ranking only', () => {
       { ...topics(pool.slice(0, 8)), cloudItems: [topic(1, { source: 'other' })] },
       { ...topics(pool.slice(0, 8)), cloudItems: 'pool' },
       { ...topics(pool.slice(0, 8)), cloudItems: pool.slice(0, 30), cloudTruncated: 'yes' },
+      { ...topics(pool.slice(0, 8)), cloudItems: [topic(1, { titlePosts: -1 })] },
       // A sent background rule must be complete: a malformed one is a failed read, not a guessed description.
       {
         ...topics(pool.slice(0, 8)),

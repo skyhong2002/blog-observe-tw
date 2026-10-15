@@ -209,9 +209,18 @@ const homeOverview = (raw: unknown) =>
  * /api/topics?view=home (topics/routes.ts): marked view 'home', the top `limit` (8) of the shared vocabulary with
  * at least two blogs, and none of the full ranking's vocabulary or coverage, so a full payload cannot pass for it.
  */
-const homeTopicRow = { id: text, label: text, canonicalPath: optional(text), source: topicSource, posts: count, blogs: count };
-/** The masthead cloud's longer slice of the same ranked pool (at most 30); absent on older gateways. */
-const HOME_CLOUD_LIMIT = 30;
+const homeTopicRow = {
+  id: text,
+  label: text,
+  canonicalPath: optional(text),
+  source: topicSource,
+  posts: count,
+  blogs: count,
+  titlePosts: optional(count),
+};
+/** Candidates for the masthead cloud, a longer slice of the same ranked pool (at most 60, of which the cloud
+ * draws 30 after skipping body-mention words); absent on older gateways. */
+const HOME_CLOUD_LIMIT = 60;
 const homeTopics = (raw: unknown) => {
   if (
     !shape(raw, {

@@ -18,6 +18,8 @@ export default function BlogRelationGraph({ nodes, edges }: { nodes: RelationNod
     const chart = echarts.init(ref.current);
     const render = () => {
       const dark = document.documentElement.dataset.theme === 'dark';
+      // Phones: shorter edges keep nodes apart inside a 390px canvas.
+      const narrow = (ref.current?.clientWidth ?? 0) < 480;
       chart.setOption({
         animation: false,
         tooltip: {
@@ -30,15 +32,18 @@ export default function BlogRelationGraph({ nodes, edges }: { nodes: RelationNod
             type: 'graph',
             layout: 'force',
             roam: true,
-            force: { repulsion: 180, edgeLength: [90, 170] },
+            force: narrow ? { repulsion: 220, edgeLength: [70, 120] } : { repulsion: 180, edgeLength: [90, 170] },
             edgeSymbol: ['none', 'arrow'],
             edgeSymbolSize: 7,
+            // Full names wrap onto a second line instead of being cut with an ellipsis.
             label: {
               show: true,
               position: 'bottom',
               color: dark ? '#d4d4d8' : '#3f3f46',
-              fontSize: 11,
-              formatter: (p: { name: string }) => (p.name.length > 14 ? p.name.slice(0, 14) + '…' : p.name),
+              fontSize: 12,
+              lineHeight: 15,
+              width: narrow ? 92 : 128,
+              overflow: 'break',
             },
             lineStyle: { color: dark ? '#a1a1aa' : '#71717a', opacity: 0.55, curveness: 0.12 },
             emphasis: { focus: 'adjacency' },
