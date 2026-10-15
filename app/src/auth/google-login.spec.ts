@@ -192,4 +192,26 @@ describe('successful-login analytics receipt', () => {
     expect(headers(response)).toContain(`${SESSION_COOKIE}=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax; Secure`);
     expect(store.deleteSession).toHaveBeenCalledWith(hashToken('session', env.BLOG_SESSION_SECRET));
   });
+  it('accepts the account menu form post (urlencoded) and still rejects cross-origin forms', async () => {
+    const { app, store } = await setup();
+    const form = { 'content-type': 'application/x-www-form-urlencoded' };
+    const cross = await app.inject({
+      method: 'POST',
+      url: '/auth/logout',
+      headers: { ...form, origin: 'https://evil.example', cookie: `${SESSION_COOKIE}=session` },
+      payload: '',
+    });
+    expect(cross.statusCode).toBe(403);
+    expect(store.deleteSession).not.toHaveBeenCalled();
+    const response = await app.inject({
+      method: 'POST',
+      url: '/auth/logout',
+      headers: { ...form, origin: env.BLOG_PUBLIC_ORIGIN, cookie: `${SESSION_COOKIE}=session` },
+      payload: '',
+    });
+    expect(response.statusCode).toBe(303);
+    expect(response.headers.location).toBe('/');
+    expect(headers(response)).toContain(`${SESSION_COOKIE}=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax; Secure`);
+    expect(store.deleteSession).toHaveBeenCalledWith(hashToken('session', env.BLOG_SESSION_SECRET));
+  });
 });

@@ -227,12 +227,20 @@ export function registerLogin(app: FastifyInstance, store: LoginStore | null, co
     }
   });
 
-  app.post('/auth/logout', async (request, reply) => {
-    reply.header('cache-control', 'no-store');
-    if (request.headers.origin !== config.origin) return reply.code(403).send({ error: 'same-origin requests only' });
-    const value = readCookie(request, SESSION_COOKIE);
-    if (value && value.length <= 128) await store.deleteSession(hashToken(value, config.sessionSecret));
-    return reply.header('set-cookie', [cookie(SESSION_COOKIE, '', 0), completedCookie(false)]).redirect('/', 303);
+  // The account menu logs out with a plain HTML form, which posts application/x-www-form-urlencoded.
+  // Fastify only parses JSON/text by default and answered that form with 415, so logout never worked
+  // from the UI. Accept (and ignore) a small form body here only, in its own scope.
+  app.register(async (scope) => {
+    scope.addContentTypeParser('application/x-www-form-urlencoded', { parseAs: 'string', bodyLimit: 1024 }, (_request, _body, done) =>
+      done(null, null),
+    );
+    scope.post('/auth/logout', async (request, reply) => {
+      reply.header('cache-control', 'no-store');
+      if (request.headers.origin !== config.origin) return reply.code(403).send({ error: 'same-origin requests only' });
+      const value = readCookie(request, SESSION_COOKIE);
+      if (value && value.length <= 128) await store.deleteSession(hashToken(value, config.sessionSecret));
+      return reply.header('set-cookie', [cookie(SESSION_COOKIE, '', 0), completedCookie(false)]).redirect('/', 303);
+    });
   });
 
   return { currentUser };
