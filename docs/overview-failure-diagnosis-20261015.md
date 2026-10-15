@@ -29,3 +29,9 @@
 既有非作者Opus5.5 CLI（session6e17，modelUsage實際claude-opus-5-5、success）review無阻擋：採納P2，包裝error不保留原始cause，只存白名單欄位；新增assert連整個wrapped error都不含private SQL。其「失敗時pool可能已釋放」建議以文件說清楚post-failure snapshot採納；不額外增加開始時採樣。production loadOverview呼叫者只有overview route，其他是integration tests，沒有依賴原始error.code的其他production caller。
 
 原始review `/home/deck/.cache/blog-home-cloud-b3-20261014/.reviews/overview-diagnosis/opus-cli-review.json`；較早API回應finish_reason=length且沒有完整正文，保留但**不計作review通過**。CLI審查後的delta只移除raw cause、改存同樣白名單欄位並補測試，未變更SQL或公開行為。
+
+## 本次候選切換結果
+
+診斷版 `bc8998d2803339238bbdccfc03857b928e93a1d9`／BUILD_ID `Xm1Rp-cc1A9eW-NCT5lnf` 通過隔離 53 barrier、60 SSR/RSC 與原生測試，於 UTC 2026-10-15T01:03:??（transition journal保留精確時間） 短暫切到 blue/gen24。切後 post-check 的三站閘門中，blog 首頁三次完整回應為 6.458525、6.914799、5.666615 秒，中位數 6.458525，超過 6.17 秒；其餘檢查尚未作為通過證據。流程立即執行 `bash tools/deploy-blue-green.sh rollback green`，目前 active green/gen25、`b8c1350e38a118c26a67fe67fc1336814e3685f0`，保留 blue release 作為未發布診斷候選。正式站沒有保留這個版本的流量。
+
+這批沒有重跑回填，也沒有恢復 Cloudflare/WAF 或快取；回填 unit 維持 failed／停止。失敗原始檔：`.reviews/overview-diagnosis/post-check.log`、`rollback.log`、`active-before.json`、`active-after.json`（若無 after 檔表示在 post-check 前回滾），以及隔離 B0 輸出 `/home/deck/.t3/projects/blog-observe-tw/.reviews/b0-final-barrier/bc8998d2803339238bbdccfc03857b928e93a1d9/`。
