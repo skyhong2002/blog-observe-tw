@@ -243,6 +243,12 @@ describe('topic detail', () => {
     expect(position($, which)).toBeLessThan(position($, block));
     expect(articles.closest('details').length).toBe(0);
     expect(which.closest('details').length).toBe(0);
+    // Phones get a jump past the article list to the blogs, above both; the wide layout hides it.
+    const jump = $('a[href="#topic-blogs"]');
+    expect(jump.length).toBe(1);
+    expect(jump.closest('p').hasClass('lg:hidden')).toBe(true);
+    expect(which.attr('id')).toBe('topic-blogs');
+    expect(position($, jump)).toBeLessThan(position($, articles));
 
     // Above the fold: the short rule, the source sentence and the partial-snapshot warning only.
     const outside = outsideText($);

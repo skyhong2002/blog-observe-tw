@@ -60,10 +60,21 @@ function ArticleTitle({ url, title: raw }: { url: string; title: string }) {
   );
 }
 
+/** On phones the blog list comes after up to 100 articles; this link reaches it without the long scroll. */
+function TopicBlogsJump({ count }: { count: number }) {
+  return count ? (
+    <p className="text-sm lg:hidden">
+      <a href="#topic-blogs" className="text-brand-700 hover:underline dark:text-brand-400">
+        看哪些部落格在寫（{count} 個）↓
+      </a>
+    </p>
+  ) : null;
+}
+
 /** Follows the articles in the markup (phones read articles first); the wide layout puts it in the left column. */
 function TopicBlogs({ blogs }: { blogs: TopicDetail['blogs'] }) {
   return (
-    <section className="rounded-xl border border-zinc-300 p-4 lg:order-first dark:border-zinc-800">
+    <section id="topic-blogs" className="scroll-mt-20 rounded-xl border border-zinc-300 p-4 lg:order-first dark:border-zinc-800">
       <h2 className="font-semibold">哪些部落格在寫</h2>
       <ul className="mt-3 divide-y divide-zinc-200 dark:divide-zinc-800">
         {blogs.map((b) => (
@@ -256,6 +267,7 @@ export default function TopicDetailView({
               {matchingReasonLabel(data.topic.matchingReason)}：排行與升溫倍率只計標題命中。
             </p>
           ) : null}
+          <TopicBlogsJump count={data.blogs.length} />
           {topicArticleMode(data) === 'history' && data.history ? (
             <div className={data.blogs.length ? 'grid gap-5 lg:grid-cols-[1fr_2fr]' : undefined}>
               <TopicHistorySection id={id} days={days} history={data.history} />
