@@ -5,15 +5,17 @@
 
 import { publicJson } from '@/lib/public-api';
 import { homeTopicsApiPath } from '@/lib/public-query';
+import { tagCloudVisuals } from '@/lib/tag-visuals';
 import { topicCloudWords } from '@/lib/topic-cloud';
 import type { HomeTopics } from './HomeTopics';
 import { MastheadWords } from './MastheadCloud';
 
 export default async function HomeTopicCloud() {
-  const topics = await publicJson<HomeTopics>(homeTopicsApiPath('30'));
+  // tag's pictures are optional decoration: tagCloudVisuals never throws and is cached per process.
+  const [topics, visuals] = await Promise.all([publicJson<HomeTopics>(homeTopicsApiPath('30')), tagCloudVisuals()]);
   // cloudItems: the same ranked pool, up to 60 candidates for 30 words, in this one response; older gateways send
   // only the left list's items.
-  const words = topicCloudWords(topics.cloudItems ?? topics.items, '30');
+  const words = topicCloudWords(topics.cloudItems ?? topics.items, '30', 30, visuals);
   return words.length ? (
     <MastheadWords words={words} />
   ) : (

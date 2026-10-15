@@ -34,27 +34,20 @@ export function mentionCards(items: readonly HomeMention[]): MentionCard[] {
   return [...cards.values()];
 }
 
-function MentionTarget({ m }: { m: HomeMention }) {
+/** One evidence entry inside the card's single disclosure: which blog, its domain, and what the link said. */
+function MentionEvidence({ m }: { m: HomeMention }) {
   return (
-    <li data-mention={`${m.postId}:${m.targetBlogId}`}>
-      <p className={styles.source}>
-        <span>{EVIDENCE_LABEL}</span>
-        <span aria-hidden="true">→</span>
-        <Link {...blogLink(m.targetBlogSlug, m.targetBlogCanonicalPath)} className="inline-flex items-center gap-1.5">
-          <BlogIcon media={m.targetBlogSlug} iconUrl={m.targetIconUrl} title={m.targetBlogName} />
-          {m.targetBlogName}
-        </Link>
+    <li data-mention-evidence={`${m.postId}:${m.targetBlogId}`}>
+      <p className={styles.evidenceTarget}>
+        {m.targetBlogName}
         {m.targetDomain ? <span data-target-domain="">{m.targetDomain}</span> : null}
       </p>
-      <details className={styles.muted}>
-        <summary>核對這筆連結</summary>
-        <p>連結文字：{m.anchor.trim() ? `「${m.anchor}」` : '未提供'}</p>
-        <p>上下文：{m.context.trim() ? `「${m.context}」` : '未提供'}</p>
-        <p>
-          觀測 {m.observedAt ? taipei(m.observedAt) : '未提供'} · 解析版本 {m.matchVersion || '未提供'} · 上下文來源{' '}
-          {CONTEXT_SOURCE[m.contextSource] ?? '未提供'}
-        </p>
-      </details>
+      <p>連結文字：{m.anchor.trim() ? `「${m.anchor}」` : '未提供'}</p>
+      <p>上下文：{m.context.trim() ? `「${m.context}」` : '未提供'}</p>
+      <p>
+        觀測 {m.observedAt ? taipei(m.observedAt) : '未提供'} · 解析版本 {m.matchVersion || '未提供'} · 上下文來源{' '}
+        {CONTEXT_SOURCE[m.contextSource] ?? '未提供'}
+      </p>
     </li>
   );
 }
@@ -82,11 +75,30 @@ function MentionCardView({ card }: { card: MentionCard }) {
             <span>{title}</span>
           )}
         </h3>
-        <ul aria-label="這篇文章連到的部落格">
-          {card.targets.map((t) => (
-            <MentionTarget key={t.targetBlogId} m={t} />
-          ))}
-        </ul>
+        {/* One label per card; each linked blog is a chip. */}
+        <div className={styles.mentionTargets}>
+          <span className={styles.mentionLabel}>
+            {EVIDENCE_LABEL} <span aria-hidden="true">→</span>
+          </span>
+          <ul aria-label="這篇文章連到的部落格">
+            {card.targets.map((t) => (
+              <li key={t.targetBlogId} data-mention={`${t.postId}:${t.targetBlogId}`}>
+                <Link {...blogLink(t.targetBlogSlug, t.targetBlogCanonicalPath)} className={styles.mentionChip}>
+                  <BlogIcon media={t.targetBlogSlug} iconUrl={t.targetIconUrl} title={t.targetBlogName} />
+                  {t.targetBlogName}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </div>
+        <details className={styles.mentionEvidence}>
+          <summary>核對連結證據{card.targets.length > 1 ? `（${card.targets.length}）` : ''}</summary>
+          <ul>
+            {card.targets.map((t) => (
+              <MentionEvidence key={t.targetBlogId} m={t} />
+            ))}
+          </ul>
+        </details>
       </div>
       {/* The source article's own image (feed/og), only when it loads; never a placeholder. */}
       {original ? <NewsImage src={m.postImageUrl} href={original} analytics="open_original" title={title} variant="thumbnail" /> : null}

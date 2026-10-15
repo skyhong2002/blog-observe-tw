@@ -287,6 +287,14 @@ export function relationCountText({ shown, total, truncated }: { shown: number; 
 /** "直接" or "繼承（第 N 層）": inherited and depth are always said. */
 export const relationDepthText = (r: { inherited: boolean; depth: number }) => `${r.inherited ? '繼承' : '直接'}（第 ${r.depth} 層）`;
 
+/** imagePath's check without throwing: the path, or null when it is not this tag's visual-image path. */
+export function checkedVisualPath(path: unknown, tag: string): string | null {
+  try {
+    return imagePath(path, tag);
+  } catch {
+    return null;
+  }
+}
 /** Absolute tag.observe.tw URL for a checked path. */
 export const sharedLabelUrl = (path: string) => `${SHARED_LABEL_ORIGIN}${path}`;
 

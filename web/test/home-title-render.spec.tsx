@@ -203,15 +203,18 @@ describe('homepage centre: body citations', () => {
     expect(title.attr('data-analytics')).toBe('open_original');
     expect(title.attr('rel')).toBe('noopener noreferrer');
     expect(first.find(`time[datetime="${PUBLISHED}"]`).text()).toBe(taipei(PUBLISHED));
+    // One evidence label per card; each linked blog is a chip.
     const target = first.find('[data-mention="20875:2"]');
-    const meta = target.find('p').filter((_, el) => $(el).text().includes('正文直接連結'));
-    expect(meta.text()).toContain('乙');
-    expect(target.find('[data-target-domain]').text()).toBe('b.example');
+    expect(first.find('[class~="mentionLabel"]').text()).toContain('正文直接連結');
+    expect(target.text()).toBe('乙');
+    const evidence = first.find('[data-mention-evidence="20875:2"]');
+    expect(evidence.find('[data-target-domain]').text()).toBe('b.example');
     // Internal blog links keep the stable slug path, never prefetch.
     expect(first.find('a[href="/blogs/a/"]').attr('data-prefetch')).toBe('false');
     expect(target.find('a[href="/blogs/b/"]').attr('data-prefetch')).toBe('false');
-    // Evidence details are per target, closed, plain text: no anchor/context markup becomes an element.
-    const details = target.find('details');
+    // One closed evidence disclosure per card, plain text: no anchor/context markup becomes an element.
+    const details = first.find('details');
+    expect(details.length).toBe(1);
     expect(details.attr('open')).toBeUndefined();
     expect(details.text()).toContain('連結文字：「乙的文章 <b>x</b>」');
     expect(details.text()).toContain('上下文：「這裡提到乙 <script>alert(1)</script>。」');
@@ -220,7 +223,7 @@ describe('homepage centre: body citations', () => {
 
     // The reverse direction is a different source article: its own card and its own date.
     expect(cards.eq(1).find('h3 a').attr('href')).toBe('https://b.example/p/9');
-    expect(cards.eq(1).find('[data-target-domain]').text()).toBe('a.example');
+    expect(cards.eq(1).find('[data-mention-evidence] [data-target-domain]').text()).toBe('a.example');
     expect(cards.eq(1).find('time').attr('datetime')).toBe('2026-07-01T00:00:00.000Z');
     expect(cards.eq(2).find('h3 a').length).toBe(0);
     expect(cards.eq(2).find('h3').text()).toBe('Unsafe');
@@ -270,13 +273,18 @@ describe('homepage centre: body citations', () => {
     expect(card.find('time').length).toBe(1);
     const targets = card.find('[data-mention]');
     expect(targets.map((_, el) => $(el).attr('data-mention')).get()).toEqual(['20875:2', '20875:3']);
-    expect(targets.eq(0).find('[data-target-domain]').text()).toBe('b.example');
-    expect(targets.eq(0).find('details').text()).toContain('連結文字：「乙」');
-    expect(targets.eq(0).find('details').text()).toContain(`觀測 ${taipei('2026-10-13T06:00:00.000Z')} · 解析版本 relations-v3`);
     expect(targets.eq(1).find('a[href="/blogs/c.example/"]').text()).toBe('丙');
-    expect(targets.eq(1).find('[data-target-domain]').text()).toBe('c.example');
-    expect(targets.eq(1).find('details').text()).toContain('上下文：「也提到丙。」');
-    expect(targets.eq(1).find('details').text()).toContain(`觀測 ${taipei('2026-10-12T06:00:00.000Z')} · 解析版本 relations-v4`);
+    // Both targets' evidence sits in the card's single disclosure, labelled with the count.
+    expect(card.find('details').length).toBe(1);
+    expect(card.find('details summary').text()).toBe('核對連結證據（2）');
+    const evidence = card.find('[data-mention-evidence]');
+    expect(evidence.map((_, el) => $(el).attr('data-mention-evidence')).get()).toEqual(['20875:2', '20875:3']);
+    expect(evidence.eq(0).find('[data-target-domain]').text()).toBe('b.example');
+    expect(evidence.eq(0).text()).toContain('連結文字：「乙」');
+    expect(evidence.eq(0).text()).toContain(`觀測 ${taipei('2026-10-13T06:00:00.000Z')} · 解析版本 relations-v3`);
+    expect(evidence.eq(1).find('[data-target-domain]').text()).toBe('c.example');
+    expect(evidence.eq(1).text()).toContain('上下文：「也提到丙。」');
+    expect(evidence.eq(1).text()).toContain(`觀測 ${taipei('2026-10-12T06:00:00.000Z')} · 解析版本 relations-v4`);
     expect(card.text()).not.toContain('重複的乙');
     expect(cards.eq(1).find('h3 a').attr('href')).toBe('https://a.example/p/2');
     expect(cards.eq(1).find('h3 a').text()).toBe(SHOWN);
@@ -475,6 +483,14 @@ describe('masthead cloud: the local 30-day topic ranking only', () => {
     expect(words.size).toBeLessThanOrEqual(30);
     // Exactly a third in the title is about the word; rows without titlePosts are not judged.
     const { topicCloudWords } = await import('@/lib/topic-cloud');
+    // A heat-ranked pool is sized by rank (first largest), so many articles cannot outgrow a rising word;
+    // a pool without heat (blog profiles) keeps article-count sizes.
+    const ranked = topicCloudWords([topic(1, { posts: 3, heat: 2.1 }), topic(2, { posts: 300, heat: 0.9 })], '30');
+    expect(ranked.map((w) => [w.label, w.count])).toEqual([
+      ['話題1', 2],
+      ['話題2', 1],
+    ]);
+    expect(topicCloudWords([topic(1, { posts: 3 }), topic(2, { posts: 300 })], '30').map((w) => w.count)).toEqual([3, 300]);
     expect(topicCloudWords([topic(1, { posts: 9, titlePosts: 3 }), topic(2)], '30').map((w) => w.label)).toEqual(['話題1', '話題2']);
     expect(topicCloudWords([topic(1, { posts: 9, titlePosts: 2 })], '30')).toEqual([]);
     // The left ranking over the same answer still lists the body-mention words.
@@ -482,6 +498,32 @@ describe('masthead cloud: the local 30-day topic ranking only', () => {
       '@/app/_home/HomeTopics',
     );
     expect(load(renderToString(await RealRanking()))('ol.ranking').text()).toContain('話題1');
+  });
+
+  test("tag's recoloured pictures replace a word only for that exact tag's checked path", async () => {
+    const { parseCloudVisuals } = await import('@/lib/tag-visuals');
+    const { topicCloudWords } = await import('@/lib/topic-cloud');
+    const path = (tag: string) => `/api/v1/tags/${encodeURIComponent(tag)}/visual-image?v=abc&size=large&accent=22c55e`;
+    const visuals = parseCloudVisuals({
+      visuals: {
+        話題1: { kind: 'place', image: path('話題1'), emoji: null },
+        // Another tag's path, a foreign origin and unknown query keys are dropped; an emoji alone is kept.
+        話題2: { image: path('話題9') },
+        話題3: { image: 'https://evil.example/api/v1/tags/x/visual-image?v=a' },
+        話題4: { image: `${path('話題4')}&layer=x` },
+        話題5: { image: null, emoji: '🍜' },
+      },
+    });
+    expect([...visuals.keys()]).toEqual(['話題1', '話題5']);
+    expect(visuals.get('話題1')?.image).toBe(`https://tag.observe.tw${path('話題1')}`);
+    const words = topicCloudWords([topic(1, { heat: 2 }), topic(2, { heat: 1.5 }), topic(5, { heat: 1 })], '30', 30, visuals);
+    expect(words.map((w) => [w.label, w.image ?? null, w.emoji ?? null])).toEqual([
+      ['話題1', `https://tag.observe.tw${path('話題1')}`, null],
+      ['話題2', null, null],
+      ['話題5', null, '🍜'],
+    ]);
+    expect(parseCloudVisuals({ visuals: [] }).size).toBe(0);
+    expect(parseCloudVisuals(null).size).toBe(0);
   });
 
   test('malformed cloudItems are a failed read, not a shorter cloud', async () => {

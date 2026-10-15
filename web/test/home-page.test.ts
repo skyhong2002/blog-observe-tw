@@ -66,7 +66,11 @@ test('clouds: drawn from the local topic ranking only, one shared path each, str
   assert.doesNotMatch(masthead, /\/tags\/\?tag=|Overview\['tags'\]|postCount|blogCount|publicJson|await/);
   // Homepage cloud and ranking read the identical path, so public-api.ts's per-request cache makes one read.
   const cloud = source('app/_home/HomeTopicCloud.tsx');
-  assert.match(cloud, /const topics = await publicJson<HomeTopics>\(homeTopicsApiPath\('30'\)\);/);
+  // The same one topic read, alongside tag's optional pictures (lib/tag-visuals.ts never throws).
+  assert.match(
+    cloud,
+    /const \[topics, visuals\] = await Promise\.all\(\[publicJson<HomeTopics>\(homeTopicsApiPath\('30'\)\), tagCloudVisuals\(\)\]\);/,
+  );
   assert.match(source('app/_home/HomeTopics.tsx'), /publicJson<HomeTopics>\(homeTopicsApiPath\('30'\)\)/);
   assert.doesNotMatch(cloud, /\btry\b|\.catch\(|data\.tags|\/tags\//);
   // Profile: list and cloud share blogTopicsApiPath; the client profile only receives a server slot.

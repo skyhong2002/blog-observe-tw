@@ -4,11 +4,13 @@
 // failures throw like BlogTopics does.
 import { publicJsonOrNull } from '@/lib/public-api';
 import { BLOG_TOPICS_PERIOD, blogTopicsApiPath } from '@/lib/public-query';
+import { tagCloudVisuals } from '@/lib/tag-visuals';
 import { topicCloudWords } from '@/lib/topic-cloud';
 import type { Topics } from '@/lib/topics';
 import MediaWordCloud from './MediaWordCloud';
 
 export default async function BlogTopicCloud({ slug }: { slug: string }) {
-  const data = await publicJsonOrNull<Topics>(blogTopicsApiPath(slug));
-  return <MediaWordCloud words={data ? topicCloudWords(data.items, BLOG_TOPICS_PERIOD) : null} />;
+  // tag's pictures are optional decoration: tagCloudVisuals never throws and is cached per process.
+  const [data, visuals] = await Promise.all([publicJsonOrNull<Topics>(blogTopicsApiPath(slug)), tagCloudVisuals()]);
+  return <MediaWordCloud words={data ? topicCloudWords(data.items, BLOG_TOPICS_PERIOD, 30, visuals) : null} />;
 }

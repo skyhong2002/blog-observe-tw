@@ -219,6 +219,7 @@ const homeTopicRow = {
   posts: count,
   blogs: count,
   titlePosts: optional(count),
+  heat: optional((v) => typeof v === 'number' && Number.isFinite(v) && v > 0),
 };
 /** Candidates for the masthead cloud, a longer slice of the same ranked pool (at most 60, of which the cloud
  * draws 30 after skipping body-mention words); absent on older gateways. */
