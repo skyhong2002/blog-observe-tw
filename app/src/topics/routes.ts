@@ -202,23 +202,25 @@ export async function ranking(
  * Matches are counted per term and blog before the term tables are read: the same per_blog counts as
  * grouping `evidence`, with one vocabulary/frequency lookup per (term, blog) instead of per (post, term).
  * A high-frequency term counts only its title posts, exactly as `evidence` drops its body rows. */
-export async function compactHomeRanking(pool: Pool, days: number, now = new Date(), requestedLimit = 30) {
-  const limit = Math.min(100, Math.max(1, Math.floor(requestedLimit)));
-  const [rows] = await pool.query<RowDataPacket[]>(
-    `WITH ${freshPosts(false)}, ${nativeLabelCte},
-     term_blog AS (
+const termBlogCtes = `term_blog AS (
        SELECT m.snapshot_id,m.term_id,p.blog_id,COUNT(DISTINCT p.id) all_n,COUNT(DISTINCT IF(m.source='title',p.id,NULL)) title_n
        FROM fresh_posts p JOIN topic_matches_v3 m ON m.post_id=p.id AND m.snapshot_id=p.snapshot_id
        WHERE m.source IN ('title','body') GROUP BY m.snapshot_id,m.term_id,p.blog_id
      ), per_blog AS (
-       SELECT CONCAT('tag:',t.id) topic_id,t.label,'tag-vocabulary' source,tb.blog_id,
+       SELECT CONCAT('tag:',t.id) topic_id,t.id term_id,t.label,'tag-vocabulary' source,tb.blog_id,
+         (fr.snapshot_id IS NULL OR COALESCE(f.high_frequency,0)=0) body_allowed,
          IF(fr.snapshot_id IS NULL OR COALESCE(f.high_frequency,0)=0,tb.all_n,tb.title_n) n,tb.title_n
        FROM term_blog tb JOIN topic_canonical_terms_v3 t ON t.snapshot_id=tb.snapshot_id AND t.id=tb.term_id
        LEFT JOIN topic_term_frequencies f ON f.snapshot_id=t.snapshot_id AND f.term_id=t.id
        LEFT JOIN topic_frequency_runs fr ON fr.snapshot_id=t.snapshot_id AND fr.policy_version=${literal(FREQUENCY_POLICY.version)}
        WHERE ${eligibleTermSql}
        HAVING n>0
-     ), source_counts AS (
+     )`;
+export async function compactHomeRanking(pool: Pool, days: number, now = new Date(), requestedLimit = 30) {
+  const limit = Math.min(100, Math.max(1, Math.floor(requestedLimit)));
+  const [rows] = await pool.query<RowDataPacket[]>(
+    `WITH ${freshPosts(false)}, ${nativeLabelCte},
+     ${termBlogCtes}, source_counts AS (
        SELECT per_blog.*,SUM(n) OVER (PARTITION BY topic_id) matched_posts,
          COUNT(*) OVER (PARTITION BY topic_id) blogs,
          SUM(n>=2) OVER (PARTITION BY topic_id) twice_sources,
@@ -247,6 +249,24 @@ export async function compactHomeRanking(pool: Pool, days: number, now = new Dat
     [...range(days, now), SOURCE, FREQUENCY_POLICY.version],
   );
   return { items: rows.slice(0, limit).map(item), truncated: rows.length > limit };
+}
+/** The /topics/ ranking: the same items as `ranking(…, 100, now, true)`, whose `evidence` CTE MariaDB
+ * re-evaluated for every reference (four times, seconds per request). Items come from the compact
+ * projection; matchedPosts counts window posts with at least one surviving match: a title match, or
+ * a body match on a term whose baseline allows body evidence and whose window gate did not close. */
+export async function fullRanking(pool: Pool, days: number, now = new Date()) {
+  const results = await compactHomeRanking(pool, days, now, 100);
+  const [[matched]] = await pool.query<RowDataPacket[]>(
+    `WITH ${freshPosts(false)}, ${termBlogCtes}, topic_gate AS (
+       SELECT term_id,MAX(body_allowed) body_allowed,SUM(n) matched_posts,COUNT(*) blogs,SUM(n>=2) twice_sources,MAX(n) peak_posts
+       FROM per_blog GROUP BY term_id
+     ) SELECT COUNT(DISTINCT p.id) n FROM fresh_posts p
+     JOIN topic_matches_v3 m ON m.post_id=p.id AND m.snapshot_id=p.snapshot_id
+     JOIN topic_gate g ON g.term_id=m.term_id
+     WHERE m.source='title' OR (m.source='body' AND g.body_allowed AND NOT ${windowGateSql('g')})`,
+    range(days, now),
+  );
+  return { matchedPosts: Number(matched?.n ?? 0), ...results };
 }
 
 /** Resolve retained source IDs without allowing native feed categories to extend the tag dictionary. */
@@ -382,7 +402,7 @@ export function registerTopicRoutes(app: FastifyInstance, pool: Pool) {
       });
     return cache.get(`rank:${days}`, async () => {
       const now = new Date();
-      const [results, vocabulary] = await Promise.all([ranking(pool, days, undefined, true, 100, now, true), vocabularyStatus(pool)]);
+      const [results, vocabulary] = await Promise.all([fullRanking(pool, days, now), vocabularyStatus(pool)]);
       const dates = range(days, now);
       const [[coverage]] = await pool.query<RowDataPacket[]>(
         `SELECT COUNT(*) datedPosts,COALESCE(SUM(cb.status='ok' OR o.status='ok'),0) bodyObservedPosts FROM posts p JOIN blogs b ON b.id=p.blog_id ${topicBodyJoins} WHERE p.published_at>=? AND p.published_at<=? AND b.status='verified'`,

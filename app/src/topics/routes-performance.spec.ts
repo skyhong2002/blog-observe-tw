@@ -148,7 +148,7 @@ describe('fresh topic ranking coverage', () => {
     expect(await ranking(emptyPool, 30, undefined, true, 1, new Date(), true)).toEqual({ items: [], truncated: false, matchedPosts: 0 });
   });
 
-  it('uses independent concurrent reads with at most two queries per request and no repeat evidence scan', async () => {
+  it('uses independent concurrent reads with at most two concurrent queries per request and no repeat evidence scan', async () => {
     let active = 0;
     let maxActive = 0;
     let rankingReads = 0;
@@ -160,6 +160,7 @@ describe('fresh topic ranking coverage', () => {
         maxActive = Math.max(maxActive, active);
         await new Promise((resolve) => setTimeout(resolve, 2));
         active--;
+        if (sql.includes('topic_gate AS')) return [[{ n: 5 }]];
         if (sql.includes('per_blog AS')) return [[topicRow(`tag:read-${++rankingReads}`, 2)]];
         if (sql.includes('SELECT s.id,s.manifest')) return [[]];
         if (sql.includes('datedPosts')) return [[{ datedPosts: 10, bodyObservedPosts: 7 }]];
@@ -179,13 +180,16 @@ describe('fresh topic ranking coverage', () => {
       expect(first.json().items[0].id).not.toBe(second.json().items[0].id);
       expect(first.json()).not.toHaveProperty('matchedPosts');
       expect(maxActive).toBe(2);
-      expect(queries.filter((sql) => sql.includes('topic_matches_v3'))).toHaveLength(2);
-      expect(queries).toHaveLength(10);
+      // Two match statements per request: the ranking reads topic_matches_v3 once; the matched-post count
+      // reads it for the per-term gate and again to count posts. None re-evaluates a shared evidence CTE.
+      const scans = queries.filter((sql) => sql.includes('topic_matches_v3')).map((sql) => sql.match(/JOIN topic_matches_v3/g)?.length);
+      expect(scans).toEqual([1, 2, 1, 2]);
+      expect(queries).toHaveLength(12);
       const overlapping = await Promise.all([app.inject('/api/topics?days=30'), app.inject('/api/topics?days=30')]);
       expect(overlapping[0].json().items[0].id).not.toBe(overlapping[1].json().items[0].id);
       expect(rankingReads).toBe(4);
-      expect(queries.filter((sql) => sql.includes('topic_matches_v3'))).toHaveLength(4);
-      expect(queries).toHaveLength(20);
+      expect(queries.filter((sql) => sql.includes('topic_matches_v3'))).toHaveLength(8);
+      expect(queries).toHaveLength(24);
       expect((await app.inject('/api/topics?days=bad')).headers['cache-control']).toBe('no-store');
     } finally {
       await app.close();
