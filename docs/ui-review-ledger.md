@@ -1,6 +1,30 @@
 # UI 逐頁審查紀錄
 
-## Current state（UTC 2026-10-15T16:50Z，gen39）
+## Current state（UTC 2026-10-15T17:10Z，gen40）
+
+正式站為 **blue／gen40／`d75403167577538546599769d5af529e72c32446`**，BUILD_ID `Jz3ykfP-tbu-AKn9mRlHq`，切換
+UTC 2026-10-15T17:06:04.426Z（transition 40）。回滾點 green／gen39 `7791578`／`gUY454KbQ44XAq8sDEB0U`：
+
+```bash
+bash /home/deck/.cache/blog-home-cloud-b3-20261014/tools/deploy-blue-green.sh rollback green
+```
+
+- **首頁正文引用只列真的用句子寫到對方的連結**（使用者：多數卡片沒有內文，看起來很怪）。規則（不使用詞或部落格名單）：
+  連結文字在上下文中、上下文扣掉連結文字至少 12 字且含逗號句號等成句標點、同一篇文章連到同一部落格不超過 5 次。
+  正式資料逐筆檢查：點子生活 → MiMi韓（同篇 60 條連結，轉載）、點子生活 → V妞（「原始文章：…」「©V妞的旅行」「台南住宿、
+  台南親子飯店」）、福寶媽 → 寶寶溫（只有「阿蘇男孩」）皆不再列出；目前 90 天只剩 Shuo-jen Blog〈文字雜想〉一張卡（2 個部落格）。
+  `/relations/` 仍計入全部正文連結。
+- 引文改為「含連結的那一句」，前面有省略（較早的句子，或 parser 從段落中間起算 100 字）加「…」，後面有省略（較晚的句子，
+  或達 320 字上限）加「…」；完整段落不加。頁尾方法區同步說明。
+- 驗收：vitest 1360、topic-ui 176、web node 225、tsc、biome（變更檔）、writer registry 重新產生；隔離 18169 整合 home-display 群組
+  （含 relation-visibility，fixture 改為句中連結）與 public-api 通過。正式資料試算查詢 93–113ms。切換後 `x-blog-release` d754031、
+  generation 40、BUILD_ID 相符、no-store、DYNAMIC；切換後頭兩次首頁 5.4 秒為冷啟動，隨後新舊 slot 直連 1.7–2.1 秒、公開網址
+  2.1–2.3 秒；`/topics/`、`/api/topics`、`/relations/`、tag 皆 200。截圖 `.reviews/gen40/blue40-1280.png`。
+- 保留：刪除 gen38 `3c9905d` release 與 checkout。刪除前先停回填 run3（cursor 25427）、node_modules 改連 gen39，
+  再以 `blog-fulltext-backfill-20261016-run4` 續跑；保留腳本也改為檢查回填 node_modules 的實際指向。
+- 待決定：正文引用只剩一張卡，首頁中欄下方大片留白。
+
+## 現況（UTC 2026-10-15T16:50Z，gen39）
 
 正式站為 **green／gen39／`77915780fa24f51c9c5584189e489cd9a49d2d51`**，BUILD_ID `gUY454KbQ44XAq8sDEB0U`，切換
 UTC 2026-10-15T16:39:20.709Z（transition 39）。回滾點 blue／gen38 `3c9905d`／`VT4lRLXSIPqMBqBDXUfxa`：
