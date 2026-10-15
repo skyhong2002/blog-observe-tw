@@ -141,6 +141,8 @@ const item = (r: RowDataPacket) => {
     recentShare,
     baselineShare,
     lift: recentShare !== null && baselineShare !== null && baselineShare > 0 ? recentShare / baselineShare : null,
+    // Only the compact/full rankings compute heat (see HEAT_SQL); per-blog rankings omit it.
+    ...(r.heat === undefined || r.heat === null ? {} : { heat: Number(r.heat) }),
     matchingRule: Number(r.high_frequency) ? 'title-only' : 'title-and-body',
     matchingReason: Number(r.window_high_frequency)
       ? DISPLAY_GATE.reason
@@ -202,6 +204,13 @@ export async function ranking(
  * Matches are counted per term and blog before the term tables are read: the same per_blog counts as
  * grouping `evidence`, with one vocabulary/frequency lookup per (term, blog) instead of per (post, term).
  * A high-frequency term counts only its title posts, exactly as `evidence` drops its body rows. */
+/**
+ * Heat: this window's posts against what the term's 365-day baseline share predicts for a window this size,
+ * smoothed by HEAT_SMOOTHING posts so a handful of articles cannot top the list. Rankings order by
+ * heat × log2(1 + blogs): rising and widely written words first; everyday words (heat about 1) sink but stay.
+ */
+export const HEAT_SMOOTHING = 5;
+const HEAT_SQL = `((SUM(IF(window_high_frequency,title_n,n))+${HEAT_SMOOTHING})/(COALESCE(MAX(baseline_matched)/NULLIF(MAX(baseline_total),0),0)*(SELECT COUNT(*) FROM scoped_posts)+${HEAT_SMOOTHING}))`;
 const termBlogCtes = `term_blog AS (
        SELECT m.snapshot_id,m.term_id,p.blog_id,COUNT(DISTINCT p.id) all_n,COUNT(DISTINCT IF(m.source='title',p.id,NULL)) title_n
        FROM fresh_posts p JOIN topic_matches_v3 m ON m.post_id=p.id AND m.snapshot_id=p.snapshot_id
@@ -242,17 +251,18 @@ export async function compactHomeRanking(pool: Pool, days: number, now = new Dat
        SUM(title_n) title_posts,SUM(IF(window_high_frequency,0,n-title_n)) body_posts,
        MAX(high_frequency) high_frequency,MAX(window_high_frequency) window_high_frequency,
        MAX(baseline_total) baseline_total,MAX(baseline_matched) baseline_matched,
-       (SELECT COUNT(*) FROM scoped_posts) recent_total
+       (SELECT COUNT(*) FROM scoped_posts) recent_total,
+       ${HEAT_SQL} heat,${HEAT_SQL}*LOG2(1+COUNT(*)) rank_score
      FROM qualified WHERE title_n>0 OR NOT window_high_frequency
      GROUP BY topic_id,label,source HAVING COUNT(*)>=2
-     ORDER BY score DESC,blogs DESC,posts DESC,topic_id LIMIT ${limit + 1}`,
+     ORDER BY rank_score DESC,score DESC,blogs DESC,posts DESC,topic_id LIMIT ${limit + 1}`,
     [...range(days, now), SOURCE, FREQUENCY_POLICY.version],
   );
   return { items: rows.slice(0, limit).map(item), truncated: rows.length > limit };
 }
-/** The /topics/ ranking: the same items as `ranking(…, 100, now, true)`, whose `evidence` CTE MariaDB
- * re-evaluated for every reference (four times, seconds per request). Items come from the compact
- * projection; matchedPosts counts window posts with at least one surviving match: a title match, or
+/** The /topics/ ranking, ordered like the homepage (heat × breadth, HEAT_SQL). It replaced
+ * `ranking(…, 100, now, true)`, whose `evidence` CTE MariaDB re-evaluated for every reference (four times,
+ * seconds per request). Items come from the compact projection; matchedPosts counts window posts with at least one surviving match: a title match, or
  * a body match on a term whose baseline allows body evidence and whose window gate did not close. */
 export async function fullRanking(pool: Pool, days: number, now = new Date()) {
   const results = await compactHomeRanking(pool, days, now, 100);

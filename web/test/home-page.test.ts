@@ -22,11 +22,12 @@ test('home: only the compact overview is awaited; the topic list streams in its 
   assert.doesNotMatch(page, /Promise\.all|topicsApiPath|homeTopicsApiPath|publicJson|\boverview\(\)|\/api\/topics/);
   assert.match(page, /<Suspense fallback=\{<HomeTopicsPending \/>\}>\s*<HomeTopicRanking \/>\s*<\/Suspense>/);
   assert.equal(page.match(/<HomeTopicRanking\b/g)?.length, 1);
-  // The left column keeps its heading, full-ranking link and method line around the streamed list.
+  // The ranking's rule is in the closed method block at the page foot, not under the list (FooterMethod).
   assert.match(
     page,
-    /<h2>最近共同話題<\/h2>\s*<Link href="\/topics\/">完整排行 →<\/Link>\s*<\/div>\s*<Suspense[\s\S]*?<\/Suspense>\s*<p className=\{styles\.muted\}>近 30 天；同站貢獻逐次遞減，至少兩站參與。/,
+    /<h2>最近共同話題<\/h2>\s*<Link href="\/topics\/">完整排行 →<\/Link>\s*<\/div>\s*<Suspense[\s\S]*?<\/Suspense>\s*<div className=/,
   );
+  assert.doesNotMatch(page, /同站貢獻逐次遞減/);
   assert.match(page, /^import Link from '@\/components\/NoPrefetchLink';$/m);
   assert.doesNotMatch(page, /^'use client';/m);
 });

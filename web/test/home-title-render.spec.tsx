@@ -127,6 +127,43 @@ beforeEach(() => {
 });
 
 describe('homepage centre: body citations', () => {
+  test('an article linking to three blogs is one card listing all three, with the article image when sent', async () => {
+    const target = (id: number, slug: string, name: string) =>
+      mention({
+        postImageUrl: 'https://a.example/img/cover.jpg',
+        targetBlogId: id,
+        targetBlogSlug: slug,
+        targetBlogName: name,
+        targetHomeUrl: `https://${slug}.example/`,
+        targetDomain: `${slug}.example`,
+      });
+    answer(
+      OVERVIEW,
+      overview({
+        mentions: mentions([
+          target(2, 'b', '乙'),
+          target(3, 'c', '丙'),
+          target(4, 'd', '丁'),
+          mention({ postId: 50001, postUrl: 'https://a.example/p/2', postImageUrl: null }),
+        ]),
+      }),
+    );
+    const $ = await renderHome();
+    const cards = $('[data-mention-card]');
+    expect(cards.map((_, el) => $(el).attr('data-mention-card')).get()).toEqual(['1:20875', '1:50001']);
+    const first = cards.eq(0);
+    expect(
+      first
+        .find('[data-mention]')
+        .map((_, el) => $(el).attr('data-mention'))
+        .get(),
+    ).toEqual(['20875:2', '20875:3', '20875:4']);
+    // The thumbnail links to the original article; a card without an image renders no image box.
+    const image = first.find('img');
+    expect(image.length).toBe(1);
+    expect(image.closest('a').attr('href')).toBe('https://a.example/p/1');
+    expect(cards.eq(1).find('img').length).toBe(0);
+  });
   test('one row per article→blog link: decoded title linked out, target blog and domain, label, date; details as text', async () => {
     const before = overview({
       mentions: mentions([
@@ -253,8 +290,9 @@ describe('homepage centre: body citations', () => {
     expect($('body').text()).not.toContain('最近發文');
     expect($('[class~="hero"], [class~="band"]').length).toBe(0);
     expect(h2).toEqual(expect.arrayContaining(['最近共同話題', '作者動態', '最近的正文引用', '部落格觀察', '最新更新的部落格']));
-    // The left column now lists only the shared vocabulary's rank, so the old RSS/vocabulary split line is gone.
-    expect($('body').text()).toContain('只列共同關鍵字詞庫的話題。');
+    // The ranking rule moved to the closed method block at the page foot; the list carries no inline note.
+    expect($('body').text()).not.toContain('只列共同關鍵字詞庫的話題。');
+    expect($('body').text()).not.toContain('同站貢獻逐次遞減');
     expect($('body').text()).not.toContain('RSS 標籤與共同詞彙分開列出');
     const recent = $('a[href="https://c.example/p/3"]');
     expect(recent.text()).toBe(`${SHOWN} &#038;`);
@@ -340,6 +378,9 @@ describe('homepage method disclosure', () => {
     expect(text).toContain('側欄、Blogroll、留言、共同標籤與文字相似都不列入，也不代表雙方交流');
     expect(text).toContain('最近共同話題（前 8 名）與首頁文字雲（同一份排行，最多 30 個）只取近 30 天共同關鍵字詞庫的排行');
     expect(text).toContain('標題有寫到它的不到三分之一，表示多半只是在正文順帶提到，這個詞仍留在排行，但不畫進文字雲');
+    expect(text).toContain('排行看熱度與參與的部落格數，不看篇數多寡');
+    expect(text).toContain('再乘上 log₂(1＋參與部落格數)');
+    expect(text).toContain('且至少兩個部落格參與');
     expect(text).toContain('排行另略過背景詞');
     expect(text).toContain('長期基準與近 30 天分開計算');
     expect(text).toContain('仍保留在詞庫、話題頁與歷史文章，也沒有另設詞彙清單');

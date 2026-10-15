@@ -11,6 +11,7 @@ import { displayTitle, type HomeMention, type HomeMentions, taipei } from '@/lib
 import { externalHref } from '@/lib/images';
 import { blogLink } from '@/lib/page-links';
 import styles from './home.module.css';
+import NewsImage from './NewsImage';
 
 const EVIDENCE_LABEL = '正文直接連結';
 /** contextSource is a public enum; the contract admits only 'body'. */
@@ -87,6 +88,8 @@ function MentionCardView({ card }: { card: MentionCard }) {
           ))}
         </ul>
       </div>
+      {/* The source article's own image (feed/og), only when it loads; never a placeholder. */}
+      {original ? <NewsImage src={m.postImageUrl} href={original} analytics="open_original" title={title} variant="thumbnail" /> : null}
     </article>
   );
 }

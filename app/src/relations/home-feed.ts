@@ -17,16 +17,18 @@ const ELIGIBLE_LINK = `l.source_post_id=p.id AND l.source_blog_id=p.blog_id AND 
  * nine rows that can reach the homepage.  FORCE INDEX plus STRAIGHT_JOIN keeps
  * the bounded published_at range as the driving table.
  * Every eligible post yields at least one row and rows sort by post first, so the
- * nine rows come from the nine newest eligible posts: walk posts_published
- * backwards and stop at the ninth with a public body link, instead of ranking
- * every link of the 90 days (which, with a cold buffer pool, hit the one-second
- * statement budget). Visibility predicates are unchanged.
+ * nine rows come from the nine newest eligible posts. They are found from the links
+ * that resolved to a blog at all (relation_links_target; a few dozen in 90 days, of
+ * about eleven thousand body links), not by walking every post of the 90 days, which
+ * still hit the one-second statement budget with a cold buffer pool. Visibility
+ * predicates are unchanged.
  */
 export const HOME_MENTIONS_SQL = `SET STATEMENT max_statement_time=1 FOR WITH recent_posts AS (
- SELECT p.id,p.blog_id,p.published_at FROM posts p FORCE INDEX (posts_published)
- WHERE p.published_at>=? AND p.published_at<=?
- AND EXISTS (SELECT 1 FROM relation_links l STRAIGHT_JOIN blogs a ON a.id=l.source_blog_id STRAIGHT_JOIN blogs b ON b.id=l.target_blog_id
-   STRAIGHT_JOIN relation_observations o ON o.post_id=p.id WHERE ${ELIGIBLE_LINK})
+ SELECT DISTINCT p.id,p.blog_id,p.published_at FROM relation_links l FORCE INDEX (relation_links_target)
+ STRAIGHT_JOIN posts p ON p.id=l.source_post_id AND p.blog_id=l.source_blog_id
+ STRAIGHT_JOIN blogs a ON a.id=l.source_blog_id STRAIGHT_JOIN blogs b ON b.id=l.target_blog_id
+ STRAIGHT_JOIN relation_observations o ON o.post_id=p.id
+ WHERE l.target_blog_id IS NOT NULL AND p.published_at>=? AND p.published_at<=? AND ${ELIGIBLE_LINK}
  ORDER BY p.published_at DESC,p.id DESC LIMIT 9
 ), eligible_links AS (
  SELECT p.id postId,p.blog_id sourceBlogId,p.published_at publishedAt,
@@ -43,7 +45,7 @@ export const HOME_MENTIONS_SQL = `SET STATEMENT max_statement_time=1 FOR WITH re
  FROM eligible_links WHERE link_number=1
  ORDER BY publishedAt DESC,postId DESC,targetBlogId LIMIT 9
 )
- SELECT p.id postId,p.title postTitle,p.url postUrl,p.published_at publishedAt,
+ SELECT p.id postId,p.title postTitle,p.url postUrl,p.image_url postImageUrl,p.published_at publishedAt,
  a.id sourceBlogId,a.slug sourceBlogSlug,a.name sourceBlogName,
  b.id targetBlogId,b.slug targetBlogSlug,b.name targetBlogName,b.url targetHomeUrl,
  l.anchor_text anchor,l.context,l.observed_at observedAt,o.parser_version matchVersion
@@ -88,6 +90,7 @@ export async function loadHomeMentions(pool: Pool, now = new Date()) {
         postId: Number(r.postId),
         postTitle: r.postTitle,
         postUrl: mentionPublicUrl(r.postUrl),
+        postImageUrl: mentionPublicUrl(r.postImageUrl),
         publishedAt: iso(r.publishedAt),
         sourceBlogId: Number(r.sourceBlogId),
         sourceBlogSlug: r.sourceBlogSlug,

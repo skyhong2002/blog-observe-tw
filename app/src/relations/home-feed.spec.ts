@@ -52,7 +52,9 @@ describe('homepage uses public article→blog body citations', () => {
     expect(HOME_MENTIONS_SQL).toContain('l.source_blog_id=p.blog_id');
     expect(HOME_MENTIONS_SQL).toContain("l.location='body'");
     expect(HOME_MENTIONS_SQL).toContain('PARTITION BY p.id,l.target_blog_id ORDER BY l.ordinal');
-    expect(HOME_MENTIONS_SQL).toContain('FORCE INDEX (posts_published)');
+    // Newest eligible posts come from links that resolved to a blog, not from every post of the window.
+    expect(HOME_MENTIONS_SQL).toContain('FORCE INDEX (relation_links_target)');
+    expect(HOME_MENTIONS_SQL).toContain('l.target_blog_id IS NOT NULL');
     expect(HOME_MENTIONS_SQL).toContain('STRAIGHT_JOIN relation_links');
     const pickedLimit = HOME_MENTIONS_SQL.indexOf('ORDER BY publishedAt DESC,postId DESC,targetBlogId LIMIT 9');
     expect(HOME_MENTIONS_SQL.indexOf('WHERE link_number=1')).toBeLessThan(pickedLimit);

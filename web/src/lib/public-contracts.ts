@@ -154,6 +154,8 @@ const homeMention = {
   postId: count,
   postTitle: text,
   postUrl: nullable(text),
+  // Source article image; absent on older answers.
+  postImageUrl: optional(nullable(text)),
   publishedAt: nullable(text),
   sourceBlogId: count,
   sourceBlogSlug: text,

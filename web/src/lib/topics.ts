@@ -101,6 +101,8 @@ export type Topic = {
   baselineShare?: number | null;
   /** recentShare ÷ baselineShare; null when there is no baseline (never 0 for "unknown"). */
   lift?: number | null;
+  /** Smoothed heat (period posts ÷ baseline-expected posts); the ranking's order key with blogs. Absent on older gateways. */
+  heat?: number;
   matchingRule?: MatchingRule;
   matchingReason?: string | null;
 };

@@ -55,7 +55,25 @@ export async function runRankingFreshnessIntegration(pool: Pool) {
     if (sql.includes('per_blog AS') && sql.includes('LIMIT 101') && !scoped) {
       const compact = await compactHomeRanking(pool, 30, args[1] as Date);
       const standard = await ranking(pool, 30, undefined, true, 30, args[1] as Date, false);
-      assert.deepEqual(compact, standard, 'compact home must preserve public counts, weights, native-label admission and ordering');
+      // Same topics, counts, weights and admission as the standard ranking; only the order differs on purpose
+      // (heat × log2(1 + blogs), routes.ts HEAT_SQL), and compact items carry their heat.
+      const byId = (items: { id: string }[]) =>
+        [...items].map(({ heat: _heat, ...rest }: { id: string; heat?: number }) => rest).sort((a, b) => a.id.localeCompare(b.id));
+      assert.deepEqual(
+        byId(compact.items),
+        byId(standard.items),
+        'compact home must preserve public counts, weights and native-label admission',
+      );
+      assert.equal(compact.truncated, standard.truncated);
+      const keys = compact.items.map((t) => (t.heat ?? 0) * Math.log2(1 + t.blogs));
+      assert.ok(
+        keys.every((k, i) => i === 0 || keys[i - 1] >= k - 1e-9),
+        'compact home orders by heat × log2(1 + blogs)',
+      );
+      assert.ok(
+        compact.items.every((t) => typeof t.heat === 'number' && t.heat > 0),
+        'compact items carry heat',
+      );
       comparisons++;
     }
     if (!dateCases && sql.includes('per_blog AS')) {

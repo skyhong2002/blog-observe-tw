@@ -77,6 +77,8 @@ export type HomeMention = {
   postId: number;
   postTitle: string;
   postUrl: string | null;
+  /** Source article image, when the feed/page offered one; absent on older gateways. */
+  postImageUrl?: string | null;
   publishedAt: string | null;
   sourceBlogId: number;
   sourceBlogSlug: string;

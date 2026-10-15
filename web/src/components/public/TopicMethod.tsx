@@ -54,7 +54,9 @@ export default function TopicMethod({
       <p>
         {ranking ? '同站對同一詞的貢獻逐篇遞減，讓大量發文的站不會獨占排行。' : ''}
         {matchingPolicyText(matchingPolicy)}
-        {ranking ? `排行仍依加權貢獻排序。${liftExplanation(matchingPolicy?.frequency?.baselineDays)}` : ''}
+        {ranking
+          ? `排行依熱度乘上 log₂(1＋參與部落格數)排序，不看篇數多寡：熱度＝期間文章數 ÷ 依長期基準占比推算的預期篇數，兩邊各加 5 篇平滑；平常就很多的詞熱度約 1，會排在最近明顯變多、很多站都在寫的詞後面。${liftExplanation(matchingPolicy?.frequency?.baselineDays)}`
+          : ''}
       </p>
       {ranking && displayGateText(matchingPolicy) ? <p>{displayGateText(matchingPolicy)}</p> : null}
       {ranking && backgroundGateText(matchingPolicy) ? <p data-method="background-gate">{backgroundGateText(matchingPolicy)}</p> : null}

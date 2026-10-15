@@ -47,7 +47,6 @@ export default async function HomePage() {
             <Suspense fallback={<HomeTopicsPending />}>
               <HomeTopicRanking />
             </Suspense>
-            <p className={styles.muted}>近 30 天；同站貢獻逐次遞減，至少兩站參與。只列共同關鍵字詞庫的話題。</p>
             <div className={`${styles.sectionHeading} ${styles.sectionHeadingLater}`}>
               <h2>作者動態</h2>
               <Link href="/authors/">全部作者 →</Link>
