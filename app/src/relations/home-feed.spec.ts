@@ -54,8 +54,15 @@ describe('homepage uses public article→blog body citations', () => {
     expect(HOME_MENTIONS_SQL).toContain('PARTITION BY p.id,l.target_blog_id ORDER BY l.ordinal');
     expect(HOME_MENTIONS_SQL).toContain('FORCE INDEX (posts_published)');
     expect(HOME_MENTIONS_SQL).toContain('STRAIGHT_JOIN relation_links');
-    expect(HOME_MENTIONS_SQL.indexOf('WHERE link_number=1')).toBeLessThan(HOME_MENTIONS_SQL.indexOf('LIMIT 9'));
-    expect(HOME_MENTIONS_SQL.indexOf('LIMIT 9')).toBeLessThan(HOME_MENTIONS_SQL.indexOf('FROM picked k'));
+    const pickedLimit = HOME_MENTIONS_SQL.indexOf('ORDER BY publishedAt DESC,postId DESC,targetBlogId LIMIT 9');
+    expect(HOME_MENTIONS_SQL.indexOf('WHERE link_number=1')).toBeLessThan(pickedLimit);
+    expect(pickedLimit).toBeLessThan(HOME_MENTIONS_SQL.indexOf('FROM picked k'));
+    // Nine rows come from the nine newest eligible posts: the index walk stops there, before any ranking.
+    const newestPosts = HOME_MENTIONS_SQL.indexOf('ORDER BY p.published_at DESC,p.id DESC LIMIT 9');
+    expect(newestPosts).toBeGreaterThan(-1);
+    expect(newestPosts).toBeLessThan(HOME_MENTIONS_SQL.indexOf('eligible_links AS'));
+    // The newest-post walk applies the same public-link predicate as the rows it feeds.
+    expect(HOME_MENTIONS_SQL.split(PUBLIC_RELATION).length - 1).toBe(2);
     expect(HOME_MENTIONS_SQL).toContain('ORDER BY k.publishedAt DESC,k.postId DESC,k.targetBlogId');
     expect(HOME_MENTIONS_SQL).toContain('p.published_at>=? AND p.published_at<=?');
     expect(HOME_MENTIONS_SQL).toContain('tp.blog_id=b.id');
