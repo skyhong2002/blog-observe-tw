@@ -9,9 +9,10 @@ import FooterMethod, { OWN_METHOD } from './FooterMethod';
 export default function TopicMethodFallback() {
   const pathname = usePathname();
   // Same place as the footer's copy elsewhere: main's bottom padding (24px) plus the footer's mt-14
-  // (56px) sit above that one, so push this one down 80px and pull what follows back up by as much.
+  // (56px) sit above that one, so push this one down 80px. Below it, elsewhere the footer band's mt-10
+  // follows (40px); here that mt-10 collapses into the then-empty footer's mt-14, so pull back only 40px.
   return OWN_METHOD.test(pathname) ? (
-    <div className="mt-20 -mb-20">
+    <div className="mt-20 -mb-10">
       <FooterMethod page />
     </div>
   ) : null;
