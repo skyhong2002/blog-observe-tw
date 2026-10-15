@@ -350,16 +350,12 @@ a.recentPost:hover { color: var(--accent); }
   .mastheadCloudCompact { display: block; }
 }
 
-/* Body citations (HomeMentions): one "正文直接連結 →" label per card, linked blogs as chips,
-   and a single evidence disclosure per card. */
-.mentionTargets { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; margin-top: 8px; font-size: 12px; }
-.mentionTargets ul { display: flex; flex-wrap: wrap; gap: 6px; }
-.mentionLabel { color: var(--muted); white-space: nowrap; }
-.mentionChip { display: inline-flex; align-items: center; gap: 6px; padding: 2px 10px 2px 6px; border: 1px solid var(--line); border-radius: 999px; line-height: 1.6; color: var(--ink); }
+/* Body citations (HomeMentions): source line, title, then one row per linked blog with the words around the
+   link (two lines). Every row is a single-height flex line so icons, names, dots and dates share a centre. */
+.mentionMeta { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; font-size: 12px; line-height: 20px; color: var(--muted); margin-bottom: 4px; }
+.mentionSource { display: inline-flex; align-items: center; gap: 6px; color: var(--accent); }
+.mentionTargets { display: grid; gap: 10px; margin-top: 10px; }
+.mentionTo { display: flex; align-items: center; gap: 6px; font-size: 12px; line-height: 20px; color: var(--muted); }
+.mentionChip { display: inline-flex; align-items: center; gap: 6px; height: 24px; padding: 0 10px 0 6px; border: 1px solid var(--line); border-radius: 999px; line-height: 1; color: var(--ink); }
 .mentionChip:hover { border-color: var(--accent); }
-.mentionEvidence { margin-top: 8px; font-size: 12px; color: var(--muted); }
-.mentionEvidence summary { cursor: pointer; width: fit-content; }
-.mentionEvidence ul { margin-top: 6px; display: grid; gap: 8px; }
-.mentionEvidence li { padding-left: 10px; border-left: 2px solid var(--soft-line); line-height: 1.7; overflow-wrap: anywhere; }
-.evidenceTarget { color: var(--ink); font-weight: 500; }
-.evidenceTarget [data-target-domain] { margin-left: 6px; font-weight: 400; color: var(--muted); }
+.mentionQuote { margin: 4px 0 0 18px; font-size: 13px; line-height: 1.6; color: var(--muted); display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; overflow-wrap: anywhere; }

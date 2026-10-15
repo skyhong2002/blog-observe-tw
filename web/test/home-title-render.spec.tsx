@@ -164,7 +164,7 @@ describe('homepage centre: body citations', () => {
     expect(image.closest('a').attr('href')).toBe('https://a.example/p/1');
     expect(cards.eq(1).find('img').length).toBe(0);
   });
-  test('one row per article→blog link: decoded title linked out, target blog and domain, label, date; details as text', async () => {
+  test('one row per article→blog link: decoded title linked out, target blog chip with its quote, date', async () => {
     const before = overview({
       mentions: mentions([
         mention(),
@@ -203,27 +203,21 @@ describe('homepage centre: body citations', () => {
     expect(title.attr('data-analytics')).toBe('open_original');
     expect(title.attr('rel')).toBe('noopener noreferrer');
     expect(first.find(`time[datetime="${PUBLISHED}"]`).text()).toBe(taipei(PUBLISHED));
-    // One evidence label per card; each linked blog is a chip.
+    // Each linked blog is a chip with the words around the link right under it: no disclosure, no
+    // observation/parser/domain lines, and anchor/context markup stays text.
     const target = first.find('[data-mention="20875:2"]');
-    expect(first.find('[class~="mentionLabel"]').text()).toContain('正文直接連結');
-    expect(target.text()).toBe('乙');
-    const evidence = first.find('[data-mention-evidence="20875:2"]');
-    expect(evidence.find('[data-target-domain]').text()).toBe('b.example');
+    expect(target.find('a').text()).toBe('乙');
+    expect(target.find('[class~="mentionQuote"]').text()).toBe('「這裡提到乙 <script>alert(1)</script>。」');
+    expect(target.find('b, script').length).toBe(0);
+    expect(first.find('details').length).toBe(0);
+    expect(first.text()).not.toMatch(/解析版本|觀測|b\.example|正文直接連結/);
     // Internal blog links keep the stable slug path, never prefetch.
     expect(first.find('a[href="/blogs/a/"]').attr('data-prefetch')).toBe('false');
     expect(target.find('a[href="/blogs/b/"]').attr('data-prefetch')).toBe('false');
-    // One closed evidence disclosure per card, plain text: no anchor/context markup becomes an element.
-    const details = first.find('details');
-    expect(details.length).toBe(1);
-    expect(details.attr('open')).toBeUndefined();
-    expect(details.text()).toContain('連結文字：「乙的文章 <b>x</b>」');
-    expect(details.text()).toContain('上下文：「這裡提到乙 <script>alert(1)</script>。」');
-    expect(details.text()).toContain(`觀測 ${taipei('2026-10-13T06:00:00.000Z')} · 解析版本 relations-v3 · 上下文來源 文章正文`);
-    expect(details.find('b, script').length).toBe(0);
 
     // The reverse direction is a different source article: its own card and its own date.
     expect(cards.eq(1).find('h3 a').attr('href')).toBe('https://b.example/p/9');
-    expect(cards.eq(1).find('[data-mention-evidence] [data-target-domain]').text()).toBe('a.example');
+    expect(cards.eq(1).find('[data-mention] a').text()).toBe('甲');
     expect(cards.eq(1).find('time').attr('datetime')).toBe('2026-07-01T00:00:00.000Z');
     expect(cards.eq(2).find('h3 a').length).toBe(0);
     expect(cards.eq(2).find('h3').text()).toBe('Unsafe');
@@ -274,17 +268,10 @@ describe('homepage centre: body citations', () => {
     const targets = card.find('[data-mention]');
     expect(targets.map((_, el) => $(el).attr('data-mention')).get()).toEqual(['20875:2', '20875:3']);
     expect(targets.eq(1).find('a[href="/blogs/c.example/"]').text()).toBe('丙');
-    // Both targets' evidence sits in the card's single disclosure, labelled with the count.
-    expect(card.find('details').length).toBe(1);
-    expect(card.find('details summary').text()).toBe('核對連結證據（2）');
-    const evidence = card.find('[data-mention-evidence]');
-    expect(evidence.map((_, el) => $(el).attr('data-mention-evidence')).get()).toEqual(['20875:2', '20875:3']);
-    expect(evidence.eq(0).find('[data-target-domain]').text()).toBe('b.example');
-    expect(evidence.eq(0).text()).toContain('連結文字：「乙」');
-    expect(evidence.eq(0).text()).toContain(`觀測 ${taipei('2026-10-13T06:00:00.000Z')} · 解析版本 relations-v3`);
-    expect(evidence.eq(1).find('[data-target-domain]').text()).toBe('c.example');
-    expect(evidence.eq(1).text()).toContain('上下文：「也提到丙。」');
-    expect(evidence.eq(1).text()).toContain(`觀測 ${taipei('2026-10-12T06:00:00.000Z')} · 解析版本 relations-v4`);
+    // Each target row carries its own quote: the context, else the anchor text.
+    expect(targets.eq(0).find('[class~="mentionQuote"]').text()).toBe('「提到乙。」');
+    expect(targets.eq(1).find('[class~="mentionQuote"]').text()).toBe('「也提到丙。」');
+    expect(card.find('details').length).toBe(0);
     expect(card.text()).not.toContain('重複的乙');
     expect(cards.eq(1).find('h3 a').attr('href')).toBe('https://a.example/p/2');
     expect(cards.eq(1).find('h3 a').text()).toBe(SHOWN);

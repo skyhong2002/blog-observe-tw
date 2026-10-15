@@ -13,10 +13,6 @@ import { blogLink } from '@/lib/page-links';
 import styles from './home.module.css';
 import NewsImage from './NewsImage';
 
-const EVIDENCE_LABEL = '正文直接連結';
-/** contextSource is a public enum; the contract admits only 'body'. */
-const CONTEXT_SOURCE: Record<HomeMention['contextSource'], string> = { body: '文章正文' };
-
 /** One source article (post id + source blog) and the distinct blogs it links to, in the gateway's order. */
 export type MentionCard = { key: string; article: HomeMention; targets: HomeMention[] };
 /**
@@ -34,23 +30,8 @@ export function mentionCards(items: readonly HomeMention[]): MentionCard[] {
   return [...cards.values()];
 }
 
-/** One evidence entry inside the card's single disclosure: which blog, its domain, and what the link said. */
-function MentionEvidence({ m }: { m: HomeMention }) {
-  return (
-    <li data-mention-evidence={`${m.postId}:${m.targetBlogId}`}>
-      <p className={styles.evidenceTarget}>
-        {m.targetBlogName}
-        {m.targetDomain ? <span data-target-domain="">{m.targetDomain}</span> : null}
-      </p>
-      <p>連結文字：{m.anchor.trim() ? `「${m.anchor}」` : '未提供'}</p>
-      <p>上下文：{m.context.trim() ? `「${m.context}」` : '未提供'}</p>
-      <p>
-        觀測 {m.observedAt ? taipei(m.observedAt) : '未提供'} · 解析版本 {m.matchVersion || '未提供'} · 上下文來源{' '}
-        {CONTEXT_SOURCE[m.contextSource] ?? '未提供'}
-      </p>
-    </li>
-  );
-}
+/** The words around the link, else its anchor text: what the article actually said about the other blog. */
+const mentionQuote = (m: HomeMention) => m.context.trim() || m.anchor.trim();
 
 function MentionCardView({ card }: { card: MentionCard }) {
   const m = card.article;
@@ -59,12 +40,13 @@ function MentionCardView({ card }: { card: MentionCard }) {
   return (
     <article className={styles.story} data-mention-card={card.key}>
       <div className={styles.storyBody}>
-        <p className={styles.storyTags}>
-          <Link {...blogLink(m.sourceBlogSlug, m.sourceBlogCanonicalPath)} className="inline-flex items-center gap-1.5">
+        <p className={styles.mentionMeta}>
+          <Link {...blogLink(m.sourceBlogSlug, m.sourceBlogCanonicalPath)} className={styles.mentionSource}>
             <BlogIcon media={m.sourceBlogSlug} iconUrl={m.sourceIconUrl} title={m.sourceBlogName} />
             {m.sourceBlogName}
           </Link>
-          <span> · {m.publishedAt ? <time dateTime={m.publishedAt}>{taipei(m.publishedAt)}</time> : '發文日期不明'}</span>
+          <span aria-hidden="true">·</span>
+          {m.publishedAt ? <time dateTime={m.publishedAt}>{taipei(m.publishedAt)}</time> : <span>發文日期不明</span>}
         </p>
         <h3>
           {original ? (
@@ -75,30 +57,23 @@ function MentionCardView({ card }: { card: MentionCard }) {
             <span>{title}</span>
           )}
         </h3>
-        {/* One label per card; each linked blog is a chip. */}
-        <div className={styles.mentionTargets}>
-          <span className={styles.mentionLabel}>
-            {EVIDENCE_LABEL} <span aria-hidden="true">→</span>
-          </span>
-          <ul aria-label="這篇文章連到的部落格">
-            {card.targets.map((t) => (
+        <ul className={styles.mentionTargets} aria-label="這篇文章在正文連到的部落格">
+          {card.targets.map((t) => {
+            const quote = mentionQuote(t);
+            return (
               <li key={t.targetBlogId} data-mention={`${t.postId}:${t.targetBlogId}`}>
-                <Link {...blogLink(t.targetBlogSlug, t.targetBlogCanonicalPath)} className={styles.mentionChip}>
-                  <BlogIcon media={t.targetBlogSlug} iconUrl={t.targetIconUrl} title={t.targetBlogName} />
-                  {t.targetBlogName}
-                </Link>
+                <p className={styles.mentionTo}>
+                  <span aria-hidden="true">→</span>
+                  <Link {...blogLink(t.targetBlogSlug, t.targetBlogCanonicalPath)} className={styles.mentionChip}>
+                    <BlogIcon media={t.targetBlogSlug} iconUrl={t.targetIconUrl} title={t.targetBlogName} />
+                    {t.targetBlogName}
+                  </Link>
+                </p>
+                {quote ? <p className={styles.mentionQuote}>「{quote}」</p> : null}
               </li>
-            ))}
-          </ul>
-        </div>
-        <details className={styles.mentionEvidence}>
-          <summary>核對連結證據{card.targets.length > 1 ? `（${card.targets.length}）` : ''}</summary>
-          <ul>
-            {card.targets.map((t) => (
-              <MentionEvidence key={t.targetBlogId} m={t} />
-            ))}
-          </ul>
-        </details>
+            );
+          })}
+        </ul>
       </div>
       {/* The source article's own image (feed/og), only when it loads; never a placeholder. */}
       {original ? <NewsImage src={m.postImageUrl} href={original} analytics="open_original" title={title} variant="thumbnail" /> : null}
