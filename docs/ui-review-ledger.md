@@ -1,6 +1,35 @@
 # UI 逐頁審查紀錄
 
-## Current state（UTC 2026-10-15T15:00Z，gen36）
+## Current state（UTC 2026-10-15T16:00Z，gen38）
+
+正式站為 **blue／gen38／`3c9905d7af7cae26d8b51599034ca9debe32b01f`**，BUILD_ID `VT4lRLXSIPqMBqBDXUfxa`，切換
+UTC 2026-10-15T15:56:52.407Z。回滾點 green／gen37 `021c55c`／`f0elr8sZPR9MEHLH2Mp0X`：
+
+```bash
+bash /home/deck/.cache/blog-home-cloud-b3-20261014/tools/deploy-blue-green.sh rollback green
+```
+
+依使用者回饋（gen37 `021c55c`、gen38 `3c9905d`）：
+
+- **共同話題改依熱度排序**（首頁列表、文字雲、`/topics/`）：熱度＝近 30 天篇數 ÷ 依 365 日基準占比推算的預期篇數（兩邊
+  ＋5 平滑），排序鍵＝熱度 × log₂(1＋參與部落格數)。正式資料試算：前 8 名由 美食／景點／住宿／飯店… 變為
+  桃園、Apple、吃到飽、台北大巨蛋、開箱、智慧家庭、大巨蛋、HomePod。話題集合、篇數、權重與門檻不變（整合測試逐筆比對）。
+  純熱度會被單一事件（Apple 發表會，5–7 站）洗版，因此乘上參與廣度。Apple／HomePod 系列近義詞仍各自成項（詞庫層級問題）。
+- 文字雲依排名決定字級（原依篇數，使美食最大）；畫上 tag 的代表圖片（地名輪廓等），以 `accent=22c55e` 染成本站綠色；
+  圖片清單是 tag 公開資料、每個 process 快取 30 分鐘、1.5 秒逾時即純文字。目前排行中有圖的是桃園、中壢、新北、彰化。
+- 「近 30 天；同站貢獻逐次遞減…」說明移到頁尾方法區，並加入熱度公式說明；`/topics/` 計算方式同步更新。
+- **正文引用不再間歇消失**：原查詢在冷快取下撞 1 秒上限（一小時 9 次以上）。改從已解析到部落格的連結出發
+  （90 天約 11,000 條正文連結中只有 74 條連到其他已收錄部落格），正式資料結果相同，冷快取 1,062ms → 8ms。
+- 正文引用卡片改版：每張卡一個「正文直接連結 →」，連到的部落格以小標籤並列；網域、連結文字、上下文、觀測、版本收進
+  單一「核對連結證據（N）」。一篇文章連到多個部落格時同一張卡列出全部（測試涵蓋 3 個）。卡片支援文章縮圖，
+  但目前 6 筆中 4 筆無圖、2 筆 `image_url` 是 RSS 網址（`https://gogojp.tw/feed/`），故實際上沒有縮圖顯示。
+- 驗收：vitest 1358、topic-ui 176、node 225；隔離 18169 整合 home-display、topic-policy-compat、relations、
+  relation-visibility、relations-quality、topics、topics-ranking、topics-quality、home-ranking-freshness、content-topics、
+  public-api 通過。gen38 切換後 `x-blog-release`／generation／BUILD_ID 相符、no-store、DYNAMIC；首頁 2.3–4.7 秒（load 12）。
+  實際瀏覽器（允許外部圖片）1280 dark／390 light 確認雲圖與卡片版面。
+- 保留：刪除 gen35 `8755f33`、gen36 `fb8e7db` 與 checkout；回填 checkout 的 node_modules 改連 gen37。
+
+## 現況（UTC 2026-10-15T15:00Z，gen36）
 
 正式站為 **blue／gen36／`fb8e7dbfd020b53e6c347f380f99076bcb50fc0d`**，BUILD_ID `wI_qqKqP1tan8lX5uvVUo`，切換
 UTC 2026-10-15T14:56:13.779Z（transition 36）。回滾點 green／gen35 `8755f33`／`30mIp94X6T4kIQ3IrSNTQ`：
