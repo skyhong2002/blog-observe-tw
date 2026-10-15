@@ -7,6 +7,8 @@ import { backfillPublicRoutes, backfillTopicRouteAliases, getPublicPages, resolv
 
 const digest = (value: string) => createHash('sha256').update(value).digest('hex');
 /** All mutations below are disposable fixtures and refuse the production database port. */
+/** Cursor that starts at blog `id`: no cursor for id 1 (a fresh database's first blog), as "0" is not a valid cursor. */
+const cursorBefore = (id: number) => (id > 1 ? String(id - 1) : '');
 export async function runPublicRoutesIntegration(pool: Pool) {
   const port = (pool as unknown as { pool: { config: { connectionConfig: { port: number } } } }).pool.config.connectionConfig.port;
   assert.equal(port, 18169);
@@ -50,7 +52,7 @@ export async function runPublicRoutesIntegration(pool: Pool) {
       topics[0],
     ]);
     const before = await pool.query<RowDataPacket[]>('SELECT id,slug FROM blogs WHERE id IN (?)', [blogs]);
-    let cursor = String(blogs[0] - 1);
+    let cursor = cursorBefore(blogs[0]);
     for (let i = 0; i < 3; i++) {
       const result = await backfillPublicRoutes(pool, { kind: 'blog', afterId: cursor, limit: 1 });
       assert.equal(result.processed, 1);
@@ -77,7 +79,7 @@ export async function runPublicRoutesIntegration(pool: Pool) {
     assert.equal(new Set([...topicPages.values()].map((p) => p.slug)).size, 2);
     await pool.execute('UPDATE topic_canonical_terms_v3 SET label=? WHERE snapshot_id=? AND id=?', ['顯示名稱已變更', snapshot, topics[0]]);
     await backfillPublicRoutes(pool, { kind: 'topic', limit: 500 });
-    await backfillPublicRoutes(pool, { kind: 'blog', afterId: String(blogs[0] - 1), limit: 3 });
+    await backfillPublicRoutes(pool, { kind: 'blog', afterId: cursorBefore(blogs[0]), limit: 3 });
     await backfillTopicRouteAliases(pool, { limit: 500 });
     assert.equal(
       (await resolvePublicPage(pool, 'topic', `tag:${topics[0]}`))?.canonicalPath,
@@ -92,7 +94,10 @@ export async function runPublicRoutesIntegration(pool: Pool) {
       now,
     ]);
     blogs.push(seed.insertId);
-    assert.equal((await backfillPublicRoutes(pool, { kind: 'blog', afterId: String(seed.insertId - 1), missingOnly: true })).processed, 1);
+    assert.equal(
+      (await backfillPublicRoutes(pool, { kind: 'blog', afterId: cursorBefore(seed.insertId), missingOnly: true })).processed,
+      1,
+    );
     assert.equal(await resolvePublicPage(pool, 'blog', `seed-${suffix}`), null, 'unverified seed is not publicly addressable');
     await pool.execute("UPDATE blogs SET status='verified' WHERE id=?", [seed.insertId]);
     assert.equal(
@@ -100,7 +105,10 @@ export async function runPublicRoutesIntegration(pool: Pool) {
       `seed-${suffix}`,
       'verification restores the same stable registry key',
     );
-    assert.equal((await backfillPublicRoutes(pool, { kind: 'blog', afterId: String(seed.insertId - 1), missingOnly: true })).processed, 0);
+    assert.equal(
+      (await backfillPublicRoutes(pool, { kind: 'blog', afterId: cursorBefore(seed.insertId), missingOnly: true })).processed,
+      0,
+    );
     const [tag] = await pool.execute<ResultSetHeader>(
       "INSERT INTO tags(slug,label,visibility,status,first_seen_at,last_seen_at,created_at,updated_at) VALUES (?,?,'private','active',?,?,?,?)",
       [`route-tag-${suffix}`, labels[0], now, now, now, now],
@@ -165,7 +173,7 @@ export async function runPublicRoutesIntegration(pool: Pool) {
       }
       for (const key of [...oldKeys, renamed])
         assert.equal((await resolvePublicPage(pool, kind, key))?.canonicalPath, `/${kind === 'blog' ? 'blogs' : 'topics'}/${renamed}/`);
-      await backfillPublicRoutes(pool, { kind, afterId: kind === 'blog' ? String(blogs[0] - 1) : undefined, limit: 3 });
+      await backfillPublicRoutes(pool, { kind, afterId: kind === 'blog' ? cursorBefore(blogs[0]) : undefined, limit: 3 });
       assert.equal(
         (await resolvePublicPage(pool, kind, oldKeys[0]))?.slug,
         renamed,

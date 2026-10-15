@@ -83,7 +83,9 @@ export async function runTopicsQualityIntegration(pool: Pool) {
         return async (...args: unknown[]) => {
           queries++;
           statements.push(String(args[0]));
-          if (gateEnabled && String(args[0]).startsWith('WITH scoped_posts') && String(args[0]).includes('per_blog AS')) {
+          // One ranking statement per request; fullRanking's matched-post count (topic_gate) follows it and is not a builder.
+          const sql = String(args[0]);
+          if (gateEnabled && sql.startsWith('WITH scoped_posts') && sql.includes('per_blog AS') && !sql.includes('topic_gate AS')) {
             builders++;
             if (builders === 8) buildersArrived();
             await gate;
@@ -280,7 +282,7 @@ export async function runTopicsQualityIntegration(pool: Pool) {
       undefined,
     );
     assert.ok(
-      statements.some((sql) => sql.startsWith('WITH scoped_posts') && sql.includes('AND b.slug=?), evidence')),
+      statements.some((sql) => /^WITH scoped_posts AS \([^()]*AND b\.slug=\?\s*\)/.test(sql)),
       'blog scope must be inside pre-union source',
     );
     invalidateTopicCache(counted);

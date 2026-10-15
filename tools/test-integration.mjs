@@ -46,33 +46,41 @@ try {
     throw Error('isolated_loopback_18169_required');
   const options = parseDbUrl(url);
   control = await mysql.createConnection({ ...options, database: undefined, charset: 'utf8mb4', connectTimeout: 5000 });
-  phase = 'create-disposable-database';
-  await control.query(`CREATE DATABASE \`${name}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`);
-  created = true;
   parsed.pathname = `/${name}`;
   process.env.BLOG_DB_URL = parsed.href;
   // Fixture suites inject their HTTP adapters; accidental direct global network is an error.
   globalThis.fetch = async () => {
     throw Error('integration_external_network_forbidden');
   };
-  store = createDb(parsed.href, { poolSize: 8 });
-  phase = 'migrations';
-  const baseline = await readFile(new URL('../db/001_init.sql', import.meta.url), 'utf8');
-  for (const statement of baseline
-    .split(';')
-    .map((s) => s.trim())
-    .filter(Boolean))
-    await store.pool.query(statement);
   const dir = new URL('../app/src/db/migrations/', import.meta.url);
   const files = (await readdir(dir)).filter((f) => /^\d{4}_.+\.sql$/.test(f) && !f.startsWith('0000_')).sort();
-  for (const file of files) {
-    phase = `migration:${file}`;
-    for (const sql of (await readFile(new URL(file, dir), 'utf8'))
-      .split('--> statement-breakpoint')
+  // Drop (if any) and recreate the one disposable database, then apply baseline and migrations.
+  const freshDatabase = async () => {
+    if (store) await store.close();
+    store = undefined;
+    if (created) await control.query(`DROP DATABASE \`${name}\``);
+    created = false;
+    phase = 'create-disposable-database';
+    await control.query(`CREATE DATABASE \`${name}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`);
+    created = true;
+    store = createDb(parsed.href, { poolSize: 8 });
+    phase = 'migrations';
+    const baseline = await readFile(new URL('../db/001_init.sql', import.meta.url), 'utf8');
+    for (const statement of baseline
+      .split(';')
       .map((s) => s.trim())
       .filter(Boolean))
-      await store.pool.query(sql);
-  }
+      await store.pool.query(statement);
+    for (const file of files) {
+      phase = `migration:${file}`;
+      for (const sql of (await readFile(new URL(file, dir), 'utf8'))
+        .split('--> statement-breakpoint')
+        .map((s) => s.trim())
+        .filter(Boolean))
+        await store.pool.query(sql);
+    }
+  };
+  await freshDatabase();
   const suites = [
     ['fulltext', '../app/src/search-fulltext.integration.ts', 'runFulltextIntegration'],
     ['home-display', '../app/src/topics/display-gate.integration.ts', 'runDisplayGateIntegration'],
@@ -125,43 +133,46 @@ try {
     process.argv[5] === 'public-api'
       ? suites.filter(([label]) => label === 'public-api')
       : process.argv[5] === 'fulltext'
-      ? suites.filter(([label]) => label === 'fulltext')
-      : process.argv[5] === 'home-display'
-        ? suites.filter(
-            ([label]) =>
-              label === 'home-display' ||
-              label === 'topic-policy-compat' ||
-              label === 'home-ranking-freshness' ||
-              label === 'relation-visibility',
-          )
-        : process.argv[5] === 'topic-policy-compat'
-          ? suites.filter(([label]) => label === 'topic-policy-compat' || label === 'home-ranking-freshness')
-          : process.argv[5] === 'f3-f4'
-            ? suites.filter(
-                ([label]) =>
-                  label === 'search-recall' ||
-                  label === 'profile-evidence' ||
-                  label === 'shared-tags' ||
-                  label === 'text-similarity' ||
-                  label === 'home-ranking-freshness' ||
-                  label.startsWith('tech-'),
-              )
-            : process.argv[5] === 'b3'
-              ? suites.filter(([label]) => label.startsWith('shared-label-'))
-              : process.argv[5] === 'vocabulary-snapshot'
-                ? suites.filter(([label]) => label === 'snapshot-import')
-                : process.argv[5] === 'staged-scan-v2'
-                  ? suites.filter(([label]) => label === 'staged-scan-v2')
-                  : process.argv[5] === 'topic-body-owner'
-                    ? suites.filter(([label]) => label === 'topic-body-owner')
-                    : process.argv[5] === 'topic-fingerprint-sql'
-                      ? suites.filter(([label]) => label === 'topic-fingerprint-sql')
-                      : process.argv[5] === 'staged-scan-proof'
-                        ? suites.filter(([label]) => label === 'staged-scan-proof')
-                        : process.argv[5] === 'staged-proof-inspector'
-                          ? suites.filter(([label]) => label === 'staged-proof-inspector')
-                          : suites;
-  for (const [label, module, entry] of selected) {
+        ? suites.filter(([label]) => label === 'fulltext')
+        : process.argv[5] === 'home-display'
+          ? suites.filter(
+              ([label]) =>
+                label === 'home-display' ||
+                label === 'topic-policy-compat' ||
+                label === 'home-ranking-freshness' ||
+                label === 'relation-visibility',
+            )
+          : process.argv[5] === 'topic-policy-compat'
+            ? suites.filter(([label]) => label === 'topic-policy-compat' || label === 'home-ranking-freshness')
+            : process.argv[5] === 'f3-f4'
+              ? suites.filter(
+                  ([label]) =>
+                    label === 'search-recall' ||
+                    label === 'profile-evidence' ||
+                    label === 'shared-tags' ||
+                    label === 'text-similarity' ||
+                    label === 'home-ranking-freshness' ||
+                    label.startsWith('tech-'),
+                )
+              : process.argv[5] === 'b3'
+                ? suites.filter(([label]) => label.startsWith('shared-label-'))
+                : process.argv[5] === 'vocabulary-snapshot'
+                  ? suites.filter(([label]) => label === 'snapshot-import')
+                  : process.argv[5] === 'staged-scan-v2'
+                    ? suites.filter(([label]) => label === 'staged-scan-v2')
+                    : process.argv[5] === 'topic-body-owner'
+                      ? suites.filter(([label]) => label === 'topic-body-owner')
+                      : process.argv[5] === 'topic-fingerprint-sql'
+                        ? suites.filter(([label]) => label === 'topic-fingerprint-sql')
+                        : process.argv[5] === 'staged-scan-proof'
+                          ? suites.filter(([label]) => label === 'staged-scan-proof')
+                          : process.argv[5] === 'staged-proof-inspector'
+                            ? suites.filter(([label]) => label === 'staged-proof-inspector')
+                            : suites;
+  // Without --suite every suite gets its own fresh database: several assume an empty corpus
+  // (staged-scan-proof asserts it), so sharing one database made the full run stop there.
+  for (const [index, [label, module, entry]] of selected.entries()) {
+    if (index > 0 && process.argv.length === 4) await freshDatabase();
     phase = label;
     const result = await (await import(module))[entry](store.pool);
     console.log(JSON.stringify({ suite: label, passed: true, result }));

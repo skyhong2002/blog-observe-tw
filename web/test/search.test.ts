@@ -30,7 +30,7 @@ const fixture = {
     { id: 4 },
   ],
   pagination: { page: 2, pageSize: 20, hasMore: true },
-  coverage: { type: 'recent-indexed-posts', limit: 1000, scannedPosts: 1000, truncated: true },
+  coverage: { type: 'bounded-ingestion-metadata', limit: 1000, scannedPosts: 1000, truncated: true },
   query: '咖啡',
   generatedAt: '2026-10-12T00:00:00Z',
   cacheSeconds: 60,

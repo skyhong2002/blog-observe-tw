@@ -118,7 +118,7 @@ describe('bounded private-body search', () => {
       const results = await Promise.all([first, second]);
       expect(results.every((r) => r.statusCode === 200)).toBe(true);
       expect(query).toHaveBeenCalledTimes(4);
-      expect(results[0].json()).toMatchObject({ cacheSeconds: 0, coverage: { type: 'recent-indexed-posts' } });
+      expect(results[0].json()).toMatchObject({ cacheSeconds: 0, coverage: { type: 'bounded-ingestion-metadata' } });
       const next = await app.inject('/api/search?q=旅行');
       expect(next.statusCode).toBe(200);
       expect(next.headers['cache-control']).toBe('no-store');

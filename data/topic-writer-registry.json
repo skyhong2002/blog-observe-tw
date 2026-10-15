@@ -455,6 +455,13 @@
       "occurrences": 1
     },
     {
+      "path": "app/src/overview.js",
+      "digest": "f1fd2c775c1c992890ea20958e1f9de76a39567c730b9aadd28cb7d091e632a0",
+      "tables": [],
+      "dynamic": true,
+      "occurrences": 1
+    },
+    {
       "path": "app/src/public-api/integration.ts",
       "digest": "2386057da3ffd917b3fe2e56ee8a20c5ee869bc0cebaafd83549e560f46c1f79",
       "tables": [
@@ -468,6 +475,24 @@
       "digest": "426d60fe7f7efdee93a8d8a1adc09420a02f3a804de9c35deb8fdc24dae8e989",
       "tables": [
         "blogs"
+      ],
+      "dynamic": false,
+      "occurrences": 1
+    },
+    {
+      "path": "app/src/public-api/integration.ts",
+      "digest": "489892dd6eae796d48b0821a52c1869462996decbf4843f2f53d9012773fb651",
+      "tables": [
+        "content_post_bodies"
+      ],
+      "dynamic": false,
+      "occurrences": 1
+    },
+    {
+      "path": "app/src/public-api/integration.ts",
+      "digest": "942283cbc2d73ee716460e40c5b50a25c223e0f02f48d305acb9783cf10dc707",
+      "tables": [
+        "content_post_bodies"
       ],
       "dynamic": false,
       "occurrences": 1
@@ -488,7 +513,7 @@
         "posts"
       ],
       "dynamic": false,
-      "occurrences": 1
+      "occurrences": 3
     },
     {
       "path": "app/src/reader/api-keys.ts",
@@ -500,6 +525,13 @@
     {
       "path": "app/src/reader/api-keys.ts",
       "digest": "eda0821b6ebff94fbdedad521eba1ee948bebd02f9332bc7f19cdd6e7944b1b7",
+      "tables": [],
+      "dynamic": true,
+      "occurrences": 1
+    },
+    {
+      "path": "app/src/relations/home-feed.ts",
+      "digest": "5eff33dd96a17d35e1a8c91b63564858742a247462524db434bbc6368c6f11c8",
       "tables": [],
       "dynamic": true,
       "occurrences": 1
@@ -655,6 +687,55 @@
     {
       "path": "app/src/search-body-index.ts",
       "digest": "e8db65fe243dc96a78b78351b887f3081cdf3fda353d3ad6af2c3340eca7bb37",
+      "tables": [],
+      "dynamic": true,
+      "occurrences": 1
+    },
+    {
+      "path": "app/src/search-fulltext.ts",
+      "digest": "113709097055a536b25f7388a354013aa88199078ec8ea7fd61b00a643cd0a9d",
+      "tables": [],
+      "dynamic": true,
+      "occurrences": 1
+    },
+    {
+      "path": "app/src/search-fulltext.ts",
+      "digest": "3d5341d3857b78bae7463488acb6fb0d5b9bcbda54963b3781af795d9b54ce33",
+      "tables": [],
+      "dynamic": true,
+      "occurrences": 1
+    },
+    {
+      "path": "app/src/search-fulltext.ts",
+      "digest": "84cd3c060d3ac76418c9d71cf9b56cf30eab8c551f575760115157705b39ef81",
+      "tables": [],
+      "dynamic": true,
+      "occurrences": 1
+    },
+    {
+      "path": "app/src/search-fulltext.ts",
+      "digest": "9a9e35dea27ad86b1cfb5e771cbf209f0408bc06983e231682ea319394ca0f1c",
+      "tables": [],
+      "dynamic": true,
+      "occurrences": 1
+    },
+    {
+      "path": "app/src/search-fulltext.ts",
+      "digest": "eb320c00230fc247a972f1716dc31d8c9d87e7c1771eee84135c9e552b539d5e",
+      "tables": [],
+      "dynamic": true,
+      "occurrences": 1
+    },
+    {
+      "path": "app/src/search-fulltext.ts",
+      "digest": "eda2581f975577776acd59b6609557003abbf7a3877b13aa9962953dc2b5aee3",
+      "tables": [],
+      "dynamic": true,
+      "occurrences": 1
+    },
+    {
+      "path": "app/src/search-fulltext.ts",
+      "digest": "f547ade3611b6069399ed184e90f7e42d3781d13253279cffc2b2b4893a1c4a9",
       "tables": [],
       "dynamic": true,
       "occurrences": 1

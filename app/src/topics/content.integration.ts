@@ -10,6 +10,7 @@ import { registerContentRoutes } from '../content/routes.ts';
 import * as schema from '../db/schema.ts';
 import { loadOverview } from '../overview.js';
 import { loadSearch } from '../search.ts';
+import { indexFulltextPosts, loadFulltextSearch } from '../search-fulltext.ts';
 import { runTopicsBatch } from './batch.ts';
 import { digest } from './matcher.ts';
 import { invalidateTopicCache, registerTopicRoutes } from './routes.ts';
@@ -113,7 +114,10 @@ export async function runContentTopicsIntegration(pool: Pool) {
     );
     const unchanged = await runTopicsBatch(pool, { limit: 200, since: new Date(now.getTime() - 2000) });
     assert.equal(unchanged.processed, 0, 'old snapshot index must not cause current-generation rematching');
-    const search = await loadSearch(pool, { q: '私藏綠茶', page: 1, limit: 20, blog: slug });
+    // Metadata search never reads bodies; body text is found through the historical fulltext index.
+    assert.equal((await loadSearch(pool, { q: '私藏綠茶', page: 1, limit: 20, blog: slug })).items.length, 0);
+    await indexFulltextPosts(pool, [postId]);
+    const search = await loadFulltextSearch(pool, { q: '私藏綠茶', page: 1, limit: 20, blog: slug });
     assert.equal(search.items.length, 1);
     assert.ok(search.items[0].snippet.includes('私藏綠茶'));
     assert.ok(!JSON.stringify(search).includes('PRIVATE_FULL_BODY_TAIL'));
