@@ -81,7 +81,12 @@ export default function SiteNavigation({ techEnabled = false }: { techEnabled?: 
             <div className="flex flex-wrap gap-1">
               {group.links.map(({ href, short }) => {
                 const exact = pathname === href || `${pathname}/` === href;
-                const current = exact || href === section || (href === '/byline/' && pathname.startsWith('/journalist/'));
+                const current =
+                  exact ||
+                  href === section ||
+                  (href === '/byline/' && pathname.startsWith('/journalist/')) ||
+                  // /ranking/ is the other tab of the tags section (SectionTabs 標籤觀察).
+                  (href === '/tags/' && pathname.startsWith('/ranking/'));
                 return (
                   <Link
                     key={href}

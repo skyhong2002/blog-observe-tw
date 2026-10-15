@@ -11,15 +11,19 @@ import { blogHref } from '@/lib/page-links';
 import type { RelationEdge, RelationNode } from '@/lib/relations';
 
 echarts.use([GraphChart, TooltipComponent, CanvasRenderer]);
+const LABEL_WIDTH_NARROW = 96;
+type GraphData = { count(): number; getItemLayout(i: number): unknown };
 export default function BlogRelationGraph({ nodes, edges }: { nodes: RelationNode[]; edges: RelationEdge[] }) {
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (!ref.current) return;
     const chart = echarts.init(ref.current);
+    let fitted = false;
     const render = () => {
       const dark = document.documentElement.dataset.theme === 'dark';
       // Phones: shorter edges keep nodes apart inside a 390px canvas.
       const narrow = (ref.current?.clientWidth ?? 0) < 480;
+      fitted = !narrow;
       chart.setOption({
         animation: false,
         tooltip: {
@@ -32,7 +36,10 @@ export default function BlogRelationGraph({ nodes, edges }: { nodes: RelationNod
             type: 'graph',
             layout: 'force',
             roam: true,
-            force: narrow ? { repulsion: 220, edgeLength: [70, 120] } : { repulsion: 180, edgeLength: [90, 170] },
+            // Settled before the first paint, so the phone fit below sees final positions.
+            force: narrow
+              ? { repulsion: 220, edgeLength: [70, 120], layoutAnimation: false }
+              : { repulsion: 180, edgeLength: [90, 170], layoutAnimation: false },
             edgeSymbol: ['none', 'arrow'],
             edgeSymbolSize: 7,
             // Full names wrap onto a second line instead of being cut with an ellipsis.
@@ -40,9 +47,9 @@ export default function BlogRelationGraph({ nodes, edges }: { nodes: RelationNod
               show: true,
               position: 'bottom',
               color: dark ? '#d4d4d8' : '#3f3f46',
-              fontSize: 12,
-              lineHeight: 15,
-              width: narrow ? 92 : 128,
+              fontSize: narrow ? 13 : 12,
+              lineHeight: narrow ? 16 : 15,
+              width: narrow ? LABEL_WIDTH_NARROW : 128,
               overflow: 'break',
             },
             lineStyle: { color: dark ? '#a1a1aa' : '#71717a', opacity: 0.55, curveness: 0.12 },
@@ -60,6 +67,33 @@ export default function BlogRelationGraph({ nodes, edges }: { nodes: RelationNod
         ],
       });
     };
+    // A force layout has no bounds: on a phone a node can settle at the canvas edge with its label cut off.
+    // Once laid out, pan and (only ever) shrink the view so every node and its label fits the canvas.
+    chart.on('finished', () => {
+      if (fitted) return;
+      fitted = true;
+      const data = (chart as unknown as { getModel(): { getSeriesByIndex(i: number): { getData(): GraphData } | undefined } })
+        .getModel()
+        .getSeriesByIndex(0)
+        ?.getData();
+      const points = Array.from({ length: data?.count() ?? 0 }, (_, i) => data?.getItemLayout(i))
+        .filter((p): p is number[] => Array.isArray(p))
+        .map((p) => chart.convertToPixel({ seriesIndex: 0 }, p) as number[]);
+      if (!points.length) return;
+      const xs = points.map((p) => p[0]),
+        ys = points.map((p) => p[1]);
+      const [left, right, top, bottom] = [Math.min(...xs), Math.max(...xs), Math.min(...ys), Math.max(...ys)];
+      const side = LABEL_WIDTH_NARROW / 2 + 6,
+        above = 18,
+        below = 54;
+      const width = chart.getWidth(),
+        height = chart.getHeight();
+      const zoom = Math.min(1, (width - 2 * side) / Math.max(1, right - left), (height - above - below) / Math.max(1, bottom - top));
+      const cx = width / 2,
+        cy = above + (height - above - below) / 2;
+      chart.dispatchAction({ type: 'graphRoam', seriesIndex: 0, dx: cx - (left + right) / 2, dy: cy - (top + bottom) / 2 });
+      if (zoom < 1) chart.dispatchAction({ type: 'graphRoam', seriesIndex: 0, zoom, originX: cx, originY: cy });
+    });
     render();
     chart.on('click', (p: { dataType?: string; data?: unknown }) => {
       if (p.dataType === 'node') {

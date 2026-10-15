@@ -108,7 +108,19 @@ export default function TableScroller({
       <div
         aria-hidden="true"
         className={`pointer-events-none absolute inset-y-0 right-0 w-10 bg-linear-to-l from-(--table-bg) transition-opacity ${scroll === 'start' || scroll === 'middle' ? 'opacity-100' : 'opacity-0'}`}
-      />
+      >
+        {/* The fade alone reads as cut-off text in reviews; a chevron on the heading row says "more to the right". */}
+        <svg
+          aria-hidden="true"
+          viewBox="0 0 16 16"
+          className="absolute top-2.5 right-1 size-4 text-zinc-500 dark:text-zinc-400"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+        >
+          <path d="m6 4 4 4-4 4" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      </div>
       {footer}
     </div>
   );

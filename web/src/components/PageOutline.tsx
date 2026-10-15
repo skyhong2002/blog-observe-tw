@@ -10,6 +10,15 @@ export type OutlineEntry = { id: string; title: string; hint?: string; mono?: bo
 const READING_LINE = 120;
 
 const flatten = (entries: OutlineEntry[]): string[] => entries.flatMap((e) => [e.id, ...flatten(e.children ?? [])]);
+/** Endpoint paths wrap after a slash (`/blogs/{slug}/` + `articles`), never inside a segment. */
+const pathBreaks = (path: string) =>
+  path.split(/(?<=\/)/).map((part, i, parts) => (
+    // Prefix of the path up to this part: unique and stable for a fixed string.
+    <span key={parts.slice(0, i + 1).join('')}>
+      {part}
+      {i < parts.length - 1 && <wbr />}
+    </span>
+  ));
 
 // A long page's side outline (/api/): its headings, with the one being
 // read marked. At the foot of the page, where the last short sections never
@@ -66,14 +75,14 @@ export default function PageOutline({ entries }: { entries: OutlineEntry[] }) {
   }, [active]);
 
   const item = (entry: OutlineEntry, nested: boolean) =>
-    `-ml-px block border-l py-1 ${nested ? 'pl-6 text-[13px]' : 'pl-3'} ${entry.mono ? 'break-all font-mono text-xs' : ''} ${
+    `-ml-px block border-l py-1 ${nested ? 'pl-6 text-[13px]' : 'pl-3'} ${entry.mono ? '[overflow-wrap:anywhere] font-mono text-xs' : ''} ${
       active === entry.id
         ? 'border-brand-600 font-medium text-brand-700 dark:border-brand-400 dark:text-brand-400'
         : 'border-transparent text-zinc-600 hover:border-zinc-400 hover:text-zinc-900 dark:text-zinc-400 dark:hover:border-zinc-500 dark:hover:text-zinc-100'
     }`;
   const link = (entry: OutlineEntry, nested: boolean) => (
     <a href={`#${entry.id}`} title={entry.hint} className={item(entry, nested)} aria-current={active === entry.id ? 'location' : undefined}>
-      {entry.title}
+      {entry.mono ? pathBreaks(entry.title) : entry.title}
     </a>
   );
 

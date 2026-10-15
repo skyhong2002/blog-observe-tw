@@ -117,3 +117,16 @@ Opus 審查後另有 `app/src/edge/deployment.spec.ts`，測試舊 slot 已停�
 **green 的 2379fba 早於公開資料隱私修正，不可視為安全回滾版本。** 保留它與歷史 release 供診斷，不刪檔、不切回。部署工具對手動切換、手動回滾與自動失敗回復，都要求目標是 `a45b06a8816e8388c463173f6b7c43da81aeb51b` 或其後代；查不到 Git 祖先關係也拒絕。下一版可安全回滾至 a45b06a，不能直接執行舊 release 內未含此檢查的部署工具。
 
 目前所有內容頁與資料 API 維持 no-store，Cloudflare 首頁與 API 兩條規則維持停用。恢復快取須先補齊 origin／Next／edge 撤銷驗證；不能以短 TTL 取代。
+
+## 靜態頁與公開旗標（2026-10-15）
+
+`/api/`、`/api/status/`、`/login/`、`/observe/opt-out/` 是 build 時預先渲染的靜態頁，layout 讀到的
+`BLOG_TECH_PUBLIC_ENABLED` 是 **build 程序**的環境，不是 web slot unit 的執行期 `Environment=`。gen22–gen28
+的 build 都沒有帶這個旗標，所以這四頁的主導覽少了「技術」，其餘動態頁有（gen28 非作者 review 發現）。
+`prepare` 會把自己的環境傳給 `npm run web:build`，因此正式旗標為 true 時，執行 prepare 要一併帶入：
+
+```bash
+BLOG_TECH_PUBLIC_ENABLED=true bash tools/deploy-blue-green.sh prepare <slot> <release> <source>
+```
+
+切換後可用 `grep -c 'href="/tech/"' <release>/web/.next/server/app/login.html` 確認靜態頁與執行期一致。

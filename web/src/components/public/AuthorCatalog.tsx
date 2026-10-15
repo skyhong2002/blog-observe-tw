@@ -94,7 +94,7 @@ function AuthorRows({ data }: { data: AuthorCatalog }) {
                       className="flex min-w-0 items-center gap-1.5 text-brand-700 hover:underline dark:text-brand-400"
                     >
                       <BlogIcon media={a.blogSlug} title={a.blogName} />
-                      <span className="min-w-0 max-w-60 truncate" title={a.blogName}>
+                      <span className="min-w-0 max-w-36 truncate sm:max-w-60" title={a.blogName}>
                         {a.blogName}
                       </span>
                     </Link>
