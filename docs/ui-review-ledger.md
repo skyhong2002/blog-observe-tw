@@ -1,6 +1,29 @@
 # UI 逐頁審查紀錄
 
-## 追加（UTC 2026-10-15T14:30Z，正式仍為 gen35）
+## Current state（UTC 2026-10-15T15:00Z，gen36）
+
+正式站為 **blue／gen36／`fb8e7dbfd020b53e6c347f380f99076bcb50fc0d`**，BUILD_ID `wI_qqKqP1tan8lX5uvVUo`，切換
+UTC 2026-10-15T14:56:13.779Z（transition 36）。回滾點 green／gen35 `8755f33`／`30mIp94X6T4kIQ3IrSNTQ`：
+
+```bash
+bash /home/deck/.cache/blog-home-cloud-b3-20261014/tools/deploy-blue-green.sh rollback green
+```
+
+- **登出修正**：帳號選單的「登出」是 HTML 表單（`application/x-www-form-urlencoded`），gateway 只解析 JSON/text，
+  一律回 `415 FST_ERR_CTP_INVALID_MEDIA_TYPE`，也就是介面上登出從未成功（使用者回報）。改為只在 `/auth/logout`
+  的獨立 scope 接受並忽略表單內容；同源檢查、刪 session、清 cookie 不變。新測試在舊程式上回 415。
+  切換前 green（舊）415、blue（新）303；切換後公開網址表單登出 303 → `/`，跨站 Origin 403。
+- 驗收：`x-blog-release` fb8e7db、generation 36、HTML BUILD_ID 相符、no-store、DYNAMIC；首頁五次 2.27／1.77／1.70／
+  1.70／1.97 秒，`/topics/` 2.8–3.7 秒，load 8.4。vitest 1358（第一次完整執行 `runtime-icons.spec` 失敗一次，
+  單獨重跑三次與完整重跑兩次皆通過，判為高負載下的偶發，與本次修改無關）。
+- **主機記憶體**：使用者以 sudo 套用 [host-memory-2026-10-15.md](host-memory-2026-10-15.md) 的設定，已核對生效：
+  `vm.swappiness=10`（含 `/etc/sysctl.d/90-observe-swappiness.conf`）、`system.slice` `memory.low=3G`、`tag-db`
+  `memory.low=2500m`。套用後換出量為 0，`tag-db` swap 由 1.8–2.3 GB 降至 1.57 GB 並持續讀回；origin 首頁 1.1–1.8 秒。
+- 保留：刪除 gen34 `5df6e62` release 與 checkout；保留 active、gen35 回滾（回填 checkout 的 node_modules 也連到它）、
+  edge/code、worker。下一次換掉 green 前，要先把回填改從新 release 重啟。
+- 登入後截圖仍 pending：我操作的預覽分頁拿不到使用者在其他分頁的 Google 登入，未代填帳密。
+
+## 追加（UTC 2026-10-15T14:30Z，gen35）
 
 正式站未變：green／gen35／`8755f33`／`30mIp94X6T4kIQ3IrSNTQ`，回滾 blue／gen34 `5df6e62`。本段只動測試、工具與文件，沒有發版。
 

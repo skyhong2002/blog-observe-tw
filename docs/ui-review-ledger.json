@@ -1,16 +1,16 @@
 {
   "schemaVersion": 1,
   "currentProduction": {
-    "slot": "green",
-    "generation": 35,
-    "sha": "8755f3336705a43ae4edf6910d9f77d6a5f5c6a9",
-    "buildId": "30mIp94X6T4kIQ3IrSNTQ",
-    "switchedAt": "2026-10-15T11:57:00.353Z",
+    "slot": "blue",
+    "generation": 36,
+    "sha": "fb8e7dbfd020b53e6c347f380f99076bcb50fc0d",
+    "buildId": "wI_qqKqP1tan8lX5uvVUo",
+    "switchedAt": "2026-10-15T14:56:13.779Z",
     "rollback": {
-      "slot": "blue",
-      "generation": 34,
-      "sha": "5df6e62c3ff57236aed1f50601c810838a89100f",
-      "buildId": "X3fk3uqDpWjLXWCN18c0-"
+      "slot": "green",
+      "generation": 35,
+      "sha": "8755f3336705a43ae4edf6910d9f77d6a5f5c6a9",
+      "buildId": "30mIp94X6T4kIQ3IrSNTQ"
     }
   },
   "summary": {
