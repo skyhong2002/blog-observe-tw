@@ -1,7 +1,7 @@
 /** Small batches, resumable by --after. Only DNT homepage health GETs; no source crawl, raw text, credentials or user identifiers in output.
  * --adaptive paces itself from the homepage time: faster (bigger batches, shorter waits) while the homepage stays
  * quick, back to one post and long waits when it slows, and a 5-minute pause while the host or tag is busy.
- * A non-200 or >6.17s homepage still ends the run without retrying.
+ * A non-200, or a >6.17s homepage (with --adaptive: the median of three probes), ends the run without retrying.
  */
 import { loadavg } from 'node:os';
 import { setTimeout as delay } from 'node:timers/promises';
@@ -45,11 +45,29 @@ async function timedGet(url: string) {
   const bytes = (await r.arrayBuffer()).byteLength;
   return { status: r.status, elapsedMs: performance.now() - start, bytes, cfCacheStatus: r.headers.get('cf-cache-status') };
 }
-async function homepageGate() {
+async function homepageProbe() {
   const probe = await timedGet('https://blog.observe.tw/');
   console.log(JSON.stringify({ probeUtc: new Date().toISOString(), ...probe }));
-  if (probe.status !== 200 || probe.elapsedMs > GATE_MS) throw Error('homepage_guard_closed');
+  if (probe.status !== 200) throw Error('homepage_guard_closed');
   return probe.elapsedMs;
+}
+/** Any non-200 closes the gate at once. With --adaptive a slow answer is re-measured twice, 15s apart,
+ * and the median decides: one host-wide stall is not the backfill slowing the homepage. */
+async function homepageGate() {
+  const first = await homepageProbe();
+  if (!adaptive || first <= SLOW_MS) {
+    if (first > GATE_MS) throw Error('homepage_guard_closed');
+    return first;
+  }
+  const samples = [first];
+  for (let i = 0; i < 2; i++) {
+    await delay(15000);
+    samples.push(await homepageProbe());
+  }
+  const median = samples.sort((a, b) => a - b)[1];
+  console.log(JSON.stringify({ medianMs: median }));
+  if (median > GATE_MS) throw Error('homepage_guard_closed');
+  return median;
 }
 /** Other sites on this host come first: high load or a slow tag homepage pauses the backfill. */
 async function hostBusy() {
@@ -69,6 +87,7 @@ let cursor = after,
   wait = delayMs,
   lastProbe = 0;
 try {
+  if (adaptive) while (await hostBusy()) await delay(BUSY_PAUSE_MS);
   await homepageGate();
   lastProbe = Date.now();
   for (let n = 0; n < max; n++) {
