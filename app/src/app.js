@@ -12,6 +12,7 @@ import { loadAuthorCatalog } from './catalog-authors.js';
 import { registerContentRoutes } from './content/routes.ts';
 import { createDb } from './db/client.ts';
 import { loadOverview } from './overview.js';
+import { overviewFailureDetails } from './overview-diagnostics.ts';
 import { gatewayRateKey, gatewayRateMax } from './public-api/client-ip.ts';
 import { installPublicApiPolicy, publicApiPath } from './public-api/middleware.ts';
 import { queryValues } from './public-api/query.ts';
@@ -143,7 +144,8 @@ export async function buildApp(config, { logger = false, store = null } = {}) {
       return await loadOverview(pool, { home: request.query?.view === 'home' });
     } catch (error) {
       // Log only a bounded database error code, never SQL, text, credentials or headers.
-      request.log.error({ operation: 'overview', databaseCode: typeof error?.code === 'string' && /^ER_[A-Z0-9_]{1,64}$/.test(error.code) ? error.code : 'unknown' }, 'public overview read failed');
+      request.log.error({ operation: 'overview', view: request.query?.view === 'home' ? 'home' : 'full',
+        ...overviewFailureDetails(error, pool) }, 'public overview read failed');
       return reply.code(503).send({ error: 'unavailable' });
     }
   });

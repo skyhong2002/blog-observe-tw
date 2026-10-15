@@ -125,7 +125,8 @@ describe('read-only frontend projection', () => {
       expect(response.statusCode).toBe(503);
       expect(response.json()).toEqual({ error: 'unavailable' });
       expect(response.headers['cache-control']).toContain('no-store');
-      expect(logger).toHaveBeenCalledWith({ operation: 'overview', databaseCode: 'ER_STATEMENT_TIMEOUT' }, 'public overview read failed');
+      expect(logger).toHaveBeenCalledWith(expect.objectContaining({ operation: 'overview', view: 'home',
+        queryStage: 'home.mentions', failureKind: 'statement-timeout', databaseCode: 'ER_STATEMENT_TIMEOUT' }), 'public overview read failed');
       expect(JSON.stringify(logger.mock.calls)).not.toContain('private');
     } finally { await app.close(); }
   });

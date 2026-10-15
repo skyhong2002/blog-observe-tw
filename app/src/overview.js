@@ -1,3 +1,4 @@
+import { overviewRead } from './overview-diagnostics.ts';
 import { publicPost } from './public-post.ts';
 import { loadHomeMentions } from './relations/home-feed.ts';
 import { TopicResponseCache } from './topics/cache.ts';
@@ -55,18 +56,18 @@ export const HOME_AUTHORS_SQL = `SELECT chosen.id,chosen.displayName,chosen.blog
  * renders identity, the latest article and its timestamp. Full overview retains those fields.
  * All SQL reads remain fresh and use the same admission boundary as the full projection. */
 async function loadHomeProjection(pool) {
-  const mentions = await loadHomeMentions(pool);
+  const mentions = await overviewRead(pool, 'home.mentions', () => loadHomeMentions(pool));
   const [authorRows, totalRows] = await Promise.all([
-    pool.query(HOME_AUTHORS_SQL),
-    pool.query(`SELECT (SELECT COUNT(*) FROM blogs WHERE status='verified') AS blogs,
+    overviewRead(pool, 'home.authors', () => pool.query(HOME_AUTHORS_SQL)),
+    overviewRead(pool, 'home.totals', () => pool.query(`SELECT (SELECT COUNT(*) FROM blogs WHERE status='verified') AS blogs,
       (SELECT COUNT(*) FROM posts p JOIN blogs b ON b.id=p.blog_id WHERE b.status='verified' AND (p.published_at IS NULL OR p.published_at<=UTC_TIMESTAMP())) AS posts,
-      (SELECT MAX(last_crawl_success_at) FROM blogs WHERE status='verified') AS updatedAt`),
+      (SELECT MAX(last_crawl_success_at) FROM blogs WHERE status='verified') AS updatedAt`)),
   ]);
-  const [recentRows] = await pool.query(`SELECT b.id,b.slug,b.name,b.url,b.last_published_at AS lastPublishedAt,
+  const [recentRows] = await overviewRead(pool, 'home.recentBlogs', () => pool.query(`SELECT b.id,b.slug,b.name,b.url,b.last_published_at AS lastPublishedAt,
     latest.id latestPostId,latest.title latestPostTitle,latest.url latestPostUrl,latest.published_at latestPostPublishedAt
     FROM blogs b ${latestJoin} WHERE b.status='verified' AND latest.published_at IS NOT NULL
-    ORDER BY latest.published_at DESC,latest.id DESC,b.id LIMIT 10`);
-  const icons = await iconManifest();
+    ORDER BY latest.published_at DESC,latest.id DESC,b.id LIMIT 10`));
+  const icons = await overviewRead(pool, 'home.icons', () => iconManifest());
   const row = totalRows[0][0];
   return {
     view: 'home',
@@ -98,28 +99,28 @@ async function loadHomeProjection(pool) {
  * not traffic, quality, or growth. No sibling database is queried. */
 async function loadProjection(pool) {
   const [postRows, tagRows, authorRows, blogRows, totalRows, recentRows] = await Promise.all([
-    pool.query(`SELECT p.id,p.guid,p.title,p.url,p.summary,p.author,p.published_at AS publishedAt,p.image_url AS imageUrl,
+    overviewRead(pool, 'full.posts', () => pool.query(`SELECT p.id,p.guid,p.title,p.url,p.summary,p.author,p.published_at AS publishedAt,p.image_url AS imageUrl,
       b.slug AS blogSlug,b.name AS blogName FROM posts p JOIN blogs b ON b.id=p.blog_id
-      WHERE b.status='verified' AND (p.published_at IS NULL OR p.published_at<=UTC_TIMESTAMP()) ORDER BY p.published_at DESC,p.id DESC LIMIT 200`),
-    pool.query(`SELECT t.slug,t.label,COUNT(DISTINCT p.id) AS postCount,COUNT(DISTINCT p.blog_id) AS blogCount
+      WHERE b.status='verified' AND (p.published_at IS NULL OR p.published_at<=UTC_TIMESTAMP()) ORDER BY p.published_at DESC,p.id DESC LIMIT 200`)),
+    overviewRead(pool, 'full.tags', () => pool.query(`SELECT t.slug,t.label,COUNT(DISTINCT p.id) AS postCount,COUNT(DISTINCT p.blog_id) AS blogCount
       FROM tags t JOIN post_tags pt ON pt.tag_id=t.id JOIN posts p ON p.id=pt.post_id JOIN blogs b ON b.id=p.blog_id
       WHERE b.status='verified' AND t.visibility='public' AND t.status='active' AND pt.status='active' AND (p.published_at IS NULL OR p.published_at<=UTC_TIMESTAMP())
-      GROUP BY t.id,t.slug,t.label ORDER BY blogCount DESC,postCount DESC,t.slug LIMIT 100`),
-    pool.query(`SELECT a.id,a.display_name AS displayName,b.slug AS blogSlug,b.name AS blogName,
+      GROUP BY t.id,t.slug,t.label ORDER BY blogCount DESC,postCount DESC,t.slug LIMIT 100`)),
+    overviewRead(pool, 'full.authors', () => pool.query(`SELECT a.id,a.display_name AS displayName,b.slug AS blogSlug,b.name AS blogName,
       COUNT(DISTINCT p.id) AS postCount FROM authors a
       JOIN blog_authors ba ON ba.author_id=a.id JOIN blogs b ON b.id=ba.blog_id
       LEFT JOIN post_authors pa ON pa.author_id=a.id AND pa.status='active'
       LEFT JOIN posts p ON p.id=pa.post_id AND p.blog_id=b.id AND (p.published_at IS NULL OR p.published_at<=UTC_TIMESTAMP())
       WHERE a.status <> 'rejected' AND ba.status='active' AND b.status='verified'
-      GROUP BY a.id,a.display_name,b.slug,b.name ORDER BY a.display_name,b.slug LIMIT 200`),
-    pool.query(`SELECT ${blogFields} FROM blogs b ${latestJoin} WHERE b.status='verified' ORDER BY postCount DESC,b.name LIMIT 200`),
-    pool.query(`SELECT (SELECT COUNT(*) FROM blogs WHERE status='verified') AS blogs,
+      GROUP BY a.id,a.display_name,b.slug,b.name ORDER BY a.display_name,b.slug LIMIT 200`)),
+    overviewRead(pool, 'full.blogs', () => pool.query(`SELECT ${blogFields} FROM blogs b ${latestJoin} WHERE b.status='verified' ORDER BY postCount DESC,b.name LIMIT 200`)),
+    overviewRead(pool, 'full.totals', () => pool.query(`SELECT (SELECT COUNT(*) FROM blogs WHERE status='verified') AS blogs,
       (SELECT COUNT(*) FROM posts p JOIN blogs b ON b.id=p.blog_id WHERE b.status='verified' AND (p.published_at IS NULL OR p.published_at<=UTC_TIMESTAMP())) AS posts,
-      (SELECT MAX(last_crawl_success_at) FROM blogs WHERE status='verified') AS updatedAt`),
-    pool.query(`SELECT ${blogFields} FROM blogs b ${latestJoin} WHERE b.status='verified' AND latest.published_at IS NOT NULL
-      ORDER BY latest.published_at DESC,latest.id DESC,b.id LIMIT 20`),
+      (SELECT MAX(last_crawl_success_at) FROM blogs WHERE status='verified') AS updatedAt`)),
+    overviewRead(pool, 'full.recentBlogs', () => pool.query(`SELECT ${blogFields} FROM blogs b ${latestJoin} WHERE b.status='verified' AND latest.published_at IS NOT NULL
+      ORDER BY latest.published_at DESC,latest.id DESC,b.id LIMIT 20`)),
   ]);
-  const icons = await iconManifest();
+  const icons = await overviewRead(pool, 'full.icons', () => iconManifest());
   const row = totalRows[0][0];
   return {
     generatedAt: new Date().toISOString(),
