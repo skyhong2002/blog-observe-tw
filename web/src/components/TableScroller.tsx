@@ -107,10 +107,10 @@ export default function TableScroller({
       </section>
       <div
         aria-hidden="true"
-        className={`pointer-events-none absolute inset-y-0 right-0 z-10 w-10 bg-linear-to-l from-(--table-bg) transition-opacity ${scroll === 'start' || scroll === 'middle' ? 'opacity-100' : 'opacity-0'}`}
+        className={`pointer-events-none absolute inset-y-0 right-0 z-[25] w-10 bg-linear-to-l from-(--table-bg) transition-opacity ${scroll === 'start' || scroll === 'middle' ? 'opacity-100' : 'opacity-0'}`}
       >
         {/* The fade alone reads as cut-off text in reviews; a chevron on the heading row says "more to the right".
-            z-10: the following header row is transformed (its own layer) and would otherwise paint over both. */}
+            z-[25]: above the header row (relative z-20, transformed to follow the page), below the site header (z-30). */}
         <svg
           aria-hidden="true"
           viewBox="0 0 16 16"
