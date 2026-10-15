@@ -1,5 +1,33 @@
 # F4 T-ref 對齊與互動驗收（2026-10-15）
 
+## Round 3：gen26 正式四頁（2026-10-15）
+
+正式版本為 blue／gen26／`7590344a4accf3059fddaba07064b54ae193b49f`，BUILD_ID
+`Xm1Rp-cc1A9eW-NCT5lnf`。本批使用既有 `tools/ui-capture.mjs`，每頁先安裝
+Google/GTM 網路阻擋，再導航；實測 document DNT 與 navigator DNT 皆為 `1`、GPC
+實值為 `null`、GA/GTM attempted 與 allowed 均為 0。四頁 capture report、raw network
+與圖片放在私有目錄：
+`/home/deck/.t3/userdata/blog-f4-round3-20261015/formal-batch1-about-api-topics-relations/`。
+
+非作者 reviewer 使用 GPT-6.1 Sol，實際看過四張 blog 圖與四張 tag T-ref 圖；原始
+transcript：`.reviews/f4-round3/batch1-gpt-review.json`，SHA-256
+`63fb5f8680a1a9df29888c4580c4a9def72bc001ad43b6ed4da72e326219e0cf`。評語是條件式
+通過：`/about/` 與 `/topics/` 在提供狀態無阻擋；`/api/` 手機的長 inline code／條列
+偏擁擠、`/relations/` 手機的節點標籤偏小且截斷，列為 issues，不把本批宣稱完整 route
+或所有狀態通過。綠色品牌是使用者明確指定的部落格差異；API 文件深色閱讀介面與
+關係圖深色畫布是功能／可讀性偏離，均保留在 ledger。
+
+| route | viewport | PNG SHA-256 | 狀態 |
+| --- | --- | --- | --- |
+| `/about/` | 1280 light | `47dd0326d26a11bd93cfe7b02501bdd1dd4e9fe592fb1cb070e6596c5b2979fc` | pass-for-supplied-state |
+| `/api/` | 390 dark | `83041d9ace26b68dc08bba7f33b0d56cb715574a6448c69b11bbd6a4a871532e` | issues（長行可讀性） |
+| `/topics/` | 1280 light | `bee2e7d2ff64c4f21545ea23e94e6114070c95b69bc29695abf95e0b5ff4d40d` | pass-for-supplied-state |
+| `/relations/` | 390 dark | `c54ac12c4cfc441b45ce0a6645cedff9c120d1ff3fced159409fdaa2b50f1fb8` | issues（節點標籤） |
+
+四站首頁 gate 在 capture 前後皆通過；blog 的完整 HTML response 中位數低於 6.17 秒，
+tag／YouTube 低於 2 秒。回填服務同時維持每次一篇、兩分鐘間隔；本批 capture 沒有新增
+爬取或合成 GA 事件。
+
 本批基底為 fetch 後的 `origin/main` `53a408481e9c09bfd9a986e7625252220cbfa227`。本批已於 UTC2026-10-14T22:28:02.034Z 上線 blue/gen22 `58e551a79626681024bf47e70ab8e1eee2b2f073`／BUILD_ID `Xm1Rp-cc1A9eW-NCT5lnf`。起始盤點時正式為 gen21/b8；其舊圖保留原 SHA，不改標成新版本。實際候選與正式圖／獨立 review、隱私測試和回滾見 [gen22證據索引](f4-gen22-evidence.md)。
 
 ## 沿用與刻意偏離

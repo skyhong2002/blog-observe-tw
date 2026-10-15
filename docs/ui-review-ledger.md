@@ -1,5 +1,19 @@
 # UI 逐頁審查紀錄
 
+## Current state（UTC 2026-10-15T02:11:40Z）
+
+正式站目前為 **blue／gen26／`7590344a4accf3059fddaba07064b54ae193b49f`**，BUILD_ID
+`Xm1Rp-cc1A9eW-NCT5lnf`；green／gen25 仍是回滾點。上一版首頁查詢修正已部署，
+回填以一篇、兩分鐘間隔恢復，仍需持續觀察 overview 診斷。
+
+本輪新增四頁正式 DNT=1 capture 與非作者 GPT-6.1 Sol review：
+`/about/`（1280 light）、`/api/`（390 dark）、`/topics/`（1280 light）、`/relations/`
+（390 dark）。原圖與 raw network 在
+`/home/deck/.t3/userdata/blog-f4-round3-20261015/formal-batch1-about-api-topics-relations/`；
+review transcript 為 `.reviews/f4-round3/batch1-gpt-review.json`，只代表提供的 viewport
+與正常資料狀態。`/about/`、`/topics/` 為 pass-for-supplied-state；`/api/` 的手機長
+inline code、`/relations/` 的手機節點標籤列為 issues；完整 route/state 仍 pending。
+
 ## 現況（UTC2026-10-14T22:28:02.034Z，gen22）
 
 正式 **blue／gen22／58e551a79626681024bf47e70ab8e1eee2b2f073**，**BUILD_ID Xm1Rp-cc1A9eW-NCT5lnf**，SM 單次 build 後同產物 prepare-built／切換；green/b8 為在線回滾。`bash tools/deploy-blue-green.sh rollback green` 可立即切回。無 migration、無新完整備份、未改 Cloudflare/WAF 或 tag-backup；no-store／DYNAMIC、HSTS86400、DNT/GA guards 維持。

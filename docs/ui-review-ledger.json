@@ -2,17 +2,17 @@
   "schemaVersion": 1,
   "currentProduction": {
     "slot": "blue",
-    "generation": 22,
-    "sha": "58e551a79626681024bf47e70ab8e1eee2b2f073",
+    "generation": 26,
+    "sha": "7590344a4accf3059fddaba07064b54ae193b49f",
     "buildId": "Xm1Rp-cc1A9eW-NCT5lnf",
-    "switchedAt": "2026-10-14T22:28:02.034Z"
+    "switchedAt": "2026-10-15T01:46:52.658Z"
   },
   "summary": {
     "pageRoutes": 20,
     "errorBoundaries": 2,
     "items": 22,
-    "formalObservedRoutes": 8,
-    "noCurrentFormalReview": 14,
+    "formalObservedRoutes": 12,
+    "noCurrentFormalReview": 10,
     "completeRoutesAndStates": 0,
     "scopePending": 22
   },
@@ -22,9 +22,34 @@
       "route": "/about/",
       "source": "web/src/app/about/page.tsx",
       "exampleUrl": "https://blog.observe.tw/about/",
-      "status": "pending",
+      "status": "issues",
       "completeRouteAndStates": false,
-      "reviews": [],
+      "reviews": [
+        {
+          "reviewer": "GPT-6.1 Sol",
+          "model": "gpt-6.1-sol",
+          "reviewedAt": "2026-10-15T02:19:30Z",
+          "reviewedSHA": "7590344a4accf3059fddaba07064b54ae193b49f",
+          "buildId": "Xm1Rp-cc1A9eW-NCT5lnf",
+          "transcript": ".reviews/f4-round3/batch1-gpt-review.json",
+          "viewport": [
+            1280,
+            900
+          ],
+          "desktopScreenshot": "/home/deck/.t3/userdata/blog-f4-round3-20261015/formal-batch1-about-api-topics-relations/page-1-1280-light.png",
+          "mobileScreenshot": null,
+          "screenshotSha256": "47dd0326d26a11bd93cfe7b02501bdd1dd4e9fe592fb1cb070e6596c5b2979fc",
+          "status": "pass-for-supplied-state",
+          "findings": "提供狀態無阻擋；手機狀態未提供。",
+          "privacy": {
+            "documentDNT": "1",
+            "navigatorDNT": "1",
+            "gpc": null,
+            "analyticsAllowed": 0
+          },
+          "reverification": null
+        }
+      ],
       "deviationsAndReasons": "尚未完成當版逐頁對照，不以共用元件推定pass。 公開資料維持no-store是隱私要求，不跟tag恢復快取。",
       "fixCommit": null,
       "fixScope": null,
@@ -62,7 +87,32 @@
       "exampleUrl": "https://blog.observe.tw/api/",
       "status": "pending",
       "completeRouteAndStates": false,
-      "reviews": [],
+      "reviews": [
+        {
+          "reviewer": "GPT-6.1 Sol",
+          "model": "gpt-6.1-sol",
+          "reviewedAt": "2026-10-15T02:19:30Z",
+          "reviewedSHA": "7590344a4accf3059fddaba07064b54ae193b49f",
+          "buildId": "Xm1Rp-cc1A9eW-NCT5lnf",
+          "transcript": ".reviews/f4-round3/batch1-gpt-review.json",
+          "viewport": [
+            390,
+            900
+          ],
+          "desktopScreenshot": null,
+          "mobileScreenshot": "/home/deck/.t3/userdata/blog-f4-round3-20261015/formal-batch1-about-api-topics-relations/page-2-390-dark.png",
+          "screenshotSha256": "83041d9ace26b68dc08bba7f33b0d56cb715574a6448c69b11bbd6a4a871532e",
+          "status": "issues",
+          "findings": "390px dark 的 inline code 與長條列偏擁擠，桌機／錯誤／空狀態待補。",
+          "privacy": {
+            "documentDNT": "1",
+            "navigatorDNT": "1",
+            "gpc": null,
+            "analyticsAllowed": 0
+          },
+          "reverification": null
+        }
+      ],
       "deviationsAndReasons": "尚未完成當版逐頁對照，不以共用元件推定pass。 公開資料維持no-store是隱私要求，不跟tag恢復快取。",
       "fixCommit": null,
       "fixScope": null,
@@ -1124,6 +1174,30 @@
           },
           "analyticsAllowed": 0,
           "guardFailures": 0
+        },
+        {
+          "reviewer": "GPT-6.1 Sol",
+          "model": "gpt-6.1-sol",
+          "reviewedAt": "2026-10-15T02:19:30Z",
+          "reviewedSHA": "7590344a4accf3059fddaba07064b54ae193b49f",
+          "buildId": "Xm1Rp-cc1A9eW-NCT5lnf",
+          "transcript": ".reviews/f4-round3/batch1-gpt-review.json",
+          "viewport": [
+            390,
+            900
+          ],
+          "desktopScreenshot": null,
+          "mobileScreenshot": "/home/deck/.t3/userdata/blog-f4-round3-20261015/formal-batch1-about-api-topics-relations/page-4-390-dark.png",
+          "screenshotSha256": "c54ac12c4cfc441b45ce0a6645cedff9c120d1ff3fced159409fdaa2b50f1fb8",
+          "status": "issues",
+          "findings": "390px dark 關係圖節點文字偏小且截斷，桌機／空／錯誤狀態待補。",
+          "privacy": {
+            "documentDNT": "1",
+            "navigatorDNT": "1",
+            "gpc": null,
+            "analyticsAllowed": 0
+          },
+          "reverification": null
         }
       ],
       "deviationsAndReasons": "直接引用、共同標籤、文字相似分開；不作抄襲判定。 公開資料維持no-store是隱私要求，不跟tag恢復快取。",
@@ -1604,7 +1678,7 @@
       "route": "/topics/",
       "source": "web/src/app/topics/page.tsx",
       "exampleUrl": "https://blog.observe.tw/topics/",
-      "status": "pending",
+      "status": "issues",
       "completeRouteAndStates": false,
       "reviews": [
         {
@@ -1876,6 +1950,30 @@
           },
           "analyticsAllowed": 0,
           "guardFailures": 0
+        },
+        {
+          "reviewer": "GPT-6.1 Sol",
+          "model": "gpt-6.1-sol",
+          "reviewedAt": "2026-10-15T02:19:30Z",
+          "reviewedSHA": "7590344a4accf3059fddaba07064b54ae193b49f",
+          "buildId": "Xm1Rp-cc1A9eW-NCT5lnf",
+          "transcript": ".reviews/f4-round3/batch1-gpt-review.json",
+          "viewport": [
+            1280,
+            900
+          ],
+          "desktopScreenshot": "/home/deck/.t3/userdata/blog-f4-round3-20261015/formal-batch1-about-api-topics-relations/page-3-1280-light.png",
+          "mobileScreenshot": null,
+          "screenshotSha256": "bee2e7d2ff64c4f21545ea23e94e6114070c95b69bc29695abf95e0b5ff4d40d",
+          "status": "pass-for-supplied-state",
+          "findings": "提供狀態無阻擋；手機橫捲、排序與錯誤狀態待補。",
+          "privacy": {
+            "documentDNT": "1",
+            "navigatorDNT": "1",
+            "gpc": null,
+            "analyticsAllowed": 0
+          },
+          "reverification": null
         }
       ],
       "deviationsAndReasons": "部落格7/30/90天、同站權重遞減；共用表格與method notes。 公開資料維持no-store是隱私要求，不跟tag恢復快取。",
