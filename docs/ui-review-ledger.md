@@ -1,6 +1,31 @@
 # UI 逐頁審查紀錄
 
-## Current state（UTC 2026-10-15T09:45Z，gen27）
+## Current state（UTC 2026-10-15T10:00Z，gen28）
+
+正式站為 **blue／gen28／`b63e4cf6f7a37cfc32d808a077179ac2b404b098`**，BUILD_ID
+`DLfWJGW-CryeKQT2PLOq2`，切換 UTC 2026-10-15T09:54:24.857Z（transition 28）。green／gen27
+`68a032b`／`QEgJ-tkNmRwTiStk11XqA` 在線，是回滾點：
+
+```bash
+bash /home/deck/.cache/blog-home-cloud-b3-20261014/tools/deploy-blue-green.sh rollback green
+```
+
+本版只改後端：`/api/topics`（`/topics/` 頁）改用與首頁相同的精簡排行取 100 筆，另以一條
+(詞, 站) 閘門查詢計算 `matchedPosts`。舊 `ranking()` 的 `evidence` CTE 在 MariaDB 每次引用都重算
+（一個請求算 4 次）。正式資料唯讀比對 7／30／90 天：items、truncated、matchedPosts 全部相同；
+30 天 8.2→2.0 秒、90 天 16.3→3.5 秒。前端原始碼與 gen27 相同（重新 build，BUILD_ID 不同）。
+
+驗收：單元測試同 gen27（只剩兩個 HEAD 既有失敗）；隔離 18169 真 SQL `topics`、`topics-ranking`、
+`home-ranking-freshness`、`relation-visibility` 全通過（預設全跑在 `staged-scan-proof` 中止，因該套件
+要求空語料庫、需單獨執行，與本版無關）。切換前 load 16 時 blue 完整排行 2.7／3.6 秒、green 10.5／12.6
+秒，內容相同。切換後 `x-blog-release` b63e4cf、generation 28、HTML BUILD_ID 相符、no-store、DYNAMIC、
+`/healthz` port 18174；公開首頁五次 5.4（首請求）／1.74／1.68／1.69／1.65 秒，`/topics/`
+5.0／3.2／3.0／2.8／2.6 秒，load 12.6；tag 0.24–0.38 秒。
+
+回填：以 `212daa8` 的自適應工具重新啟動（慢探測改取三次中位數、啟動前先等主機不忙），游標 24462 起，
+log `.reviews/gen27/backfill-adaptive.log`。原始 release／switch 紀錄 `.reviews/gen28/`。
+
+## 現況（UTC 2026-10-15T09:45Z，gen27）
 
 正式站為 **green／gen27／`68a032bcb96733ec5e4a024a415ebd6622ea4987`**，BUILD_ID
 `QEgJ-tkNmRwTiStk11XqA`，切換 UTC 2026-10-15T09:34:32.426Z（transition 27）。blue／gen26
