@@ -1,6 +1,32 @@
 # UI 逐頁審查紀錄
 
-## Current state（UTC 2026-10-15T19:15Z，gen41）
+## Current state（UTC 2026-10-15T20:05Z，gen42）
+
+正式站為 **blue／gen42／`b7648d9b286482fdf0caecf3abe22d3849c59f1d`**，BUILD_ID `0oSLarRwu8aQwhsMiQeya`，切換
+UTC 2026-10-15T19:56:28.223Z（transition 42）。回滾點 green／gen41 `91ee7da`／`IckLDw5TLWeYzYIQ33NZp`：
+
+```bash
+bash /home/deck/.cache/blog-home-cloud-b3-20261014/tools/deploy-blue-green.sh rollback green
+```
+
+Worker 跟隨 gen42：drop-in `blog-observe-worker.service.d/95-release-b7648d9.conf`（取代 95-release-91ee7da）。回滾：把
+WorkingDirectory／NODE_PATH 改回 `91ee7da`、daemon-reload、restart。
+
+- **候選審核卡住修正**：`web.archive.org` 單站每日 20 次額度用完後，舊程式把整批停下且不寫結果，它永遠排第一，
+  所以自 10/15 起沒有任何候選被審（含 blogblog.club 名單衍生的首頁）。改為單站額度不足只記錄該筆
+  （`candidate_host_budget_exhausted`，7 天後重審），總額度或時限才停批；審核改每 5 分鐘一次。
+- **連結抓取吞吐**：每批原本 2.5 分鐘幾乎都花在重新比對 500 條未解析連結（每條一次寫入）。改為每批 100 條；
+  排程批次可另外解析最多 40 篇內容爬蟲已存好內文的文章（不發請求），其他呼叫端維持原本 limit。
+- **/blogs/**（使用者回饋）：預設「最新文章▼」；最新文章日期與排序忽略未來日期（windfeathers 有 2115 年文章而排第一）；
+  新增「作者」欄（每站有效作者數，可排序）；整列儲存格以文字基準線對齊、名稱與網址同一基準線（量測誤差 ≤1px）。
+- **移除作者頁**（使用者：不需要 authors 頁、選單刪掉作者）：導覽、首頁「作者動態」、部落格頁作者連結移除；`/authors/`
+  永久導向 `/blogs/`（308）。`/api/catalog/authors` 公開 API 保留。
+- 驗收：vitest 1364、web node 226、topic-ui 176、tsc、writer registry；隔離 18169 完整整合 46 套件通過。正式資料試算目錄查詢
+  冷 2.1 秒／熱 0.12 秒。切換後 `x-blog-release` b7648d9、generation 42、BUILD_ID 相符、no-store、DYNAMIC；首頁 1.8–1.9 秒，
+  `/blogs/` 200、`/authors/` 308、`/topics/`、`/api/topics`、`/relations/` 200，tag 200。截圖 `.reviews/gen42/blue42-blogs.png`。
+- 保留：刪除 gen40 `d754031` release 與 checkout（回填與測試副本連 gen41）。
+
+## 現況（UTC 2026-10-15T19:15Z，gen41）
 
 正式站為 **green／gen41／`91ee7dad864fd92daffaeade66523b7cf2998a20`**，BUILD_ID `IckLDw5TLWeYzYIQ33NZp`，切換
 UTC 2026-10-15T19:07:45.914Z（transition 41）。回滾點 blue／gen40 `d754031`／`Jz3ykfP-tbu-AKn9mRlHq`：

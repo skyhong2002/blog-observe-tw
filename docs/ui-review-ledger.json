@@ -1,21 +1,21 @@
 {
   "schemaVersion": 1,
   "currentProduction": {
-    "slot": "green",
-    "generation": 41,
-    "sha": "91ee7dad864fd92daffaeade66523b7cf2998a20",
-    "buildId": "IckLDw5TLWeYzYIQ33NZp",
-    "switchedAt": "2026-10-15T19:07:45.914Z",
+    "slot": "blue",
+    "generation": 42,
+    "sha": "b7648d9b286482fdf0caecf3abe22d3849c59f1d",
+    "buildId": "0oSLarRwu8aQwhsMiQeya",
+    "switchedAt": "2026-10-15T19:56:28.223Z",
     "rollback": {
-      "slot": "blue",
-      "generation": 40,
-      "sha": "d75403167577538546599769d5af529e72c32446",
-      "buildId": "Jz3ykfP-tbu-AKn9mRlHq"
+      "slot": "green",
+      "generation": 41,
+      "sha": "91ee7dad864fd92daffaeade66523b7cf2998a20",
+      "buildId": "IckLDw5TLWeYzYIQ33NZp"
     },
     "worker": {
-      "sha": "91ee7dad864fd92daffaeade66523b7cf2998a20",
-      "dropIn": "blog-observe-worker.service.d/95-release-91ee7da.conf",
-      "previous": "af0e73ccc3c5ace88dc8fb6f45d7d76123c218da"
+      "sha": "b7648d9b286482fdf0caecf3abe22d3849c59f1d",
+      "dropIn": "blog-observe-worker.service.d/95-release-b7648d9.conf",
+      "previous": "91ee7dad864fd92daffaeade66523b7cf2998a20"
     }
   },
   "summary": {
