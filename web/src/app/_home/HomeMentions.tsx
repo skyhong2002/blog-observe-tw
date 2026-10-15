@@ -99,7 +99,9 @@ export default function HomeMentionsSection({ mentions }: { mentions: HomeMentio
         <h2>最近的正文引用</h2>
         <Link href="/relations/">關係圖 →</Link>
       </div>
-      {cards.length ? (
+      {mentions.status === 'unavailable' ? (
+        <p className={styles.notice}>正文引用暫時無法載入；其他首頁資料仍可使用。</p>
+      ) : cards.length ? (
         <div className={styles.storyList}>
           {cards.map((card) => (
             <MentionCardView key={card.key} card={card} />

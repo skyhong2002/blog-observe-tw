@@ -187,6 +187,7 @@ const homeMentions = (value: unknown) =>
     truncated: boolean,
     generatedAt: text,
     items: (items) => rows(items, homeMention) && atMost(8)(items),
+    status: optional(oneOf('available', 'unavailable')),
   });
 /**
  * /api/overview?view=home (loadHomeProjection): marked view 'home', the overview's shape at the homepage's bounds,

@@ -49,10 +49,14 @@ describe('homepage uses public article→blog body citations', () => {
   it('deduplicates article→target before LIMIT, excludes all revoked/future/nonbody ownership paths in SQL', () => {
     expect(HOME_MENTIONS_SQL).toContain(PUBLIC_RELATION);
     expect(HOME_MENTIONS_SQL).toContain("a.status='verified' AND b.status='verified'");
-    expect(HOME_MENTIONS_SQL).toContain('p.blog_id=l.source_blog_id');
+    expect(HOME_MENTIONS_SQL).toContain('l.source_blog_id=p.blog_id');
     expect(HOME_MENTIONS_SQL).toContain("l.location='body'");
-    expect(HOME_MENTIONS_SQL).toContain('PARTITION BY p.id,b.id ORDER BY l.ordinal');
+    expect(HOME_MENTIONS_SQL).toContain('PARTITION BY p.id,l.target_blog_id ORDER BY l.ordinal');
+    expect(HOME_MENTIONS_SQL).toContain('FORCE INDEX (posts_published)');
+    expect(HOME_MENTIONS_SQL).toContain('STRAIGHT_JOIN relation_links');
     expect(HOME_MENTIONS_SQL.indexOf('WHERE link_number=1')).toBeLessThan(HOME_MENTIONS_SQL.indexOf('LIMIT 9'));
+    expect(HOME_MENTIONS_SQL.indexOf('LIMIT 9')).toBeLessThan(HOME_MENTIONS_SQL.indexOf('FROM picked k'));
+    expect(HOME_MENTIONS_SQL).toContain('ORDER BY k.publishedAt DESC,k.postId DESC,k.targetBlogId');
     expect(HOME_MENTIONS_SQL).toContain('p.published_at>=? AND p.published_at<=?');
     expect(HOME_MENTIONS_SQL).toContain('tp.blog_id=b.id');
     expect(HOME_MENTIONS_SQL).toContain('tp.published_at<=?');

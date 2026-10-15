@@ -1,4 +1,4 @@
-import { overviewRead } from './overview-diagnostics.ts';
+import { overviewFailureDetails, overviewRead } from './overview-diagnostics.ts';
 import { publicPost } from './public-post.ts';
 import { loadHomeMentions } from './relations/home-feed.ts';
 import { TopicResponseCache } from './topics/cache.ts';
@@ -6,13 +6,13 @@ import { iconManifest } from './v1/favicon-routes.ts';
 import { iconUrl } from './v1/icons.ts';
 
 const overviewCaches = new WeakMap();
-export function loadOverview(pool, { home = false } = {}) {
+export function loadOverview(pool, { home = false, onFailure } = {}) {
   let cache = overviewCaches.get(pool);
   if (!cache) {
     cache = new TopicResponseCache(60000, 1);
     overviewCaches.set(pool, cache);
   }
-  return cache.get(home ? 'overview:home' : 'overview', () => (home ? loadHomeProjection(pool) : loadProjection(pool)));
+  return cache.get(home ? 'overview:home' : 'overview', () => (home ? loadHomeProjection(pool, { onFailure }) : loadProjection(pool)));
 }
 export function invalidateOverviewCache(pool) {
   overviewCaches.get(pool)?.clear();
@@ -55,8 +55,26 @@ export const HOME_AUTHORS_SQL = `SELECT chosen.id,chosen.displayName,chosen.blog
  * Compact recentBlogs intentionally omit description and postCount: the home sidebar only
  * renders identity, the latest article and its timestamp. Full overview retains those fields.
  * All SQL reads remain fresh and use the same admission boundary as the full projection. */
-async function loadHomeProjection(pool) {
-  const mentions = await overviewRead(pool, 'home.mentions', () => loadHomeMentions(pool));
+async function loadHomeProjection(pool, { onFailure } = {}) {
+  let mentions;
+  try {
+    mentions = await overviewRead(pool, 'home.mentions', () => loadHomeMentions(pool));
+  } catch (error) {
+    // A slow/temporarily unavailable mentions query must not take down the
+    // rest of the homepage. Keep the state explicit so an empty list is never
+    // presented as proof that there are no relations.
+    onFailure?.(overviewFailureDetails(error, pool));
+    mentions = {
+      days: 90,
+      evidenceType: 'direct-link',
+      location: 'body',
+      limit: 8,
+      truncated: false,
+      generatedAt: new Date().toISOString(),
+      status: 'unavailable',
+      items: [],
+    };
+  }
   const [authorRows, totalRows] = await Promise.all([
     overviewRead(pool, 'home.authors', () => pool.query(HOME_AUTHORS_SQL)),
     overviewRead(pool, 'home.totals', () => pool.query(`SELECT (SELECT COUNT(*) FROM blogs WHERE status='verified') AS blogs,

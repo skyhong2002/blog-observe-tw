@@ -108,6 +108,8 @@ export type HomeMentions = {
   truncated: boolean;
   generatedAt: string;
   items: HomeMention[];
+  /** The bounded query can degrade independently; this is distinct from an empty result. */
+  status?: 'available' | 'unavailable';
 };
 /** /api/overview?view=home: the overview's shape (posts and tags now empty) plus the body citations. */
 export type HomeOverview = Overview & { view: 'home'; mentions: HomeMentions };

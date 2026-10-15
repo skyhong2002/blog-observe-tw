@@ -7,21 +7,43 @@ export const HOME_MENTION_LIMIT = 8;
 export const HOME_MENTION_DAYS = 90;
 
 /** This is the same article→blog body-link evidence as /relations, never shared tags or text similarity. */
-export const HOME_MENTIONS_SQL = `SET STATEMENT max_statement_time=1 FOR WITH visible_mentions AS (
+/**
+ * Select the date-bounded post/link keys first, then fetch text only for the
+ * nine rows that can reach the homepage.  The old plan started at every
+ * relation_observations row and applied the post date range afterwards; on
+ * MariaDB that made a window/filesort query hit the one-second statement
+ * budget.  FORCE INDEX plus STRAIGHT_JOIN keeps the bounded published_at
+ * range as the driving table without changing any public-visibility predicate.
+ */
+export const HOME_MENTIONS_SQL = `SET STATEMENT max_statement_time=1 FOR WITH eligible_links AS (
+ SELECT p.id postId,p.blog_id sourceBlogId,p.published_at publishedAt,
+   l.ordinal,l.target_blog_id targetBlogId,
+   ROW_NUMBER() OVER (PARTITION BY p.id,l.target_blog_id ORDER BY l.ordinal) link_number
+ FROM posts p FORCE INDEX (posts_published)
+ STRAIGHT_JOIN relation_links l ON l.source_post_id=p.id AND l.source_blog_id=p.blog_id AND l.location='body'
+ STRAIGHT_JOIN blogs a ON a.id=l.source_blog_id
+ STRAIGHT_JOIN blogs b ON b.id=l.target_blog_id
+ STRAIGHT_JOIN relation_observations o ON o.post_id=p.id
+ WHERE ${PUBLIC_RELATION} AND a.status='verified' AND b.status='verified' AND a.id<>b.id
+ AND p.published_at>=? AND p.published_at<=?
+ AND (l.target_post_id IS NULL OR EXISTS (SELECT 1 FROM posts tp WHERE tp.id=l.target_post_id
+   AND tp.blog_id=b.id AND (tp.published_at IS NULL OR tp.published_at<=?)))
+), picked AS (
+ SELECT postId,sourceBlogId,publishedAt,ordinal,targetBlogId
+ FROM eligible_links WHERE link_number=1
+ ORDER BY publishedAt DESC,postId DESC,targetBlogId LIMIT 9
+)
  SELECT p.id postId,p.title postTitle,p.url postUrl,p.published_at publishedAt,
  a.id sourceBlogId,a.slug sourceBlogSlug,a.name sourceBlogName,
  b.id targetBlogId,b.slug targetBlogSlug,b.name targetBlogName,b.url targetHomeUrl,
- l.anchor_text anchor,l.context,l.observed_at observedAt,o.parser_version matchVersion,
- ROW_NUMBER() OVER (PARTITION BY p.id,b.id ORDER BY l.ordinal) link_number
- FROM relation_links l JOIN posts p ON p.id=l.source_post_id AND p.blog_id=l.source_blog_id
- JOIN blogs a ON a.id=l.source_blog_id JOIN blogs b ON b.id=l.target_blog_id
- JOIN relation_observations o ON o.post_id=p.id
- WHERE ${PUBLIC_RELATION} AND l.location='body' AND a.status='verified' AND b.status='verified'
- AND a.id<>b.id AND p.published_at>=? AND p.published_at<=?
- AND (l.target_post_id IS NULL OR EXISTS (SELECT 1 FROM posts tp WHERE tp.id=l.target_post_id
- AND tp.blog_id=b.id AND (tp.published_at IS NULL OR tp.published_at<=?)))
- ) SELECT * FROM visible_mentions WHERE link_number=1
- ORDER BY publishedAt DESC,postId DESC,targetBlogId LIMIT 9`;
+ l.anchor_text anchor,l.context,l.observed_at observedAt,o.parser_version matchVersion
+ FROM picked k
+ STRAIGHT_JOIN posts p ON p.id=k.postId AND p.blog_id=k.sourceBlogId
+ STRAIGHT_JOIN relation_links l ON l.source_post_id=k.postId AND l.source_blog_id=k.sourceBlogId AND l.ordinal=k.ordinal
+ STRAIGHT_JOIN blogs a ON a.id=l.source_blog_id
+ STRAIGHT_JOIN blogs b ON b.id=k.targetBlogId
+ STRAIGHT_JOIN relation_observations o ON o.post_id=k.postId
+ ORDER BY k.publishedAt DESC,k.postId DESC,k.targetBlogId`;
 
 const iso = (value: unknown) => {
   const date = value instanceof Date ? value : new Date(String(value));
@@ -49,6 +71,7 @@ export async function loadHomeMentions(pool: Pool, now = new Date()) {
     limit: HOME_MENTION_LIMIT,
     truncated: rows.length > HOME_MENTION_LIMIT,
     generatedAt: now.toISOString(),
+    status: 'available' as const,
     items: rows.slice(0, HOME_MENTION_LIMIT).map((r) => {
       const targetHomeUrl = mentionPublicUrl(r.targetHomeUrl);
       return {

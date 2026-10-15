@@ -141,7 +141,10 @@ export async function buildApp(config, { logger = false, store = null } = {}) {
     reply.header('cache-control', 'no-store');
     if (request.query?.view !== undefined && request.query.view !== 'home') return reply.code(400).send({ error: 'invalid_view' });
     try {
-      return await loadOverview(pool, { home: request.query?.view === 'home' });
+      return await loadOverview(pool, {
+        home: request.query?.view === 'home',
+        onFailure: (details) => request.log.error({ operation: 'overview', view: 'home', ...details }, 'public overview read degraded'),
+      });
     } catch (error) {
       // Log only a bounded database error code, never SQL, text, credentials or headers.
       request.log.error({ operation: 'overview', view: request.query?.view === 'home' ? 'home' : 'full',

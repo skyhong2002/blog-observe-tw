@@ -21,7 +21,7 @@ describe('read-only frontend projection', () => {
     expect(statements).toHaveLength(4);
     expect(peak).toBe(2);
     expect(statements.filter((sql) => sql.includes('LIMIT 7'))).toHaveLength(0);
-    expect(statements.filter((sql) => sql.includes('visible_mentions'))).toHaveLength(1);
+    expect(statements.filter((sql) => sql.includes('eligible_links'))).toHaveLength(1);
     expect(statements.filter((sql) => sql.includes('LIMIT 30'))).toHaveLength(0);
     expect(statements.filter((sql) => sql.includes('LIMIT 8'))).toHaveLength(1);
     expect(statements.filter((sql) => sql.includes('LIMIT 10'))).toHaveLength(1);
@@ -45,7 +45,7 @@ describe('read-only frontend projection', () => {
       release = resolve;
     });
     const query = vi.fn(async (sql: string) => {
-      if (sql.includes('visible_mentions')) {
+      if (sql.includes('eligible_links')) {
         const rows = hidden
           ? []
           : [
@@ -108,7 +108,7 @@ describe('read-only frontend projection', () => {
       await app.close();
     }
   });
-  it('overview failures keep no-store and expose/log only a bounded error code', async () => {
+  it('mentions timeout degrades to an explicit unavailable section while other home data stays available', async () => {
     const failure = Object.assign(Error('private database text'), {
       code: 'ER_STATEMENT_TIMEOUT', sql: 'private SQL text', sqlMessage: 'private query context',
     });
@@ -116,19 +116,62 @@ describe('read-only frontend projection', () => {
       { login: null, uiOrigin: 'http://127.0.0.1:1', port: 18165 },
       {
         // @ts-expect-error JS gateway accepts injected pool.
-        store: { pool: { query: async () => { throw failure; } } },
+        store: { pool: { query: async (sql) => {
+          if (sql.includes('eligible_links')) throw failure;
+          return [sql.includes('AS blogs,') ? [{ blogs: 2, posts: 7, updatedAt: null }] : []];
+        } } },
       },
     );
     const logger = vi.spyOn(app.log, 'error');
     try {
       const response = await app.inject('/api/overview?view=home');
-      expect(response.statusCode).toBe(503);
-      expect(response.json()).toEqual({ error: 'unavailable' });
+      expect(response.statusCode).toBe(200);
+      expect(response.json().mentions).toMatchObject({ status: 'unavailable', items: [] });
+      expect(response.json().totals).toEqual({ blogs: 2, posts: 7 });
       expect(response.headers['cache-control']).toContain('no-store');
       expect(logger).toHaveBeenCalledWith(expect.objectContaining({ operation: 'overview', view: 'home',
-        queryStage: 'home.mentions', failureKind: 'statement-timeout', databaseCode: 'ER_STATEMENT_TIMEOUT' }), 'public overview read failed');
+        queryStage: 'home.mentions', failureKind: 'statement-timeout', databaseCode: 'ER_STATEMENT_TIMEOUT' }), 'public overview read degraded');
       expect(JSON.stringify(logger.mock.calls)).not.toContain('private');
     } finally { await app.close(); }
+  });
+  it('still returns unavailable when a non-mentions home query fails', async () => {
+    const failure = Object.assign(Error('private database text'), { code: 'ER_CON_COUNT_ERROR' });
+    const app = await buildApp(
+      { login: null, uiOrigin: 'http://127.0.0.1:1', port: 18165 },
+      {
+        // @ts-expect-error JS gateway accepts an injected pool.
+        store: { pool: { query: async (sql: string) => { if (sql.includes('eligible_links')) return [[]]; throw failure; } } },
+      },
+    );
+    try {
+      const response = await app.inject('/api/overview?view=home');
+      expect(response.statusCode).toBe(503);
+      expect(response.json()).toEqual({ error: 'unavailable' });
+    } finally { await app.close(); }
+  });
+  it('does not retain a degraded mentions result after a later successful read', async () => {
+    let fail = true;
+    const app = await buildApp(
+      { login: null, uiOrigin: 'http://127.0.0.1:1', port: 18165 },
+      {
+        // @ts-expect-error JS gateway accepts an injected pool.
+        store: { pool: { query: async (sql: string) => {
+          if (sql.includes('eligible_links') && fail) throw Object.assign(Error('timeout'), { errno: 1969 });
+          return [sql.includes('AS blogs,') ? [{ blogs: 1, posts: 1, updatedAt: null }] : []];
+        } } },
+      },
+    );
+    try {
+      const first = await app.inject('/api/overview?view=home');
+      expect(first.statusCode).toBe(200);
+      expect(first.json().mentions.status).toBe('unavailable');
+      fail = false;
+      const second = await app.inject('/api/overview?view=home');
+      expect(second.statusCode).toBe(200);
+      expect(second.json().mentions.status).toBe('available');
+    } finally {
+      await app.close();
+    }
   });
   it('reads each homepage independently and rejects overflow without retaining completed content', async () => {
     let release!: () => void;
