@@ -1,6 +1,27 @@
 # UI 逐頁審查紀錄
 
-## Current state（UTC 2026-10-15T16:00Z，gen38）
+## Current state（UTC 2026-10-15T16:50Z，gen39）
+
+正式站為 **green／gen39／`77915780fa24f51c9c5584189e489cd9a49d2d51`**，BUILD_ID `gUY454KbQ44XAq8sDEB0U`，切換
+UTC 2026-10-15T16:39:20.709Z（transition 39）。回滾點 blue／gen38 `3c9905d`／`VT4lRLXSIPqMBqBDXUfxa`：
+
+```bash
+bash /home/deck/.cache/blog-home-cloud-b3-20261014/tools/deploy-blue-green.sh rollback blue
+```
+
+- **正文引用卡片再簡化**（使用者：不要展開、直接顯示約兩行提及內文、說明太多、同一行沒有上下對齊）：拿掉
+  「核對連結證據」展開、每卡的「正文直接連結」標籤、網域／觀測時間／版本。每個被連到的部落格一列「→ 部落格」，
+  下方直接引出原文在連結附近的文字（沒有上下文時用連結文字），兩行截斷。來源列與每列「→ 部落格」改為 flex
+  置中對齊；正式站 390 量測箭頭與標籤的垂直中心逐列相同。頁尾方法區同步改寫該句。
+- 驗收：topic-ui 176、node 225；切換後 `x-blog-release` 7791578、generation 39、HTML BUILD_ID 相符、no-store、DYNAMIC；
+  首頁三次 2.19／2.13／2.03 秒、tag 200；`/topics/` 200、`/api/topics?days=7` 200、`/relations/` 200。實際瀏覽器 1280 dark、
+  390 light 截圖於 `.reviews/gen39/`。
+- 保留：刪除 gen37 `021c55c` release 與 checkout；保留 active、gen38 回滾、edge/code、worker。
+- **回填**：run2 在 00:25（台北）通過健康複查後立即結束；當時回填 checkout 的 node_modules 仍連到已退休的 release
+  （錯誤被工具統一吞為 `fulltext_batch_failed_or_homepage_guard_closed`）。已改連 gen38，以
+  `blog-fulltext-backfill-20261016-run3` 從 cursor 25420 重啟，第一批成功。
+
+## 現況（UTC 2026-10-15T16:00Z，gen38）
 
 正式站為 **blue／gen38／`3c9905d7af7cae26d8b51599034ca9debe32b01f`**，BUILD_ID `VT4lRLXSIPqMBqBDXUfxa`，切換
 UTC 2026-10-15T15:56:52.407Z。回滾點 green／gen37 `021c55c`／`f0elr8sZPR9MEHLH2Mp0X`：
