@@ -1,5 +1,26 @@
 # UI 逐頁審查紀錄
 
+## 追加（UTC 2026-10-15T14:30Z，正式仍為 gen35）
+
+正式站未變：green／gen35／`8755f33`／`30mIp94X6T4kIQ3IrSNTQ`，回滾 blue／gen34 `5df6e62`。本段只動測試、工具與文件，沒有發版。
+
+- **測試全部通過**：先前列為「HEAD 既有失敗」的兩項已修（`public-post.spec` 與 web search fixture 用了 `1af0b44`
+  改名前的 coverage type；`topic-writer-registry` 補記此後已審的寫入，皆不碰話題表）。整合測試執行器在不帶
+  `--suite` 時改為每個套件各用新的拋棄式資料庫，因此第一次真正跑到後面的套件，又發現並修正三個過時測試
+  （`public-routes` 游標、`topics-quality` 計數與 CTE 名稱、`content-topics` 的正文搜尋改走 F3 全文索引）。
+  vitest 1357、node 225、topic-ui 174、隔離 18169 整合 46 套件全過（`8f8d894`；之後再以正式執行器從頭一次跑完 46／46，exit 0）。
+- **回填**：gen35 那次在首頁探測逾時（>13 秒）時被當成致命錯誤結束於游標 25420；工具 `09b76ca` 改為探測逾時、
+  啟動時首頁變慢、索引語句撞 DB 1 秒上限都走「冷卻 30 分鐘、恢復健康才以最慢節奏續跑」，非 200 才結束。
+  目前 `blog-fulltext-backfill-20261015-run2.service`（工作目錄 `~/.cache/blog-backfill-run-09b76ca…`，
+  node_modules 連到 gen35 release），首次探測三次中位數 8.6 秒，已進入冷卻。
+- **主機記憶體**：量測與不提權下的限制見 [host-memory-2026-10-15.md](host-memory-2026-10-15.md)；需要 sudo 的
+  `vm.swappiness` 與 `system.slice` 記憶體保護沒有執行，指令與還原方式已列出。沒有用 docker 特權容器繞過 sudo。
+- **登入**：在 T3 協作瀏覽器以使用者本人已登入的 Google 帳號（只選帳號，未輸入任何帳密）登入成功，確認
+  `/my/` 登入後空狀態與 `/admin/`（管理員，顯示「候選來源」）可載入；全程只瀏覽、沒有任何管理操作。之後預覽面板
+  重建，網站與 Google 的登入狀態都消失，Google 改要求輸入帳號，因此停止。登入後的 1280／390 正式截圖仍 pending。
+  唯一一張登入後 `/my/` 圖（`gen35-l1-loggedin/`）被 reviewer 判為右側溢出，但那是約 1402px 視窗裁成 1280 的
+  預覽截圖，同次 DOM 量測所有元素都在 1261px 內；記錄為無效截圖，不是頁面問題。
+
 ## Current state（UTC 2026-10-15T12:05Z，gen35）
 
 正式站為 **green／gen35／`8755f3336705a43ae4edf6910d9f77d6a5f5c6a9`**，BUILD_ID `30mIp94X6T4kIQ3IrSNTQ`，
