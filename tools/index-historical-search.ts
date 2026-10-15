@@ -5,6 +5,7 @@
  * A non-200 homepage ends the run. A >6.17s homepage (with --adaptive: the median of three probes) ends it too,
  * unless --cooldown-ms is set: then the backfill stops for that long, resumes at its slowest pace only once the host,
  * the homepage (median under 4.5s) and the overview log are healthy again, and ends after --max-cooldowns stops.
+ * A homepage probe timeout and a DB statement timeout while indexing take the same cooldown path.
  */
 import { spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
@@ -67,9 +68,11 @@ class GateClosed extends Error {
     this.fatal = fatal;
   }
 }
+/** A probe that times out (13s) or cannot connect counts as infinitely slow, not as a failed response. */
 async function homepageProbe() {
-  const probe = await timedGet('https://blog.observe.tw/');
-  console.log(JSON.stringify({ probeUtc: new Date().toISOString(), ...probe }));
+  const probe = await timedGet('https://blog.observe.tw/').catch(() => null);
+  console.log(JSON.stringify({ probeUtc: new Date().toISOString(), ...(probe ?? { error: 'timeout-or-network' }) }));
+  if (!probe) return Number.POSITIVE_INFINITY;
   if (probe.status !== 200) throw new GateClosed(true);
   return probe.elapsedMs;
 }
@@ -138,12 +141,37 @@ let cursor = after,
   wait = delayMs,
   lastProbe = 0,
   cooldowns = 0;
+/** Slow homepage (or a DB statement timeout while indexing): stop, then resume slowest once healthy. */
+async function coolDown(error: unknown) {
+  if (!(error instanceof GateClosed) || error.fatal || !cooldownMs || ++cooldowns > maxCooldowns) throw error;
+  console.log(JSON.stringify({ cooldownUtc: new Date().toISOString(), cooldowns, resumeAfter: cursor }));
+  do await delay(cooldownMs);
+  while (!(await healthyAgain()));
+  size = 1;
+  wait = maxDelayMs;
+  lastProbe = Date.now();
+}
+// MariaDB max_statement_time exceeded: the shared database is stalled, not the batch broken.
+const statementTimeout = (error: unknown) => (error as { errno?: unknown } | null)?.errno === 1969;
 try {
   if (adaptive) while (await hostBusy()) await delay(BUSY_PAUSE_MS);
-  await homepageGate();
+  try {
+    await homepageGate();
+  } catch (error) {
+    if (!adaptive) throw error;
+    await coolDown(error);
+  }
   lastProbe = Date.now();
   for (let n = 0; n < max; n++) {
-    const result = await runFulltextBatch(db.pool, { after: cursor, limit: size });
+    let result: Awaited<ReturnType<typeof runFulltextBatch>>;
+    try {
+      result = await runFulltextBatch(db.pool, { after: cursor, limit: size });
+    } catch (error) {
+      if (!adaptive || !statementTimeout(error)) throw error;
+      console.log(JSON.stringify({ batchTimeoutUtc: new Date().toISOString(), resumeAfter: cursor }));
+      await coolDown(new GateClosed(false));
+      continue;
+    }
     cursor = result.next;
     count += result.items.length;
     console.log(
@@ -174,13 +202,7 @@ try {
         wait = Math.max(minDelayMs, Math.round(wait / 2));
       }
     } catch (error) {
-      if (!(error instanceof GateClosed) || error.fatal || !cooldownMs || ++cooldowns > maxCooldowns) throw error;
-      console.log(JSON.stringify({ cooldownUtc: new Date().toISOString(), cooldowns, resumeAfter: cursor }));
-      do await delay(cooldownMs);
-      while (!(await healthyAgain()));
-      size = 1;
-      wait = maxDelayMs;
-      lastProbe = Date.now();
+      await coolDown(error);
     }
   }
 } catch {
