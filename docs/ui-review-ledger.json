@@ -1,16 +1,21 @@
 {
   "schemaVersion": 1,
   "currentProduction": {
-    "slot": "blue",
-    "generation": 40,
-    "sha": "d75403167577538546599769d5af529e72c32446",
-    "buildId": "Jz3ykfP-tbu-AKn9mRlHq",
-    "switchedAt": "2026-10-15T17:06:04.426Z",
+    "slot": "green",
+    "generation": 41,
+    "sha": "91ee7dad864fd92daffaeade66523b7cf2998a20",
+    "buildId": "IckLDw5TLWeYzYIQ33NZp",
+    "switchedAt": "2026-10-15T19:07:45.914Z",
     "rollback": {
-      "slot": "green",
-      "generation": 39,
-      "sha": "77915780fa24f51c9c5584189e489cd9a49d2d51",
-      "buildId": "gUY454KbQ44XAq8sDEB0U"
+      "slot": "blue",
+      "generation": 40,
+      "sha": "d75403167577538546599769d5af529e72c32446",
+      "buildId": "Jz3ykfP-tbu-AKn9mRlHq"
+    },
+    "worker": {
+      "sha": "91ee7dad864fd92daffaeade66523b7cf2998a20",
+      "dropIn": "blog-observe-worker.service.d/95-release-91ee7da.conf",
+      "previous": "af0e73ccc3c5ace88dc8fb6f45d7d76123c218da"
     }
   },
   "summary": {

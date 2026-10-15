@@ -1,6 +1,36 @@
 # UI 逐頁審查紀錄
 
-## Current state（UTC 2026-10-15T17:10Z，gen40）
+## Current state（UTC 2026-10-15T19:15Z，gen41）
+
+正式站為 **green／gen41／`91ee7dad864fd92daffaeade66523b7cf2998a20`**，BUILD_ID `IckLDw5TLWeYzYIQ33NZp`，切換
+UTC 2026-10-15T19:07:45.914Z（transition 41）。回滾點 blue／gen40 `d754031`／`Jz3ykfP-tbu-AKn9mRlHq`：
+
+```bash
+bash /home/deck/.cache/blog-home-cloud-b3-20261014/tools/deploy-blue-green.sh rollback blue
+```
+
+**Worker 改跑同一 release**（原為 `af0e73c`）：drop-in
+`~/.config/systemd/user/blog-observe-worker.service.d/95-release-91ee7da.conf` 設定 WorkingDirectory 與 NODE_PATH。
+回滾：刪除該檔、`systemctl --user daemon-reload`、`systemctl --user restart blog-observe-worker`。`af0e73c` 至 HEAD 間 worker
+相關差異只有 `blogs-fulltext` 排程（`BLOG_SEARCH_FULLTEXT_ENABLED` 未設定，維持關閉）與新增資料表定義。
+
+- **使用者問為何正文引用只有一篇**。查證原因：(1) 連結抓取每天上限 300 頁、每站 20 頁，10/12 起每天用滿，近 90 天
+  6,153 篇只讀了 949 篇（15%）；(2) wiwi.blog 等 blogblog.club 社群部落格多在 2,181 筆候選中未核准；(3) 美食旅遊站的外連
+  多為 Agoda／Klook／KKday 等。
+- **B 加快連結抓取**（使用者同意）：每日 2,400 頁、6,000 次請求、每站 60 次；`blogs-relations` 每分鐘一次（每次最多 5 頁）。
+  內容抓取共用同一頁數預算。
+- **A blogblog.club 名單直接收錄**（使用者：在 blogblog.club blogroll 上就直接批准，不需人工篩選）：直接列在
+  blogblog.club 頁面（blogrollroll、party）的候選，以該名單代替「個人首頁自我介紹／AI」證明。名單連的是 blogroll 頁或派對文章，
+  所以先為其部落格首頁建立（或標記）候選；首頁、RSS／文章 sitemap、名稱一致、擁有權檢查不變。1,009 筆名單候選對應 311 個首頁，
+  其中 29 個已收錄、282 個待驗證。名單收錄每日 100 個（獨立預算），候選審核 HTTP 每日 1,500 次；政策升為 v4，既有候選重新審核。
+  新部落格狀態標示「BlogBlog.Club 名單自動收錄」。名單往外再一層（成員自己的 blogroll）仍是一般候選。
+- 驗收：vitest 1363、tsc、biome（變更檔）、writer registry；隔離 18169 完整整合 46 套件全數通過（candidates 新增名單衍生、
+  收錄、偽造名單在 writer 端被拒）。切換後 `x-blog-release` 91ee7da、generation 41、BUILD_ID 相符、no-store、DYNAMIC；首頁
+  2.0–3.4 秒，`/topics/`、`/api/topics`、`/relations/` 200，`/admin/` 302，tag 200。
+- 保留：刪除 gen39 `7791578` release 與 checkout（先停回填 run4，cursor 25462，node_modules 改連 gen41，以 run5 續跑）。
+  `af0e73c` 暫留：worker 回滾目標，且多個停用 unit 的 drop-in 仍指向它。
+
+## 現況（UTC 2026-10-15T17:10Z，gen40）
 
 正式站為 **blue／gen40／`d75403167577538546599769d5af529e72c32446`**，BUILD_ID `Jz3ykfP-tbu-AKn9mRlHq`，切換
 UTC 2026-10-15T17:06:04.426Z（transition 40）。回滾點 green／gen39 `7791578`／`gUY454KbQ44XAq8sDEB0U`：
