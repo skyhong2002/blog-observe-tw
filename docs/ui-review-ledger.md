@@ -1,6 +1,57 @@
 # UI 逐頁審查紀錄
 
-## Current state（UTC 2026-10-15T02:11:40Z）
+## Current state（UTC 2026-10-15T09:45Z，gen27）
+
+正式站為 **green／gen27／`68a032bcb96733ec5e4a024a415ebd6622ea4987`**，BUILD_ID
+`QEgJ-tkNmRwTiStk11XqA`，切換 UTC 2026-10-15T09:34:32.426Z（transition 27）。blue／gen26
+`7590344a`／`Xm1Rp-cc1A9eW-NCT5lnf` 仍在線，是回滾點：
+
+```bash
+bash /home/deck/.cache/blog-home-cloud-b3-20261014/tools/deploy-blue-green.sh rollback blue
+```
+
+本版內容：
+
+- 首頁話題排行：先以 (詞, 站) 彙總比對再查詞表／頻率表，查詢次數 12.2 萬→約 4.6 萬；
+  `fresh_posts` 與 `native_labels` 以 STRAIGHT_JOIN 固定從期間內文章出發，避免忙碌時計畫翻轉。
+  對正式資料（唯讀）7／30／90 天結果 hash 與舊版完全相同；30 天約 2.6→0.9 秒、90 天 4.5→1.7 秒。
+  完整排行 `ranking()` 共用同一段 SQL，90 天逐欄比對 0 差異。
+- 文字雲：首頁改取 60 筆排行候選、畫 30 個；本期文章標題提到該詞不到 1/3 的「正文順帶詞」
+  不畫進雲但保留排行列（同背景詞閘門的 1/3，判斷的是篇數，不是詞名）。上線時 30 天雲已無
+  Life、星巴克、西區、信義區、鮭魚、法國、德國；景點、美食保留。方法說明另更正：背景詞的
+  原站分類豁免實際門檻是 1 個部落格（程式 `minimumNativeBlogs: 1`），不是先前寫的 2 個；
+  若改為 2 會誤殺「景點」，因此維持程式、改正說明。
+- `/api/` 手機：inline code 改 `overflow-wrap:anywhere`，短 token 不再被從中切斷（T-ref 仍是
+  break-all，這是可讀性修正的刻意偏離）。`/relations/` 關係圖：節點字 11→12px、依寬度換行顯示
+  完整名稱（不再 14 字截斷），窄螢幕縮短邊長。兩項尚待本版正式 390 capture 與非作者 review。
+
+驗收：
+
+- 測試：web vitest 174／node 225 全過；後端 vitest 1355 過、2 失敗（`public-post.spec`
+  coverage type、`topic-writer-audit` 登記表），兩者在未修改的 HEAD 257bc01 同樣失敗、輸出逐行相同，
+  非本版造成。隔離 18169 真 SQL `home-display` 套件（display gate、policy compat、
+  home-ranking-freshness、relation-visibility 69 assertions 含 seed/rejected/moved/future/
+  delete/owner barrier）全數通過。
+- 切換後：`x-blog-release` 68a032b、`x-blog-edge-generation` 27、HTML 內 BUILD_ID 相符、
+  `private, no-store`、CF DYNAMIC、`/healthz` port 18175；tag 200。green 直連話題 API
+  0.99／1.01 秒（blue 同時 1.94／1.99 秒）。公開首頁五次 15.0（切換後首請求）／4.8／2.6／3.7／3.9 秒，
+  當時 load 13–14。
+
+已知問題與需要人決定：
+
+- **主機記憶體不足**：UTC 09:41 時 iowait 75%、swap 20.8/25 GB；blog MariaDB RSS 956 MB 另有
+  1.9 GB 在 swap（buffer pool 本身被換出）。首頁偶發 >10 秒與此同時出現；大量記憶體在 tag 的多個
+  平行 release 服務。SQL 已縮短到約 1 秒，剩下的波動需要主機層處理（加 RAM、收斂其他服務、或讓
+  blog DB 容器不被換出），未擅自更動。
+- `edge/code` 指向的 `releases/93060cc…` 先前被清理刪除（早於本輪；執行中的 edge／blue 不受影響，
+  但任何 slot 重啟都會失敗）。首次 prepare green 因此 `slot_start_timeout`；已以 `git archive 93060cc`
+  原樣重建（edge 只用 Node 內建模組），第二次 prepare 成功。原始失敗 log：
+  `.reviews/gen27/prepare-green-attempt1-edge-code-missing.log`。
+- 回填：自適應版本（`--adaptive`，`b56facb`）首批後於 09:39:44 首頁 8.4 秒（>6.17）自動停止，
+  游標 24462，未重試；當時 load 13、iowait 高，非回填量造成（只索引 1 篇）。待主機回穩後再續跑。
+- Release、prepare、switch 原始紀錄：`/home/deck/.cache/blog-home-cloud-b3-20261014/.reviews/gen27/`。
+
+## 現況（UTC 2026-10-15T02:11:40Z，gen26）
 
 正式站目前為 **blue／gen26／`7590344a4accf3059fddaba07064b54ae193b49f`**，BUILD_ID
 `Xm1Rp-cc1A9eW-NCT5lnf`；green／gen25 仍是回滾點。上一版首頁查詢修正已部署，
