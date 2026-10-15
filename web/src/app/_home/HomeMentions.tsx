@@ -30,8 +30,8 @@ export function mentionCards(items: readonly HomeMention[]): MentionCard[] {
   return [...cards.values()];
 }
 
-/** The words around the link, else its anchor text: what the article actually said about the other blog. */
-const mentionQuote = (m: HomeMention) => m.context.trim() || m.anchor.trim();
+/** The gateway's sentence around the link (「…」 marks omitted text); older answers fall back to the raw context. */
+const mentionQuote = (m: HomeMention) => (m.quote ?? m.context).trim() || m.anchor.trim();
 
 function MentionCardView({ card }: { card: MentionCard }) {
   const m = card.article;

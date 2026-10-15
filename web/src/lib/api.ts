@@ -97,6 +97,8 @@ export type HomeMention = {
   location: 'body';
   anchor: string;
   context: string;
+  /** The sentence holding the link, with 「…」 where text before or after it was left out. */
+  quote?: string;
   observedAt: string | null;
   matchVersion: string;
   /** Public enum: the context was taken from the article body. Never an internal extraction id. */

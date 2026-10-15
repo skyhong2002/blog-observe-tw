@@ -6,12 +6,29 @@ import { PUBLIC_RELATION } from './public-relation.ts';
 export const HOME_MENTION_LIMIT = 8;
 export const HOME_MENTION_DAYS = 90;
 
+/** Most links a post may have to one blog and still count as citing it; more is a reprint of that blog's article
+ * (carrying its internal links) or a link list, not one article writing about another. */
+export const HOME_MENTION_MAX_LINKS_PER_BLOG = 5;
+/** Text the article itself wrote around the link, beyond the anchor; shorter is a credit line or list item. */
+export const HOME_MENTION_MIN_PROSE = 12;
+/**
+ * Only links the article writes about in a sentence reach the homepage: the anchor sits inside its context, the
+ * context has at least HOME_MENTION_MIN_PROSE characters besides the anchor and a clause mark (，。！？…), and the
+ * post links to that blog at most HOME_MENTION_MAX_LINKS_PER_BLOG times. Bare credits (「©名稱」「原始文章：標題」),
+ * link-only list items and reprints drop out without any list of words or blogs. /relations still counts every link.
+ */
+const QUOTED_LINK = `l.anchor_text<>'' AND LOCATE(l.anchor_text,l.context)>0
+ AND CHAR_LENGTH(REPLACE(l.context,l.anchor_text,''))>=${HOME_MENTION_MIN_PROSE}
+ AND REPLACE(l.context,l.anchor_text,'') REGEXP '[，。！？；、,.!?;]'
+ AND (SELECT COUNT(*) FROM relation_links x FORCE INDEX (relation_links_unresolved) WHERE x.target_blog_id=l.target_blog_id
+   AND x.source_post_id=l.source_post_id AND x.location='body')<=${HOME_MENTION_MAX_LINKS_PER_BLOG}`;
 /** This is the same article→blog body-link evidence as /relations, never shared tags or text similarity. */
 // One public body link from post p to another verified blog: the /relations predicate plus the target-post check.
 const ELIGIBLE_LINK = `l.source_post_id=p.id AND l.source_blog_id=p.blog_id AND l.location='body'
  AND ${PUBLIC_RELATION} AND a.status='verified' AND b.status='verified' AND a.id<>b.id
  AND (l.target_post_id IS NULL OR EXISTS (SELECT 1 FROM posts tp WHERE tp.id=l.target_post_id
-   AND tp.blog_id=b.id AND (tp.published_at IS NULL OR tp.published_at<=?)))`;
+   AND tp.blog_id=b.id AND (tp.published_at IS NULL OR tp.published_at<=?)))
+ AND ${QUOTED_LINK}`;
 /**
  * Select the date-bounded post/link keys first, then fetch text only for the
  * nine rows that can reach the homepage.  FORCE INDEX plus STRAIGHT_JOIN keeps
@@ -57,6 +74,28 @@ export const HOME_MENTIONS_SQL = `SET STATEMENT max_statement_time=1 FOR WITH re
  STRAIGHT_JOIN relation_observations o ON o.post_id=k.postId
  ORDER BY k.publishedAt DESC,k.postId DESC,k.targetBlogId`;
 
+/** parser.ts keeps up to 100 characters before the anchor and 320 in all. */
+const CONTEXT_LEAD = 100,
+  CONTEXT_MAX = 320,
+  QUOTE_LEAD = 40;
+const SENTENCE_END = /[。！？!?]/;
+/**
+ * The sentence holding the link, cut from its context, with 「…」 wherever text was left out: before it (earlier
+ * sentences, or the parser started mid-paragraph) and after it (later sentences, or the parser stopped at 320).
+ * Long lead-ins are cut to QUOTE_LEAD characters so the anchor stays inside the two lines the card shows.
+ */
+export function mentionQuote(context: string, anchor: string) {
+  const at = anchor ? context.indexOf(anchor) : -1;
+  if (at < 0) return '';
+  let start = at;
+  while (start > 0 && !SENTENCE_END.test(context[start - 1])) start--;
+  const stop = context.slice(at + anchor.length).search(SENTENCE_END);
+  const end = stop < 0 ? context.length : at + anchor.length + stop + 1;
+  if (at - start > QUOTE_LEAD) start = at - QUOTE_LEAD;
+  const before = start > 0 || at === CONTEXT_LEAD;
+  const after = end < context.length || Array.from(context).length >= CONTEXT_MAX;
+  return `${before ? '…' : ''}${context.slice(start, end).trim()}${after ? '…' : ''}`;
+}
 const iso = (value: unknown) => {
   const date = value instanceof Date ? value : new Date(String(value));
   return Number.isFinite(date.getTime()) ? date.toISOString() : null;
@@ -106,6 +145,7 @@ export async function loadHomeMentions(pool: Pool, now = new Date()) {
         location: 'body' as const,
         anchor: String(r.anchor ?? '').slice(0, 255),
         context: String(r.context ?? '').slice(0, 240),
+        quote: mentionQuote(String(r.context ?? ''), String(r.anchor ?? '')),
         observedAt: iso(r.observedAt),
         matchVersion: r.matchVersion,
         contextSource: 'body' as const,

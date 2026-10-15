@@ -1,6 +1,6 @@
 import type { Pool } from 'mysql2/promise';
 import { describe, expect, it, vi } from 'vitest';
-import { HOME_MENTIONS_SQL, loadHomeMentions, mentionPublicUrl } from './home-feed.ts';
+import { HOME_MENTIONS_SQL, loadHomeMentions, mentionPublicUrl, mentionQuote } from './home-feed.ts';
 import { PUBLIC_RELATION } from './public-relation.ts';
 
 vi.mock('../v1/favicon-routes.ts', () => ({ iconManifest: async () => ({}) }));
@@ -119,5 +119,24 @@ describe('homepage uses public article→blog body citations', () => {
         },
       } as unknown as Pool),
     ).rejects.toThrow('db_timeout');
+  });
+});
+
+describe('homepage citations are links the article writes about in a sentence', () => {
+  it('requires prose and clause marks around the anchor and drops reprints, by rule rather than by name', () => {
+    expect(HOME_MENTIONS_SQL).toContain('LOCATE(l.anchor_text,l.context)>0');
+    expect(HOME_MENTIONS_SQL).toContain("CHAR_LENGTH(REPLACE(l.context,l.anchor_text,''))>=12");
+    expect(HOME_MENTIONS_SQL).toMatch(/REGEXP '\[，。！？；、,\.!\?;\]'/);
+    expect(HOME_MENTIONS_SQL).toContain(')<=5');
+    expect(HOME_MENTIONS_SQL).not.toMatch(/原始文章|©/);
+  });
+  it('quotes the sentence holding the link and marks omitted text with …', () => {
+    expect(mentionQuote('今天看 R 的這篇文章，其中這句話讓我覺得很有意思', 'R')).toBe('今天看 R 的這篇文章，其中這句話讓我覺得很有意思');
+    expect(mentionQuote('前一句。「Y」的文筆像水；很好。後一句。', '「Y」')).toBe('…「Y」的文筆像水；很好。…');
+    // parser.ts started 100 characters before the anchor: the paragraph began earlier.
+    expect(mentionQuote(`${'甲'.repeat(100)}B 寫得好。`, 'B')).toBe(`…${'甲'.repeat(40)}B 寫得好。`);
+    expect(mentionQuote(`${'乙'.repeat(10)}B${'丙'.repeat(309)}`, 'B')).toBe(`${'乙'.repeat(10)}B${'丙'.repeat(309)}…`);
+    expect(mentionQuote('沒有連結文字', '')).toBe('');
+    expect(mentionQuote('上下文', 'X')).toBe('');
   });
 });

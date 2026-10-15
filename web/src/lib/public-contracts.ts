@@ -174,6 +174,8 @@ const homeMention = {
   location: (v: unknown) => v === 'body',
   anchor: text,
   context: (v: unknown) => typeof v === 'string' && v.length <= 240,
+  // The sentence around the link with 「…」 for omitted text; absent on older answers (context is shown).
+  quote: optional((v: unknown) => typeof v === 'string' && v.length <= 330),
   observedAt: nullable(text),
   matchVersion: text,
   // A public enum, never an internal extraction id or digest.

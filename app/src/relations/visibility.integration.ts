@@ -61,7 +61,9 @@ export async function runRelationVisibilityIntegration(pool: Pool) {
       postIds.push(r.insertId);
     }
     const aliases = await loadAliases(pool);
-    const aBody = `<article><a href="${bUrl}one">B first</a><a href="${bUrl}one">B repeated</a><a href="${cUrl}">C</a><a href="${unknown}">Unknown</a><aside><a href="${bUrl}one">B sidebar</a></aside></article>`;
+    // Homepage citations need the link inside a sentence (home-feed.ts QUOTED_LINK); /relations counts any body link.
+    const said = (link: string) => `<p>今天讀到 ${link} 寫的文章，裡面的想法讓我很有共鳴。</p>`;
+    const aBody = `<article>${said(`<a href="${bUrl}one">B first</a>`)}${said(`<a href="${bUrl}one">B repeated</a>`)}${said(`<a href="${cUrl}">C</a>`)}${said(`<a href="${unknown}">Unknown</a>`)}<aside><a href="${bUrl}one">B sidebar</a></aside></article>`;
     const save = async (postId: number, blogId: number, url: string, body: string) =>
       saveObservation(
         pool,
@@ -71,8 +73,8 @@ export async function runRelationVisibilityIntegration(pool: Pool) {
         now,
       );
     await save(postIds[0], a, aUrl + 'one', aBody);
-    await save(postIds[1], a, aUrl + 'two', `<article><a href="${bUrl}one">B</a></article>`);
-    await save(postIds[2], b, bUrl + 'one', `<article><a href="${aUrl}one">A</a></article>`);
+    await save(postIds[1], a, aUrl + 'two', `<article>${said(`<a href="${bUrl}one">B</a>`)}</article>`);
+    await save(postIds[2], b, bUrl + 'one', `<article>${said(`<a href="${aUrl}one">A</a>`)}</article>`);
     const homeInitial = await loadHomeMentions(pool, now);
     check(homeInitial.items.filter((row) => row.postId === postIds[0] && row.targetBlogId === b).length === 1);
     check(homeInitial.items.every((row) => row.location === 'body' && row.contextSource === 'body'));
@@ -155,7 +157,7 @@ export async function runRelationVisibilityIntegration(pool: Pool) {
             now,
           ]);
           // The deleted post's outgoing rows remain query-joined safely; restore its observation for the original fixture.
-          await save(postIds[2], b, bUrl + 'one', `<article><a href="${aUrl}one">A</a></article>`);
+          await save(postIds[2], b, bUrl + 'one', `<article>${said(`<a href="${aUrl}one">A</a>`)}</article>`);
         } else await pool.execute('UPDATE posts SET blog_id=?,published_at=? WHERE id=?', [b, now, postIds[2]]);
       }
     }
