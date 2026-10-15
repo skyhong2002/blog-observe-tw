@@ -32,6 +32,6 @@
 
 ## 本次候選切換結果
 
-診斷版 `bc8998d2803339238bbdccfc03857b928e93a1d9`／BUILD_ID `Xm1Rp-cc1A9eW-NCT5lnf` 通過隔離 53 barrier、60 SSR/RSC 與原生測試，於 UTC 2026-10-15T01:03:??（transition journal保留精確時間） 短暫切到 blue/gen24。切後 post-check 的三站閘門中，blog 首頁三次完整回應為 6.458525、6.914799、5.666615 秒，中位數 6.458525，超過 6.17 秒；其餘檢查尚未作為通過證據。流程立即執行 `bash tools/deploy-blue-green.sh rollback green`，目前 active green/gen25、`b8c1350e38a118c26a67fe67fc1336814e3685f0`，保留 blue release 作為未發布診斷候選。正式站沒有保留這個版本的流量。
+診斷版 `bc8998d2803339238bbdccfc03857b928e93a1d9`／BUILD_ID `Xm1Rp-cc1A9eW-NCT5lnf` 通過隔離 53 barrier、60 SSR/RSC 與原生測試，於 UTC 2026-10-15T01:03:26.133Z 短暫切到 blue/gen24。切後 post-check 的三站閘門中，blog 首頁三次完整回應為 6.458525、6.914799、5.666615 秒，中位數 6.458525，超過 6.17 秒；其餘檢查尚未作為通過證據。流程立即執行 `bash tools/deploy-blue-green.sh rollback green`，目前 active green/gen25、`b8c1350e38a118c26a67fe67fc1336814e3685f0`，保留 blue release 作為未發布診斷候選。正式站沒有保留這個版本的流量。
 
 這批沒有重跑回填，也沒有恢復 Cloudflare/WAF 或快取；回填 unit 維持 failed／停止。失敗原始檔：`.reviews/overview-diagnosis/post-check.log`、`rollback.log`、`active-before.json`、`active-after.json`（若無 after 檔表示在 post-check 前回滾），以及隔離 B0 輸出 `/home/deck/.t3/projects/blog-observe-tw/.reviews/b0-final-barrier/bc8998d2803339238bbdccfc03857b928e93a1d9/`。
