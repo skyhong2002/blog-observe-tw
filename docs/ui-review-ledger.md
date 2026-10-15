@@ -1,6 +1,82 @@
 # UI 逐頁審查紀錄
 
-## Current state（UTC 2026-10-15T10:00Z，gen28）
+## Current state（UTC 2026-10-15T12:05Z，gen35）
+
+正式站為 **green／gen35／`8755f3336705a43ae4edf6910d9f77d6a5f5c6a9`**，BUILD_ID `30mIp94X6T4kIQ3IrSNTQ`，
+切換 UTC 2026-10-15T11:57:00.353Z（transition 35）。回滾點 blue／gen34 `5df6e62c`／`X3fk3uqDpWjLXWCN18c0-`：
+
+```bash
+bash /home/deck/.cache/blog-home-cloud-b3-20261014/tools/deploy-blue-green.sh rollback blue
+```
+
+每次切換都驗過：`x-blog-release`／`x-blog-edge-generation` 相符、HTML 內 BUILD_ID 相符、`private, no-store`、
+CF DYNAMIC、兩個 `/healthz`、tag 200、首頁話題 8 筆＋文字雲候選 60 筆。gen35 切換後公開首頁五次
+1.85／1.81／3.03／1.61／1.83 秒，`/topics/` 2.3–3.0 秒（load 8.8）。原始 prepare／switch／active 紀錄在
+`.reviews/gen29/`～`.reviews/gen35/`。
+
+### 本輪版本（gen29–gen35）
+
+| gen | slot／SHA | BUILD_ID | 內容 |
+| --- | --- | --- | --- |
+| 29 | green `5f0abf0` | `Mzo2u19r4TN2qfO-dZRoB` | 手機關係圖佈局後自動縮放置中（節點與標籤不出畫布、13px）；API 大綱路徑在斜線後換行；表格右緣加箭頭；作者表手機名稱上限；`/ranking/` 主導覽標示「標籤」；靜態頁 build 帶入 `BLOG_TECH_PUBLIC_ENABLED`（gen22 起 `/api/`、`/login/` 等靜態頁導覽缺「技術」） |
+| 30 | blue `b2b1882` | `ra9Vzh0AxH4JEAgKH8pqw` | 表格漸隱層 z-10（仍被 thead 蓋住，見 gen31） |
+| 31 | green `c8803e8` | `JnofJRBbaAaZcZWHnIRZG` | 漸隱層 z-[25]：在 thead（z-20）之上、網站標頭（z-30）之下；上線前在正式頁注入相同 z-index 驗證 |
+| 32 | blue `ba40fc1` | `D8USHxAzrj_4ZSKdJAlQS` | 話題頁手機在文章列表上方加「看哪些部落格在寫（N 個）↓」（原本要滑過約 100 篇） |
+| 33 | green `c47be34` | `Ilul-kHqqV9FT0RQUgW3F` | 錯誤／404 頁在話題路徑的方法區位置對齊；回填工具加 overview 紀錄調速與冷卻續跑 |
+| 34 | blue `5df6e62` | `X3fk3uqDpWjLXWCN18c0-` | 頁尾起點再對齊（頁尾無方法區時 `mt-10` 與 `mt-14` 外距合併，只拉回 40px）；上線前在正式 404 頁量測模擬 |
+| 35 | green `8755f33` | `30mIp94X6T4kIQ3IrSNTQ` | 首頁正文引用改為沿 `posts_published` 倒序找最新 9 篇有效文章即停；正式資料唯讀比對 now／7／30／60 天結果相同，冷快取 2.3→0.2 秒、暖 92→48ms |
+
+測試：每版 web vitest 174（話題跳轉斷言加在既有話題頁測試內）／node 225 全過；後端 vitest 1355 過、2 個 HEAD 既有失敗
+（`public-post.spec`、`topic-writer-audit`，未修改的 HEAD 上同樣失敗、輸出逐行相同）。隔離 18169 真 SQL：
+`topics`、`topics-ranking`、`home-ranking-freshness`、`relation-visibility`（首頁 6 種隱私 barrier）通過。
+
+### 第 4 輪逐頁 review（22 項全數有當版正式圖）
+
+非作者 **GPT-6.1 Sol**（codex exec，read-only；作者為 Claude Opus 5.5），每批附 tag 現行 T-ref
+`/home/deck/tag-analysis-private/ui-review/current-live-7dc-20261015/`。共 68 張圖審查紀錄，每張的 release、
+viewport、主題、狀態、截圖路徑、SHA256、結論與 findings 逐筆寫在 [ledger JSON](ui-review-ledger.json)；
+review 原始輸出 `.reviews/f4-round4/reviews/batch-A.json`～`batch-K.json`（D 首次因模型滿載失敗，保留並重跑
+`batch-D-retry.json`）。截圖：`/home/deck/.t3/userdata/blog-f4-round4-20261015/`（`gen28-*`、`gen29-*`、`gen31-*`、`gen32-*`、`gen33-*`、`gen34-*`）。
+
+capture 方式：公開頁用既有 `tools/ui-capture.mjs`（DNT=1、導航前阻擋 GA/GTM、每批 4 張）。工具刻意拒絕
+`/admin`、`/login`、`/my` 與非 200 文件，因此未登入私人頁與 404 改用一次性無 cookie 腳本（DNT=1、只放行
+本站 GET/HEAD；報告在各目錄 `report.json`）。錯誤頁無法在正式流量安全觸發，改在**非活躍** slot 暫停其
+gateway 約 1 分鐘、直接對該 slot 的 web 拍攝後恢復（gen31、gen33、gen34 各一次，皆在切換前或回滾 slot 上）。
+capture 工具會阻擋 `/me`、`/auth` 類請求，所以它拍的圖頂部沒有「登入」按鈕，這是工具限制、不是頁面缺陷。
+
+| 結果 | 路由 |
+| --- | --- |
+| 完整（已審狀態全 pass，且無已知未驗狀態）9 項 | `/about/`、`/api/`、`/articles/`（有結果＋查無結果）、`/login/`、`/ranking/`、`/relations/`（90／7 天、手機）、`/topics/`（30／7 天）、(not-found)、(error) |
+| 已審狀態 pass，仍有待驗狀態 13 項 | `/`（正文引用降級狀態）、`/admin/`、`/admin/discovery/`、`/my/`（登入後需真人 Google 登入）、`/api/status/`（degraded）、`/authors/`（作者篩選）、`/blogs/`（篩選排序）、`/blogs/[slug]/`（其他資料量）、`/observe/opt-out/`（切換後）、`/tags/`（搜尋）、`/tech/`（篩選分頁）、`/topics/[id]/`（歷史模式、撤銷）、`/traffic/`（月份排序） |
+| issues | 0 |
+
+本輪 review 發現並已修正上線：手機關係圖裁切（gen29）、API 大綱斷字（gen29）、表格看不出能橫捲（gen29–31）、
+作者表名稱截斷（gen29）、`/ranking/` 導覽（gen29）、靜態頁缺「技術」導覽（gen29）、話題頁手機找不到部落格清單
+（gen32）、錯誤頁間距（gen33–34）。保留的低等級意見：API 大綱路徑在斜線後換行（刻意，避免斷在字中）、
+手機表格名稱省略（有完整名稱 title）。表格右緣箭頭、`overflow-wrap:anywhere` 為相對 T-ref 的刻意偏離。
+
+### 回填、主機與保留
+
+- 歷史全文索引 16,661／99,046 篇（本輪開始 15,948）。回填 A/B（關／開各 8 分鐘兩輪，開＝每 5 秒 10 篇）：origin
+  首頁中位數 2.70／2.46／2.53／2.50 秒不變，p90 由 3.23 升到 5.2–5.4 秒，開啟期間 `home.mentions` 逾時 4 次。
+  原始資料 `.reviews/gen27/backfill-ab-20261015.tsv`。據此工具改為：每批最多 5 篇、間隔 10–120 秒，每次探測同時
+  讀活躍 gateway 近 2 分鐘的 overview 失敗紀錄，有就降速；首頁三次中位數 >6.17 秒則先停 30 分鐘，主機、首頁
+  （<4.5 秒）與 overview 紀錄都健康才以最慢節奏續跑，最多 12 次；非 200 立即結束。目前由
+  `blog-fulltext-backfill-20261015-gen35.service`（工作目錄 gen35 release）執行，log 同上。
+- **主機記憶體／IO 是剩餘不穩的主因**：blog 與 tag 共用同一個 MariaDB 容器（`tag-db`，buffer pool 1 GB），
+  它有約 1.9–2.3 GB 被換到 swap；主機 swap 20.8/25 GB、尖峰 iowait 75–80%。gen35 後仍見一次
+  `home.mentions` 在連線池全空下 1002ms 逾時。首頁查詢已縮短（話題 2→1 秒、正文引用冷 2.3→0.2 秒），剩下的
+  波動需要主機層決定。
+- 滾動保留（UTC 11:35–12:00，三次，都在 `edge/deploy.lock` 內並在鎖內重驗引用）：刪除 10 個舊 release
+  （58e551a、7590344、b8c1350、68a032b、b63e4cf、5f0abf0、b2b1882、c8803e8、ba40fc1、c47be34）、
+  對應 prepared/build JSON、殘留 bc8998d JSON，與 9 個拋棄式 source checkout；第一次量到可用空間增加約 6.78 GiB。
+  保留：active `8755f33`、回滾 `5df6e62`、`93060cc`（edge/code）、`af0e73c`（worker 與 unit drop-in）、
+  `blog-release-source-76a90e7`（兩個工作目錄的 node_modules 仍指向它）。紀錄
+  `.reviews/rolling-retention-20261015b|c|d/`。
+- `releases/93060cc`（edge/code）在本輪之前已被某次清理刪掉，導致 slot 無法重啟；已用 `git archive 93060cc`
+  原樣重建（見 gen27 段）。
+
+## 現況（UTC 2026-10-15T10:00Z，gen28）
 
 正式站為 **blue／gen28／`b63e4cf6f7a37cfc32d808a077179ac2b404b098`**，BUILD_ID
 `DLfWJGW-CryeKQT2PLOq2`，切換 UTC 2026-10-15T09:54:24.857Z（transition 28）。green／gen27

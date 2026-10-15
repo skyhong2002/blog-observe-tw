@@ -1,26 +1,29 @@
 {
   "schemaVersion": 1,
   "currentProduction": {
-    "slot": "blue",
-    "generation": 28,
-    "sha": "b63e4cf6f7a37cfc32d808a077179ac2b404b098",
-    "buildId": "DLfWJGW-CryeKQT2PLOq2",
-    "switchedAt": "2026-10-15T09:54:24.857Z",
+    "slot": "green",
+    "generation": 35,
+    "sha": "8755f3336705a43ae4edf6910d9f77d6a5f5c6a9",
+    "buildId": "30mIp94X6T4kIQ3IrSNTQ",
+    "switchedAt": "2026-10-15T11:57:00.353Z",
     "rollback": {
-      "slot": "green",
-      "generation": 27,
-      "sha": "68a032bcb96733ec5e4a024a415ebd6622ea4987",
-      "buildId": "QEgJ-tkNmRwTiStk11XqA"
+      "slot": "blue",
+      "generation": 34,
+      "sha": "5df6e62c3ff57236aed1f50601c810838a89100f",
+      "buildId": "X3fk3uqDpWjLXWCN18c0-"
     }
   },
   "summary": {
     "pageRoutes": 20,
     "errorBoundaries": 2,
     "items": 22,
-    "formalObservedRoutes": 12,
-    "noCurrentFormalReview": 10,
-    "completeRoutesAndStates": 0,
-    "scopePending": 22
+    "formalObservedRoutes": 22,
+    "noCurrentFormalReview": 0,
+    "completeRoutesAndStates": 9,
+    "scopePending": 13,
+    "round4ReviewedImages": 68,
+    "passForReviewedStatesWithPending": 13,
+    "issues": 0
   },
   "limitations": "Machine-readable index of real screenshot/review artifacts, not a template promoted to pass. Markdown ledger contains deliberate deviations and issues. Missing states remain pending. Old artifacts retained separately.",
   "routes": [
@@ -28,8 +31,8 @@
       "route": "/about/",
       "source": "web/src/app/about/page.tsx",
       "exampleUrl": "https://blog.observe.tw/about/",
-      "status": "issues",
-      "completeRouteAndStates": false,
+      "status": "complete",
+      "completeRouteAndStates": true,
       "reviews": [
         {
           "reviewer": "GPT-6.1 Sol",
@@ -54,45 +57,125 @@
             "analyticsAllowed": 0
           },
           "reverification": null
+        },
+        {
+          "reviewer": "GPT-6.1 Sol (non-author; author Claude Opus 5.5)",
+          "model": "gpt-6.1-sol",
+          "reviewedAt": "2026-10-15T10:22:41.135272+00:00",
+          "reviewedGeneration": 28,
+          "transcript": ".reviews/f4-round4/reviews/batch-E.json",
+          "state": "/about/ 390 light",
+          "viewport": [
+            390,
+            900
+          ],
+          "theme": "light",
+          "screenshot": "/home/deck/.t3/userdata/blog-f4-round4-20261015/gen28-b9-about-topics-mobile/page-1-390-light.png",
+          "screenshotSha256": "08c55979200ed7299661da22d0d3ef52fba4b0cb9f6149063a6a24ba9b4cd926",
+          "verdict": "pass",
+          "findings": []
+        },
+        {
+          "reviewer": "GPT-6.1 Sol (non-author; author Claude Opus 5.5)",
+          "model": "gpt-6.1-sol",
+          "reviewedAt": "2026-10-15T10:22:41.135272+00:00",
+          "reviewedGeneration": 28,
+          "transcript": ".reviews/f4-round4/reviews/batch-E.json",
+          "state": "/about/ 1280 dark",
+          "viewport": [
+            1280,
+            900
+          ],
+          "theme": "dark",
+          "screenshot": "/home/deck/.t3/userdata/blog-f4-round4-20261015/gen28-b9-about-topics-mobile/page-2-1280-dark.png",
+          "screenshotSha256": "e3f8824e2455b45a15a6e28163f2c771b938c8f2ed1fdb72893671dcd01a36be",
+          "verdict": "pass",
+          "findings": []
         }
       ],
       "deviationsAndReasons": "尚未完成當版逐頁對照，不以共用元件推定pass。 公開資料維持no-store是隱私要求，不跟tag恢復快取。",
       "fixCommit": null,
       "fixScope": null,
-      "reverification": []
+      "reverification": [],
+      "pendingStates": null
     },
     {
       "route": "/admin/discovery/",
       "source": "web/src/app/admin/discovery/page.tsx",
       "exampleUrl": "https://blog.observe.tw/admin/discovery/",
-      "status": "pending",
+      "status": "pass-for-reviewed-states",
       "completeRouteAndStates": false,
-      "reviews": [],
+      "reviews": [
+        {
+          "reviewer": "GPT-6.1 Sol (non-author; author Claude Opus 5.5)",
+          "model": "gpt-6.1-sol",
+          "reviewedAt": "2026-10-15T10:28:43.144842+00:00",
+          "reviewedGeneration": 28,
+          "transcript": ".reviews/f4-round4/reviews/batch-F.json",
+          "state": "/admin/discovery/ 未登入→導向 /login 390 dark",
+          "viewport": [
+            390,
+            900
+          ],
+          "theme": "dark",
+          "screenshot": "/home/deck/.t3/userdata/blog-f4-round4-20261015/gen28-c1-private-loggedout-notfound/page-6-390-dark.png",
+          "screenshotSha256": "c2188f99bf4b1119e0ecd9f528b164b503ef0e7160436a1fcb7f5b3f238c88eb",
+          "verdict": "pass",
+          "findings": []
+        }
+      ],
       "missingReason": "Capture guard forbids private/auth routes; no account or permission created. Existing authorized account or manual verification needed.",
       "deviationsAndReasons": "尚未完成當版逐頁對照，不以共用元件推定pass。 公開資料維持no-store是隱私要求，不跟tag恢復快取。",
       "fixCommit": null,
       "fixScope": null,
-      "reverification": []
+      "reverification": [],
+      "pendingStates": "僅審查未登入（導向 /login）；管理員登入後狀態需真人 Google 登入。"
     },
     {
       "route": "/admin/",
       "source": "web/src/app/admin/page.tsx",
       "exampleUrl": "https://blog.observe.tw/admin/",
-      "status": "pending",
+      "status": "pass-for-reviewed-states",
       "completeRouteAndStates": false,
-      "reviews": [],
+      "reviews": [
+        {
+          "reviewer": "GPT-6.1 Sol (non-author; author Claude Opus 5.5)",
+          "model": "gpt-6.1-sol",
+          "reviewedAt": "2026-10-15T10:28:43.144842+00:00",
+          "reviewedGeneration": 28,
+          "transcript": ".reviews/f4-round4/reviews/batch-F.json",
+          "state": "/admin/ 未登入→導向 /login 1280 light",
+          "viewport": [
+            1280,
+            900
+          ],
+          "theme": "light",
+          "screenshot": "/home/deck/.t3/userdata/blog-f4-round4-20261015/gen28-c1-private-loggedout-notfound/page-5-1280-light.png",
+          "screenshotSha256": "dce83f1fc897f89ed63eff09bd231f17cbd236f26eed0d5b8919ece7c18ab5f6",
+          "verdict": "pass-with-minor-issues",
+          "findings": [
+            {
+              "severity": "low",
+              "issue": "桌面主導覽缺少「技術」項目，與同一 release 的 404 桌面頁不一致。",
+              "evidence": "本頁導覽為「文章／標籤／關係圖／話題／部落格／作者／流量／追蹤／RSS／API」；404 dark 頁面在「流量」後多出「技術」。",
+              "recommendation": "確認「技術」是否應在 blog 全站桌面導覽固定顯示，並統一各路由的導覽來源。"
+            }
+          ]
+        }
+      ],
       "missingReason": "Capture guard forbids private/auth routes; no account or permission created. Existing authorized account or manual verification needed.",
       "deviationsAndReasons": "尚未完成當版逐頁對照，不以共用元件推定pass。 公開資料維持no-store是隱私要求，不跟tag恢復快取。",
       "fixCommit": null,
       "fixScope": null,
-      "reverification": []
+      "reverification": [],
+      "pendingStates": "僅審查未登入（導向 /login）；管理員登入後狀態需真人 Google 登入。"
     },
     {
       "route": "/api/",
       "source": "web/src/app/api/page.tsx",
       "exampleUrl": "https://blog.observe.tw/api/",
-      "status": "pending",
-      "completeRouteAndStates": false,
+      "status": "complete",
+      "completeRouteAndStates": true,
       "reviews": [
         {
           "reviewer": "GPT-6.1 Sol",
@@ -117,42 +200,231 @@
             "analyticsAllowed": 0
           },
           "reverification": null
+        },
+        {
+          "reviewer": "GPT-6.1 Sol (non-author; author Claude Opus 5.5)",
+          "model": "gpt-6.1-sol",
+          "reviewedAt": "2026-10-15T10:03:29.399809+00:00",
+          "reviewedGeneration": 28,
+          "transcript": ".reviews/f4-round4/reviews/batch-A.json",
+          "state": "/api/ 390 dark",
+          "viewport": [
+            390,
+            900
+          ],
+          "theme": "dark",
+          "screenshot": "/home/deck/.t3/userdata/blog-f4-round4-20261015/gen28-a1-api-relations/page-1-390-dark.png",
+          "screenshotSha256": "c09ba230a534369f39533a3601d703201960854fdbe263ac2a3dd535c16fb8de",
+          "verdict": "pass-with-minor-issues",
+          "findings": [
+            {
+              "severity": "low",
+              "issue": "長 inline code 已可換行且未見水平溢出，但仍會在 390px 寬度下於連字號處拆開，閱讀密度偏高。",
+              "evidence": "`x-ratelimit-limit`、`x-ratelimit-remaining`、`x-ratelimit-reset` 在手機版多行斷開，灰底片段貼近文字邊界。"
+            }
+          ]
+        },
+        {
+          "reviewer": "GPT-6.1 Sol (non-author; author Claude Opus 5.5)",
+          "model": "gpt-6.1-sol",
+          "reviewedAt": "2026-10-15T10:03:29.399809+00:00",
+          "reviewedGeneration": 28,
+          "transcript": ".reviews/f4-round4/reviews/batch-A.json",
+          "state": "/api/ 1280 light",
+          "viewport": [
+            1280,
+            900
+          ],
+          "theme": "light",
+          "screenshot": "/home/deck/.t3/userdata/blog-f4-round4-20261015/gen28-a1-api-relations/page-2-1280-light.png",
+          "screenshotSha256": "a6071e43ab4a54dbbcb9d05b94c1975ca8d55b0a1b48a588101d8a820cd466a4",
+          "verdict": "pass-with-minor-issues",
+          "findings": [
+            {
+              "severity": "low",
+              "issue": "右側頁面大綱中的 GET 路徑會在 token 中間換行，降低端點掃讀性。",
+              "evidence": "`GET /blogs/{slug}/articles` 顯示為 `artic`／`les`，`GET /blogs/{slug}/relations` 顯示為 `relat`／`ions`。"
+            }
+          ]
+        },
+        {
+          "reviewer": "GPT-6.1 Sol (non-author; author Claude Opus 5.5)",
+          "model": "gpt-6.1-sol",
+          "reviewedAt": "2026-10-15T10:49:37.343171+00:00",
+          "reviewedGeneration": 31,
+          "transcript": ".reviews/f4-round4/reviews/batch-G.json",
+          "state": "/api/ 1280 light（複查：右側大綱路徑斷行）",
+          "viewport": [
+            1280,
+            900
+          ],
+          "theme": "light",
+          "screenshot": "/home/deck/.t3/userdata/blog-f4-round4-20261015/gen31-g1-fixes/page-3-1280-light.png",
+          "screenshotSha256": "35633378e5a74014e44e80cec4f6b4e14876f229f12c710265d184aac779952d",
+          "verdict": "pass-with-minor-issues",
+          "findings": [
+            "右側大綱中的 GET /blogs/{slug}/articles 與 GET /blogs/{slug}/relations 仍在斜線後斷成兩行；內容可讀，但路徑掃讀性較差。"
+          ]
         }
       ],
       "deviationsAndReasons": "尚未完成當版逐頁對照，不以共用元件推定pass。 公開資料維持no-store是隱私要求，不跟tag恢復快取。",
       "fixCommit": null,
       "fixScope": null,
-      "reverification": []
+      "reverification": [],
+      "pendingStates": null
     },
     {
       "route": "/api/status/",
       "source": "web/src/app/api/status/page.tsx",
       "exampleUrl": "https://blog.observe.tw/api/status/",
-      "status": "pending",
+      "status": "pass-for-reviewed-states",
       "completeRouteAndStates": false,
-      "reviews": [],
+      "reviews": [
+        {
+          "reviewer": "GPT-6.1 Sol (non-author; author Claude Opus 5.5)",
+          "model": "gpt-6.1-sol",
+          "reviewedAt": "2026-10-15T10:16:44.071143+00:00",
+          "reviewedGeneration": 28,
+          "transcript": ".reviews/f4-round4/reviews/batch-C.json",
+          "state": "/api/status/ 1280 light",
+          "viewport": [
+            1280,
+            900
+          ],
+          "theme": "light",
+          "screenshot": "/home/deck/.t3/userdata/blog-f4-round4-20261015/gen28-b3-status-optout/page-1-1280-light.png",
+          "screenshotSha256": "b62b3ffac202c93b737430bed56d86978e5a63bcbc90879df9e01464f335cdef",
+          "verdict": "pass",
+          "findings": []
+        },
+        {
+          "reviewer": "GPT-6.1 Sol (non-author; author Claude Opus 5.5)",
+          "model": "gpt-6.1-sol",
+          "reviewedAt": "2026-10-15T10:16:44.071143+00:00",
+          "reviewedGeneration": 28,
+          "transcript": ".reviews/f4-round4/reviews/batch-C.json",
+          "state": "/api/status/ 390 dark",
+          "viewport": [
+            390,
+            900
+          ],
+          "theme": "dark",
+          "screenshot": "/home/deck/.t3/userdata/blog-f4-round4-20261015/gen28-b3-status-optout/page-2-390-dark.png",
+          "screenshotSha256": "8a17ff216c83941b6aab6366b112754da90547e6e1df1678c38993426ce23c18",
+          "verdict": "pass",
+          "findings": []
+        },
+        {
+          "reviewer": "GPT-6.1 Sol (non-author; author Claude Opus 5.5)",
+          "model": "gpt-6.1-sol",
+          "reviewedAt": "2026-10-15T10:49:37.343171+00:00",
+          "reviewedGeneration": 31,
+          "transcript": ".reviews/f4-round4/reviews/batch-G.json",
+          "state": "/api/status/ 1280 light（複查：靜態頁導覽含「技術」）",
+          "viewport": [
+            1280,
+            900
+          ],
+          "theme": "light",
+          "screenshot": "/home/deck/.t3/userdata/blog-f4-round4-20261015/gen31-g2-fixes/page-3-1280-light.png",
+          "screenshotSha256": "7b516e050c43b67f84bc3b0c26f2def84e9398f2950a477039fbc3cd987a38a5",
+          "verdict": "pass",
+          "findings": []
+        }
+      ],
       "deviationsAndReasons": "尚未完成當版逐頁對照，不以共用元件推定pass。 公開資料維持no-store是隱私要求，不跟tag恢復快取。",
       "fixCommit": null,
       "fixScope": null,
-      "reverification": []
+      "reverification": [],
+      "pendingStates": "依賴異常（degraded）狀態未截圖。"
     },
     {
       "route": "/articles/",
       "source": "web/src/app/articles/page.tsx",
       "exampleUrl": "https://blog.observe.tw/articles/",
-      "status": "pending",
-      "completeRouteAndStates": false,
-      "reviews": [],
+      "status": "complete",
+      "completeRouteAndStates": true,
+      "reviews": [
+        {
+          "reviewer": "GPT-6.1 Sol (non-author; author Claude Opus 5.5)",
+          "model": "gpt-6.1-sol",
+          "reviewedAt": "2026-10-15T10:12:22.113675+00:00",
+          "reviewedGeneration": 28,
+          "transcript": ".reviews/f4-round4/reviews/batch-B.json",
+          "state": "/articles/?q=蛤蜊絲瓜 搜尋有結果 1280 light",
+          "viewport": [
+            1280,
+            900
+          ],
+          "theme": "light",
+          "screenshot": "/home/deck/.t3/userdata/blog-f4-round4-20261015/gen28-b1-articles-search-empty/page-1-1280-light.png",
+          "screenshotSha256": "c8a542421ce25c2188e14728b41dd6935acf727e2fca32098022fb3ffb3b515d",
+          "verdict": "pass",
+          "findings": []
+        },
+        {
+          "reviewer": "GPT-6.1 Sol (non-author; author Claude Opus 5.5)",
+          "model": "gpt-6.1-sol",
+          "reviewedAt": "2026-10-15T10:12:22.113675+00:00",
+          "reviewedGeneration": 28,
+          "transcript": ".reviews/f4-round4/reviews/batch-B.json",
+          "state": "/articles/?q=蛤蜊絲瓜 搜尋有結果 390 dark",
+          "viewport": [
+            390,
+            900
+          ],
+          "theme": "dark",
+          "screenshot": "/home/deck/.t3/userdata/blog-f4-round4-20261015/gen28-b1-articles-search-empty/page-2-390-dark.png",
+          "screenshotSha256": "ef27aca6ade140234c665dcb3c7e9690b530ac1230bb4c73c085ceb720815811",
+          "verdict": "pass",
+          "findings": []
+        },
+        {
+          "reviewer": "GPT-6.1 Sol (non-author; author Claude Opus 5.5)",
+          "model": "gpt-6.1-sol",
+          "reviewedAt": "2026-10-15T10:12:22.113675+00:00",
+          "reviewedGeneration": 28,
+          "transcript": ".reviews/f4-round4/reviews/batch-B.json",
+          "state": "/articles/?q=查無結果 空狀態 1280 dark",
+          "viewport": [
+            1280,
+            900
+          ],
+          "theme": "dark",
+          "screenshot": "/home/deck/.t3/userdata/blog-f4-round4-20261015/gen28-b1-articles-search-empty/page-3-1280-dark.png",
+          "screenshotSha256": "3f6021cc5fb2b982cf305cbddb24438a20c78986ef83b1a5f442c38ba7f4de65",
+          "verdict": "pass",
+          "findings": []
+        },
+        {
+          "reviewer": "GPT-6.1 Sol (non-author; author Claude Opus 5.5)",
+          "model": "gpt-6.1-sol",
+          "reviewedAt": "2026-10-15T10:12:22.113675+00:00",
+          "reviewedGeneration": 28,
+          "transcript": ".reviews/f4-round4/reviews/batch-B.json",
+          "state": "/articles/?q=查無結果 空狀態 390 light",
+          "viewport": [
+            390,
+            900
+          ],
+          "theme": "light",
+          "screenshot": "/home/deck/.t3/userdata/blog-f4-round4-20261015/gen28-b1-articles-search-empty/page-4-390-light.png",
+          "screenshotSha256": "0f23d1fea378381cf91f2137f250905e1ac9c3478f7306a0a1c5e61b1f8c432a",
+          "verdict": "pass",
+          "findings": []
+        }
+      ],
       "deviationsAndReasons": "尚未完成當版逐頁對照，不以共用元件推定pass。 公開資料維持no-store是隱私要求，不跟tag恢復快取。",
       "fixCommit": null,
       "fixScope": null,
-      "reverification": []
+      "reverification": [],
+      "pendingStates": null
     },
     {
       "route": "/authors/",
       "source": "web/src/app/authors/page.tsx",
       "exampleUrl": "https://blog.observe.tw/authors/",
-      "status": "pending",
+      "status": "pass-for-reviewed-states",
       "completeRouteAndStates": false,
       "reviews": [
         {
@@ -344,6 +616,59 @@
           },
           "analyticsAllowed": 0,
           "guardFailures": 0
+        },
+        {
+          "reviewer": "GPT-6.1 Sol (non-author; author Claude Opus 5.5)",
+          "model": "gpt-6.1-sol",
+          "reviewedAt": "2026-10-15T10:12:22.113675+00:00",
+          "reviewedGeneration": 28,
+          "transcript": ".reviews/f4-round4/reviews/batch-B.json",
+          "state": "/authors/ 1280 dark",
+          "viewport": [
+            1280,
+            900
+          ],
+          "theme": "dark",
+          "screenshot": "/home/deck/.t3/userdata/blog-f4-round4-20261015/gen28-b2-authors-tags/page-1-1280-dark.png",
+          "screenshotSha256": "7609cd7c296e57a09d3533e9b44f7cc36a4a6bf143957ac7abdf1b4631bbea86",
+          "verdict": "pass",
+          "findings": []
+        },
+        {
+          "reviewer": "GPT-6.1 Sol (non-author; author Claude Opus 5.5)",
+          "model": "gpt-6.1-sol",
+          "reviewedAt": "2026-10-15T10:12:22.113675+00:00",
+          "reviewedGeneration": 28,
+          "transcript": ".reviews/f4-round4/reviews/batch-B.json",
+          "state": "/authors/ 390 light",
+          "viewport": [
+            390,
+            900
+          ],
+          "theme": "light",
+          "screenshot": "/home/deck/.t3/userdata/blog-f4-round4-20261015/gen28-b2-authors-tags/page-2-390-light.png",
+          "screenshotSha256": "4d818ac93fa71da9eb541de1e7e1e9ac2127a75339fb18eeea12afc3633902b0",
+          "verdict": "issues",
+          "findings": [
+            "作者表格第二欄的長部落格名稱在手機右側直接被裁切，未提供省略號、tooltip 或明顯水平捲動提示；Admin 與 Andrew Conkling 等列無法完整閱讀。"
+          ]
+        },
+        {
+          "reviewer": "GPT-6.1 Sol (non-author; author Claude Opus 5.5)",
+          "model": "gpt-6.1-sol",
+          "reviewedAt": "2026-10-15T10:49:37.343171+00:00",
+          "reviewedGeneration": 31,
+          "transcript": ".reviews/f4-round4/reviews/batch-G.json",
+          "state": "/authors/ 390 light（複查：長名稱截斷提示）",
+          "viewport": [
+            390,
+            900
+          ],
+          "theme": "light",
+          "screenshot": "/home/deck/.t3/userdata/blog-f4-round4-20261015/gen31-g1-fixes/page-4-390-light.png",
+          "screenshotSha256": "dc64464f154cc831561564b134c0e0c361c3259b50c2d2d776edf9e74b90b16b",
+          "verdict": "pass",
+          "findings": []
         }
       ],
       "deviationsAndReasons": "公開byline與站主分開，同名不跨站合併，表格/圖示沿tag。 公開資料維持no-store是隱私要求，不跟tag恢復快取。",
@@ -365,13 +690,14 @@
           "transcript": "/home/deck/.cache/blog-home-cloud-b3-20261014/.reviews/f4-round2/formal-gen22-batch2-mobile-review.json",
           "screenshot": "/home/deck/.t3/userdata/blog-f4-round2-20261015/formal-batch2-mobile-tables/page-2-390-light.png"
         }
-      ]
+      ],
+      "pendingStates": "?author= 篩選狀態未審。"
     },
     {
       "route": "/blogs/[slug]/",
       "source": "web/src/app/blogs/[slug]/page.tsx",
       "exampleUrl": "https://blog.observe.tw/blogs/carol-691/",
-      "status": "issues",
+      "status": "pass-for-reviewed-states",
       "completeRouteAndStates": false,
       "reviews": [
         {
@@ -513,6 +839,40 @@
           },
           "analyticsAllowed": 0,
           "guardFailures": 0
+        },
+        {
+          "reviewer": "GPT-6.1 Sol (non-author; author Claude Opus 5.5)",
+          "model": "gpt-6.1-sol",
+          "reviewedAt": "2026-10-15T10:36:27.739741+00:00",
+          "reviewedGeneration": 28,
+          "transcript": ".reviews/f4-round4/reviews/batch-D-retry.json",
+          "state": "/blogs/carol-691/ 部落格頁 1280 light",
+          "viewport": [
+            1280,
+            900
+          ],
+          "theme": "light",
+          "screenshot": "/home/deck/.t3/userdata/blog-f4-round4-20261015/gen28-b6-blogs-profile/page-3-1280-light.png",
+          "screenshotSha256": "77506e0f7f2a3f9a742cf6cb575f1bcba15b437a554f03634bc72ca19ab1af21",
+          "verdict": "pass",
+          "findings": []
+        },
+        {
+          "reviewer": "GPT-6.1 Sol (non-author; author Claude Opus 5.5)",
+          "model": "gpt-6.1-sol",
+          "reviewedAt": "2026-10-15T10:36:27.739741+00:00",
+          "reviewedGeneration": 28,
+          "transcript": ".reviews/f4-round4/reviews/batch-D-retry.json",
+          "state": "/blogs/carol-691/ 部落格頁 390 dark",
+          "viewport": [
+            390,
+            900
+          ],
+          "theme": "dark",
+          "screenshot": "/home/deck/.t3/userdata/blog-f4-round4-20261015/gen28-b6-blogs-profile/page-4-390-dark.png",
+          "screenshotSha256": "dde20a51f971dc4f4ce0515025d2f37323aa66bd16cecb60aad61534b6e61912",
+          "verdict": "pass",
+          "findings": []
         }
       ],
       "deviationsAndReasons": "站名與作者分開，sidebar保留正文取得狀態和技術證據，全文回原站。 公開資料維持no-store是隱私要求，不跟tag恢復快取。",
@@ -529,13 +889,14 @@
           "transcript": "/home/deck/.cache/blog-home-cloud-b3-20261014/.reviews/f4-round2/formal-gen22-four-page-review.json",
           "screenshot": "/home/deck/.t3/userdata/blog-f4-round2-20261015/formal-method-profile-new/page-4-390-dark.png"
         }
-      ]
+      ],
+      "pendingStates": "僅 carol-691；其他資料量（無正文、無技術、無關係）未審。"
     },
     {
       "route": "/blogs/",
       "source": "web/src/app/blogs/page.tsx",
       "exampleUrl": "https://blog.observe.tw/blogs/",
-      "status": "issues",
+      "status": "pass-for-reviewed-states",
       "completeRouteAndStates": false,
       "reviews": [
         {
@@ -733,6 +1094,83 @@
           },
           "analyticsAllowed": 0,
           "guardFailures": 0
+        },
+        {
+          "reviewer": "GPT-6.1 Sol (non-author; author Claude Opus 5.5)",
+          "model": "gpt-6.1-sol",
+          "reviewedAt": "2026-10-15T10:36:27.739741+00:00",
+          "reviewedGeneration": 28,
+          "transcript": ".reviews/f4-round4/reviews/batch-D-retry.json",
+          "state": "/blogs/ 1280 dark",
+          "viewport": [
+            1280,
+            900
+          ],
+          "theme": "dark",
+          "screenshot": "/home/deck/.t3/userdata/blog-f4-round4-20261015/gen28-b6-blogs-profile/page-1-1280-dark.png",
+          "screenshotSha256": "b9a53aeaab53d8d3e503825b4bb7f43801bc455ee8f15aa6aedd08aa0fa557fa",
+          "verdict": "pass",
+          "findings": []
+        },
+        {
+          "reviewer": "GPT-6.1 Sol (non-author; author Claude Opus 5.5)",
+          "model": "gpt-6.1-sol",
+          "reviewedAt": "2026-10-15T10:36:27.739741+00:00",
+          "reviewedGeneration": 28,
+          "transcript": ".reviews/f4-round4/reviews/batch-D-retry.json",
+          "state": "/blogs/ 390 light",
+          "viewport": [
+            390,
+            900
+          ],
+          "theme": "light",
+          "screenshot": "/home/deck/.t3/userdata/blog-f4-round4-20261015/gen28-b6-blogs-profile/page-2-390-light.png",
+          "screenshotSha256": "832c29f0319ef75a97419718b9647b687745bf153f4a81d1a38d9e5cf3a42888",
+          "verdict": "pass-with-minor-issues",
+          "findings": [
+            {
+              "severity": "low",
+              "issue": "手機部落格表格只露出部落格與分類欄，最新文章、抓取成功、狀態等欄位在右側不可見，且沒有明顯橫向捲動提示。",
+              "evidence": "390 版表格在分類欄後即離開視窗；長部落格名稱與網域也以省略號截斷，完整資料需自行猜測可橫向捲動。"
+            }
+          ]
+        },
+        {
+          "reviewer": "GPT-6.1 Sol (non-author; author Claude Opus 5.5)",
+          "model": "gpt-6.1-sol",
+          "reviewedAt": "2026-10-15T10:49:37.343171+00:00",
+          "reviewedGeneration": 31,
+          "transcript": ".reviews/f4-round4/reviews/batch-G.json",
+          "state": "/blogs/ 390 light（複查：表格橫捲提示）",
+          "viewport": [
+            390,
+            900
+          ],
+          "theme": "light",
+          "screenshot": "/home/deck/.t3/userdata/blog-f4-round4-20261015/gen31-g2-fixes/page-4-390-light.png",
+          "screenshotSha256": "d92d5ee8826a8d585329cf6cb0d9c6d43bfacf010652fd2f0db79a00cea31997",
+          "verdict": "pass",
+          "findings": []
+        },
+        {
+          "reviewer": "GPT-6.1 Sol (non-author; author Claude Opus 5.5)",
+          "model": "gpt-6.1-sol",
+          "reviewedAt": "2026-10-15T10:54:23.178921+00:00",
+          "reviewedGeneration": 32,
+          "transcript": ".reviews/f4-round4/reviews/batch-H.json",
+          "state": "/blogs/ 390 dark（複查：表格橫捲提示）",
+          "viewport": [
+            390,
+            900
+          ],
+          "theme": "dark",
+          "screenshot": "/home/deck/.t3/userdata/blog-f4-round4-20261015/gen32-g3-topic-mobile/page-4-390-dark.png",
+          "screenshotSha256": "3078fd9d00773d813c8e576e2db275dadb41b0d05734858a34ddf9f82c2af190",
+          "verdict": "pass-with-minor-issues",
+          "findings": [
+            "部落格清單首欄以省略號截斷，例如「[daily dose of im…」、「麥麗斯的夢遊日…」與「456 Berea Str…」，在手機首屏難以辨認完整名稱。",
+            "表格右上角的 › 圖示可作為橫捲提示，但沒有明確文字說明可左右滑動。"
+          ]
         }
       ],
       "deviationsAndReasons": "媒體目錄實體換成部落格；低頻不失效，表格與chips沿tag。 公開資料維持no-store是隱私要求，不跟tag恢復快取。",
@@ -754,51 +1192,160 @@
           "transcript": "/home/deck/.cache/blog-home-cloud-b3-20261014/.reviews/f4-round2/formal-gen22-batch2-mobile-review.json",
           "screenshot": "/home/deck/.t3/userdata/blog-f4-round2-20261015/formal-batch2-mobile-tables/page-1-390-light.png"
         }
-      ]
+      ],
+      "pendingStates": "篩選／排序狀態未審。"
     },
     {
       "route": "/login/",
       "source": "web/src/app/login/page.tsx",
       "exampleUrl": "https://blog.observe.tw/login/",
-      "status": "pending",
-      "completeRouteAndStates": false,
-      "reviews": [],
+      "status": "complete",
+      "completeRouteAndStates": true,
+      "reviews": [
+        {
+          "reviewer": "GPT-6.1 Sol (non-author; author Claude Opus 5.5)",
+          "model": "gpt-6.1-sol",
+          "reviewedAt": "2026-10-15T10:16:44.071143+00:00",
+          "reviewedGeneration": 28,
+          "transcript": ".reviews/f4-round4/reviews/batch-C.json",
+          "state": "/login/ 未登入 1280 light",
+          "viewport": [
+            1280,
+            900
+          ],
+          "theme": "light",
+          "screenshot": "/home/deck/.t3/userdata/blog-f4-round4-20261015/gen28-c1-private-loggedout-notfound/page-1-1280-light.png",
+          "screenshotSha256": "dce83f1fc897f89ed63eff09bd231f17cbd236f26eed0d5b8919ece7c18ab5f6",
+          "verdict": "pass",
+          "findings": []
+        },
+        {
+          "reviewer": "GPT-6.1 Sol (non-author; author Claude Opus 5.5)",
+          "model": "gpt-6.1-sol",
+          "reviewedAt": "2026-10-15T10:16:44.071143+00:00",
+          "reviewedGeneration": 28,
+          "transcript": ".reviews/f4-round4/reviews/batch-C.json",
+          "state": "/login/ 未登入 390 dark",
+          "viewport": [
+            390,
+            900
+          ],
+          "theme": "dark",
+          "screenshot": "/home/deck/.t3/userdata/blog-f4-round4-20261015/gen28-c1-private-loggedout-notfound/page-2-390-dark.png",
+          "screenshotSha256": "c2188f99bf4b1119e0ecd9f528b164b503ef0e7160436a1fcb7f5b3f238c88eb",
+          "verdict": "pass",
+          "findings": []
+        }
+      ],
       "missingReason": "Capture guard forbids private/auth routes; no account or permission created. Existing authorized account or manual verification needed.",
       "deviationsAndReasons": "尚未完成當版逐頁對照，不以共用元件推定pass。 公開資料維持no-store是隱私要求，不跟tag恢復快取。",
       "fixCommit": null,
       "fixScope": null,
-      "reverification": []
+      "reverification": [],
+      "pendingStates": null
     },
     {
       "route": "/my/",
       "source": "web/src/app/my/page.tsx",
       "exampleUrl": "https://blog.observe.tw/my/",
-      "status": "pending",
+      "status": "pass-for-reviewed-states",
       "completeRouteAndStates": false,
-      "reviews": [],
+      "reviews": [
+        {
+          "reviewer": "GPT-6.1 Sol (non-author; author Claude Opus 5.5)",
+          "model": "gpt-6.1-sol",
+          "reviewedAt": "2026-10-15T10:16:44.071143+00:00",
+          "reviewedGeneration": 28,
+          "transcript": ".reviews/f4-round4/reviews/batch-C.json",
+          "state": "/my/ 未登入 1280 dark",
+          "viewport": [
+            1280,
+            900
+          ],
+          "theme": "dark",
+          "screenshot": "/home/deck/.t3/userdata/blog-f4-round4-20261015/gen28-c1-private-loggedout-notfound/page-3-1280-dark.png",
+          "screenshotSha256": "668c1286e8e74142b65959c9bef5dd828b72364cdc07415912849a11da2047b4",
+          "verdict": "pass",
+          "findings": []
+        },
+        {
+          "reviewer": "GPT-6.1 Sol (non-author; author Claude Opus 5.5)",
+          "model": "gpt-6.1-sol",
+          "reviewedAt": "2026-10-15T10:16:44.071143+00:00",
+          "reviewedGeneration": 28,
+          "transcript": ".reviews/f4-round4/reviews/batch-C.json",
+          "state": "/my/ 未登入 390 light",
+          "viewport": [
+            390,
+            900
+          ],
+          "theme": "light",
+          "screenshot": "/home/deck/.t3/userdata/blog-f4-round4-20261015/gen28-c1-private-loggedout-notfound/page-4-390-light.png",
+          "screenshotSha256": "f74460ac427ac183d730fa17cc931530800c2e1b74095c0f975fdacb969433f4",
+          "verdict": "pass",
+          "findings": []
+        }
+      ],
       "missingReason": "Capture guard forbids private/auth routes; no account or permission created. Existing authorized account or manual verification needed.",
       "deviationsAndReasons": "尚未完成當版逐頁對照，不以共用元件推定pass。 公開資料維持no-store是隱私要求，不跟tag恢復快取。",
       "fixCommit": null,
       "fixScope": null,
-      "reverification": []
+      "reverification": [],
+      "pendingStates": "僅審查未登入；登入後追蹤清單需真人 Google 登入。"
     },
     {
       "route": "/observe/opt-out/",
       "source": "web/src/app/observe/opt-out/page.tsx",
       "exampleUrl": "https://blog.observe.tw/observe/opt-out/",
-      "status": "pending",
+      "status": "pass-for-reviewed-states",
       "completeRouteAndStates": false,
-      "reviews": [],
+      "reviews": [
+        {
+          "reviewer": "GPT-6.1 Sol (non-author; author Claude Opus 5.5)",
+          "model": "gpt-6.1-sol",
+          "reviewedAt": "2026-10-15T10:16:44.071143+00:00",
+          "reviewedGeneration": 28,
+          "transcript": ".reviews/f4-round4/reviews/batch-C.json",
+          "state": "/observe/opt-out/ 1280 dark",
+          "viewport": [
+            1280,
+            900
+          ],
+          "theme": "dark",
+          "screenshot": "/home/deck/.t3/userdata/blog-f4-round4-20261015/gen28-b3-status-optout/page-3-1280-dark.png",
+          "screenshotSha256": "10ad73af17fa16410d7cf9734691e52c6d96bb718878b0f6380d84b82e747e91",
+          "verdict": "pass",
+          "findings": []
+        },
+        {
+          "reviewer": "GPT-6.1 Sol (non-author; author Claude Opus 5.5)",
+          "model": "gpt-6.1-sol",
+          "reviewedAt": "2026-10-15T10:16:44.071143+00:00",
+          "reviewedGeneration": 28,
+          "transcript": ".reviews/f4-round4/reviews/batch-C.json",
+          "state": "/observe/opt-out/ 390 light",
+          "viewport": [
+            390,
+            900
+          ],
+          "theme": "light",
+          "screenshot": "/home/deck/.t3/userdata/blog-f4-round4-20261015/gen28-b3-status-optout/page-4-390-light.png",
+          "screenshotSha256": "f478b65b3f344bbfe058604734b41067d9b1f8756546ef9e244af4f7b48acaa6",
+          "verdict": "pass",
+          "findings": []
+        }
+      ],
       "deviationsAndReasons": "尚未完成當版逐頁對照，不以共用元件推定pass。 公開資料維持no-store是隱私要求，不跟tag恢復快取。",
       "fixCommit": null,
       "fixScope": null,
-      "reverification": []
+      "reverification": [],
+      "pendingStates": "切換後狀態未審。"
     },
     {
       "route": "/",
       "source": "web/src/app/page.tsx",
       "exampleUrl": "https://blog.observe.tw/",
-      "status": "pending",
+      "status": "pass-for-reviewed-states",
       "completeRouteAndStates": false,
       "reviews": [
         {
@@ -864,19 +1411,54 @@
           },
           "analyticsAllowed": 0,
           "guardFailures": 0
+        },
+        {
+          "reviewer": "GPT-6.1 Sol (non-author; author Claude Opus 5.5)",
+          "model": "gpt-6.1-sol",
+          "reviewedAt": "2026-10-15T10:03:29.399809+00:00",
+          "reviewedGeneration": 28,
+          "transcript": ".reviews/f4-round4/reviews/batch-A.json",
+          "state": "/ 1280 light",
+          "viewport": [
+            1280,
+            900
+          ],
+          "theme": "light",
+          "screenshot": "/home/deck/.t3/userdata/blog-f4-round4-20261015/gen28-a2-home-tech/page-1-1280-light.png",
+          "screenshotSha256": "d5eede8806f427b79c1a22d24e1812f1d3018ee39ce195794c352b6b3c6bc34f",
+          "verdict": "pass",
+          "findings": []
+        },
+        {
+          "reviewer": "GPT-6.1 Sol (non-author; author Claude Opus 5.5)",
+          "model": "gpt-6.1-sol",
+          "reviewedAt": "2026-10-15T10:03:29.399809+00:00",
+          "reviewedGeneration": 28,
+          "transcript": ".reviews/f4-round4/reviews/batch-A.json",
+          "state": "/ 390 dark",
+          "viewport": [
+            390,
+            900
+          ],
+          "theme": "dark",
+          "screenshot": "/home/deck/.t3/userdata/blog-f4-round4-20261015/gen28-a2-home-tech/page-2-390-dark.png",
+          "screenshotSha256": "602b04d6f4389583fa7bc4433fd98dc4311b88d631563568ebd7cd5352e3a06a",
+          "verdict": "pass",
+          "findings": []
         }
       ],
       "deviationsAndReasons": "品牌綠色、部落格正文引用取代新聞焦點；首頁三欄與tag token沿用。 公開資料維持no-store是隱私要求，不跟tag恢復快取。",
       "fixCommit": null,
       "fixScope": null,
-      "reverification": []
+      "reverification": [],
+      "pendingStates": "首頁正文引用降級（statement-timeout 時顯示暫時無法取得）狀態未截圖審查；選單展開互動未驗。"
     },
     {
       "route": "/ranking/",
       "source": "web/src/app/ranking/page.tsx",
       "exampleUrl": "https://blog.observe.tw/ranking/",
-      "status": "issues",
-      "completeRouteAndStates": false,
+      "status": "complete",
+      "completeRouteAndStates": true,
       "reviews": [
         {
           "phase": "formal",
@@ -1067,6 +1649,63 @@
           },
           "analyticsAllowed": 0,
           "guardFailures": 0
+        },
+        {
+          "reviewer": "GPT-6.1 Sol (non-author; author Claude Opus 5.5)",
+          "model": "gpt-6.1-sol",
+          "reviewedAt": "2026-10-15T10:22:41.135272+00:00",
+          "reviewedGeneration": 28,
+          "transcript": ".reviews/f4-round4/reviews/batch-E.json",
+          "state": "/ranking/ 1280 dark",
+          "viewport": [
+            1280,
+            900
+          ],
+          "theme": "dark",
+          "screenshot": "/home/deck/.t3/userdata/blog-f4-round4-20261015/gen28-b7-traffic-ranking/page-3-1280-dark.png",
+          "screenshotSha256": "880fd72e14e728fcb8326c626ec4795cff8c1e1f8a268b7339a3390b32949fa3",
+          "verdict": "pass-with-minor-issues",
+          "findings": [
+            {
+              "severity": "low",
+              "issue": "桌面主導覽沒有清楚標示目前的「標籤」區段。",
+              "evidence": "截圖頂部「標籤」與其他未選項同色；相較之下 /traffic/ 的「流量」有綠色 active 底色。"
+            }
+          ]
+        },
+        {
+          "reviewer": "GPT-6.1 Sol (non-author; author Claude Opus 5.5)",
+          "model": "gpt-6.1-sol",
+          "reviewedAt": "2026-10-15T10:22:41.135272+00:00",
+          "reviewedGeneration": 28,
+          "transcript": ".reviews/f4-round4/reviews/batch-E.json",
+          "state": "/ranking/ 390 light",
+          "viewport": [
+            390,
+            900
+          ],
+          "theme": "light",
+          "screenshot": "/home/deck/.t3/userdata/blog-f4-round4-20261015/gen28-b7-traffic-ranking/page-4-390-light.png",
+          "screenshotSha256": "8bec0fd8fd231fe9ae78e3c7491b1c15b482a28fd1eda447ce2058ea20547d56",
+          "verdict": "pass",
+          "findings": []
+        },
+        {
+          "reviewer": "GPT-6.1 Sol (non-author; author Claude Opus 5.5)",
+          "model": "gpt-6.1-sol",
+          "reviewedAt": "2026-10-15T10:49:37.343171+00:00",
+          "reviewedGeneration": 31,
+          "transcript": ".reviews/f4-round4/reviews/batch-G.json",
+          "state": "/ranking/ 1280 dark（複查：主導覽 active）",
+          "viewport": [
+            1280,
+            900
+          ],
+          "theme": "dark",
+          "screenshot": "/home/deck/.t3/userdata/blog-f4-round4-20261015/gen31-g2-fixes/page-2-1280-dark.png",
+          "screenshotSha256": "4777cd1731b5939210e6f9e77a537603412d6f7af831fb26f21a66c432eff7a2",
+          "verdict": "pass",
+          "findings": []
         }
       ],
       "deviationsAndReasons": "原始標籤收錄站數/篇數，非新聞熱度；來源品質規則與共同話題分開。 公開資料維持no-store是隱私要求，不跟tag恢復快取。",
@@ -1088,14 +1727,15 @@
           "transcript": "/home/deck/.cache/blog-home-cloud-b3-20261014/.reviews/f4-round2/formal-gen22-batch2-mobile-review.json",
           "screenshot": "/home/deck/.t3/userdata/blog-f4-round2-20261015/formal-batch2-mobile-tables/page-4-390-light.png"
         }
-      ]
+      ],
+      "pendingStates": null
     },
     {
       "route": "/relations/",
       "source": "web/src/app/relations/page.tsx",
       "exampleUrl": "https://blog.observe.tw/relations/",
-      "status": "pending",
-      "completeRouteAndStates": false,
+      "status": "complete",
+      "completeRouteAndStates": true,
       "reviews": [
         {
           "phase": "formal",
@@ -1204,6 +1844,103 @@
             "analyticsAllowed": 0
           },
           "reverification": null
+        },
+        {
+          "reviewer": "GPT-6.1 Sol (non-author; author Claude Opus 5.5)",
+          "model": "gpt-6.1-sol",
+          "reviewedAt": "2026-10-15T10:03:29.399809+00:00",
+          "reviewedGeneration": 28,
+          "transcript": ".reviews/f4-round4/reviews/batch-A.json",
+          "state": "/relations/ 390 dark",
+          "viewport": [
+            390,
+            900
+          ],
+          "theme": "dark",
+          "screenshot": "/home/deck/.t3/userdata/blog-f4-round4-20261015/gen28-a1-api-relations/page-3-390-dark.png",
+          "screenshotSha256": "35f3aaa690d7c3f2ba1040aba7fcf592ef590729ade7c314421669a364a41151",
+          "verdict": "issues",
+          "findings": [
+            {
+              "severity": "medium",
+              "issue": "手機關係圖節點文字仍偏小，且部分名稱在圖卡邊界被截斷。",
+              "evidence": "右側 `YangBear...` 節點名稱貼近並超出卡片邊界；其他節點標籤約 12px，在深色圖面與連線交疊下辨識負擔高。"
+            }
+          ]
+        },
+        {
+          "reviewer": "GPT-6.1 Sol (non-author; author Claude Opus 5.5)",
+          "model": "gpt-6.1-sol",
+          "reviewedAt": "2026-10-15T10:03:29.399809+00:00",
+          "reviewedGeneration": 28,
+          "transcript": ".reviews/f4-round4/reviews/batch-A.json",
+          "state": "/relations/ 1280 light",
+          "viewport": [
+            1280,
+            900
+          ],
+          "theme": "light",
+          "screenshot": "/home/deck/.t3/userdata/blog-f4-round4-20261015/gen28-a1-api-relations/page-4-1280-light.png",
+          "screenshotSha256": "451a244b7323b00d8ad152c61ebe7197f959ceb163541d4687a1deaa02c9e237",
+          "verdict": "pass",
+          "findings": []
+        },
+        {
+          "reviewer": "GPT-6.1 Sol (non-author; author Claude Opus 5.5)",
+          "model": "gpt-6.1-sol",
+          "reviewedAt": "2026-10-15T10:22:41.135272+00:00",
+          "reviewedGeneration": 28,
+          "transcript": ".reviews/f4-round4/reviews/batch-E.json",
+          "state": "/relations/?days=7 期間切換 390 light",
+          "viewport": [
+            390,
+            900
+          ],
+          "theme": "light",
+          "screenshot": "/home/deck/.t3/userdata/blog-f4-round4-20261015/gen28-b9-about-topics-mobile/page-4-390-light.png",
+          "screenshotSha256": "0524dc66f0c60181a6ad0f640f7e6394b9671128b4ffa412655ee4dd6a52e4c3",
+          "verdict": "issues",
+          "findings": [
+            {
+              "severity": "medium",
+              "issue": "關係圖在窄版的右側安全邊界不足，節點、連線與標籤有邊界裁切風險。",
+              "evidence": "YangBear 節點與連線貼近卡片右緣，右側留白明顯少於其他方向；依提供說明，gen28 尚未包含手機關係圖邊界裁切修正。"
+            }
+          ]
+        },
+        {
+          "reviewer": "GPT-6.1 Sol (non-author; author Claude Opus 5.5)",
+          "model": "gpt-6.1-sol",
+          "reviewedAt": "2026-10-15T10:49:37.343171+00:00",
+          "reviewedGeneration": 31,
+          "transcript": ".reviews/f4-round4/reviews/batch-G.json",
+          "state": "/relations/ 390 dark（複查：節點邊界裁切）",
+          "viewport": [
+            390,
+            900
+          ],
+          "theme": "dark",
+          "screenshot": "/home/deck/.t3/userdata/blog-f4-round4-20261015/gen31-g1-fixes/page-1-390-dark.png",
+          "screenshotSha256": "2bfe37c8bda50e4befabcf61e1a0c0e4515f30d293518fd8ea564291a2ce5106",
+          "verdict": "pass",
+          "findings": []
+        },
+        {
+          "reviewer": "GPT-6.1 Sol (non-author; author Claude Opus 5.5)",
+          "model": "gpt-6.1-sol",
+          "reviewedAt": "2026-10-15T10:49:37.343171+00:00",
+          "reviewedGeneration": 31,
+          "transcript": ".reviews/f4-round4/reviews/batch-G.json",
+          "state": "/relations/?days=7 390 light（複查）",
+          "viewport": [
+            390,
+            900
+          ],
+          "theme": "light",
+          "screenshot": "/home/deck/.t3/userdata/blog-f4-round4-20261015/gen31-g1-fixes/page-2-390-light.png",
+          "screenshotSha256": "a94805d707153208db0658a239109362cef0e9618bfc2fa3cfb1b45e5bb07eab",
+          "verdict": "pass",
+          "findings": []
         }
       ],
       "deviationsAndReasons": "直接引用、共同標籤、文字相似分開；不作抄襲判定。 公開資料維持no-store是隱私要求，不跟tag恢復快取。",
@@ -1220,25 +1957,62 @@
           "transcript": "/home/deck/.cache/blog-home-cloud-b3-20261014/.reviews/f4-round2/formal-gen22-four-page-review.json",
           "screenshot": "/home/deck/.t3/userdata/blog-f4-round2-20261015/formal-method-profile-new/page-2-390-light.png"
         }
-      ]
+      ],
+      "pendingStates": null
     },
     {
       "route": "/tags/",
       "source": "web/src/app/tags/page.tsx",
       "exampleUrl": "https://blog.observe.tw/tags/",
-      "status": "pending",
+      "status": "pass-for-reviewed-states",
       "completeRouteAndStates": false,
-      "reviews": [],
+      "reviews": [
+        {
+          "reviewer": "GPT-6.1 Sol (non-author; author Claude Opus 5.5)",
+          "model": "gpt-6.1-sol",
+          "reviewedAt": "2026-10-15T10:12:22.113675+00:00",
+          "reviewedGeneration": 28,
+          "transcript": ".reviews/f4-round4/reviews/batch-B.json",
+          "state": "/tags/ 1280 light",
+          "viewport": [
+            1280,
+            900
+          ],
+          "theme": "light",
+          "screenshot": "/home/deck/.t3/userdata/blog-f4-round4-20261015/gen28-b2-authors-tags/page-3-1280-light.png",
+          "screenshotSha256": "858c9d352f4e9d10d68207625784741feba489a5640bba5a0a53a4c8d5ca0e48",
+          "verdict": "pass",
+          "findings": []
+        },
+        {
+          "reviewer": "GPT-6.1 Sol (non-author; author Claude Opus 5.5)",
+          "model": "gpt-6.1-sol",
+          "reviewedAt": "2026-10-15T10:12:22.113675+00:00",
+          "reviewedGeneration": 28,
+          "transcript": ".reviews/f4-round4/reviews/batch-B.json",
+          "state": "/tags/ 390 dark",
+          "viewport": [
+            390,
+            900
+          ],
+          "theme": "dark",
+          "screenshot": "/home/deck/.t3/userdata/blog-f4-round4-20261015/gen28-b2-authors-tags/page-4-390-dark.png",
+          "screenshotSha256": "4395f0585f45d0396b3ccfc70354be903cf7d91b41f0014be9e0b759220b0a97",
+          "verdict": "pass",
+          "findings": []
+        }
+      ],
       "deviationsAndReasons": "尚未完成當版逐頁對照，不以共用元件推定pass。 公開資料維持no-store是隱私要求，不跟tag恢復快取。",
       "fixCommit": null,
       "fixScope": null,
-      "reverification": []
+      "reverification": [],
+      "pendingStates": "標籤搜尋／篩選狀態未審。"
     },
     {
       "route": "/tech/",
       "source": "web/src/app/tech/page.tsx",
       "exampleUrl": "https://blog.observe.tw/tech/",
-      "status": "pending",
+      "status": "pass-for-reviewed-states",
       "completeRouteAndStates": false,
       "reviews": [
         {
@@ -1650,6 +2424,40 @@
           },
           "analyticsAllowed": 0,
           "guardFailures": 0
+        },
+        {
+          "reviewer": "GPT-6.1 Sol (non-author; author Claude Opus 5.5)",
+          "model": "gpt-6.1-sol",
+          "reviewedAt": "2026-10-15T10:03:29.399809+00:00",
+          "reviewedGeneration": 28,
+          "transcript": ".reviews/f4-round4/reviews/batch-A.json",
+          "state": "/tech/ 1280 dark",
+          "viewport": [
+            1280,
+            900
+          ],
+          "theme": "dark",
+          "screenshot": "/home/deck/.t3/userdata/blog-f4-round4-20261015/gen28-a2-home-tech/page-3-1280-dark.png",
+          "screenshotSha256": "0ae39074c45c764d255b6c38e3e7a8d5c2d10af19f7b1eb792f1b2ed74ff92b9",
+          "verdict": "pass",
+          "findings": []
+        },
+        {
+          "reviewer": "GPT-6.1 Sol (non-author; author Claude Opus 5.5)",
+          "model": "gpt-6.1-sol",
+          "reviewedAt": "2026-10-15T10:03:29.399809+00:00",
+          "reviewedGeneration": 28,
+          "transcript": ".reviews/f4-round4/reviews/batch-A.json",
+          "state": "/tech/ 390 light",
+          "viewport": [
+            390,
+            900
+          ],
+          "theme": "light",
+          "screenshot": "/home/deck/.t3/userdata/blog-f4-round4-20261015/gen28-a2-home-tech/page-4-390-light.png",
+          "screenshotSha256": "d7992ae08b4ca465ccdf3962c9dad4ff3f2c1e149b165de23d4a6593f6e70f86",
+          "verdict": "pass",
+          "findings": []
         }
       ],
       "deviationsAndReasons": "被動技術觀測無新聞流量月份口徑；CMS與低信心主機/CDN分開，卡片與表格沿tag。 公開資料維持no-store是隱私要求，不跟tag恢復快取。",
@@ -1666,26 +2474,103 @@
           "transcript": "/home/deck/.cache/blog-home-cloud-b3-20261014/.reviews/f4-round2/formal-gen22-four-page-review.json",
           "screenshot": "/home/deck/.t3/userdata/blog-f4-round2-20261015/formal-tables-new/page-4-390-dark.png"
         }
-      ]
+      ],
+      "pendingStates": "篩選／分頁狀態未審。"
     },
     {
       "route": "/topics/[id]/",
       "source": "web/src/app/topics/[id]/page.tsx",
       "exampleUrl": "https://blog.observe.tw/topics/%E6%9F%AF%E6%96%87%E5%93%B2/",
-      "status": "pending",
+      "status": "pass-for-reviewed-states",
       "completeRouteAndStates": false,
-      "reviews": [],
+      "reviews": [
+        {
+          "reviewer": "GPT-6.1 Sol (non-author; author Claude Opus 5.5)",
+          "model": "gpt-6.1-sol",
+          "reviewedAt": "2026-10-15T10:36:27.739741+00:00",
+          "reviewedGeneration": 28,
+          "transcript": ".reviews/f4-round4/reviews/batch-D-retry.json",
+          "state": "/topics/美食/ 話題頁 1280 light",
+          "viewport": [
+            1280,
+            900
+          ],
+          "theme": "light",
+          "screenshot": "/home/deck/.t3/userdata/blog-f4-round4-20261015/gen28-b5-topic-detail-period/page-1-1280-light.png",
+          "screenshotSha256": "6826a253ca8b1f409d0dd96b52ac5055a6ced59b5390a1348fdbd2c9e8e87ab4",
+          "verdict": "pass",
+          "findings": []
+        },
+        {
+          "reviewer": "GPT-6.1 Sol (non-author; author Claude Opus 5.5)",
+          "model": "gpt-6.1-sol",
+          "reviewedAt": "2026-10-15T10:36:27.739741+00:00",
+          "reviewedGeneration": 28,
+          "transcript": ".reviews/f4-round4/reviews/batch-D-retry.json",
+          "state": "/topics/美食/ 話題頁 390 dark",
+          "viewport": [
+            390,
+            900
+          ],
+          "theme": "dark",
+          "screenshot": "/home/deck/.t3/userdata/blog-f4-round4-20261015/gen28-b5-topic-detail-period/page-2-390-dark.png",
+          "screenshotSha256": "246e85aae971d94d9bf31ca51a1125499d208ddfae19bc65ae67565b3357f4ef",
+          "verdict": "issues",
+          "findings": [
+            {
+              "severity": "medium",
+              "issue": "桌面版的「哪些部落格在寫」在手機版完全消失，沒有折疊區塊、入口或替代導覽。",
+              "evidence": "1280 版左側有部落格清單；390 版說明文字後直接進入「相關文章」，主題相關部落格清單在手機不可達。"
+            }
+          ]
+        },
+        {
+          "reviewer": "GPT-6.1 Sol (non-author; author Claude Opus 5.5)",
+          "model": "gpt-6.1-sol",
+          "reviewedAt": "2026-10-15T10:54:23.178921+00:00",
+          "reviewedGeneration": 32,
+          "transcript": ".reviews/f4-round4/reviews/batch-H.json",
+          "state": "/topics/美食/ 390 dark（複查：手機「哪些部落格在寫」入口）",
+          "viewport": [
+            390,
+            900
+          ],
+          "theme": "dark",
+          "screenshot": "/home/deck/.t3/userdata/blog-f4-round4-20261015/gen32-g3-topic-mobile/page-1-390-dark.png",
+          "screenshotSha256": "ca9a9ab36ec368d34a682b2c41be4fccf9ffbcef896d171dc8aa1c4b947b33e9",
+          "verdict": "pass",
+          "findings": []
+        },
+        {
+          "reviewer": "GPT-6.1 Sol (non-author; author Claude Opus 5.5)",
+          "model": "gpt-6.1-sol",
+          "reviewedAt": "2026-10-15T10:54:23.178921+00:00",
+          "reviewedGeneration": 32,
+          "transcript": ".reviews/f4-round4/reviews/batch-H.json",
+          "state": "/topics/美食/ 390 light",
+          "viewport": [
+            390,
+            900
+          ],
+          "theme": "light",
+          "screenshot": "/home/deck/.t3/userdata/blog-f4-round4-20261015/gen32-g3-topic-mobile/page-2-390-light.png",
+          "screenshotSha256": "0c59908d0450265069bdc726003b5223f5e48f4c013d8d5268243c4de2ff2109",
+          "verdict": "pass",
+          "findings": []
+        }
+      ],
       "deviationsAndReasons": "尚未完成當版逐頁對照，不以共用元件推定pass。 公開資料維持no-store是隱私要求，不跟tag恢復快取。",
       "fixCommit": null,
       "fixScope": null,
-      "reverification": []
+      "reverification": [],
+      "pendingStates": "歷史模式與證據撤銷（gone）狀態未截圖；資料由同一元件與單元測試覆蓋，非截圖證據。"
     },
     {
       "route": "/topics/",
       "source": "web/src/app/topics/page.tsx",
       "exampleUrl": "https://blog.observe.tw/topics/",
-      "status": "issues",
-      "completeRouteAndStates": false,
+      "status": "complete",
+      "completeRouteAndStates": true,
       "reviews": [
         {
           "phase": "formal",
@@ -1980,6 +2865,106 @@
             "analyticsAllowed": 0
           },
           "reverification": null
+        },
+        {
+          "reviewer": "GPT-6.1 Sol (non-author; author Claude Opus 5.5)",
+          "model": "gpt-6.1-sol",
+          "reviewedAt": "2026-10-15T10:36:27.739741+00:00",
+          "reviewedGeneration": 28,
+          "transcript": ".reviews/f4-round4/reviews/batch-D-retry.json",
+          "state": "/topics/?days=7 期間切換 1280 dark",
+          "viewport": [
+            1280,
+            900
+          ],
+          "theme": "dark",
+          "screenshot": "/home/deck/.t3/userdata/blog-f4-round4-20261015/gen28-b5-topic-detail-period/page-3-1280-dark.png",
+          "screenshotSha256": "b7b85debdc4d331c7de59e38a749e331eabe6aafdc4e9b3307ed392002f32584",
+          "verdict": "pass",
+          "findings": []
+        },
+        {
+          "reviewer": "GPT-6.1 Sol (non-author; author Claude Opus 5.5)",
+          "model": "gpt-6.1-sol",
+          "reviewedAt": "2026-10-15T10:36:27.739741+00:00",
+          "reviewedGeneration": 28,
+          "transcript": ".reviews/f4-round4/reviews/batch-D-retry.json",
+          "state": "/topics/?days=7 期間切換 390 light",
+          "viewport": [
+            390,
+            900
+          ],
+          "theme": "light",
+          "screenshot": "/home/deck/.t3/userdata/blog-f4-round4-20261015/gen28-b5-topic-detail-period/page-4-390-light.png",
+          "screenshotSha256": "744e64e4dd2f4afb6bbc54fcb3bd8622bbcba11db69115911a010769cc480ba9",
+          "verdict": "pass-with-minor-issues",
+          "findings": [
+            {
+              "severity": "low",
+              "issue": "表格寬度超過手機視窗，右側標題／正文等欄位在畫面邊界被截斷，未提供明顯的橫向捲動提示。",
+              "evidence": "390 版只完整看見話題、來源、部落格、文章，標題欄從右側開始被裁切；多筆 `x / 0` 數值只顯示一部分。"
+            }
+          ]
+        },
+        {
+          "reviewer": "GPT-6.1 Sol (non-author; author Claude Opus 5.5)",
+          "model": "gpt-6.1-sol",
+          "reviewedAt": "2026-10-15T10:22:41.135272+00:00",
+          "reviewedGeneration": 28,
+          "transcript": ".reviews/f4-round4/reviews/batch-E.json",
+          "state": "/topics/ 390 dark",
+          "viewport": [
+            390,
+            900
+          ],
+          "theme": "dark",
+          "screenshot": "/home/deck/.t3/userdata/blog-f4-round4-20261015/gen28-b9-about-topics-mobile/page-3-390-dark.png",
+          "screenshotSha256": "9cdf04a5bad6dbcc26ba76ca7d91bdc0486abdd09834da6877fe1ab95f8c8f89",
+          "verdict": "issues",
+          "findings": [
+            {
+              "severity": "medium",
+              "issue": "話題統計表右側標題與數值在手機寬度內被截斷，沒有明顯的水平捲動提示或替代呈現。",
+              "evidence": "「標題／僅正文」標頭顯示省略號；「美食」「新竹」等列右側只露出「366 / 0 只計…」「21 / 36…」，完整欄位與數字難以讀取。"
+            }
+          ]
+        },
+        {
+          "reviewer": "GPT-6.1 Sol (non-author; author Claude Opus 5.5)",
+          "model": "gpt-6.1-sol",
+          "reviewedAt": "2026-10-15T10:49:37.343171+00:00",
+          "reviewedGeneration": 31,
+          "transcript": ".reviews/f4-round4/reviews/batch-G.json",
+          "state": "/topics/ 390 dark（複查：表格橫捲提示）",
+          "viewport": [
+            390,
+            900
+          ],
+          "theme": "dark",
+          "screenshot": "/home/deck/.t3/userdata/blog-f4-round4-20261015/gen31-g2-fixes/page-1-390-dark.png",
+          "screenshotSha256": "0e166d13ac32a5df4b53711c537050fd137e372730ccad3ecfa48674b6139095",
+          "verdict": "pass",
+          "findings": []
+        },
+        {
+          "reviewer": "GPT-6.1 Sol (non-author; author Claude Opus 5.5)",
+          "model": "gpt-6.1-sol",
+          "reviewedAt": "2026-10-15T10:54:23.178921+00:00",
+          "reviewedGeneration": 32,
+          "transcript": ".reviews/f4-round4/reviews/batch-H.json",
+          "state": "/topics/?days=7 390 light（複查：表格橫捲提示）",
+          "viewport": [
+            390,
+            900
+          ],
+          "theme": "light",
+          "screenshot": "/home/deck/.t3/userdata/blog-f4-round4-20261015/gen32-g3-topic-mobile/page-3-390-light.png",
+          "screenshotSha256": "d6cb901f74599134ad99882d8d78b5e2d10f6324d9eabfcb75124f13ad657e0e",
+          "verdict": "pass-with-minor-issues",
+          "findings": [
+            "表格右側內容在 390px 首屏被截斷，最右的「標題」欄及數值需要水平捲動才能完整閱讀。",
+            "右上角僅有單一 › 圖示作為橫捲提示，沒有文字或漸層輔助，首次使用者可能不易理解可左右滑動。"
+          ]
         }
       ],
       "deviationsAndReasons": "部落格7/30/90天、同站權重遞減；共用表格與method notes。 公開資料維持no-store是隱私要求，不跟tag恢復快取。",
@@ -1996,13 +2981,14 @@
           "transcript": "/home/deck/.cache/blog-home-cloud-b3-20261014/.reviews/f4-round2/formal-gen22-four-page-review.json",
           "screenshot": "/home/deck/.t3/userdata/blog-f4-round2-20261015/formal-tables-new/page-2-390-light.png"
         }
-      ]
+      ],
+      "pendingStates": null
     },
     {
       "route": "/traffic/",
       "source": "web/src/app/traffic/page.tsx",
       "exampleUrl": "https://blog.observe.tw/traffic/",
-      "status": "pending",
+      "status": "pass-for-reviewed-states",
       "completeRouteAndStates": false,
       "reviews": [
         {
@@ -2204,6 +3190,40 @@
           },
           "analyticsAllowed": 0,
           "guardFailures": 0
+        },
+        {
+          "reviewer": "GPT-6.1 Sol (non-author; author Claude Opus 5.5)",
+          "model": "gpt-6.1-sol",
+          "reviewedAt": "2026-10-15T10:22:41.135272+00:00",
+          "reviewedGeneration": 28,
+          "transcript": ".reviews/f4-round4/reviews/batch-E.json",
+          "state": "/traffic/ 1280 dark",
+          "viewport": [
+            1280,
+            900
+          ],
+          "theme": "dark",
+          "screenshot": "/home/deck/.t3/userdata/blog-f4-round4-20261015/gen28-b7-traffic-ranking/page-1-1280-dark.png",
+          "screenshotSha256": "83040eaf305ec81e1a00dfbd9753e198da16f4fa8de5dbda547bb646414812ba",
+          "verdict": "pass",
+          "findings": []
+        },
+        {
+          "reviewer": "GPT-6.1 Sol (non-author; author Claude Opus 5.5)",
+          "model": "gpt-6.1-sol",
+          "reviewedAt": "2026-10-15T10:22:41.135272+00:00",
+          "reviewedGeneration": 28,
+          "transcript": ".reviews/f4-round4/reviews/batch-E.json",
+          "state": "/traffic/ 390 light",
+          "viewport": [
+            390,
+            900
+          ],
+          "theme": "light",
+          "screenshot": "/home/deck/.t3/userdata/blog-f4-round4-20261015/gen28-b7-traffic-ranking/page-2-390-light.png",
+          "screenshotSha256": "f08f9a56815cfa3e7e6ef2c388599885cb6c3aa450210c657ba49081f6ba6420",
+          "verdict": "pass",
+          "findings": []
         }
       ],
       "deviationsAndReasons": "網域月流量估算非品質；缺月不補0，chart/table沿tag。 公開資料維持no-store是隱私要求，不跟tag恢復快取。",
@@ -2225,31 +3245,312 @@
           "transcript": "/home/deck/.cache/blog-home-cloud-b3-20261014/.reviews/f4-round2/formal-gen22-batch2-mobile-review.json",
           "screenshot": "/home/deck/.t3/userdata/blog-f4-round2-20261015/formal-batch2-mobile-tables/page-3-390-light.png"
         }
-      ]
+      ],
+      "pendingStates": "月份／排序／選站互動未審。"
     },
     {
       "route": "(error)",
       "source": "web/src/app/error.tsx",
       "exampleUrl": null,
-      "status": "pending",
-      "completeRouteAndStates": false,
-      "reviews": [],
+      "status": "complete",
+      "completeRouteAndStates": true,
+      "reviews": [
+        {
+          "reviewer": "GPT-6.1 Sol (non-author; author Claude Opus 5.5)",
+          "model": "gpt-6.1-sol",
+          "reviewedAt": "2026-10-15T11:02:15.181565+00:00",
+          "reviewedGeneration": 31,
+          "transcript": ".reviews/f4-round4/reviews/batch-I.json",
+          "state": "error boundary：/ 1280 light（gateway 停止，讀取失敗）",
+          "viewport": [
+            1280,
+            900
+          ],
+          "theme": "light",
+          "screenshot": "/home/deck/.t3/userdata/blog-f4-round4-20261015/gen31-e1-error-boundary-green-gateway-stopped/page-1-1280-light.png",
+          "screenshotSha256": "8518f209cf86e826519c992158002ebe278d71c875f4f78ac13ac74ebb502420",
+          "verdict": "issues",
+          "findings": [
+            "根路徑錯誤邊界的垂直間距明顯偏大：重新載入按鈕底部約 y253，資料說明分隔線約 y380，中間約 127px 空白；/topics/ 同尺寸約 48px。",
+            "錯誤文案明確排除「沒有收錄資料」並提供「重新載入」，但未說明公開資料服務或 gateway 暫時失敗的原因。",
+            "頁尾約在 y861 結束，視窗底部仍露出約 39px 白色 body 色帶；若頁尾預期貼底，會顯得未填滿。"
+          ]
+        },
+        {
+          "reviewer": "GPT-6.1 Sol (non-author; author Claude Opus 5.5)",
+          "model": "gpt-6.1-sol",
+          "reviewedAt": "2026-10-15T11:02:15.181565+00:00",
+          "reviewedGeneration": 31,
+          "transcript": ".reviews/f4-round4/reviews/batch-I.json",
+          "state": "error boundary：/ 390 dark",
+          "viewport": [
+            390,
+            900
+          ],
+          "theme": "dark",
+          "screenshot": "/home/deck/.t3/userdata/blog-f4-round4-20261015/gen31-e1-error-boundary-green-gateway-stopped/page-2-390-dark.png",
+          "screenshotSha256": "8cd84494b2dd948f7e31b9c97a532981dede9a73d2ee8cb24a5e9370c22ebdcd",
+          "verdict": "issues",
+          "findings": [
+            "手機根路徑同樣保留約 128px 的按鈕後空白：按鈕底部約 y251，資料說明分隔線約 y379；/topics/ 手機版約 49px。",
+            "錯誤文案與重試按鈕可讀且不誤導為空資料，但沒有交代實際服務失敗原因。"
+          ]
+        },
+        {
+          "reviewer": "GPT-6.1 Sol (non-author; author Claude Opus 5.5)",
+          "model": "gpt-6.1-sol",
+          "reviewedAt": "2026-10-15T11:02:15.181565+00:00",
+          "reviewedGeneration": 31,
+          "transcript": ".reviews/f4-round4/reviews/batch-I.json",
+          "state": "error boundary：/topics/ 1280 dark",
+          "viewport": [
+            1280,
+            900
+          ],
+          "theme": "dark",
+          "screenshot": "/home/deck/.t3/userdata/blog-f4-round4-20261015/gen31-e1-error-boundary-green-gateway-stopped/page-3-1280-dark.png",
+          "screenshotSha256": "5bca2ec247fd4b238196b66218590ab1ef4487661236ce8a1c0487071bb38d1b",
+          "verdict": "pass-with-minor-issues",
+          "findings": [
+            "本頁的說明區前空白約 48px，與根路徑約 127px 不一致；單頁節奏可接受，但跨路徑狀態不統一。",
+            "頁尾約在 y821 結束後露出約 79px 較深 body 色帶；若預期頁尾貼底，需確認最小高度。",
+            "錯誤文案能表達暫時不可用並提供下一步，但仍未指出公開資料服務失敗的具體原因。"
+          ]
+        },
+        {
+          "reviewer": "GPT-6.1 Sol (non-author; author Claude Opus 5.5)",
+          "model": "gpt-6.1-sol",
+          "reviewedAt": "2026-10-15T11:02:15.181565+00:00",
+          "reviewedGeneration": 31,
+          "transcript": ".reviews/f4-round4/reviews/batch-I.json",
+          "state": "error boundary：/topics/ 390 light",
+          "viewport": [
+            390,
+            900
+          ],
+          "theme": "light",
+          "screenshot": "/home/deck/.t3/userdata/blog-f4-round4-20261015/gen31-e1-error-boundary-green-gateway-stopped/page-4-390-light.png",
+          "screenshotSha256": "6c263b51aff77a2e35a015f98ca5a5a0d16c42888647d49d9d67bf0f8a7939ed",
+          "verdict": "pass-with-minor-issues",
+          "findings": [
+            "本頁的說明區前空白約 49px，與根路徑手機版約 128px 不一致；建議兩個錯誤邊界使用一致的垂直節奏。",
+            "錯誤文案、重試按鈕與資料來源說明在 390px 寬度下均可讀，未見文字截斷、元件擠壓或水平溢出。",
+            "錯誤訊息明確排除「沒有收錄資料」，但服務失敗原因仍屬泛化描述。"
+          ]
+        },
+        {
+          "reviewer": "GPT-6.1 Sol (non-author; author Claude Opus 5.5)",
+          "model": "gpt-6.1-sol",
+          "reviewedAt": "2026-10-15T11:43:08.232605+00:00",
+          "reviewedGeneration": 33,
+          "transcript": ".reviews/f4-round4/reviews/batch-J.json",
+          "state": "error boundary：/ 1280 light（複查：與 /topics/ 間距一致）",
+          "viewport": [
+            1280,
+            900
+          ],
+          "theme": "light",
+          "screenshot": "/home/deck/.t3/userdata/blog-f4-round4-20261015/gen33-e2-error-boundary-green-gateway-stopped/page-1-1280-light.png",
+          "screenshotSha256": "8518f209cf86e826519c992158002ebe278d71c875f4f78ac13ac74ebb502420",
+          "verdict": "issues",
+          "findings": [
+            "錯誤標題、暫時性原因說明與「重新載入」下一步清楚，方法說明列也容易辨識。",
+            "與 /topics/ 對照，方法區頂部同在約 y=381，但頁尾從 y=474 開始；/topics/ 約 y=434，仍有約 40px 的底部高度差。",
+            "桌面導覽的「部落格」未顯示與 /topics/「話題」相同的綠色目前頁面樣式；若 / 是部落格首頁，建議確認是否應標示 active。"
+          ]
+        },
+        {
+          "reviewer": "GPT-6.1 Sol (non-author; author Claude Opus 5.5)",
+          "model": "gpt-6.1-sol",
+          "reviewedAt": "2026-10-15T11:43:08.232605+00:00",
+          "reviewedGeneration": 33,
+          "transcript": ".reviews/f4-round4/reviews/batch-J.json",
+          "state": "error boundary：/ 390 dark",
+          "viewport": [
+            390,
+            900
+          ],
+          "theme": "dark",
+          "screenshot": "/home/deck/.t3/userdata/blog-f4-round4-20261015/gen33-e2-error-boundary-green-gateway-stopped/page-2-390-dark.png",
+          "screenshotSha256": "8cd84494b2dd948f7e31b9c97a532981dede9a73d2ee8cb24a5e9370c22ebdcd",
+          "verdict": "issues",
+          "findings": [
+            "手機導覽、錯誤訊息、重試按鈕與方法說明列均能在 390px 寬度內完整閱讀，沒有文字擠壓或水平溢出。",
+            "與 /topics/ 390 light 對照，方法區頂部同在約 y=379，但頁尾從 y=472 開始；/topics/ 約 y=432，仍有約 40px 差距。",
+            "頁尾兩欄在手機寬度內排列清楚；底部連結因截圖高度而未完整顯示，未見元件溢出證據。"
+          ]
+        },
+        {
+          "reviewer": "GPT-6.1 Sol (non-author; author Claude Opus 5.5)",
+          "model": "gpt-6.1-sol",
+          "reviewedAt": "2026-10-15T11:43:08.232605+00:00",
+          "reviewedGeneration": 33,
+          "transcript": ".reviews/f4-round4/reviews/batch-J.json",
+          "state": "error boundary：/topics/ 1280 dark",
+          "viewport": [
+            1280,
+            900
+          ],
+          "theme": "dark",
+          "screenshot": "/home/deck/.t3/userdata/blog-f4-round4-20261015/gen33-e2-error-boundary-green-gateway-stopped/page-3-1280-dark.png",
+          "screenshotSha256": "f65f3e1052ba9dc839fcee68a1b78aad6730cd0d0899447d4a3174f9a3de1ead",
+          "verdict": "issues",
+          "findings": [
+            "「話題」目前頁面以綠色 pill 清楚標示，桌面導覽層級與搜尋區排列穩定。",
+            "錯誤狀態文字、重試按鈕、方法說明列與頁尾內容均清楚，深色對比足夠。",
+            "與 / 1280 light 對照，方法列下方至頁尾的高度少約 40px；目前仍未達到兩路由相同的頁尾起點。"
+          ]
+        },
+        {
+          "reviewer": "GPT-6.1 Sol (non-author; author Claude Opus 5.5)",
+          "model": "gpt-6.1-sol",
+          "reviewedAt": "2026-10-15T11:43:08.232605+00:00",
+          "reviewedGeneration": 33,
+          "transcript": ".reviews/f4-round4/reviews/batch-J.json",
+          "state": "error boundary：/topics/ 390 light",
+          "viewport": [
+            390,
+            900
+          ],
+          "theme": "light",
+          "screenshot": "/home/deck/.t3/userdata/blog-f4-round4-20261015/gen33-e2-error-boundary-green-gateway-stopped/page-4-390-light.png",
+          "screenshotSha256": "08e42880418d34d132dca0d856d1691506e33bb664a0dd8f529b35a2cd40a00b",
+          "verdict": "issues",
+          "findings": [
+            "390px 寬度下標題、說明、重試按鈕與方法說明列皆未截斷，按鈕群組與頁尾雙欄可讀。",
+            "與 / 390 dark 對照，方法列頂部同在約 y=379，但頁尾從 y=432 開始；/ 約 y=472，仍有約 40px 差距。",
+            "手機頁尾在截圖下緣仍持續向下，沒有看到水平溢出或欄位互相擠壓。"
+          ]
+        },
+        {
+          "reviewer": "GPT-6.1 Sol (non-author; author Claude Opus 5.5)",
+          "model": "gpt-6.1-sol",
+          "reviewedAt": "2026-10-15T11:56:20.773791+00:00",
+          "reviewedGeneration": 34,
+          "transcript": ".reviews/f4-round4/reviews/batch-K.json",
+          "state": "error boundary：/ 1280 light（複查：方法區與頁尾起點）",
+          "viewport": [
+            1280,
+            900
+          ],
+          "theme": "light",
+          "screenshot": "/home/deck/.t3/userdata/blog-f4-round4-20261015/gen34-e3-error-boundary-blue-gateway-stopped/page-1-1280-light.png",
+          "screenshotSha256": "8518f209cf86e826519c992158002ebe278d71c875f4f78ac13ac74ebb502420",
+          "verdict": "pass",
+          "findings": []
+        },
+        {
+          "reviewer": "GPT-6.1 Sol (non-author; author Claude Opus 5.5)",
+          "model": "gpt-6.1-sol",
+          "reviewedAt": "2026-10-15T11:56:20.773791+00:00",
+          "reviewedGeneration": 34,
+          "transcript": ".reviews/f4-round4/reviews/batch-K.json",
+          "state": "error boundary：/ 390 dark",
+          "viewport": [
+            390,
+            900
+          ],
+          "theme": "dark",
+          "screenshot": "/home/deck/.t3/userdata/blog-f4-round4-20261015/gen34-e3-error-boundary-blue-gateway-stopped/page-2-390-dark.png",
+          "screenshotSha256": "8cd84494b2dd948f7e31b9c97a532981dede9a73d2ee8cb24a5e9370c22ebdcd",
+          "verdict": "pass",
+          "findings": []
+        },
+        {
+          "reviewer": "GPT-6.1 Sol (non-author; author Claude Opus 5.5)",
+          "model": "gpt-6.1-sol",
+          "reviewedAt": "2026-10-15T11:56:20.773791+00:00",
+          "reviewedGeneration": 34,
+          "transcript": ".reviews/f4-round4/reviews/batch-K.json",
+          "state": "error boundary：/topics/ 1280 dark",
+          "viewport": [
+            1280,
+            900
+          ],
+          "theme": "dark",
+          "screenshot": "/home/deck/.t3/userdata/blog-f4-round4-20261015/gen34-e3-error-boundary-blue-gateway-stopped/page-3-1280-dark.png",
+          "screenshotSha256": "b9c960762c7aeec8f18befbf404f7a352d093e6206c123dc9951855ce9e2b0c9",
+          "verdict": "pass",
+          "findings": []
+        },
+        {
+          "reviewer": "GPT-6.1 Sol (non-author; author Claude Opus 5.5)",
+          "model": "gpt-6.1-sol",
+          "reviewedAt": "2026-10-15T11:56:20.773791+00:00",
+          "reviewedGeneration": 34,
+          "transcript": ".reviews/f4-round4/reviews/batch-K.json",
+          "state": "error boundary：/topics/ 390 light",
+          "viewport": [
+            390,
+            900
+          ],
+          "theme": "light",
+          "screenshot": "/home/deck/.t3/userdata/blog-f4-round4-20261015/gen34-e3-error-boundary-blue-gateway-stopped/page-4-390-light.png",
+          "screenshotSha256": "a9cf10c28f1af046b2f7a1dc147713cf03506162fac843bacb7adfaa66b0ef39",
+          "verdict": "pass",
+          "findings": []
+        }
+      ],
       "deviationsAndReasons": "尚未完成當版逐頁對照，不以共用元件推定pass。 公開資料維持no-store是隱私要求，不跟tag恢復快取。",
       "fixCommit": null,
       "fixScope": null,
-      "reverification": []
+      "reverification": [],
+      "pendingStates": null
     },
     {
       "route": "(not-found)",
       "source": "web/src/app/not-found.tsx",
       "exampleUrl": "https://blog.observe.tw/not-a-real-blog-path-20261014/",
-      "status": "pending",
-      "completeRouteAndStates": false,
-      "reviews": [],
+      "status": "complete",
+      "completeRouteAndStates": true,
+      "reviews": [
+        {
+          "reviewer": "GPT-6.1 Sol (non-author; author Claude Opus 5.5)",
+          "model": "gpt-6.1-sol",
+          "reviewedAt": "2026-10-15T10:28:43.144842+00:00",
+          "reviewedGeneration": 28,
+          "transcript": ".reviews/f4-round4/reviews/batch-F.json",
+          "state": "not-found：/blogs/不存在/ 404 1280 dark",
+          "viewport": [
+            1280,
+            900
+          ],
+          "theme": "dark",
+          "screenshot": "/home/deck/.t3/userdata/blog-f4-round4-20261015/gen28-c1-private-loggedout-notfound/page-7-1280-dark.png",
+          "screenshotSha256": "0e3f751ae88fb6c420de5f94a01b014992880be2e2a15ed0a9192326a33bb656",
+          "verdict": "pass-with-minor-issues",
+          "findings": [
+            {
+              "severity": "low",
+              "issue": "桌面主導覽多出「技術」項目，與登入頁同一 release 的桌面導覽不一致。",
+              "evidence": "本頁導覽在「流量」後顯示「技術／追蹤／RSS／API」；登入 light 頁面沒有「技術」。",
+              "recommendation": "統一不同路由的桌面導覽項目與順序。"
+            }
+          ]
+        },
+        {
+          "reviewer": "GPT-6.1 Sol (non-author; author Claude Opus 5.5)",
+          "model": "gpt-6.1-sol",
+          "reviewedAt": "2026-10-15T10:28:43.144842+00:00",
+          "reviewedGeneration": 28,
+          "transcript": ".reviews/f4-round4/reviews/batch-F.json",
+          "state": "not-found：/blogs/不存在/ 404 390 light",
+          "viewport": [
+            390,
+            900
+          ],
+          "theme": "light",
+          "screenshot": "/home/deck/.t3/userdata/blog-f4-round4-20261015/gen28-c1-private-loggedout-notfound/page-8-390-light.png",
+          "screenshotSha256": "10fb19048388fde5aeec584b0916c965455b3950353ba2c792018012ef8ec7a0",
+          "verdict": "pass",
+          "findings": []
+        }
+      ],
       "deviationsAndReasons": "尚未完成當版逐頁對照，不以共用元件推定pass。 公開資料維持no-store是隱私要求，不跟tag恢復快取。",
       "fixCommit": null,
       "fixScope": null,
-      "reverification": []
+      "reverification": [],
+      "pendingStates": null
     }
   ]
 }

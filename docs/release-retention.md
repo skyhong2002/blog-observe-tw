@@ -31,3 +31,17 @@
 ```bash
 bash /home/deck/.cache/blog-home-cloud-b3-20261014/tools/deploy-blue-green.sh rollback green
 ```
+
+## 2026-10-15 實際執行（gen33–gen35）
+
+- 三次清理，都在 `edge/deploy.lock` 內、鎖內重驗 active／slot／ready／edge/code／worker 與回填 unit 的工作目錄：
+  刪除 58e551a、7590344、b8c1350、68a032b、b63e4cf、5f0abf0、b2b1882、c8803e8、ba40fc1、c47be34 十個 release，
+  對應 prepared/build JSON 與殘留的 bc8998d JSON；以 `git worktree remove` 移除九個無未提交內容的拋棄式 source checkout。
+  第一次（八個 release）量到 `/home` 可用空間 62.9→69.6 GiB（磁碟差值，含期間其他寫入）。
+- 保留：active、回滾、`93060cc`（`edge/code` 目標）、`af0e73c`（worker 與多個 unit drop-in）、`blog-release-source-76a90e7`
+  （`blog-home-cloud-b3-20261014` 與 `blog-display-noise-20261014` 的 `node_modules` symlink 指向它）。
+- **注意**：`93060cc` 曾在先前某次清理被刪，edge 與 slot 程序因已載入記憶體而照常運作，但任何 slot 重啟都會失敗。
+  已以 `git archive 93060cc` 原樣重建。之後清理前務必先 `readlink -f edge/code` 並保留其目標，清理後確認
+  `edge/code/app/src/edge/slot-service.ts` 存在。
+- 回填等長時間工作若以 release 為工作目錄，清理前要一併保留（本次腳本會檢查 `blog-fulltext-backfill-*` unit）。
+- 原始紀錄：`.reviews/rolling-retention-20261015b|c|d/`。
