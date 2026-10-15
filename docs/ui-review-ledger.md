@@ -21,7 +21,12 @@ bash /home/deck/.cache/blog-home-cloud-b3-20261014/tools/deploy-blue-green.sh ro
   `memory.low=2500m`。套用後換出量為 0，`tag-db` swap 由 1.8–2.3 GB 降至 1.57 GB 並持續讀回；origin 首頁 1.1–1.8 秒。
 - 保留：刪除 gen34 `5df6e62` release 與 checkout；保留 active、gen35 回滾（回填 checkout 的 node_modules 也連到它）、
   edge/code、worker。下一次換掉 green 前，要先把回填改從新 release 重啟。
-- 登入後截圖仍 pending：我操作的預覽分頁拿不到使用者在其他分頁的 Google 登入，未代填帳密。
+- 登入後截圖：預覽工具開的分頁與使用者面板是不同瀏覽器環境、cookie 不共用（切換寬度也會重建環境），因此改由使用者
+  在自己面板登入並擷取。`/my/`（0 追蹤、無 API 金鑰）與 `/admin/` 候選來源（管理員）桌機 dark 兩張，非作者 GPT-6.1 Sol
+  `batch-M.json` 皆 pass-with-minor（RSS／OPML 入口重複、深色次要文字偏暗、管理區無導覽 active，皆 low），截圖
+  `gen36-l2-loggedin-user/`。`/admin/discovery/` 是舊網址、直接導向 `/admin/` 候選來源，標為完整。登入後手機 390 仍 pending。
+- OAuth：blog 與 tag 使用同一個 Google OAuth client（雜湊比對相同，設定檔自 2026-10-13 未變）；登入畫面顯示
+  「chumei」或「observe.tw」是 Google 端的名稱，`client_id` 相同，伺服器沒有切換。
 
 ## 追加（UTC 2026-10-15T14:30Z，gen35）
 

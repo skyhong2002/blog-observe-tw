@@ -19,10 +19,10 @@
     "items": 22,
     "formalObservedRoutes": 22,
     "noCurrentFormalReview": 0,
-    "completeRoutesAndStates": 9,
-    "scopePending": 13,
+    "completeRoutesAndStates": 10,
+    "scopePending": 12,
     "round4ReviewedImages": 68,
-    "passForReviewedStatesWithPending": 13,
+    "passForReviewedStatesWithPending": 12,
     "issues": 0
   },
   "limitations": "Machine-readable index of real screenshot/review artifacts, not a template promoted to pass. Markdown ledger contains deliberate deviations and issues. Missing states remain pending. Old artifacts retained separately.",
@@ -103,8 +103,8 @@
       "route": "/admin/discovery/",
       "source": "web/src/app/admin/discovery/page.tsx",
       "exampleUrl": "https://blog.observe.tw/admin/discovery/",
-      "status": "pass-for-reviewed-states",
-      "completeRouteAndStates": false,
+      "status": "complete",
+      "completeRouteAndStates": true,
       "reviews": [
         {
           "reviewer": "GPT-6.1 Sol (non-author; author Claude Opus 5.5)",
@@ -122,6 +122,11 @@
           "screenshotSha256": "c2188f99bf4b1119e0ecd9f528b164b503ef0e7160436a1fcb7f5b3f238c88eb",
           "verdict": "pass",
           "findings": []
+        },
+        {
+          "reviewer": "note",
+          "state": "舊網址，web/src/app/admin/discovery/page.tsx 直接 redirect 到 /admin/；登入後即候選來源分頁，見 /admin/ 的 batch-M 紀錄",
+          "reviewedGeneration": 36
         }
       ],
       "missingReason": "Capture guard forbids private/auth routes; no account or permission created. Existing authorized account or manual verification needed.",
@@ -129,7 +134,7 @@
       "fixCommit": null,
       "fixScope": null,
       "reverification": [],
-      "pendingStates": "僅審查未登入（導向 /login）；管理員登入後狀態需真人 Google 登入。"
+      "pendingStates": null
     },
     {
       "route": "/admin/",
@@ -161,6 +166,35 @@
               "recommendation": "確認「技術」是否應在 blog 全站桌面導覽固定顯示，並統一各路由的導覽來源。"
             }
           ]
+        },
+        {
+          "reviewer": "GPT-6.1 Sol (non-author; author Claude Opus 5.5)",
+          "model": "gpt-6.1-sol",
+          "reviewedAt": "2026-10-15T15:23:36.891524+00:00",
+          "reviewedGeneration": 36,
+          "transcript": ".reviews/f4-round4/reviews/batch-M.json",
+          "state": "/admin/ 已登入管理員：候選來源分頁（/admin/discovery/ 也導向此頁）桌機 dark",
+          "viewport": null,
+          "theme": null,
+          "screenshot": "/home/deck/.t3/userdata/blog-f4-round4-20261015/gen36-l2-loggedin-user/admin-candidates-loggedin-dark.png",
+          "screenshotSha256": "a14f3c243655aa87aef8cac45eabfa57c3a212ee245a60e9edecaaa863f41a79",
+          "verdict": "pass-with-minor-issues",
+          "findings": [
+            {
+              "severity": "low",
+              "label": "管理頁的全域導覽位置提示較弱",
+              "issue": "頁面標題和區域分頁能辨識管理情境，但全域導覽沒有目前位置或管理區標記。",
+              "evidence": "相較 /my/ 的「追蹤」綠色 active 狀態，管理頁頂部導覽項目全部呈中性樣式。",
+              "recommendation": "加入管理區 active 標記、麵包屑或明確的返回公開區入口。"
+            },
+            {
+              "severity": "low",
+              "label": "候選來源次要資訊對比偏弱",
+              "issue": "來源、發現時間、發現頁面與卡片分隔線使用偏暗灰色，在深色卡片中辨識度較低。",
+              "evidence": "候選項目的輔助 metadata 明顯弱於名稱和綠色 URL。",
+              "recommendation": "提高輔助文字與分隔線亮度，並以實際色值核對 WCAG AA。"
+            }
+          ]
         }
       ],
       "missingReason": "Capture guard forbids private/auth routes; no account or permission created. Existing authorized account or manual verification needed.",
@@ -168,7 +202,7 @@
       "fixCommit": null,
       "fixScope": null,
       "reverification": [],
-      "pendingStates": "僅審查未登入（導向 /login）；管理員登入後狀態需真人 Google 登入。"
+      "pendingStates": "已審：未登入導向、登入管理員「候選來源」桌機（使用者本人截圖）。其他分頁（簡介與標籤、連結關係、Similarweb、稽核紀錄）與手機 390 未審。"
     },
     {
       "route": "/api/",
@@ -1284,6 +1318,35 @@
           "screenshotSha256": "f74460ac427ac183d730fa17cc931530800c2e1b74095c0f975fdacb969433f4",
           "verdict": "pass",
           "findings": []
+        },
+        {
+          "reviewer": "GPT-6.1 Sol (non-author; author Claude Opus 5.5)",
+          "model": "gpt-6.1-sol",
+          "reviewedAt": "2026-10-15T15:23:36.891524+00:00",
+          "reviewedGeneration": 36,
+          "transcript": ".reviews/f4-round4/reviews/batch-M.json",
+          "state": "/my/ 已登入（0 個追蹤、無 API 金鑰）桌機 dark",
+          "viewport": null,
+          "theme": null,
+          "screenshot": "/home/deck/.t3/userdata/blog-f4-round4-20261015/gen36-l2-loggedin-user/my-loggedin-dark.png",
+          "screenshotSha256": "1723364e094338bd3e0add520044add84e6135e61081c80f73fa38e143e02a5e",
+          "verdict": "pass-with-minor-issues",
+          "findings": [
+            {
+              "severity": "low",
+              "label": "RSS/OPML 操作入口重複",
+              "issue": "「個人 RSS」與「匯出 OPML」同時出現在分頁列和右側動作列，分頁與操作的層級差異不明。",
+              "evidence": "追蹤清單區域可見兩組相同文字入口。",
+              "recommendation": "移除其中一組，或用不同視覺樣式明確區分分頁與動作。"
+            },
+            {
+              "severity": "low",
+              "label": "次要文字與邊框偏暗",
+              "issue": "空狀態說明、API 說明、虛線框和分隔線與黑底接近，閱讀對比弱於主要標題與綠色連結。",
+              "evidence": "截圖中次要文案與卡片邊界需依賴高 DPI 才較容易辨識。",
+              "recommendation": "以實際色值核對 WCAG AA，必要時提高灰階文字或邊框亮度。"
+            }
+          ]
         }
       ],
       "missingReason": "Capture guard forbids private/auth routes; no account or permission created. Existing authorized account or manual verification needed.",
@@ -1291,7 +1354,7 @@
       "fixCommit": null,
       "fixScope": null,
       "reverification": [],
-      "pendingStates": "僅審查未登入；登入後追蹤清單需真人 Google 登入。"
+      "pendingStates": "已審：未登入 1280/390、登入後空狀態桌機（使用者本人截圖）。登入後手機 390、有追蹤／有 API 金鑰的狀態未審。"
     },
     {
       "route": "/observe/opt-out/",
