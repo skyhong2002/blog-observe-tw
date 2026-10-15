@@ -109,6 +109,26 @@ describe('automatic discovery verification', () => {
       expect(check.eligible).toBe(false);
     }
   });
+  it('admits a BlogBlog.Club-listed home without self-description, still requiring its own feed and identity', async () => {
+    const listed = {
+      ...candidate,
+      name: null,
+      source_evidence: { directoryListing: { page: 'https://blogblog.club/blogrollroll', candidateId: 9, linkedUrl: `${home}blogroll` } },
+    };
+    const plain = `<title>Quill Writer</title><link rel="alternate" type="application/rss+xml" href="/feed/">`;
+    const check = await validateCandidate(listed, options(rss(), plain));
+    expect(check).toMatchObject({
+      eligible: true,
+      enrichedName: 'Quill Writer',
+      directoryListing: 'https://blogblog.club/blogrollroll',
+      reason: 'verified_homepage_and_rss_directory_listed',
+    });
+    expect((await validateCandidate(listed, options(rss(home, 'Other Writer'), plain))).eligible).toBe(false);
+    expect((await validateCandidate(listed, options('<rss version="2.0"><channel></channel></rss>', plain))).eligible).toBe(false);
+    // Only the directory itself counts: a listing claimed by another host is ordinary evidence.
+    const elsewhere = { ...listed, source_evidence: { directoryListing: { page: 'https://blogblog.club.evil.test/' } } };
+    expect((await validateCandidate(elsewhere, options(rss(), plain))).eligible).toBe(false);
+  });
   it('enriches article anchor into independently verified homepage and RSS identity', async () => {
     const check = await validateCandidate(
       { ...candidate, source_type: 'article-link', name: 'An unrelated linked article' },

@@ -8,6 +8,7 @@ vi.mock('../jobs/lease.ts', () => ({
   withJobLease: async (_p: unknown, _n: string, fn: (assert: () => Promise<void>) => unknown) => fn(async () => {}),
 }));
 vi.mock('../relations/worker.ts', () => ({
+  RELATION_PAGES_DAILY: 2400,
   budgetedRelationFetcher: () => ({ lastFailure: null }),
   relationBudgetAvailable: async () => true,
   relationFailureCode: () => 'fetch-failed',

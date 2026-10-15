@@ -2,11 +2,12 @@ import { XMLParser, XMLValidator } from 'fast-xml-parser';
 import { type PersonalEvidence, personalHomepage } from '../ai/personal.ts';
 import { type SitemapArticleEvidence, verifyArticleSitemap } from '../ai/publication-sitemap.ts';
 import { identityKey, publicationDecision } from '../relations/identity.ts';
+import { directoryListing } from './directory-listing.ts';
 import { type FeedCrawlerOptions, isAllowedCrawlUrl, parseFeed, politeFetch, readFeedBody } from './feed.ts';
 import { seedIdentityKey } from './seed-url-resolution.ts';
 import { isSeedPlatformRoot, type SeedUrlValidation, validateSeedUrl } from './seed-url-validation.ts';
 
-export const CANDIDATE_POLICY = 'personal-rss-publication-v3-ownership';
+export const CANDIDATE_POLICY = 'personal-rss-publication-v4-directory';
 export type DiscoveryCandidate = {
   id: number;
   url: string;
@@ -26,6 +27,8 @@ export type CandidateCheck = {
   enrichedName?: string;
   sitemapArticles?: SitemapArticleEvidence[];
   personalEvidence?: PersonalEvidence;
+  /** The BlogBlog.Club page listing this publication (directory-listing.ts); stands in for personal-homepage proof. */
+  directoryListing?: string;
   feed?: { url: string; type: 'rss' | 'atom' | 'sitemap'; title: string; identityUrl: string; entries: number; sample: string[] };
 };
 const platforms = new Set([
@@ -141,7 +144,12 @@ export async function validateCandidate(candidate: DiscoveryCandidate, options: 
     eligible: false,
     reason: candidatePreflight(candidate) || 'unverified',
   };
-  const mayEnrich = ['article-link', 'blogroll'].includes(candidate.source_type);
+  const listed = candidate.source_type === 'blogblog-club' ? directoryListing(candidate.source_evidence) : null;
+  if (listed) result.directoryListing = listed;
+  // Directory-listed homes are added without a name; like discovered links, they take the homepage's own.
+  const mayEnrich = ['article-link', 'blogroll'].includes(candidate.source_type) || Boolean(listed);
+  const personal = () => result.personalEvidence?.personal === true || Boolean(listed);
+  const personalReason = (verified: string) => (result.personalEvidence?.personal === true ? verified : `${verified}_directory_listed`);
   if (result.reason !== 'unverified' && !(mayEnrich && result.reason === 'missing_identity_name')) return result;
   try {
     const home = await politeFetch(candidate.url, {}, options);
@@ -207,9 +215,9 @@ export async function validateCandidate(candidate: DiscoveryCandidate, options: 
         entries: articles.length,
         sample: articles.map((a) => a.url),
       };
-      result.eligible = result.personalEvidence?.personal === true;
+      result.eligible = personal();
       result.reason = result.eligible
-        ? 'verified_personal_homepage_and_article_sitemap'
+        ? personalReason('verified_personal_homepage_and_article_sitemap')
         : result.personalEvidence?.reason || 'personal_identity_uncertain';
       return result;
     }
@@ -286,9 +294,10 @@ export async function validateCandidate(candidate: DiscoveryCandidate, options: 
       entries: entries.length,
       sample: entries.slice(0, 3).map((e) => e.url),
     };
-    result.reason = 'verified_homepage_and_rss';
-    result.eligible = result.personalEvidence?.personal === true;
-    if (!result.eligible) result.reason = result.personalEvidence?.reason || 'personal_identity_uncertain';
+    result.eligible = personal();
+    result.reason = result.eligible
+      ? personalReason('verified_homepage_and_rss')
+      : result.personalEvidence?.reason || 'personal_identity_uncertain';
   } catch (error) {
     const m = error instanceof Error ? error.message : '';
     result.reason = /robots/i.test(m)

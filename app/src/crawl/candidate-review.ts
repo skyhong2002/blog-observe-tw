@@ -27,7 +27,7 @@ export function budgetedCandidateFetcher(
     const allowed = await reserveBudget(
       pool,
       [
-        { scope: 'candidates:http', amount: 1, limit: 300 },
+        { scope: 'candidates:http', amount: 1, limit: 1500 },
         { scope: `candidates:host:${host}`, amount: 1, limit: 20 },
       ],
       options.now?.() ?? new Date(),
@@ -123,6 +123,7 @@ export async function runCandidateReviewBatch(
         options.apply === true &&
         process.env.BLOG_AI_ENABLED === 'true' &&
         checked.feed &&
+        !checked.eligible &&
         checked.personalEvidence?.method === 'unresolved' &&
         checked.personalEvidence.reason === 'personal_identity_uncertain'
       ) {

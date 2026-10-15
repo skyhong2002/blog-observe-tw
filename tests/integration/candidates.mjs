@@ -4,6 +4,7 @@ import { AI_POLICY, inputKey, normalizeInput } from '../../app/src/ai/contracts.
 import { infer } from '../../app/src/ai/service.ts';
 import { validateCandidate } from '../../app/src/crawl/candidate-validation.ts';
 import { recordCandidateCheck } from '../../app/src/crawl/candidate-promotion.ts';
+import { deriveDirectoryHomes, directoryListing } from '../../app/src/crawl/directory-listing.ts';
 export async function runCandidateIntegration(pool) {
   assertEphemeralDatabase(pool);
   assert.equal(new URL(process.env.BLOG_DB_URL).hostname, '127.0.0.1');
@@ -54,7 +55,7 @@ export async function runCandidateIntegration(pool) {
     );
     ids.push(created.insertId);
     const result = await validateCandidate(
-      { id: created.insertId, url: home, name: 'Quill Writer', status: 'candidate', source_type: type },
+      { id: created.insertId, url: home, name: 'Quill Writer', status: 'candidate', source_type: type, source_evidence: evidence },
       source(home, kind, personal, intro),
     );
     return { home, check: result, id: created.insertId };
@@ -141,6 +142,42 @@ export async function runCandidateIntegration(pool) {
     check(!nonpersonal.check.eligible, 'company not personal');
     check((await apply(nonpersonal)).status === 'candidate', 'company retained');
     check((await used()) === 1, 'decline no admission charge');
+    // BlogBlog.Club: a listed blogroll page yields its home, admitted without a self-description under its own budget.
+    const listedHome = `https://listed-${suffix}.example/`;
+    const [page] = await pool.execute(
+      "INSERT INTO discovery_candidates(url,name,source_type,source_evidence,status,discovered_at) VALUES (?,'Listed','blogblog-club',?,'candidate',UTC_TIMESTAMP())",
+      [listedHome + 'blogroll', JSON.stringify({ blogrollRelationship: { from: 'https://blogblog.club/blogrollroll' } })],
+    );
+    ids.push(page.insertId);
+    check((await deriveDirectoryHomes(pool, 1000)).homes >= 1, 'directory home derived');
+    await deriveDirectoryHomes(pool, 1000);
+    const [homes] = await pool.query("SELECT id,name,source_evidence FROM discovery_candidates WHERE url=? AND source_type='blogblog-club'", [
+      listedHome,
+    ]);
+    ids.push(...homes.map((h) => h.id));
+    check(homes.length === 1 && homes[0].name === null, 'one nameless home candidate, idempotent');
+    check(directoryListing(homes[0].source_evidence) === 'https://blogblog.club/blogrollroll', 'home carries the listing');
+    const listed = {
+      home: listedHome,
+      id: homes[0].id,
+      check: await validateCandidate(
+        { id: homes[0].id, url: listedHome, name: null, status: 'candidate', source_type: 'blogblog-club', source_evidence: homes[0].source_evidence },
+        source(listedHome, 'rss', null),
+      ),
+    };
+    check(listed.check.eligible && listed.check.reason === 'verified_homepage_and_rss_directory_listed', 'listed ' + JSON.stringify(listed.check));
+    const listedResult = await apply(listed);
+    check(listedResult.created, 'listed home admitted');
+    const [[label]] = await pool.query('SELECT status_label FROM blogs WHERE id=?', [listedResult.blogId]);
+    check(label.status_label === 'BlogBlog.Club 名單自動收錄', 'listed status label');
+    check((await used()) === 1, 'directory admissions do not use the general budget');
+    const forged = await candidate('forged-listing', {
+      personal: null,
+      evidence: { discoveryDepth: 1, directoryListing: { page: 'https://blogblog.club/party' } },
+    });
+    check(!forged.check.eligible, 'listing evidence on another source type is not a directory listing');
+    forged.check = { ...forged.check, eligible: true };
+    check((await apply(forged)).reason === 'personal_publication_unverified', 'writer re-reads the listing from the row');
     const bad = await candidate('badproof');
     bad.check.personalEvidence = undefined;
     const badResult = await apply(bad);
@@ -245,7 +282,7 @@ export async function runCandidateIntegration(pool) {
       await pool.query('DELETE FROM discovery_candidate_audits WHERE candidate_id IN (?)', [ids]);
       await pool.query('DELETE FROM discovery_candidates WHERE id IN (?)', [ids]);
     }
-    await pool.query("DELETE FROM work_budgets WHERE day=UTC_DATE() AND scope='discovery:admissions'");
+    await pool.query("DELETE FROM work_budgets WHERE day=UTC_DATE() AND scope IN ('discovery:admissions','discovery:directory-admissions')");
     if (oldBudget)
       await pool.execute(
         "INSERT INTO work_budgets(day,scope,used,updated_at) VALUES(UTC_DATE(),'discovery:admissions',?,UTC_TIMESTAMP())",

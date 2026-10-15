@@ -22,6 +22,13 @@ import {
 
 type BudgetedFetcher = FeedFetcher & { lastFailure: 'budget-exhausted' | 'batch-stopped' | null };
 
+/**
+ * Daily UTC budgets shared by the relation and content crawlers: article pages fetched, every HTTP request (robots and
+ * redirects too), and requests per origin, so no site is asked more than RELATION_HOST_DAILY times a day.
+ */
+export const RELATION_PAGES_DAILY = 2400,
+  RELATION_HTTP_DAILY = 6000,
+  RELATION_HOST_DAILY = 60;
 /** All actual HTTP including robots and each redirect consumes a host/global reservation. */
 export function budgetedRelationFetcher(
   pool: Pool,
@@ -42,8 +49,8 @@ export function budgetedRelationFetcher(
       const allowed = await reserveBudget(
         pool,
         [
-          { scope: 'relations:http', amount: 1, limit: 900 },
-          { scope, amount: 1, limit: 20 },
+          { scope: 'relations:http', amount: 1, limit: RELATION_HTTP_DAILY },
+          { scope, amount: 1, limit: RELATION_HOST_DAILY },
         ],
         options.now?.() ?? new Date(),
       );
@@ -67,7 +74,7 @@ export async function relationBudgetAvailable(pool: Pool, url: string, now = new
     now.toISOString().slice(0, 10),
     ['relations:http', scope],
   ]);
-  return rows.every((r) => Number(r.used) < (r.scope === 'relations:http' ? 900 : 20));
+  return rows.every((r) => Number(r.used) < (r.scope === 'relations:http' ? RELATION_HTTP_DAILY : RELATION_HOST_DAILY));
 }
 
 export function relationFailureCode(error: unknown): string {
@@ -128,7 +135,7 @@ export async function runRelationBatch(pool: Pool, options: BatchOptions & { blo
             result.skipped++;
             continue;
           }
-          if (!(await reserveBudget(pool, [{ scope: 'relations:pages', amount: 1, limit: 300 }], now()))) {
+          if (!(await reserveBudget(pool, [{ scope: 'relations:pages', amount: 1, limit: RELATION_PAGES_DAILY }], now()))) {
             result.truncated = true;
             break;
           }

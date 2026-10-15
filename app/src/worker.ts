@@ -1,4 +1,3 @@
-import { runFulltextBatch, indexFulltextPosts, indexMissingFulltextPosts } from './search-fulltext.ts';
 import { Queue, Worker } from 'bullmq';
 import { Redis } from 'ioredis';
 import pino from 'pino';
@@ -6,6 +5,7 @@ import { runAiBatch } from './ai/batch.ts';
 import { loadConfig } from './config.js';
 import { runContentBatch } from './content/worker.ts';
 import { runCandidateReviewBatch } from './crawl/candidate-review.ts';
+import { deriveDirectoryHomes } from './crawl/directory-listing.ts';
 import { discoverBlogblog, discoverSimilar } from './crawl/discovery.ts';
 import { refreshMissingBlogFavicons } from './crawl/favicon-batch.ts';
 import { crawlBlog } from './crawl/feed.ts';
@@ -16,6 +16,7 @@ import { createDb } from './db/client.ts';
 import { runPublicationDiscoveryBatch } from './relations/home.ts';
 import { runRelationSnapshotBatch } from './relations/routes.ts';
 import { runRelationBatch } from './relations/worker.ts';
+import { indexFulltextPosts, indexMissingFulltextPosts, runFulltextBatch } from './search-fulltext.ts';
 import { createIndexJobClaim, createIndexJobEnqueue, runSearchIndexJob, SEARCH_INDEX_JOB } from './search-index-job.ts';
 import { backfillPublicRoutes, backfillTopicRouteAliases } from './seo/page-routes.ts';
 import { createTechFetchBatch } from './tech/fetch-batch.ts';
@@ -75,7 +76,8 @@ for (const [name, every, enabled] of [
   ['blogs-fulltext', 5 * 60_000, process.env.BLOG_SEARCH_FULLTEXT_ENABLED === 'true'],
   ['blogs-content', 5 * 60_000, contentEnabled],
   ['blogs-relation-snapshots', 5 * 60_000, process.env.BLOG_RELATION_SNAPSHOTS_ENABLED !== 'false'],
-  ['blogs-relations', 5 * 60_000, relationsEnabled],
+  // Each run fetches at most 5 pages; the daily budgets in relations/worker.ts bound the total and per-site load.
+  ['blogs-relations', 60_000, relationsEnabled],
   ['blogs-publication-discovery', 30 * 60_000, relationsEnabled],
   ['blogs-ai', 60 * 60_000, aiEnabled],
   ['blogs-topics', 10 * 60_000, topicsEnabled],
@@ -203,6 +205,9 @@ const worker = new Worker(
     }
     if (job.name === 'blogs-candidate-review') {
       if (!candidateReviewEnabled) return { skipped: 'disabled' };
+      // BlogBlog.Club listings point at blogroll pages and party posts; queue their publication homes first.
+      const directory = await deriveDirectoryHomes(store.pool);
+      if (directory.inspected) log.info({ directory }, 'directory homes derived');
       return runCandidateReviewBatch(store.pool, {
         apply: true,
         limit: 25,

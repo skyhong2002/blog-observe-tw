@@ -144,7 +144,7 @@
     },
     {
       "path": "app/src/crawl/candidate-promotion.ts",
-      "digest": "0b15f62b548d72050864f9a1db64ed3ec4f29480aa541694e1ac89c3fc7885d2",
+      "digest": "250a3e4f66688b2100da89ae8ab2ae682d85c5ff1a78d78e7a87b81dcc6b68a4",
       "tables": [
         "blogs"
       ],

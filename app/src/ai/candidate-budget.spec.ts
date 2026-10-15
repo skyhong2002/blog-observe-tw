@@ -17,7 +17,7 @@ it('charges every actual robots/redirect request and forwards pinned dispatcher 
   await fetcher('https://writer.test/redirected', init);
   expect(original).toHaveBeenCalledWith('https://writer.test/redirected', init);
   expect(budget).toHaveBeenCalledTimes(2);
-  expect(budget.mock.calls[0][1]).toMatchObject([{ scope: 'candidates:http', limit: 300 }, { limit: 20 }]);
+  expect(budget.mock.calls[0][1]).toMatchObject([{ scope: 'candidates:http', limit: 1500 }, { limit: 20 }]);
   budget.mockResolvedValue(false);
   await expect(fetcher('https://writer.test/more', init)).rejects.toThrow('candidate_http_budget');
   expect(stop).toHaveBeenCalledOnce();

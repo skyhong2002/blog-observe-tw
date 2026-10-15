@@ -11,6 +11,7 @@ import {
   candidatePreflight,
   publicationContains,
 } from './candidate-validation.ts';
+import { DIRECTORY_ADMISSIONS_DAILY, directoryListing } from './directory-listing.ts';
 import { isAllowedCrawlUrl } from './feed.ts';
 import { seedIdentityKey } from './seed-url-resolution.ts';
 
@@ -128,8 +129,10 @@ export async function recordCandidateCheck(
         if (!parent || Number(parent.depth) + 1 !== depth) decline('discovery_depth_mismatch');
       }
     }
+    // Re-read from the locked row, never from the check: a BlogBlog.Club listing replaces the personal-homepage proof.
+    const listed = candidate.source_type === 'blogblog-club' ? directoryListing(sourceEvidence) : null;
     const effectiveName =
-      check.enrichedName && ['article-link', 'blogroll'].includes(candidate.source_type) ? check.enrichedName : candidate.name;
+      check.enrichedName && (['article-link', 'blogroll'].includes(candidate.source_type) || listed) ? check.enrichedName : candidate.name;
     if (check.eligible) {
       const personal = check.personalEvidence;
       let personalValid = personal ? deterministicPersonalProof(personal) : false;
@@ -142,7 +145,7 @@ export async function recordCandidateCheck(
         personalValid =
           cached?.input_hash === inputKey('classification', normalizeInput(personal.input)).inputHash && aiPersonalProof(personal, value);
       }
-      if (!personalValid) decline('personal_publication_unverified');
+      if (!personalValid && !listed) decline('personal_publication_unverified');
     }
     // biome-ignore lint/suspicious/noConfusingLabels: all declines must reach the shared append-only audit below.
     admission: if (apply && check.eligible) {
@@ -210,7 +213,10 @@ export async function recordCandidateCheck(
           blogId = owner?.id ?? null;
           slug = owner?.slug ?? null;
           if (!blogId) {
-            if (!(await reserveBudgetOnConnection(c, [{ scope: 'discovery:admissions', amount: 1, limit: 10 }], now))) {
+            const admissions = listed
+              ? { scope: 'discovery:directory-admissions', amount: 1, limit: DIRECTORY_ADMISSIONS_DAILY }
+              : { scope: 'discovery:admissions', amount: 1, limit: 10 };
+            if (!(await reserveBudgetOnConnection(c, [admissions], now))) {
               decline('daily_admission_budget_exhausted');
               break admission;
             }
@@ -219,8 +225,8 @@ export async function recordCandidateCheck(
               .slice(0, 255)
               .join('');
             const [insert] = await c.execute<ResultSetHeader>(
-              "INSERT INTO blogs (slug,name,url,canonical_host,status,status_label,discovered_at,stale_policy) VALUES (?,?,?,?,'verified','個人部落格自動驗證',?,'low_frequency')",
-              [slug, name, v.finalUrl, new URL(v.finalUrl).hostname, now],
+              "INSERT INTO blogs (slug,name,url,canonical_host,status,status_label,discovered_at,stale_policy) VALUES (?,?,?,?,'verified',?,?,'low_frequency')",
+              [slug, name, v.finalUrl, new URL(v.finalUrl).hostname, listed ? 'BlogBlog.Club 名單自動收錄' : '個人部落格自動驗證', now],
             );
             blogId = insert.insertId;
             created = true;

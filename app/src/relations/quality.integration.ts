@@ -4,7 +4,7 @@ import { createHash } from 'node:crypto';
 import type { Pool, ResultSetHeader, RowDataPacket } from 'mysql2/promise';
 import { parseArticleLinks } from './parser.ts';
 import { deferObservation, discoverCandidateLinks, loadAliases, requeueLegacyObservations, saveObservation } from './store.ts';
-import { relationBudgetAvailable } from './worker.ts';
+import { RELATION_HOST_DAILY, relationBudgetAvailable } from './worker.ts';
 
 export async function runRelationQualityIntegration(pool: Pool) {
   const suffix = Date.now().toString(36),
@@ -32,7 +32,12 @@ export async function runRelationQualityIntegration(pool: Pool) {
     );
     postId = post.insertId;
     const p = { id: postId, blog_id: blogId, url: url + 'post', blog_url: url, published_at: now, depth: 0 };
-    await pool.query('INSERT INTO work_budgets(day,scope,used,updated_at) VALUES (?,?,20,?)', [now.toISOString().slice(0, 10), scope, now]);
+    await pool.query('INSERT INTO work_budgets(day,scope,used,updated_at) VALUES (?,?,?,?)', [
+      now.toISOString().slice(0, 10),
+      scope,
+      RELATION_HOST_DAILY,
+      now,
+    ]);
     check(!(await relationBudgetAvailable(pool, p.url, now)));
     await deferObservation(pool, p, now);
     let [[o]] = await pool.query<RowDataPacket[]>('SELECT * FROM relation_observations WHERE post_id=?', [postId]);

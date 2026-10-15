@@ -8,7 +8,7 @@ import { parsePublicationBlogroll, runPublicationDiscoveryBatch, saveHomeSweep }
 import { parseArticleLinks } from './parser.ts';
 import { loadRelationCoverage, loadRelations, registerRelationRoutes } from './routes.ts';
 import { type ArticleRow, discoverCandidates, loadAliases, reconcileTargets, retainFailedObservation, saveObservation } from './store.ts';
-import { budgetedRelationFetcher } from './worker.ts';
+import { budgetedRelationFetcher, RELATION_HOST_DAILY } from './worker.ts';
 
 export async function runRelationIntegration(pool: Pool) {
   const configuredPort = (pool as unknown as { pool: { config: { connectionConfig: { port: number } } } }).pool?.config?.connectionConfig
@@ -121,10 +121,10 @@ export async function runRelationIntegration(pool: Pool) {
       async () => {},
       Date.now() + 60000,
     );
-    for (let i = 0; i < 20; i++) await fetcher(`https://budget-${suffix}.example/robots.txt`);
+    for (let i = 0; i < RELATION_HOST_DAILY; i++) await fetcher(`https://budget-${suffix}.example/robots.txt`);
     await assert.rejects(() => fetcher(`https://budget-${suffix}.example/redirect`), /relation_http_budget/);
     assertions++;
-    check(networkCalls === 20);
+    check(networkCalls === RELATION_HOST_DAILY);
     await registerRelationRoutes(app, pool);
     const profile = await app.inject({ method: 'GET', url: `/api/blogs/relation-fixture-a-${suffix}/relations` });
     check(profile.statusCode === 200 && profile.json().coverage.totalPosts === 1);

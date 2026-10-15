@@ -3,7 +3,7 @@ import { politeFetch } from '../crawl/feed.ts';
 import { reserveBudget } from '../jobs/budget.ts';
 import type { BatchOptions, BatchResult } from '../jobs/contracts.ts';
 import { withJobLease } from '../jobs/lease.ts';
-import { budgetedRelationFetcher, relationBudgetAvailable, relationFailureCode } from '../relations/worker.ts';
+import { budgetedRelationFetcher, RELATION_PAGES_DAILY, relationBudgetAvailable, relationFailureCode } from '../relations/worker.ts';
 import { type AdoptionEnqueue, createSearchIndexAdoption } from '../search-index-adoption.ts';
 import { createTechObserver } from '../tech/observer.ts';
 import { inPublication, wordpressEvidence } from './article-content.ts';
@@ -107,7 +107,7 @@ export async function runContentBatch(
           result.skipped++;
           continue;
         }
-        if (!(await reserveBudget(pool, [{ scope: 'relations:pages', amount: 1, limit: 300 }], now()))) {
+        if (!(await reserveBudget(pool, [{ scope: 'relations:pages', amount: 1, limit: RELATION_PAGES_DAILY }], now()))) {
           result.truncated = true;
           break;
         }
