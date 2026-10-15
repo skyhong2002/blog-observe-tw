@@ -28,6 +28,13 @@ transcript：`.reviews/f4-round3/batch1-gpt-review.json`，SHA-256
 tag／YouTube 低於 2 秒。回填服務同時維持每次一篇、兩分鐘間隔；本批 capture 沒有新增
 爬取或合成 GA 事件。
 
+本次回填實跑命令為：
+`tools/index-historical-search.ts --after 24455 --batches 6 --batch-size 1 --delay-ms 120000`，
+使用 gen26 release、Nice 19／IO idle、pool size 1。六批各索引 1 篇，游標到 24461；
+每批前後首頁皆 200，耗時 2.92–5.66 秒，沒有出現 `home.mentions` 降級或 statement
+timeout。完整 stdout／首頁診斷在私有 `.reviews/overview-fix/backfill-20261015t1008.log`；
+服務完成後自動退出，舊的失敗 transient units 沒有重啟。
+
 本批基底為 fetch 後的 `origin/main` `53a408481e9c09bfd9a986e7625252220cbfa227`。本批已於 UTC2026-10-14T22:28:02.034Z 上線 blue/gen22 `58e551a79626681024bf47e70ab8e1eee2b2f073`／BUILD_ID `Xm1Rp-cc1A9eW-NCT5lnf`。起始盤點時正式為 gen21/b8；其舊圖保留原 SHA，不改標成新版本。實際候選與正式圖／獨立 review、隱私測試和回滾見 [gen22證據索引](f4-gen22-evidence.md)。
 
 ## 沿用與刻意偏離
