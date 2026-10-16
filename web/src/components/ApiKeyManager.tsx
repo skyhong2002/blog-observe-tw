@@ -2,6 +2,7 @@
 
 import { type FormEvent, useCallback, useEffect, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
+import { plainSpaces } from '@/lib/api';
 import { ApiKeyError, type ApiKeyMeta, createFence, createKey, listKeys, revokeKey } from '@/lib/api-keys';
 
 // /my's API key section. Everything is loaded in the browser with no-store, so
@@ -24,15 +25,17 @@ const time = (iso: string | null) => {
   const d = new Date(iso);
   return Number.isNaN(d.getTime())
     ? null
-    : d.toLocaleString('zh-TW', {
-        timeZone: 'Asia/Taipei',
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit',
-        hour12: false,
-      });
+    : plainSpaces(
+        d.toLocaleString('zh-TW', {
+          timeZone: 'Asia/Taipei',
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit',
+          hour: '2-digit',
+          minute: '2-digit',
+          hour12: false,
+        }),
+      );
 };
 
 export default function ApiKeyManager({ example }: { example: string }) {

@@ -143,17 +143,24 @@ export type Catalog = {
 };
 // Types and formatting only, so client components may import this file. Gateway
 // reads live in server-only modules: public-api.ts (public, no-store) and server-gateway.ts (private).
+/**
+ * Node's ICU puts a thin space (U+2009) between a date and its time where Chrome's puts a plain one; the mismatch
+ * failed hydration (React #418) on every page showing a time. Every date-time string gets plain spaces.
+ */
+export const plainSpaces = (text: string) => text.replace(/[\u00a0\u2000-\u200b\u202f]/gu, ' ');
 export function taipei(value?: string | null) {
   return value && Number.isFinite(Date.parse(value))
-    ? new Date(value).toLocaleString('zh-TW', {
-        timeZone: 'Asia/Taipei',
-        year: 'numeric',
-        month: 'numeric',
-        day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-        hourCycle: 'h23',
-      })
+    ? plainSpaces(
+        new Date(value).toLocaleString('zh-TW', {
+          timeZone: 'Asia/Taipei',
+          year: 'numeric',
+          month: 'numeric',
+          day: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit',
+          hourCycle: 'h23',
+        }),
+      )
     : '尚無紀錄';
 }
 export function plainText(value?: string | null) {
