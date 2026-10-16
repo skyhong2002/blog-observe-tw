@@ -245,7 +245,7 @@ export default function BlogCatalogView({
             ? '正在搜尋…'
             : ready
               ? q
-                ? `符合「${q}」的部落格 ${total} 個${sort === 'relevance' ? ' · 依相符程度排序' : ''}`
+                ? `符合「${q}」的部落格 ${total} 個${sort === 'relevance' && total > 1 ? ' · 依相符程度排序' : ''}`
                 : `共 ${total} 個部落格 · 沒有近期文章不代表網站失效`
               : status === 'pending'
                 ? '正在載入符合條件的部落格…'
