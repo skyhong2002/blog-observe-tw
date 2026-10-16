@@ -7,6 +7,7 @@ import * as echarts from 'echarts/core';
 import { CanvasRenderer } from 'echarts/renderers';
 import { useEffect, useRef } from 'react';
 import { brandMark } from '@/lib/brand';
+import { fitPoints, placeLabels } from '@/lib/graph-labels';
 import { mediaIconSrc, mediaIcons } from '@/lib/media-icons';
 import { blogHref } from '@/lib/page-links';
 import type { RelationEdge, RelationNode } from '@/lib/relations';
@@ -39,107 +40,139 @@ function loadedIcons(urls: string[]): Promise<Set<string>> {
     ),
   ).then((list) => new Set(list.filter((url): url is string => url !== null)));
 }
+function extent(points: number[][]) {
+  const xs = points.map((p) => p[0]),
+    ys = points.map((p) => p[1]);
+  const left = Math.min(...xs),
+    top = Math.min(...ys);
+  return { left, top, width: Math.max(1, Math.max(...xs) - left), height: Math.max(1, Math.max(...ys) - top) };
+}
 export default function BlogRelationGraph({ nodes, edges }: { nodes: RelationNode[]; edges: RelationEdge[] }) {
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (!ref.current) return;
     const chart = echarts.init(ref.current);
-    let fitted = false,
-      disposed = false,
-      loaded = new Set<string>();
+    let disposed = false,
+      loaded = new Set<string>(),
+      // Where the force layout settled (its own units); null until it has run once.
+      settled: number[][] | null = null,
+      placed: { points: number[][]; shown: Set<number> } | null = null;
     const linked = nodes.filter((n) => edges.some((e) => e.sourceBlogId === n.id || e.targetBlogId === n.id));
     const icon = new Map(linked.map((n) => [n.id, mediaIconSrc(n.slug, mediaIcons, n.iconUrl)]));
-    // Mentions received: the most-cited blogs are drawn larger, and their labels win when labels overlap.
+    // Mentions received: the most-cited blogs are drawn larger, and their names win when names would collide.
     const incoming = new Map<number, number>();
     for (const e of edges) incoming.set(e.targetBlogId, (incoming.get(e.targetBlogId) ?? 0) + e.count);
+    const symbolSize = (n: RelationNode) => Math.round(20 + Math.min(16, 4 * Math.log2(1 + (incoming.get(n.id) ?? 0))));
+    // Phones: shorter edges keep nodes apart inside a 390px canvas.
+    const isNarrow = () => chart.getWidth() < 480;
+    const labelStyle = () => {
+      const narrow = isNarrow();
+      return {
+        fontFamily: getComputedStyle(document.body).fontFamily,
+        fontSize: narrow ? 13 : 12,
+        lineHeight: narrow ? 16 : 15,
+        width: narrow ? LABEL_WIDTH_NARROW : LABEL_WIDTH,
+      };
+    };
     const render = () => {
       const dark = document.documentElement.dataset.theme === 'dark';
-      // Phones: shorter edges keep nodes apart inside a 390px canvas.
-      const narrow = (ref.current?.clientWidth ?? 0) < 480;
-      fitted = false;
-      chart.setOption({
-        animation: false,
-        tooltip: {
-          renderMode: 'richText',
-          formatter: (p: { dataType?: string; name?: string; data?: { value?: number } }) =>
-            p.dataType === 'edge' ? `${p.data?.value ?? 0} 篇文章提及` : (p.name ?? ''),
-        },
-        series: [
-          {
-            type: 'graph',
-            layout: 'force',
-            roam: true,
-            // Settled before the first paint, so the phone fit below sees final positions.
-            force: narrow
-              ? { repulsion: 220, edgeLength: [70, 120], layoutAnimation: false }
-              : { repulsion: 180, edgeLength: [90, 170], layoutAnimation: false },
-            edgeSymbol: ['none', 'arrow'],
-            edgeSymbolSize: 7,
-            // Full names wrap onto a second line instead of being cut with an ellipsis; in the page's own font.
-            // Only blogs mentioned at least LABELLED_MENTIONS times keep a name on the map; the rest show it on hover,
-            // and overlapping labels are hidden, the smaller node's first (echarts ranks labels by symbol area).
-            labelLayout: { hideOverlap: true },
-            emphasis: { focus: 'adjacency', label: { show: true } },
-            label: {
-              show: true,
-              position: 'bottom',
-              fontFamily: getComputedStyle(document.body).fontFamily,
-              color: dark ? '#d4d4d8' : '#3f3f46',
-              fontSize: narrow ? 13 : 12,
-              lineHeight: narrow ? 16 : 15,
-              width: narrow ? LABEL_WIDTH_NARROW : LABEL_WIDTH,
-              overflow: 'break',
-            },
-            lineStyle: { color: dark ? '#a1a1aa' : '#71717a', opacity: 0.55, curveness: 0.12 },
-            // Each blog is drawn as its own icon; without one (or when it does not load), a green dot.
-            data: linked.map((n) => {
-              const src = icon.get(n.id);
-              return {
-                id: String(n.id),
-                name: n.name,
-                symbol: src && loaded.has(src) ? `image://${src}` : 'circle',
-                symbolSize: Math.round(20 + Math.min(16, 4 * Math.log2(1 + (incoming.get(n.id) ?? 0)))),
-                label: { show: (incoming.get(n.id) ?? 0) >= LABELLED_MENTIONS },
-                itemStyle: { color: brandMark(dark) },
-              };
-            }),
-            links: edges.map((e) => ({
-              source: String(e.sourceBlogId),
-              target: String(e.targetBlogId),
-              value: e.count,
-              lineStyle: { width: Math.min(6, 1 + Math.log2(1 + e.count)) },
-            })),
+      const narrow = isNarrow();
+      chart.setOption(
+        {
+          animation: false,
+          tooltip: {
+            renderMode: 'richText',
+            formatter: (p: { dataType?: string; name?: string; data?: { value?: number } }) =>
+              p.dataType === 'edge' ? `${p.data?.value ?? 0} 篇文章提及` : (p.name ?? ''),
           },
-        ],
-      });
+          series: [
+            {
+              type: 'graph',
+              // First a force layout; once settled, the nodes are pinned where they landed (see place()).
+              layout: placed ? 'none' : 'force',
+              // Pinned points are already fitted to the canvas in pixels. echarts scales a graph's points into its
+              // box, so the box is exactly their extent: an identity mapping.
+              ...(placed ? extent(placed.points) : {}),
+              roam: true,
+              force: narrow
+                ? { repulsion: 220, edgeLength: [70, 120], layoutAnimation: false }
+                : { repulsion: 180, edgeLength: [90, 170], layoutAnimation: false },
+              edgeSymbol: ['none', 'arrow'],
+              edgeSymbolSize: 7,
+              // Names in the page's own font; a long one wraps onto a second line rather than being cut.
+              // Every name shows on hover; on the map only those placed without colliding (see placeLabels).
+              emphasis: { focus: 'adjacency', label: { show: true } },
+              label: {
+                show: true,
+                position: 'bottom',
+                color: dark ? '#d4d4d8' : '#3f3f46',
+                overflow: 'break',
+                ...labelStyle(),
+              },
+              lineStyle: { color: dark ? '#a1a1aa' : '#71717a', opacity: 0.55, curveness: 0.12 },
+              // Each blog is drawn as its own icon; without one (or when it does not load), a green dot.
+              data: linked.map((n, i) => {
+                const src = icon.get(n.id);
+                return {
+                  id: String(n.id),
+                  name: n.name,
+                  ...(placed ? { x: placed.points[i][0], y: placed.points[i][1] } : {}),
+                  symbol: src && loaded.has(src) ? `image://${src}` : 'circle',
+                  symbolSize: symbolSize(n),
+                  label: { show: placed ? placed.shown.has(i) : false },
+                  itemStyle: { color: brandMark(dark) },
+                };
+              }),
+              links: edges.map((e) => ({
+                source: String(e.sourceBlogId),
+                target: String(e.targetBlogId),
+                value: e.count,
+                lineStyle: { width: Math.min(6, 1 + Math.log2(1 + e.count)) },
+              })),
+            },
+          ],
+        },
+        { replaceMerge: ['series'] },
+      );
     };
-    // A force layout has no bounds: a node can settle at (or past) the canvas edge with its label cut off.
-    // Once laid out, pan and (only ever) shrink the view so every node and its label fits the canvas.
+    // A force layout has no bounds, and echarts' hideOverlap does not hold for it: fit the settled nodes into the
+    // canvas here, then give names (most-mentioned first) only where they collide with no other name or node.
+    const place = () => {
+      if (!settled) return;
+      const style = labelStyle();
+      const width = chart.getWidth(),
+        height = chart.getHeight();
+      const points = fitPoints(settled, width, height, { side: 18, above: 18, below: 2 * style.lineHeight + 8 });
+      const measure = document.createElement('canvas').getContext('2d');
+      if (measure) measure.font = `${style.fontSize}px ${style.fontFamily}`;
+      const shown = placeLabels(
+        linked.map((n, i) => ({
+          x: points[i][0],
+          y: points[i][1],
+          size: symbolSize(n),
+          textWidth: measure ? measure.measureText(n.name).width : n.name.length * style.fontSize,
+          rank: incoming.get(n.id) ?? 0,
+          wanted: (incoming.get(n.id) ?? 0) >= LABELLED_MENTIONS,
+        })),
+        { maxWidth: style.width, lineHeight: style.lineHeight, gap: 5, pad: 2, width, height },
+      );
+      placed = { points, shown };
+      render();
+    };
     chart.on('finished', () => {
-      if (fitted) return;
+      if (settled) return;
       // A resize before the icons load also fires 'finished', on a chart with no option (and no model) yet.
       const data = (chart as unknown as { getModel(): { getSeriesByIndex(i: number): { getData(): GraphData } | undefined } | undefined })
         .getModel()
         ?.getSeriesByIndex(0)
         ?.getData();
-      const points = Array.from({ length: data?.count() ?? 0 }, (_, i) => data?.getItemLayout(i))
-        .filter((p): p is number[] => Array.isArray(p))
-        .map((p) => chart.convertToPixel({ seriesIndex: 0 }, p) as number[]);
-      if (!points.length) return;
-      fitted = true;
-      const xs = points.map((p) => p[0]),
-        ys = points.map((p) => p[1]);
-      const [left, right, top, bottom] = [Math.min(...xs), Math.max(...xs), Math.min(...ys), Math.max(...ys)];
-      const side = (chart.getWidth() < 480 ? LABEL_WIDTH_NARROW : LABEL_WIDTH) / 2 + 6,
-        above = 18,
-        below = 54;
-      const width = chart.getWidth(),
-        height = chart.getHeight();
-      const zoom = Math.min(1, (width - 2 * side) / Math.max(1, right - left), (height - above - below) / Math.max(1, bottom - top));
-      const cx = width / 2,
-        cy = above + (height - above - below) / 2;
-      chart.dispatchAction({ type: 'graphRoam', seriesIndex: 0, dx: cx - (left + right) / 2, dy: cy - (top + bottom) / 2 });
-      if (zoom < 1) chart.dispatchAction({ type: 'graphRoam', seriesIndex: 0, zoom, originX: cx, originY: cy });
+      const points = Array.from({ length: data?.count() ?? 0 }, (_, i) => data?.getItemLayout(i)).filter((p): p is number[] =>
+        Array.isArray(p),
+      );
+      if (!points.length || points.length !== linked.length) return;
+      settled = points.map((p) => [p[0], p[1]]);
+      // Outside echarts' own render pass, which is what fires 'finished'.
+      setTimeout(() => !disposed && place(), 0);
     });
     // Wait (briefly) for the icons, so the force layout runs once with the final symbols.
     void loadedIcons([...new Set([...icon.values()].filter((src): src is string => Boolean(src)))]).then((ok) => {
@@ -154,7 +187,11 @@ export default function BlogRelationGraph({ nodes, edges }: { nodes: RelationNod
         if (n) window.location.assign(blogHref(n.slug, n.canonicalPath));
       }
     });
-    const resize = new ResizeObserver(() => chart.resize());
+    // Same settled layout, refitted (and its names re-placed) to the new size.
+    const resize = new ResizeObserver(() => {
+      chart.resize();
+      place();
+    });
     resize.observe(ref.current);
     const theme = new MutationObserver(render);
     theme.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
