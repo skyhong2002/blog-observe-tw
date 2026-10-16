@@ -13,6 +13,7 @@ import { registerContentRoutes } from './content/routes.ts';
 import { createDb } from './db/client.ts';
 import { loadOverview } from './overview.js';
 import { overviewFailureDetails } from './overview-diagnostics.ts';
+import { crawlIntervalHours, postingIntervalHours } from './posting-interval.js';
 import { gatewayRateKey, gatewayRateMax } from './public-api/client-ip.ts';
 import { installPublicApiPolicy, publicApiPath } from './public-api/middleware.ts';
 import { queryValues } from './public-api/query.ts';
@@ -147,8 +148,10 @@ export async function buildApp(config, { logger = false, store = null } = {}) {
       });
     } catch (error) {
       // Log only a bounded database error code, never SQL, text, credentials or headers.
-      request.log.error({ operation: 'overview', view: request.query?.view === 'home' ? 'home' : 'full',
-        ...overviewFailureDetails(error, pool) }, 'public overview read failed');
+      request.log.error(
+        { operation: 'overview', view: request.query?.view === 'home' ? 'home' : 'full', ...overviewFailureDetails(error, pool) },
+        'public overview read failed',
+      );
       return reply.code(503).send({ error: 'unavailable' });
     }
   });
@@ -202,7 +205,22 @@ export async function buildApp(config, { logger = false, store = null } = {}) {
        WHERE bt.blog_id=? AND bt.status='active' AND t.visibility='public' AND t.status='active' ORDER BY t.label`,
       [blogs[0].id],
     );
-    return { blog: { ...blogs[0], iconUrl: iconUrl(blogs[0].slug, await iconManifest()), authors, tags }, posts: posts.map(publicPost) };
+    // How often it actually posts: the median gap between its latest 21 published posts (a fixed default was shown).
+    const [dates] = await pool.query(
+      'SELECT published_at AS at FROM posts WHERE blog_id=? AND published_at IS NOT NULL AND published_at<=UTC_TIMESTAMP() ORDER BY published_at DESC LIMIT 21',
+      [blogs[0].id],
+    );
+    return {
+      blog: {
+        ...blogs[0],
+        iconUrl: iconUrl(blogs[0].slug, await iconManifest()),
+        authors,
+        tags,
+        postingIntervalHours: postingIntervalHours(dates.map((row) => row.at)),
+        crawlIntervalHours: crawlIntervalHours(),
+      },
+      posts: posts.map(publicPost),
+    };
   });
 
   const login = registerLogin(app, config.login ? dbLoginStore(own.db, { pool, adminEmails: config.adminEmails }) : null, config.login);

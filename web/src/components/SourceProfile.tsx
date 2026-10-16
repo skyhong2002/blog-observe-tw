@@ -9,10 +9,23 @@ import { blogHref } from '@/lib/page-links';
 import FollowButton from './follow-button';
 import MediaSidebar from './MediaSidebar';
 import SectionTabs from './SectionTabs';
+
 /**
  * `cloud` is a server-rendered slot (the page passes BlogTopicCloud in its own Suspense): the profile's word cloud
  * is drawn from the blog's local topic ranking, never from its raw tags, and this component never fetches it.
  */
+/** The median gap between its latest posts, in words: 約每天, 約每 3 天, 約每 2 週. */
+function postingText(hours: number | null | undefined) {
+  if (hours === undefined) return '未提供';
+  if (hours === null) return '文章太少，尚無法估計';
+  if (hours < 18) return '一天數篇';
+  const days = Math.round(hours / 24);
+  if (days <= 1) return '約每天';
+  if (days < 14) return `約每 ${days} 天`;
+  if (days < 60) return `約每 ${Math.round(days / 7)} 週`;
+  return `約每 ${Math.round(days / 30)} 個月`;
+}
+
 export default function SourceProfile({ blog, sidebar, cloud }: { blog: Blog; sidebar?: ReactNode; cloud?: ReactNode }) {
   const allPosts = blog.posts ?? [];
   const owner = { slug: blog.slug, name: blog.name, canonicalPath: blog.canonicalPath };
@@ -82,8 +95,10 @@ export default function SourceProfile({ blog, sidebar, cloud }: { blog: Blog; si
               <dd>{taipei(blog.lastPublishedAt)}</dd>
               <dt className="text-zinc-500 dark:text-zinc-400">抓取成功</dt>
               <dd>{taipei(blog.lastCrawlSuccessAt)}</dd>
-              <dt className="text-zinc-500 dark:text-zinc-400">預期更新</dt>
-              <dd>{blog.expectedIntervalHours ? `約每 ${blog.expectedIntervalHours} 小時` : '尚未設定'}</dd>
+              <dt className="text-zinc-500 dark:text-zinc-400">發文頻率</dt>
+              <dd>{postingText(blog.postingIntervalHours)}</dd>
+              <dt className="text-zinc-500 dark:text-zinc-400">檢查頻率</dt>
+              <dd>{blog.crawlIntervalHours ? `每 ${blog.crawlIntervalHours} 小時檢查 RSS` : '未提供'}</dd>
             </dl>
             <p className="mt-3 border-t border-zinc-200 pt-3 leading-5 text-zinc-500 dark:border-zinc-800">
               沒有近期文章不代表網站失效，抓取成功與發文時間分開記錄。

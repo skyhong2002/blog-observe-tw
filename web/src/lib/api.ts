@@ -17,6 +17,10 @@ export type Blog = {
   lastCrawlSuccessAt?: string | null;
   lastPublishedAt?: string | null;
   expectedIntervalHours?: number;
+  /** Median gap between its latest posts, in hours; null with fewer than 3 posts. */
+  postingIntervalHours?: number | null;
+  /** How often the RSS is checked, in hours. */
+  crawlIntervalHours?: number;
   postCount?: number;
   /** /api/catalog: distinct active authors recorded for the blog. */
   authorCount?: number;
