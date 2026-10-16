@@ -31,6 +31,7 @@ try {
           'topic-fingerprint-sql',
           'staged-scan-proof',
           'staged-proof-inspector',
+          'scheduler-candidates',
         ].includes(process.argv[5])))
   )
     throw Error('explicit_private_clone_env_required');
@@ -93,11 +94,13 @@ try {
     ['budgets-ai', '../tests/integration/core.mjs', 'runCoreIntegration'],
     ['candidates', '../tests/integration/candidates.mjs', 'runCandidateIntegration'],
     ['relations', '../app/src/relations/integration.ts', 'runRelationIntegration'],
+    ['relation-candidates', '../app/src/relations/candidates.integration.ts', 'runRelationCandidatesIntegration'],
     ['relation-visibility', '../app/src/relations/visibility.integration.ts', 'runRelationVisibilityIntegration'],
     ['relations-quality', '../app/src/relations/quality.integration.ts', 'runRelationQualityIntegration'],
     ['topics', '../tests/integration/topics.mjs', 'runTopicsIntegration'],
     ['topic-frequency', '../app/src/topics/frequency.integration.ts', 'runTopicFrequencyIntegration'],
     ['topic-history', '../app/src/topics/history.integration.ts', 'runTopicHistoryIntegration'],
+    ['topic-history-candidates', '../app/src/topics/history-candidates.integration.ts', 'runHistoryCandidatesIntegration'],
     ['content-visibility', '../tests/integration/content-visibility.mjs', 'runContentVisibilityIntegration'],
     ['future-visibility', '../app/src/future-visibility.integration.ts', 'runFutureVisibilityIntegration'],
     ['topic-history-read', '../app/src/topics/history-read.integration.ts', 'runTopicHistoryReadIntegration'],
@@ -168,7 +171,9 @@ try {
                           ? suites.filter(([label]) => label === 'staged-scan-proof')
                           : process.argv[5] === 'staged-proof-inspector'
                             ? suites.filter(([label]) => label === 'staged-proof-inspector')
-                            : suites;
+                            : process.argv[5] === 'scheduler-candidates'
+                              ? suites.filter(([label]) => label === 'relation-candidates' || label === 'topic-history-candidates')
+                              : suites;
   // Without --suite every suite gets its own fresh database: several assume an empty corpus
   // (staged-scan-proof asserts it), so sharing one database made the full run stop there.
   for (const [index, [label, module, entry]] of selected.entries()) {

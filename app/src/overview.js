@@ -36,19 +36,21 @@ const blogDto = (row, icons) => {
   };
 };
 
-/** Select the eight visible profiles before counting their posts; do not aggregate
- * every author on every no-store homepage request. Both joins recheck public data. */
-export const HOME_AUTHORS_SQL = `SELECT chosen.id,chosen.displayName,chosen.blogSlug,chosen.blogName,
+/** Select the visible profiles before counting their posts; do not aggregate every
+ * author's post links just to keep the first page. Both joins recheck public data. */
+const authorsSql = (limit) => `SELECT chosen.id,chosen.displayName,chosen.blogSlug,chosen.blogName,
  COUNT(DISTINCT p.id) AS postCount
  FROM (SELECT a.id,a.display_name AS displayName,b.id blogId,b.slug AS blogSlug,b.name AS blogName
   FROM authors a JOIN blog_authors ba ON ba.author_id=a.id JOIN blogs b ON b.id=ba.blog_id
   WHERE a.status<>'rejected' AND ba.status='active' AND b.status='verified'
-  ORDER BY a.display_name,b.slug LIMIT 8) chosen
+  ORDER BY a.display_name,b.slug LIMIT ${limit}) chosen
  LEFT JOIN post_authors pa ON pa.author_id=chosen.id AND pa.status='active'
  LEFT JOIN posts p ON p.id=pa.post_id AND p.blog_id=chosen.blogId
   AND (p.published_at IS NULL OR p.published_at<=UTC_TIMESTAMP())
  GROUP BY chosen.id,chosen.displayName,chosen.blogSlug,chosen.blogName
  ORDER BY chosen.displayName,chosen.blogSlug`;
+export const HOME_AUTHORS_SQL = authorsSql(8);
+export const FULL_AUTHORS_SQL = authorsSql(200);
 
 /** Homepage needs bounded body-link evidence, eight authors and ten recent blogs.
  * Keep the full overview contract available, but do not collect unused catalog/description rows.
@@ -124,13 +126,7 @@ async function loadProjection(pool) {
       FROM tags t JOIN post_tags pt ON pt.tag_id=t.id JOIN posts p ON p.id=pt.post_id JOIN blogs b ON b.id=p.blog_id
       WHERE b.status='verified' AND t.visibility='public' AND t.status='active' AND pt.status='active' AND (p.published_at IS NULL OR p.published_at<=UTC_TIMESTAMP())
       GROUP BY t.id,t.slug,t.label ORDER BY blogCount DESC,postCount DESC,t.slug LIMIT 100`)),
-    overviewRead(pool, 'full.authors', () => pool.query(`SELECT a.id,a.display_name AS displayName,b.slug AS blogSlug,b.name AS blogName,
-      COUNT(DISTINCT p.id) AS postCount FROM authors a
-      JOIN blog_authors ba ON ba.author_id=a.id JOIN blogs b ON b.id=ba.blog_id
-      LEFT JOIN post_authors pa ON pa.author_id=a.id AND pa.status='active'
-      LEFT JOIN posts p ON p.id=pa.post_id AND p.blog_id=b.id AND (p.published_at IS NULL OR p.published_at<=UTC_TIMESTAMP())
-      WHERE a.status <> 'rejected' AND ba.status='active' AND b.status='verified'
-      GROUP BY a.id,a.display_name,b.slug,b.name ORDER BY a.display_name,b.slug LIMIT 200`)),
+    overviewRead(pool, 'full.authors', () => pool.query(FULL_AUTHORS_SQL)),
     overviewRead(pool, 'full.blogs', () => pool.query(`SELECT ${blogFields} FROM blogs b ${latestJoin} WHERE b.status='verified' ORDER BY postCount DESC,b.name LIMIT 200`)),
     overviewRead(pool, 'full.totals', () => pool.query(`SELECT (SELECT COUNT(*) FROM blogs WHERE status='verified') AS blogs,
       (SELECT COUNT(*) FROM posts p JOIN blogs b ON b.id=p.blog_id WHERE b.status='verified' AND (p.published_at IS NULL OR p.published_at<=UTC_TIMESTAMP())) AS posts,

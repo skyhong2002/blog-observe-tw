@@ -22,6 +22,35 @@ import {
 
 type BudgetedFetcher = FeedFetcher & { lastFailure: 'budget-exhausted' | 'batch-stopped' | null };
 
+const RELATION_FIELDS =
+  'p.id,p.blog_id,p.url,p.published_at,b.url blog_url,COALESCE(rp.depth,0) depth,o.etag,o.last_modified,o.status,o.parser_version';
+/** Never-observed posts sort first (COALESCE(..., 1970)) and need no body comparison. While at least
+ * `limit` of them exist they are the whole answer, so the full query, which joins every observation to
+ * its stored body, only runs once that backlog is nearly gone or a row is due at the epoch itself. */
+export async function selectRelationCandidates(pool: Pool, blogId: number | null, now: Date, limit: number) {
+  const [unobserved] = await pool.query<RowDataPacket[]>(
+    `SELECT ${RELATION_FIELDS}
+      FROM posts p JOIN blogs b ON b.id=p.blog_id LEFT JOIN relation_observations o ON o.post_id=p.id
+      LEFT JOIN relation_publications rp ON rp.blog_id=b.id
+      WHERE b.status='verified' AND (? IS NULL OR p.blog_id=?) AND o.post_id IS NULL
+      ORDER BY p.published_at DESC,p.id DESC LIMIT ?`,
+    [blogId, blogId, limit],
+  );
+  if (unobserved.length === limit) {
+    const [[epoch]] = await pool.query<RowDataPacket[]>("SELECT 1 FROM relation_observations WHERE next_attempt_at<='1970-01-01' LIMIT 1");
+    if (!epoch) return unobserved;
+  }
+  const [rows] = await pool.query<RowDataPacket[]>(
+    `SELECT ${RELATION_FIELDS}
+      FROM posts p JOIN blogs b ON b.id=p.blog_id LEFT JOIN relation_observations o ON o.post_id=p.id
+      LEFT JOIN relation_publications rp ON rp.blog_id=b.id LEFT JOIN content_post_bodies cb ON cb.post_id=p.id
+      WHERE b.status='verified' AND (? IS NULL OR p.blog_id=?) AND (o.post_id IS NULL OR o.next_attempt_at<=? OR (o.parser_version<>? AND o.status IN ('ok','no-body') AND o.error_code IS NULL) OR (cb.status='ok' AND NOT(o.extraction<=>CONCAT('content:',cb.source_kind,':',LEFT(cb.content_hash,24)))))
+      ORDER BY COALESCE(o.next_attempt_at,'1970-01-01'),p.published_at DESC,p.id DESC LIMIT ?`,
+    [blogId, blogId, now, PARSER_VERSION, limit],
+  );
+  return rows;
+}
+
 /**
  * Daily UTC budgets shared by the relation and content crawlers: article pages fetched, every HTTP request (robots and
  * redirects too), and requests per origin, so no site is asked more than RELATION_HOST_DAILY times a day.
@@ -109,14 +138,7 @@ export async function runRelationBatch(
         const aliases = await loadAliases(pool);
         // A small slice per run: the job now runs every minute, and each recheck is one write on the shared database.
         const resolved = await reconcileTargets(pool, aliases, now(), 100);
-        const [rows] = await pool.query<RowDataPacket[]>(
-          `SELECT p.id,p.blog_id,p.url,p.published_at,b.url blog_url,COALESCE(rp.depth,0) depth,o.etag,o.last_modified,o.status,o.parser_version
-      FROM posts p JOIN blogs b ON b.id=p.blog_id LEFT JOIN relation_observations o ON o.post_id=p.id
-      LEFT JOIN relation_publications rp ON rp.blog_id=b.id LEFT JOIN content_post_bodies cb ON cb.post_id=p.id
-      WHERE b.status='verified' AND (? IS NULL OR p.blog_id=?) AND (o.post_id IS NULL OR o.next_attempt_at<=? OR (o.parser_version<>? AND o.status IN ('ok','no-body') AND o.error_code IS NULL) OR (cb.status='ok' AND NOT(o.extraction<=>CONCAT('content:',cb.source_kind,':',LEFT(cb.content_hash,24)))))
-      ORDER BY COALESCE(o.next_attempt_at,'1970-01-01'),p.published_at DESC,p.id DESC LIMIT ?`,
-          [options.blogId ?? null, options.blogId ?? null, now(), PARSER_VERSION, 50],
-        );
+        const rows = await selectRelationCandidates(pool, options.blogId ?? null, now(), 50);
         const fetcher = budgetedRelationFetcher(pool, options, assertLease, deadline);
         // Stored bodies need no request; unless the caller allows more, they share `limit` with fetched pages.
         const storedLimit = Math.max(0, Math.min(50, Math.trunc(options.storedLimit ?? 0)));

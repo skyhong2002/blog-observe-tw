@@ -21,6 +21,59 @@ export type HistoryRevalidationResult = {
   disabled?: boolean;
   leaseBusy?: boolean;
 };
+type RevalidationCandidate = { post_id: number; oldest: Date };
+
+/** The full definition: every unrevoked row whose post is gone, pending, re-hashed or older than the cutoff.
+ * Hashing joins every evidence row to its article body, so it reads most of content_post_bodies. */
+export async function scanRevalidationCandidates(pool: Pool, cutoff: Date, limit: number, postIds?: number[]) {
+  const [rows] = await pool.query<RowDataPacket[]>(
+    `SELECT e.post_id,MIN(e.checked_at) oldest FROM topic_article_evidence e
+       LEFT JOIN posts p ON p.id=e.post_id ${topicBodyJoins}
+       JOIN topic_pages hp ON hp.canonical_id=e.canonical_id AND hp.state<>'merged'
+       WHERE e.state<>'revoked' ${postIds ? 'AND e.post_id IN (?)' : ''} AND (p.id IS NULL OR e.state='pending' OR NOT(e.post_hash<=>p.content_hash)
+         OR NOT(e.body_hash<=>(${topicBodyHash})) OR e.checked_at<?)
+       GROUP BY e.post_id ORDER BY oldest,e.post_id LIMIT ?`,
+    [...(postIds ? [postIds] : []), cutoff, limit],
+  );
+  return rows as RevalidationCandidate[];
+}
+
+const STALE_WINDOWS = [4_000, 16_000, 64_000, 256_000];
+/** Same result as the full scan, read from topic_history_work. Every row checked before the cutoff
+ * qualifies, so a post's oldest qualifying row is its first stale row in (checked_at, post_id) order,
+ * and any post with a stale row sorts ahead of every post without one. Once `limit` stale posts are
+ * known the hash comparison cannot change the answer; only a short stale backlog needs the full scan. */
+export async function selectRevalidationCandidates(pool: Pool, cutoff: Date, limit: number, postIds?: number[]) {
+  if (postIds) return scanRevalidationCandidates(pool, cutoff, limit, postIds);
+  const key = (r: RowDataPacket) => [new Date(r.checked_at).getTime(), Number(r.post_id)] as const;
+  const before = (a: readonly [number, number], b: readonly [number, number]) => a[0] < b[0] || (a[0] === b[0] && a[1] < b[1]);
+  for (const window of STALE_WINDOWS) {
+    const states = await Promise.all(
+      (['confirmed', 'pending'] as const).map(async (state) => {
+        const [rows] = await pool.query<RowDataPacket[]>(
+          `SELECT STRAIGHT_JOIN e.post_id,e.checked_at FROM topic_article_evidence e FORCE INDEX (topic_history_work)
+           JOIN topic_pages hp ON hp.canonical_id=e.canonical_id AND hp.state<>'merged'
+           WHERE e.state=? AND e.checked_at<? ORDER BY e.checked_at,e.post_id LIMIT ?`,
+          [state, cutoff, window],
+        );
+        return rows;
+      }),
+    );
+    // Rows past the shortest full window may be missing from the other state's window.
+    const bound = states
+      .filter((rows) => rows.length === window)
+      .map((rows) => key(rows[rows.length - 1]))
+      .reduce<readonly [number, number] | null>((min, k) => (!min || before(k, min) ? k : min), null);
+    const candidates = new Map<number, RevalidationCandidate>();
+    for (const r of states.flat().sort((a, b) => (before(key(a), key(b)) ? -1 : before(key(b), key(a)) ? 1 : 0))) {
+      if (bound && !before(key(r), bound)) break;
+      if (!candidates.has(Number(r.post_id))) candidates.set(Number(r.post_id), { post_id: Number(r.post_id), oldest: r.checked_at });
+    }
+    if (candidates.size >= limit) return [...candidates.values()].slice(0, limit);
+    if (!bound) break;
+  }
+  return scanRevalidationCandidates(pool, cutoff, limit);
+}
 /** No network requests. The historical matcher contains exactly the ledger terms for this article;
  * unlike the current rolling matcher, its absence result really covers those historical terms. */
 export async function revalidateTopicHistory(
@@ -40,15 +93,7 @@ export async function revalidateTopicHistory(
   return (
     (await withJobLease(pool, 'topics', async (assertLease) => {
       const now = options.now?.() ?? new Date();
-      const [posts] = await pool.query<RowDataPacket[]>(
-        `SELECT e.post_id,MIN(e.checked_at) oldest FROM topic_article_evidence e
-       LEFT JOIN posts p ON p.id=e.post_id ${topicBodyJoins}
-       JOIN topic_pages hp ON hp.canonical_id=e.canonical_id AND hp.state<>'merged'
-       WHERE e.state<>'revoked' ${options.postIds ? 'AND e.post_id IN (?)' : ''} AND (p.id IS NULL OR e.state='pending' OR NOT(e.post_hash<=>p.content_hash)
-         OR NOT(e.body_hash<=>(${topicBodyHash})) OR e.checked_at<?)
-       GROUP BY e.post_id ORDER BY oldest,e.post_id LIMIT ?`,
-        [...(options.postIds ? [options.postIds] : []), new Date(now.getTime() - 6 * 3600_000), limit],
-      );
+      const posts = await selectRevalidationCandidates(pool, new Date(now.getTime() - 6 * 3600_000), limit, options.postIds);
       result.truncated = posts.length === limit;
       for (const candidate of posts) {
         if (options.signal?.aborted || Date.now() - started >= duration) {
