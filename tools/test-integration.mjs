@@ -118,6 +118,7 @@ try {
     ['content-topics', '../app/src/topics/content.integration.ts', 'runContentTopicsIntegration'],
     ['content-feed', '../app/src/crawl/feed-content.integration.ts', 'runFeedContentIntegration'],
     ['content', '../app/src/content/content.integration.ts', 'runContentIntegration'],
+    ['content-candidates', '../app/src/content/candidates.integration.ts', 'runContentCandidatesIntegration'],
     ['public-api', '../app/src/public-api/integration.ts', 'runPublicApiIntegration'],
     ['api-keys', '../app/src/reader/api-keys.integration.ts', 'runApiKeyIntegration'],
     ['admin', '../tests/integration/admin.mjs', 'runAdminIntegration'],
@@ -172,7 +173,7 @@ try {
                           : process.argv[5] === 'staged-proof-inspector'
                             ? suites.filter(([label]) => label === 'staged-proof-inspector')
                             : process.argv[5] === 'scheduler-candidates'
-                              ? suites.filter(([label]) => label === 'relation-candidates' || label === 'topic-history-candidates')
+                              ? suites.filter(([label]) => label.endsWith('-candidates'))
                               : suites;
   // Without --suite every suite gets its own fresh database: several assume an empty corpus
   // (staged-scan-proof asserts it), so sharing one database made the full run stop there.

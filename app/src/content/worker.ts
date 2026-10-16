@@ -57,6 +57,28 @@ async function noteFailure(pool: Pool, post: RowDataPacket, rule: ContentRule, r
     c.release();
   }
 }
+const UPGRADE = "c.adapter_version<>? AND c.source_kind='article-html' AND c.status<>'ok'";
+/** The scheduler order over posts without a body, due bodies and older-adapter page failures, without reading
+ * every stored body: each branch reads one index. No branch limit can drop a row from the first `limit`: posts
+ * without a body share one sort key, and every row that can sort first (content-limit upgrades) is in the
+ * unlimited upgrade branch. */
+export async function selectContentCandidates(pool: Pool, blogId: number | null, now: Date, limit: number) {
+  const scope = "b.status='verified' AND (? IS NULL OR p.blog_id=?) AND b.url IS NOT NULL";
+  const [rows] = await pool.query<RowDataPacket[]>(
+    `SELECT p.id,p.blog_id,p.url,b.url blog_url,c.etag,c.last_modified,c.status,c.content_hash,c.source_kind,c.source_url FROM (
+      (SELECT p.id FROM posts p JOIN blogs b ON b.id=p.blog_id WHERE ${scope}
+        AND NOT EXISTS (SELECT 1 FROM content_post_bodies c FORCE INDEX (content_bodies_schedule) WHERE c.post_id=p.id)
+        ORDER BY p.published_at DESC,p.id DESC LIMIT ?)
+      UNION (SELECT p.id FROM content_post_bodies c FORCE INDEX (content_bodies_due) JOIN posts p ON p.id=c.post_id JOIN blogs b ON b.id=p.blog_id
+        WHERE c.next_attempt_at<=? AND ${scope} ORDER BY c.next_attempt_at,p.published_at DESC,p.id DESC LIMIT ?)
+      UNION (SELECT p.id FROM content_post_bodies c FORCE INDEX (content_bodies_schedule) JOIN posts p ON p.id=c.post_id JOIN blogs b ON b.id=p.blog_id
+        WHERE ${UPGRADE} AND ${scope})
+    ) pick JOIN posts p ON p.id=pick.id JOIN blogs b ON b.id=p.blog_id LEFT JOIN content_post_bodies c ON c.post_id=p.id
+    ORDER BY CASE WHEN ${UPGRADE} AND c.last_error='content-limit' THEN 0 ELSE 1 END,COALESCE(c.next_attempt_at,'1970-01-01'),p.published_at DESC,p.id DESC LIMIT ?`,
+    [blogId, blogId, limit, now, blogId, blogId, limit, CONTENT_VERSION, blogId, blogId, CONTENT_VERSION, limit],
+  );
+  return rows;
+}
 /** Shared relations lease + actual HTTP scopes: the body worker and legacy article fetch can never race. */
 export async function runContentBatch(
   pool: Pool,
@@ -72,13 +94,7 @@ export async function runContentBatch(
         deadline = Date.now() + Math.max(1000, Math.min(120000, options.maxDurationMs ?? 120000));
       await initializeContentRules(pool, now());
       await pool.execute('DELETE FROM content_attempts WHERE observed_at<? LIMIT 1000', [new Date(now().getTime() - 30 * 86400000)]);
-      const [posts] = await pool.query<RowDataPacket[]>(
-        `SELECT p.id,p.blog_id,p.url,b.url blog_url,c.etag,c.last_modified,c.status,c.content_hash,c.source_kind,c.source_url
-   FROM posts p JOIN blogs b ON b.id=p.blog_id LEFT JOIN content_post_bodies c ON c.post_id=p.id
-   WHERE b.status='verified' AND (? IS NULL OR p.blog_id=?) AND b.url IS NOT NULL AND (c.post_id IS NULL OR c.next_attempt_at<=? OR (c.adapter_version<>? AND c.source_kind='article-html' AND c.status<>'ok'))
-   ORDER BY CASE WHEN c.adapter_version<>? AND c.source_kind='article-html' AND c.status<>'ok' AND c.last_error='content-limit' THEN 0 ELSE 1 END,COALESCE(c.next_attempt_at,'1970-01-01'),p.published_at DESC,p.id DESC LIMIT 50`,
-        [options.blogId ?? null, options.blogId ?? null, now(), CONTENT_VERSION, CONTENT_VERSION],
-      );
+      const posts = await selectContentCandidates(pool, options.blogId ?? null, now(), 50);
       const fetcher = budgetedRelationFetcher(pool, options, assertLease, deadline);
       let attempts = 0;
       for (const post of posts) {

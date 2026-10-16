@@ -48,7 +48,11 @@ export const contentPostBodies = mysqlTable(
     coverage: varchar('coverage', { length: 32 }).notNull(),
     pageLinks: json('page_links'),
   },
-  (t) => [index('content_bodies_due').on(t.nextAttemptAt, t.postId), index('content_bodies_blog').on(t.blogId, t.status)],
+  (t) => [
+    index('content_bodies_due').on(t.nextAttemptAt, t.postId),
+    index('content_bodies_blog').on(t.blogId, t.status),
+    index('content_bodies_schedule').on(t.postId, t.adapterVersion, t.sourceKind, t.status),
+  ],
 );
 export const contentAttempts = mysqlTable(
   'content_attempts',
