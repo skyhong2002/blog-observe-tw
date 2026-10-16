@@ -17,6 +17,8 @@ test('relation lists keep each icon and name on one line', () => {
   assert.match(map, /className="inline-flex min-w-0 items-center gap-1\.5/);
   assert.match(map, /<li className="flex items-center justify-between gap-4 py-2\.5 text-sm"/);
   assert.match(map, /rounded-full border border-zinc-300/);
+  // Phones: both list cards may shrink below their widest pair of chips (no sideways page scroll).
+  assert.equal(map.match(/<section className="min-w-0 rounded-xl border border-zinc-300 p-4/g)?.length, 2);
   assert.doesNotMatch(map, /<p className="mt-1 text-xs text-zinc-500">期間內兩個方向/);
 });
 

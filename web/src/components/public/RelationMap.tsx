@@ -86,8 +86,9 @@ function RelationDetails({ data }: { data: Relations }) {
           {data.coverage.graphTruncated ? '圖中只顯示部分節點與連結。' : ''}
         </p>
       </section>
+      {/* min-w-0: a grid item is otherwise as wide as its widest row, and two long chips pushed the page sideways. */}
       <div className="grid gap-5 lg:grid-cols-2">
-        <section className="rounded-xl border border-zinc-300 p-4 dark:border-zinc-800">
+        <section className="min-w-0 rounded-xl border border-zinc-300 p-4 dark:border-zinc-800">
           <h2 className="font-semibold">最常被提及</h2>
           <ol className="mt-3 divide-y divide-zinc-200 dark:divide-zinc-800">
             {data.mostMentioned.map((r) => (
@@ -101,7 +102,7 @@ function RelationDetails({ data }: { data: Relations }) {
           </ol>
           {!data.mostMentioned.length ? <p className="py-6 text-sm text-zinc-500">尚無足夠資料。</p> : null}
         </section>
-        <section className="rounded-xl border border-zinc-300 p-4 dark:border-zinc-800">
+        <section className="min-w-0 rounded-xl border border-zinc-300 p-4 dark:border-zinc-800">
           <h2 className="font-semibold">互相提及</h2>
           {/* Same pills as the homepage's citation cards. Each direction is its own articles and dates (see the foot's
               引用與交流), so the counts stay per direction and the pair is never called a same-time exchange. */}
