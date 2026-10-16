@@ -87,6 +87,14 @@ describe('seed official URL validation', () => {
     expect(moved.reason).toBe('identity_not_confirmed');
   });
 
+  it("finds Hugo's unadvertised /index.xml feed", async () => {
+    const home = 'https://hugo-seed.example/';
+    const head = '<html><head><title>小林筆記</title></head><body>文章</body></html>';
+    const options = { ...fixture({ [home]: head, [`${home}index.xml`]: rss(home) }), maxSourceRequests: 8 };
+    const result = await validateSeedUrl({ id: 34, name: '小林筆記', url: home }, options);
+    expect(result.feedSources).toEqual([{ url: `${home}index.xml`, type: 'rss' }]);
+  }, 20_000);
+
   it('accepts independently researched aliases with provenance and first-party confirmation', async () => {
     const home = 'https://researched-seed.example/';
     const result = await validateSeedUrl(

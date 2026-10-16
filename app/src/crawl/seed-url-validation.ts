@@ -234,6 +234,8 @@ function candidates(html: string, base: string): string[] {
     'feed.xml',
     'rss.xml',
     'atom.xml',
+    // Hugo's default feed, often not advertised in the page head (hshuang.com, eddielv.com).
+    'index.xml',
     'sitemap.xml',
     'sitemap_index.xml',
     'wp-sitemap.xml',

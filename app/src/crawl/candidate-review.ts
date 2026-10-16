@@ -9,7 +9,8 @@ import type { FeedCrawlerOptions, FeedFetcher } from './feed.ts';
 
 /** Daily candidate-review requests in total and per host. */
 export const CANDIDATE_HTTP_DAILY = 1500,
-  CANDIDATE_HOST_DAILY = 20,
+  // One review of one site can take robots, the homepage, redirects, up to 8 feed/sitemap paths and the feed itself.
+  CANDIDATE_HOST_DAILY = 40,
   /** Operator re-reviews (--id) draw on their own daily total, so a spent automatic budget never blocks them. */
   CANDIDATE_OPERATOR_DAILY = 200;
 /**
@@ -107,9 +108,22 @@ export async function runCandidateReviewBatch(
     const [rows] = await connection.query<RowDataPacket[]>(
       `SELECT id,url,name,status,source_type,source_evidence FROM discovery_candidates d WHERE status='candidate'
    AND NOT EXISTS (SELECT 1 FROM discovery_candidate_audits a WHERE a.candidate_id=d.id AND (a.source_type IN ('manual','human-review','admin') OR a.source_actor_id IS NOT NULL))
-   AND ${ids.length ? 'd.id IN (?)' : `(COALESCE(JSON_UNQUOTE(JSON_EXTRACT(source_evidence,'$.automaticReview.policy')),'')<>? OR COALESCE(JSON_UNQUOTE(JSON_EXTRACT(source_evidence,'$.automaticReview.checkedAt')),'') < ? OR EXISTS(SELECT 1 FROM ai_results ai WHERE ai.entity_type='candidate' AND ai.entity_id=d.id AND ai.task='classification' AND ai.status<>'ok' AND ai.attempts<3 AND ai.next_attempt_at<=UTC_TIMESTAMP()))`}
+   AND ${
+     ids.length
+       ? 'd.id IN (?)'
+       : `(COALESCE(JSON_UNQUOTE(JSON_EXTRACT(source_evidence,'$.automaticReview.policy')),'')<>? OR COALESCE(JSON_UNQUOTE(JSON_EXTRACT(source_evidence,'$.automaticReview.checkedAt')),'') < ?
+   OR (JSON_UNQUOTE(JSON_EXTRACT(source_evidence,'$.automaticReview.reason'))='candidate_host_budget_exhausted' AND JSON_UNQUOTE(JSON_EXTRACT(source_evidence,'$.automaticReview.checkedAt')) < ?) OR EXISTS(SELECT 1 FROM ai_results ai WHERE ai.entity_type='candidate' AND ai.entity_id=d.id AND ai.task='classification' AND ai.status<>'ok' AND ai.attempts<3 AND ai.next_attempt_at<=UTC_TIMESTAMP()))`
+   }
    ORDER BY COALESCE(JSON_UNQUOTE(JSON_EXTRACT(source_evidence,'$.automaticReview.checkedAt')),''),id LIMIT ?`,
-      ids.length ? [ids, limit] : [CANDIDATE_POLICY, new Date(Date.now() - 7 * 86400000).toISOString(), limit],
+      // A spent per-host budget is retried once that budget resets (the next UTC day), not after the weekly recheck.
+      ids.length
+        ? [ids, limit]
+        : [
+            CANDIDATE_POLICY,
+            new Date(Date.now() - 7 * 86400000).toISOString(),
+            `${new Date().toISOString().slice(0, 10)}T00:00:00.000Z`,
+            limit,
+          ],
     );
     const results = [];
     let stopped = false,
@@ -138,7 +152,7 @@ export async function runCandidateReviewBatch(
       await assertLease(connection);
       hostSpent = false;
       const checked = await validateCandidate(row as DiscoveryCandidate, boundedOptions);
-      // Recorded (retried after the 7-day recheck) rather than deferred: deferring left it first in line every run.
+      // Recorded (retried the next UTC day) rather than deferred: deferring left it first in line every run.
       if (hostSpent && !stopped) Object.assign(checked, { eligible: false, reason: 'candidate_host_budget_exhausted' });
       if (stopped) {
         results.push({ id: row.id, status: 'deferred', reason: 'candidate_http_budget_or_deadline' });

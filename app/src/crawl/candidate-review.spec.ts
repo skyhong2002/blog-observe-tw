@@ -89,8 +89,18 @@ describe('resumable candidate review batch', () => {
     const fetcher = vi.fn(async () => new Response(''));
     await runCandidateReviewBatch(harness().pool, { apply: true, ids: [1], fetcher });
     await runCandidateReviewBatch(harness().pool, { apply: true, fetcher });
-    expect(scopes).toEqual(['candidates:host:<host>/20', 'candidates:operator/200', 'candidates:host:<host>/20', 'candidates:http/1500']);
+    expect(scopes).toEqual(['candidates:host:<host>/40', 'candidates:operator/200', 'candidates:host:<host>/40', 'candidates:http/1500']);
     reserve.mockRestore();
+  });
+  it('a candidate stopped by a spent per-host budget is queued again once the budget resets (next UTC day)', async () => {
+    const h = harness();
+    await runCandidateReviewBatch(h.pool);
+    const [sql, params] = (h.c.query.mock.calls as unknown as [string, unknown[]][]).find(([q]) =>
+      q.includes('FROM discovery_candidates'),
+    )!;
+    expect(sql).toContain("automaticReview.reason'))='candidate_host_budget_exhausted' AND JSON_UNQUOTE");
+    expect(params[2]).toBe(`${new Date().toISOString().slice(0, 10)}T00:00:00.000Z`);
+    expect(params).toHaveLength(4);
   });
   it('checks lease again after a slow network request, before any write', async () => {
     const h = harness();
