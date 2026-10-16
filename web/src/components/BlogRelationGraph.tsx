@@ -117,15 +117,16 @@ export default function BlogRelationGraph({ nodes, edges }: { nodes: RelationNod
     // Once laid out, pan and (only ever) shrink the view so every node and its label fits the canvas.
     chart.on('finished', () => {
       if (fitted) return;
-      fitted = true;
-      const data = (chart as unknown as { getModel(): { getSeriesByIndex(i: number): { getData(): GraphData } | undefined } })
+      // A resize before the icons load also fires 'finished', on a chart with no option (and no model) yet.
+      const data = (chart as unknown as { getModel(): { getSeriesByIndex(i: number): { getData(): GraphData } | undefined } | undefined })
         .getModel()
-        .getSeriesByIndex(0)
+        ?.getSeriesByIndex(0)
         ?.getData();
       const points = Array.from({ length: data?.count() ?? 0 }, (_, i) => data?.getItemLayout(i))
         .filter((p): p is number[] => Array.isArray(p))
         .map((p) => chart.convertToPixel({ seriesIndex: 0 }, p) as number[]);
       if (!points.length) return;
+      fitted = true;
       const xs = points.map((p) => p[0]),
         ys = points.map((p) => p[1]);
       const [left, right, top, bottom] = [Math.min(...xs), Math.max(...xs), Math.min(...ys), Math.max(...ys)];
