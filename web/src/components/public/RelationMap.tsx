@@ -44,9 +44,13 @@ function RelationDetails({ data }: { data: Relations }) {
   const blog = (id: number) => {
     const n = nodes.get(id);
     return n ? (
-      <Link className="min-w-0 break-words text-brand-700 hover:underline dark:text-brand-400" {...blogLink(n.slug, n.canonicalPath)}>
+      // Icon and name stay on one line: the icon is an <img>, which the base styles make a block of its own.
+      <Link
+        className="inline-flex min-w-0 items-center gap-1.5 align-middle text-brand-700 hover:underline dark:text-brand-400"
+        {...blogLink(n.slug, n.canonicalPath)}
+      >
         <BlogIcon media={n.slug} iconUrl={n.iconUrl} title={n.name} size={16} />
-        <span className="ml-1.5">{n.name}</span>
+        <span className="min-w-0 break-words">{n.name}</span>
       </Link>
     ) : (
       <span>部落格 #{id}</span>
@@ -71,7 +75,7 @@ function RelationDetails({ data }: { data: Relations }) {
           <h2 className="font-semibold">最常被提及</h2>
           <ol className="mt-3 divide-y divide-zinc-200 dark:divide-zinc-800">
             {data.mostMentioned.map((r) => (
-              <li className="flex justify-between gap-4 py-3 text-sm" key={r.blogId}>
+              <li className="flex items-center justify-between gap-4 py-3 text-sm" key={r.blogId}>
                 {blog(r.blogId)}
                 <span className="shrink-0 tabular-nums">
                   {r.incomingBlogs} 站 · {r.mentions} 篇
@@ -87,8 +91,13 @@ function RelationDetails({ data }: { data: Relations }) {
           <ol className="mt-3 divide-y divide-zinc-200 dark:divide-zinc-800">
             {data.mutual.map((r) => (
               <li className="py-3 text-sm" key={`${r.sourceBlogId}:${r.targetBlogId}`}>
-                <div>
-                  {blog(r.sourceBlogId)} ↔ {blog(r.targetBlogId)}
+                <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1">
+                  {blog(r.sourceBlogId)}
+                  <span aria-hidden="true" className="text-zinc-500">
+                    ↔
+                  </span>
+                  <span className="sr-only">與</span>
+                  {blog(r.targetBlogId)}
                 </div>
                 <p className="mt-1 text-xs text-zinc-500">
                   分別提及 {r.forwardCount}／{r.reverseCount} 篇

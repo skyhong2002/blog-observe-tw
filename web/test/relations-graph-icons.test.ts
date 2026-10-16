@@ -1,0 +1,20 @@
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import test from 'node:test';
+
+const read = (path: string) => readFileSync(new URL(`../src/${path}`, import.meta.url), 'utf8');
+
+test('relation graph: blogs drawn as their icons (green dot only without one), labels in the page font, overlaps hidden', () => {
+  const graph = read('components/BlogRelationGraph.tsx');
+  assert.match(graph, /symbol: src && loaded\.has\(src\) \? `image:\/\/\$\{src\}` : 'circle'/);
+  assert.match(graph, /image\.onerror/);
+  assert.match(graph, /labelLayout: \{ hideOverlap: true \}/);
+  assert.match(graph, /fontFamily: getComputedStyle\(document\.body\)\.fontFamily/);
+});
+
+test('relation lists keep each icon and name on one line', () => {
+  const map = read('components/public/RelationMap.tsx');
+  assert.match(map, /className="inline-flex min-w-0 items-center gap-1\.5/);
+  assert.match(map, /<li className="flex items-center justify-between gap-4 py-3 text-sm"/);
+  assert.match(map, /className="flex flex-wrap items-center gap-x-1\.5 gap-y-1"/);
+});

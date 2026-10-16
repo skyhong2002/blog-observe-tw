@@ -7,18 +7,49 @@ import * as echarts from 'echarts/core';
 import { CanvasRenderer } from 'echarts/renderers';
 import { useEffect, useRef } from 'react';
 import { brandMark } from '@/lib/brand';
+import { mediaIconSrc, mediaIcons } from '@/lib/media-icons';
 import { blogHref } from '@/lib/page-links';
 import type { RelationEdge, RelationNode } from '@/lib/relations';
 
 echarts.use([GraphChart, TooltipComponent, CanvasRenderer]);
 const LABEL_WIDTH_NARROW = 96;
+const ICON_WAIT_MS = 2500;
 type GraphData = { count(): number; getItemLayout(i: number): unknown };
+/** The icon URLs that actually load within ICON_WAIT_MS; a node whose icon fails keeps the green dot. */
+function loadedIcons(urls: string[]): Promise<Set<string>> {
+  return Promise.all(
+    urls.map(
+      (url) =>
+        new Promise<string | null>((resolve) => {
+          const image = new Image();
+          const timer = setTimeout(() => resolve(null), ICON_WAIT_MS);
+          image.onload = () => {
+            clearTimeout(timer);
+            resolve(url);
+          };
+          image.onerror = () => {
+            clearTimeout(timer);
+            resolve(null);
+          };
+          image.referrerPolicy = 'no-referrer';
+          image.src = url;
+        }),
+    ),
+  ).then((list) => new Set(list.filter((url): url is string => url !== null)));
+}
 export default function BlogRelationGraph({ nodes, edges }: { nodes: RelationNode[]; edges: RelationEdge[] }) {
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (!ref.current) return;
     const chart = echarts.init(ref.current);
-    let fitted = false;
+    let fitted = false,
+      disposed = false,
+      loaded = new Set<string>();
+    const linked = nodes.filter((n) => edges.some((e) => e.sourceBlogId === n.id || e.targetBlogId === n.id));
+    const icon = new Map(linked.map((n) => [n.id, mediaIconSrc(n.slug, mediaIcons, n.iconUrl)]));
+    // Mentions received: the most-cited blogs are drawn larger, and their labels win when labels overlap.
+    const incoming = new Map<number, number>();
+    for (const e of edges) incoming.set(e.targetBlogId, (incoming.get(e.targetBlogId) ?? 0) + e.count);
     const render = () => {
       const dark = document.documentElement.dataset.theme === 'dark';
       // Phones: shorter edges keep nodes apart inside a 390px canvas.
@@ -42,10 +73,13 @@ export default function BlogRelationGraph({ nodes, edges }: { nodes: RelationNod
               : { repulsion: 180, edgeLength: [90, 170], layoutAnimation: false },
             edgeSymbol: ['none', 'arrow'],
             edgeSymbolSize: 7,
-            // Full names wrap onto a second line instead of being cut with an ellipsis.
+            // Full names wrap onto a second line instead of being cut with an ellipsis; in the page's own font.
+            // Overlapping labels are hidden, the smaller node's first (echarts ranks labels by symbol area).
+            labelLayout: { hideOverlap: true },
             label: {
               show: true,
               position: 'bottom',
+              fontFamily: getComputedStyle(document.body).fontFamily,
               color: dark ? '#d4d4d8' : '#3f3f46',
               fontSize: narrow ? 13 : 12,
               lineHeight: narrow ? 16 : 15,
@@ -54,9 +88,17 @@ export default function BlogRelationGraph({ nodes, edges }: { nodes: RelationNod
             },
             lineStyle: { color: dark ? '#a1a1aa' : '#71717a', opacity: 0.55, curveness: 0.12 },
             emphasis: { focus: 'adjacency' },
-            data: nodes
-              .filter((n) => edges.some((e) => e.sourceBlogId === n.id || e.targetBlogId === n.id))
-              .map((n) => ({ id: String(n.id), name: n.name, symbolSize: 22, itemStyle: { color: brandMark(dark) } })),
+            // Each blog is drawn as its own icon; without one (or when it does not load), a green dot.
+            data: linked.map((n) => {
+              const src = icon.get(n.id);
+              return {
+                id: String(n.id),
+                name: n.name,
+                symbol: src && loaded.has(src) ? `image://${src}` : 'circle',
+                symbolSize: Math.round(20 + Math.min(16, 4 * Math.log2(1 + (incoming.get(n.id) ?? 0)))),
+                itemStyle: { color: brandMark(dark) },
+              };
+            }),
             links: edges.map((e) => ({
               source: String(e.sourceBlogId),
               target: String(e.targetBlogId),
@@ -94,7 +136,12 @@ export default function BlogRelationGraph({ nodes, edges }: { nodes: RelationNod
       chart.dispatchAction({ type: 'graphRoam', seriesIndex: 0, dx: cx - (left + right) / 2, dy: cy - (top + bottom) / 2 });
       if (zoom < 1) chart.dispatchAction({ type: 'graphRoam', seriesIndex: 0, zoom, originX: cx, originY: cy });
     });
-    render();
+    // Wait (briefly) for the icons, so the force layout runs once with the final symbols.
+    void loadedIcons([...new Set([...icon.values()].filter((src): src is string => Boolean(src)))]).then((ok) => {
+      if (disposed) return;
+      loaded = ok;
+      render();
+    });
     chart.on('click', (p: { dataType?: string; data?: unknown }) => {
       if (p.dataType === 'node') {
         const id = (p.data as { id: string }).id;
@@ -107,6 +154,7 @@ export default function BlogRelationGraph({ nodes, edges }: { nodes: RelationNod
     const theme = new MutationObserver(render);
     theme.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
     return () => {
+      disposed = true;
       resize.disconnect();
       theme.disconnect();
       chart.dispose();
