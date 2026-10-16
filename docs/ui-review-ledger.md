@@ -15,8 +15,9 @@ Worker 跟隨 gen50：drop-in `95-release-4684abc.conf`（回滾改回 `c578e11`
   （新增 `relation-candidates`／`topic-history-candidates`／`content-candidates` integration，以原 SQL 為 oracle）。正式 DB 唯讀比對：
   topic history 候選 24.4 s → 0.39 s、relations 7.5 s → 68 ms、content ~9 s（slow log 平均）→ 0.2 s、完整 overview 作者 740 ms → 37 ms。
 - **Migration 0028**（`content_bodies_schedule` 索引，INPLACE／LOCK=NONE，7.8 s）**單獨**套用並寫入 ledger；備份依據為 NAS restic
-  `tag-analysis` snapshot `f3a660ee`（2026-10-16T08:16Z，`--all-databases` dump）。**0023–0026 仍未套用**，勿直接跑
-  `migrate-drizzle.mjs`；`blogs-vocabulary` 因缺 0026 的 `topic_generation_proof_contracts` 每次失敗（gen49 前已如此）。
+  `tag-analysis` snapshot `f3a660ee`（2026-10-16T08:16Z，`--all-databases` dump）。之後依使用者指示於 12:36Z 逐檔補套
+  **0023–0026**（0024 在 topic_terms 建索引 36 s，其餘 <2 s），ledger 已無 pending。此前 `blogs-vocabulary` 因缺 0026 的表每次失敗，
+  詞庫自 10/14 16:07 起沒有新快照；套用後清理恢復（published 34→33），新 window run 12:37Z 開始分頁抓取。
 - 驗收：vitest 1375、tsc、integration 49 suites／28 migrations（隔離 18169）；blue 與 green `/api/overview` 相同；切換後主要頁面 200。
 
 ## 現況（UTC 2026-10-16T08:25Z，gen49）
