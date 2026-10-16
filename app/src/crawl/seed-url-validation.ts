@@ -384,6 +384,22 @@ export async function validateSeedUrl(input: SeedUrlInput, options: SeedValidati
   const tokens = [...seedTokens, ...aliasTokens];
   const identities = [result.title, result.siteName, result.author].map(normalized);
   result.evidence.identityMatches = [...new Set(tokens.filter((token) => identities.some((identity) => identity.includes(token))))];
+  // A listing named by its own domain (「Wiwi.Blog」) has no words left once domains are stripped. It is confirmed
+  // only on that same host, when the homepage also names itself by that domain (「官大為的部落格 | Wiwi.Blog」).
+  const host = new URL(result.finalUrl).hostname.replace(/^www\./, '').toLowerCase();
+  const namedDomain = input.name
+    .trim()
+    .toLowerCase()
+    .replace(/^https?:\/\//, '')
+    .replace(/^www\./, '')
+    .replace(/\/$/, '');
+  if (
+    !result.evidence.identityMatches.length &&
+    !acrossHosts &&
+    namedDomain === host &&
+    [result.title, result.siteName, result.author].some((value) => value.toLowerCase().includes(host))
+  )
+    result.evidence.identityMatches = [host];
   if (!result.evidence.identityMatches.length) {
     result.reason = 'identity_not_confirmed';
     return result;

@@ -66,6 +66,27 @@ describe('seed official URL validation', () => {
     expect(result.reason).toBe('identity_not_confirmed');
   });
 
+  it('confirms a listing named by its own domain only when the homepage on that host names itself by it', async () => {
+    const home = 'https://wiwi-like.blog/';
+    const own = await validateSeedUrl(
+      { id: 31, name: 'Wiwi-Like.Blog', url: home },
+      fixture({ [home]: page('官大為的部落格 | Wiwi-Like.Blog'), [`${home}feed/`]: rss(home) }),
+    );
+    expect(own.validated).toBe(true);
+    expect(own.evidence.identityMatches).toEqual(['wiwi-like.blog']);
+    // The homepage never names the domain: still unconfirmed, and no feed is fetched.
+    const silent = fixture({ [home]: page('官大為的部落格'), [`${home}feed/`]: rss(home) });
+    expect((await validateSeedUrl({ id: 32, name: 'Wiwi-Like.Blog', url: home }, silent)).reason).toBe('identity_not_confirmed');
+    expect(silent.fetcher.mock.calls.some(([url]) => String(url).endsWith('/feed/'))).toBe(false);
+    // Another host that mentions the domain in its title is not that listing.
+    const other = 'https://elsewhere.example/';
+    const moved = await validateSeedUrl(
+      { id: 33, name: 'Wiwi-Like.Blog', url: home },
+      fixture({ [home]: { status: 301, location: other }, [other]: page('Wiwi-Like.Blog 粉絲站'), [`${other}feed/`]: rss(other) }),
+    );
+    expect(moved.reason).toBe('identity_not_confirmed');
+  });
+
   it('accepts independently researched aliases with provenance and first-party confirmation', async () => {
     const home = 'https://researched-seed.example/';
     const result = await validateSeedUrl(

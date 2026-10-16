@@ -58,6 +58,16 @@ describe('resumable candidate review batch', () => {
     expect(recordCandidateCheck).not.toHaveBeenCalled();
     expect(h.c.release).toHaveBeenCalledOnce();
   });
+  it('an operator re-review selects only the given candidates, skipping the queue but not the exclusions', async () => {
+    const h = harness();
+    await runCandidateReviewBatch(h.pool, { ids: [20, 31, -1] });
+    const [sql, params] = (h.c.query.mock.calls as unknown as [string, unknown][]).find(([q]) => q.includes('FROM discovery_candidates'))!;
+    expect(sql).toContain('d.id IN (?)');
+    expect(sql).toContain("status='candidate'");
+    expect(sql).toContain("a.source_type IN ('manual','human-review','admin')");
+    expect(sql).not.toContain('automaticReview.policy');
+    expect(params).toEqual([[20, 31], 25]);
+  });
   it('checks lease again after a slow network request, before any write', async () => {
     const h = harness();
     vi.mocked(validateCandidate).mockImplementation(async () => {

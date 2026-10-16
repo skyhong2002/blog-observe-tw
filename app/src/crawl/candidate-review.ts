@@ -80,7 +80,15 @@ async function applyWithRetry(pool: Pool, check: Parameters<typeof recordCandida
 /** Review a bounded, resumable batch. Keep declined/operator-reviewed candidates out of automatic work. */
 export async function runCandidateReviewBatch(
   pool: Pool,
-  options: FeedCrawlerOptions & { apply?: boolean; limit?: number; maxDurationMs?: number; signal?: AbortSignal; now?: () => Date } = {},
+  options: FeedCrawlerOptions & {
+    apply?: boolean;
+    limit?: number;
+    maxDurationMs?: number;
+    signal?: AbortSignal;
+    now?: () => Date;
+    /** Operator re-review of these candidates now, whatever their place in the queue; same checks and writer. */
+    ids?: number[];
+  } = {},
 ) {
   if ((pool as unknown as { pool?: { config?: { connectionLimit?: number } } }).pool?.config?.connectionLimit === 1)
     throw Error('candidate review requires poolSize >= 2');
@@ -92,12 +100,13 @@ export async function runCandidateReviewBatch(
     held = true;
     const limit = Math.max(1, Math.min(2000, Math.trunc(options.limit || 25)));
     const deadline = Date.now() + Math.max(1000, Math.min(3600000, options.maxDurationMs || 600000));
+    const ids = options.ids?.filter((id) => Number.isSafeInteger(id) && id > 0) ?? [];
     const [rows] = await connection.query<RowDataPacket[]>(
       `SELECT id,url,name,status,source_type,source_evidence FROM discovery_candidates d WHERE status='candidate'
    AND NOT EXISTS (SELECT 1 FROM discovery_candidate_audits a WHERE a.candidate_id=d.id AND (a.source_type IN ('manual','human-review','admin') OR a.source_actor_id IS NOT NULL))
-   AND (COALESCE(JSON_UNQUOTE(JSON_EXTRACT(source_evidence,'$.automaticReview.policy')),'')<>? OR COALESCE(JSON_UNQUOTE(JSON_EXTRACT(source_evidence,'$.automaticReview.checkedAt')),'') < ? OR EXISTS(SELECT 1 FROM ai_results ai WHERE ai.entity_type='candidate' AND ai.entity_id=d.id AND ai.task='classification' AND ai.status<>'ok' AND ai.attempts<3 AND ai.next_attempt_at<=UTC_TIMESTAMP()))
+   AND ${ids.length ? 'd.id IN (?)' : `(COALESCE(JSON_UNQUOTE(JSON_EXTRACT(source_evidence,'$.automaticReview.policy')),'')<>? OR COALESCE(JSON_UNQUOTE(JSON_EXTRACT(source_evidence,'$.automaticReview.checkedAt')),'') < ? OR EXISTS(SELECT 1 FROM ai_results ai WHERE ai.entity_type='candidate' AND ai.entity_id=d.id AND ai.task='classification' AND ai.status<>'ok' AND ai.attempts<3 AND ai.next_attempt_at<=UTC_TIMESTAMP()))`}
    ORDER BY COALESCE(JSON_UNQUOTE(JSON_EXTRACT(source_evidence,'$.automaticReview.checkedAt')),''),id LIMIT ?`,
-      [CANDIDATE_POLICY, new Date(Date.now() - 7 * 86400000).toISOString(), limit],
+      ids.length ? [ids, limit] : [CANDIDATE_POLICY, new Date(Date.now() - 7 * 86400000).toISOString(), limit],
     );
     const results = [];
     let stopped = false,
