@@ -1,6 +1,35 @@
 # UI 逐頁審查紀錄
 
-## Current state（UTC 2026-10-16T07:25Z，gen47）
+## Current state（UTC 2026-10-16T08:25Z，gen49）
+
+正式站為 **green／gen49／`c578e11dbf8f32da8c35730900fa100ab884b432`**，BUILD_ID `3j9PAEl0Gd4IHvTVib9ZW`，切換
+UTC 2026-10-16T08:20:59Z（transition 49）。gen48 blue `6e08aed`／`Gv2pNmXxjHRvwNztz87HW`（07:59:48Z）為回滾點：
+
+```bash
+bash /home/deck/.cache/blog-home-cloud-b3-20261014/tools/deploy-blue-green.sh rollback blue
+```
+
+Worker 跟隨 gen49：drop-in `95-release-c578e11.conf`（回滾改回 `6e08aed`）。回填 run8（WorkingDirectory `6e08aed`，自 cursor 25482
+起，08:20 已到 25514，load 高時自動暫停）。
+
+- **gen48 候選審核 v5**：政策 `personal-rss-publication-v5-directory`（規則見 `docs/discovery.md`「審核規則 v5」），全部候選重審且
+  BlogBlog.Club 名單首頁優先；feed 中零星無標題項目略過（九成須為文章）；收錄額度用完同樣隔日重排。今天 UTC 日的自動審核
+  1,500 次額度早上已用完、名單收錄 100 筆已滿，故 v5 首批與 hshuang.com（Hugo index.xml，113 篇）、eddielv.com 於台北 10/17 08:00
+  後由排程處理。
+- **gen49 非作者逐頁 review**（首頁、`/blogs/?q=blog`、`/blogs/wiwi.blog/`、`/relations/`；1280 light／390 dark；截圖
+  `/home/deck/.t3/userdata/ui-review-blog-20261016/gen48/`）。修正：
+  - `/relations/` 390 整頁橫向溢出到 485px（上一版的 chip 列表：grid 子項目 min-width:auto 被最長一對 chip 撐開）→ 兩張卡 `min-w-0`。
+    16 個主要頁面 390 寬掃描，只有此頁溢出，且全部 0 個 page error。
+  - 平台預設圖示：同一張圖出現在 3 個以上不同網站即為平台預設（Bear Blog ʕ•ᴥ•ʔ 43 站、Blogger B 27 站），公開圖示清單不輸出，
+    改用字母／圖上綠點（依「不以平台總站 logo 冒充作者」）；`/api/icons` 1,242 → 951 筆。同站多個候選網址只算一站。
+  - 部落格頁頁首「本頁收錄 50」改為「收錄文章」全站總數（wiwi.blog 1,011）。
+  - 未處理（記錄）：`/blogs/` 手機表格橫向捲動（照 T-ref 表格設計）、分類 chip 含「旅遊, 生活內容」原始合併值（資料）、首頁文字雲
+    圖片標籤字小、部落格頁 共同標籤／文字相似「目前未開啟」兩卡、標籤含 emoji、關係圖前 5 名名稱可壓在圖示上（刻意）。
+    reviewer 看到的「提到誰」空圖示為 lazy 圖片在整頁截圖未載入，非缺圖。
+- 另修：`app/src/ai/candidate-budget.spec.ts` 仍期待每站 20（gen48 已改 40）。驗收：vitest 1375、web node 236、topic-ui 176、tsc。
+  切換後 generation 49、BUILD_ID 相符，主要頁面 200，tag 200。
+
+## 現況（UTC 2026-10-16T07:25Z，gen47）
 
 正式站為 **green／gen47／`831aac861b79abbbb851bc1ae56b642f0062aac2`**，BUILD_ID `43tdIBD78RDHig0qKNrFO`，切換
 UTC 2026-10-16T07:15:43Z（transition 47）。回滾點 blue／gen46 `5119e58`（建置 gen48 期間暫時停用）：
