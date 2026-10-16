@@ -205,6 +205,11 @@ export async function buildApp(config, { logger = false, store = null } = {}) {
        WHERE bt.blog_id=? AND bt.status='active' AND t.visibility='public' AND t.status='active' ORDER BY t.label`,
       [blogs[0].id],
     );
+    // Every collected post (the page lists only the latest 50), with the same not-in-the-future rule.
+    const [[total]] = await pool.query(
+      'SELECT COUNT(*) AS n FROM posts WHERE blog_id=? AND (published_at IS NULL OR published_at<=UTC_TIMESTAMP())',
+      [blogs[0].id],
+    );
     // How often it actually posts: the median gap between its latest 21 published posts (a fixed default was shown).
     const [dates] = await pool.query(
       'SELECT published_at AS at FROM posts WHERE blog_id=? AND published_at IS NOT NULL AND published_at<=UTC_TIMESTAMP() ORDER BY published_at DESC LIMIT 21',
@@ -216,6 +221,7 @@ export async function buildApp(config, { logger = false, store = null } = {}) {
         iconUrl: iconUrl(blogs[0].slug, await iconManifest()),
         authors,
         tags,
+        postCount: Number(total.n),
         postingIntervalHours: postingIntervalHours(dates.map((row) => row.at)),
         crawlIntervalHours: crawlIntervalHours(),
       },

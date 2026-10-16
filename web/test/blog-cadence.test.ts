@@ -11,3 +11,8 @@ test('a blog page shows how often it posts and how often its RSS is checked, nev
   assert.match(profile, /if \(hours === null\) return '文章太少，尚無法估計';/);
   assert.match(profile, /if \(days <= 1\) return '約每天';/);
 });
+
+test('a blog page heads with its whole collection, not the 50 posts listed', () => {
+  assert.match(profile, /\{blog\.postCount === undefined \? '本頁收錄' : '收錄文章'\}/);
+  assert.match(profile, /\(blog\.postCount \?\? allPosts\.length\)\.toLocaleString\('zh-TW'\)/);
+});

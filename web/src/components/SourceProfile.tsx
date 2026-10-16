@@ -55,9 +55,10 @@ export default function SourceProfile({ blog, sidebar, cloud }: { blog: Blog; si
         </div>
         <dl className="flex gap-5 text-right sm:gap-7">
           <div>
-            <dt className="text-[11px] text-zinc-500 dark:text-zinc-400">本頁收錄</dt>
+            {/* The blog's whole collection; 本頁收錄 (the 50 listed) read like its total (1,011 for wiwi.blog). */}
+            <dt className="text-[11px] text-zinc-500 dark:text-zinc-400">{blog.postCount === undefined ? '本頁收錄' : '收錄文章'}</dt>
             <dd className="mt-0.5 text-xl font-semibold tabular-nums">
-              {allPosts.length}
+              {(blog.postCount ?? allPosts.length).toLocaleString('zh-TW')}
               <span className="ml-1 text-[10px] font-normal text-zinc-500">篇</span>
             </dd>
           </div>

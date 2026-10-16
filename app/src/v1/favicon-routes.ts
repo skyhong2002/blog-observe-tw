@@ -8,11 +8,32 @@ export type IconManifest = Record<string, IconRecord>;
 type IconRecord = { revision?: string; dark?: 'invert' | 'outline' };
 const repositoryRoot = new URL('../../../', import.meta.url).pathname;
 const runtimeRoot = process.env.BLOG_FAVICON_ROOT;
+/** The same picture on this many different sites is a platform default, not a blog's own icon. */
+export const PLATFORM_DEFAULT_SITES = 3;
+const siteOf = (url: unknown) => {
+  try {
+    return typeof url === 'string' ? new URL(url).hostname.replace(/^www\./, '').toLowerCase() : null;
+  } catch {
+    return null;
+  }
+};
+/**
+ * Platform defaults are left out, so the blog shows its letter (or the graph's green dot) instead: Bear Blog's
+ * ʕ•ᴥ•ʔ share image (43 blogs on different bearblog.dev hosts) and Blogger's B (27 blogspot.com hosts) are not
+ * those authors' icons (docs: 不以平台總站 logo 冒充作者). One site's many candidate URLs count once.
+ */
 export function publicIconManifest(data: unknown): Record<string, IconRecord> {
   const safe: Record<string, IconRecord> = {};
   if (!data || typeof data !== 'object' || Array.isArray(data)) return safe;
+  const sites = new Map<string, Set<string>>();
+  for (const value of Object.values(data)) {
+    const row = value as IconRecord & { targetUrl?: unknown };
+    const site = siteOf(row?.targetUrl);
+    if (typeof row?.revision === 'string' && site) sites.set(row.revision, (sites.get(row.revision) ?? new Set()).add(site));
+  }
   for (const [id, value] of Object.entries(data)) {
     const row = value as IconRecord;
+    if ((sites.get(String(row?.revision))?.size ?? 0) >= PLATFORM_DEFAULT_SITES) continue;
     if (/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,159}$/.test(id) && typeof row?.revision === 'string' && /^[a-f0-9]{8,64}$/.test(row.revision))
       safe[id] = { revision: row.revision, ...(row.dark === 'invert' || row.dark === 'outline' ? { dark: row.dark } : {}) };
   }

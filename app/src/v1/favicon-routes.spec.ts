@@ -19,6 +19,23 @@ describe('public favicon metadata', () => {
     expect(result).toEqual({ 'candidate-42': { revision: 'abcdef1234567890', dark: 'outline' } });
     expect(publicIconManifest(null)).toEqual({});
   });
+  it("leaves out a platform default shared by three or more different sites; one site's many URLs count once", () => {
+    const row = (revision: string, targetUrl: string) => ({ revision, targetUrl });
+    const result = publicIconManifest({
+      // Bear Blog's share image on three different blogs.
+      a: row('11a960b9df58ec1d', 'https://one.bearblog.dev/'),
+      b: row('11a960b9df58ec1d', 'https://two.bearblog.dev/'),
+      c: row('11a960b9df58ec1d', 'https://three.example/'),
+      // One site's own icon on its home and many candidate URLs.
+      wiwi: row('bcc0807a39873d5b', 'https://wiwi.blog/'),
+      'candidate-1': row('bcc0807a39873d5b', 'https://wiwi.blog/blogroll'),
+      'candidate-2': row('bcc0807a39873d5b', 'https://www.wiwi.blog/blog/x'),
+      // Two sites sharing one picture is still allowed (a person's two blogs).
+      d: row('2222222222222222', 'https://d.example/'),
+      e: row('2222222222222222', 'https://e.example/'),
+    });
+    expect(Object.keys(result).sort()).toEqual(['candidate-1', 'candidate-2', 'd', 'e', 'wiwi']);
+  });
   it('rejects non-PNG paths without reflecting path content', async () => {
     const app = Fastify();
     registerFavicons(app);
