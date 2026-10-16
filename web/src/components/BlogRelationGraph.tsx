@@ -7,7 +7,7 @@ import * as echarts from 'echarts/core';
 import { CanvasRenderer } from 'echarts/renderers';
 import { useEffect, useRef } from 'react';
 import { brandMark } from '@/lib/brand';
-import { fitPoints, placeLabels } from '@/lib/graph-labels';
+import { fitPoints, type LabelSide, placeLabels } from '@/lib/graph-labels';
 import { mediaIconSrc, mediaIcons } from '@/lib/media-icons';
 import { blogHref } from '@/lib/page-links';
 import type { RelationEdge, RelationNode } from '@/lib/relations';
@@ -17,6 +17,8 @@ const LABEL_WIDTH_NARROW = 96,
   LABEL_WIDTH = 128;
 const ICON_WAIT_MS = 2500;
 const LABELLED_MENTIONS = 2;
+// The most-mentioned blogs keep their names even in a crowd, drawn over other icons (with a halo) if need be.
+const MUST_LABEL = 5;
 type GraphData = { count(): number; getItemLayout(i: number): unknown };
 /** The icon URLs that actually load within ICON_WAIT_MS; a node whose icon fails keeps the green dot. */
 function loadedIcons(urls: string[]): Promise<Set<string>> {
@@ -56,13 +58,13 @@ export default function BlogRelationGraph({ nodes, edges }: { nodes: RelationNod
       loaded = new Set<string>(),
       // Where the force layout settled (its own units); null until it has run once.
       settled: number[][] | null = null,
-      placed: { points: number[][]; shown: Set<number> } | null = null;
+      placed: { points: number[][]; sides: Map<number, LabelSide> } | null = null;
     const linked = nodes.filter((n) => edges.some((e) => e.sourceBlogId === n.id || e.targetBlogId === n.id));
     const icon = new Map(linked.map((n) => [n.id, mediaIconSrc(n.slug, mediaIcons, n.iconUrl)]));
     // Mentions received: the most-cited blogs are drawn larger, and their names win when names would collide.
     const incoming = new Map<number, number>();
     for (const e of edges) incoming.set(e.targetBlogId, (incoming.get(e.targetBlogId) ?? 0) + e.count);
-      // Phones: shorter edges and smaller symbols keep nodes (and some names) apart inside a 390px canvas.
+    // Phones: shorter edges and smaller symbols keep nodes (and some names) apart inside a 390px canvas.
     const isNarrow = () => chart.getWidth() < 480;
     const symbolSize = (n: RelationNode) =>
       Math.round((isNarrow() ? 0.75 : 1) * (20 + Math.min(16, 4 * Math.log2(1 + (incoming.get(n.id) ?? 0)))));
@@ -96,8 +98,8 @@ export default function BlogRelationGraph({ nodes, edges }: { nodes: RelationNod
               ...(placed ? extent(placed.points) : {}),
               roam: true,
               force: narrow
-                ? { repulsion: 220, edgeLength: [70, 120], layoutAnimation: false }
-                : { repulsion: 180, edgeLength: [90, 170], layoutAnimation: false },
+                ? { repulsion: 260, edgeLength: [50, 100], gravity: 0.25, layoutAnimation: false }
+                : { repulsion: 180, edgeLength: [90, 170], gravity: 0.15, layoutAnimation: false },
               edgeSymbol: ['none', 'arrow'],
               edgeSymbolSize: 7,
               // Names in the page's own font; a long one wraps onto a second line rather than being cut.
@@ -107,6 +109,9 @@ export default function BlogRelationGraph({ nodes, edges }: { nodes: RelationNod
                 show: true,
                 position: 'bottom',
                 color: dark ? '#d4d4d8' : '#3f3f46',
+                // A halo in the page background keeps a name readable where it crosses edges or icons.
+                textBorderColor: dark ? '#18181b' : '#ffffff',
+                textBorderWidth: 3,
                 overflow: 'break',
                 ...labelStyle(),
               },
@@ -120,7 +125,7 @@ export default function BlogRelationGraph({ nodes, edges }: { nodes: RelationNod
                   ...(placed ? { x: placed.points[i][0], y: placed.points[i][1] } : {}),
                   symbol: src && loaded.has(src) ? `image://${src}` : 'circle',
                   symbolSize: symbolSize(n),
-                  label: { show: placed ? placed.shown.has(i) : false },
+                  label: { show: placed?.sides.has(i) ?? false, position: placed?.sides.get(i) ?? 'bottom' },
                   itemStyle: { color: brandMark(dark) },
                 };
               }),
@@ -146,7 +151,7 @@ export default function BlogRelationGraph({ nodes, edges }: { nodes: RelationNod
       const points = fitPoints(settled, width, height, { side: 18, above: 18, below: 2 * style.lineHeight + 8 });
       const measure = document.createElement('canvas').getContext('2d');
       if (measure) measure.font = `${style.fontSize}px ${style.fontFamily}`;
-      const shown = placeLabels(
+      const sides = placeLabels(
         linked.map((n, i) => ({
           x: points[i][0],
           y: points[i][1],
@@ -155,9 +160,9 @@ export default function BlogRelationGraph({ nodes, edges }: { nodes: RelationNod
           rank: incoming.get(n.id) ?? 0,
           wanted: (incoming.get(n.id) ?? 0) >= LABELLED_MENTIONS,
         })),
-        { maxWidth: style.width, lineHeight: style.lineHeight, gap: 5, pad: 2, width, height },
+        { maxWidth: style.width, lineHeight: style.lineHeight, gap: 5, pad: 2, width, height, mustShow: MUST_LABEL },
       );
-      placed = { points, shown };
+      placed = { points, sides };
       render();
     };
     chart.on('finished', () => {

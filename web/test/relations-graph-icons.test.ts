@@ -58,26 +58,24 @@ test('graph labels: points fill the canvas inside its margins', async () => {
   assert.deepEqual(wide[1], [200, 100 + 16]);
 });
 
-test('graph labels: most-mentioned names first; a colliding or off-canvas name is left to hover', async () => {
+test('graph labels: most-mentioned names first, on a free side; a name with no free side is left to hover', async () => {
   const { placeLabels } = await import('../src/lib/graph-labels.ts');
   const opts = { maxWidth: 100, lineHeight: 15, gap: 5, pad: 2, width: 400, height: 300 };
   const node = (x: number, y: number, rank: number, wanted = true) => ({ x, y, size: 20, textWidth: 60, rank, wanted });
-  // 0 and 1 sit 30px apart: their names collide, and the more-mentioned (1) keeps its name.
-  // 2 is far away, 3 is not wanted, 4's name would run off the bottom, 5's name would cover node 6.
-  const shown = placeLabels(
+  // 1 claims the space below; 0 (30px left of it, less mentioned) moves its name above.
+  const pair = placeLabels([node(100, 100, 2), node(130, 100, 5)], opts);
+  assert.deepEqual(
+    [...pair],
     [
-      node(100, 100, 2),
-      node(130, 100, 5),
-      node(300, 100, 1),
-      node(300, 200, 9, false),
-      node(200, 290, 3),
-      node(50, 200, 4),
-      node(50, 225, 0, false),
+      [1, 'bottom'],
+      [0, 'top'],
     ],
-    opts,
   );
-  assert.deepEqual([...shown].sort(), [1, 2]);
-  // A long name wraps: two lines tall, so a node just below the first line still blocks it.
-  const long = placeLabels([{ x: 200, y: 100, size: 20, textWidth: 180, rank: 1, wanted: true }, node(200, 140, 0, false)], opts);
-  assert.equal(long.size, 0);
+  // Unwanted names never show; at the bottom edge the name goes above instead of off the canvas.
+  const edge = placeLabels([node(300, 100, 9, false), node(200, 290, 3)], opts);
+  assert.deepEqual([...edge], [[1, 'top']]);
+  // Boxed in by nodes on all four sides: no name, unless it is among the mustShow most mentioned.
+  const boxed = [node(200, 150, 4), node(200, 185, 0, false), node(200, 115, 0, false), node(245, 150, 0, false), node(155, 150, 0, false)];
+  assert.equal(placeLabels(boxed, opts).size, 0);
+  assert.deepEqual([...placeLabels(boxed, { ...opts, mustShow: 1 })], [[0, 'bottom']]);
 });
