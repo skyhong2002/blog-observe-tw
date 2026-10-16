@@ -1,6 +1,34 @@
 # UI 逐頁審查紀錄
 
-## Current state（UTC 2026-10-16T05:05Z，gen43）
+## Current state（UTC 2026-10-16T05:30Z，gen44）
+
+正式站為 **blue／gen44／`8b2510cc2848950f3c980abfea116b7b1a6a4836`**，BUILD_ID `9lxYgivAgYPQ40FORG5XL`，切換
+UTC 2026-10-16T05:25:51Z（transition 44）。回滾點 green／gen43 `f7f2dde`／`9Xr01QYB68SGPz7O8uo2-`：
+
+```bash
+bash /home/deck/.cache/blog-home-cloud-b3-20261014/tools/deploy-blue-green.sh rollback green
+```
+
+Worker 跟隨 gen44：drop-in `blog-observe-worker.service.d/95-release-8b2510c.conf`（取代 95-release-b7648d9）。回滾：把
+WorkingDirectory／NODE_PATH 改到 `f7f2dde`、daemon-reload、restart。
+
+- **部落格個別頁錯誤頁**（使用者回報 `/blogs/blog.ikukaroom.com/` 顯示「資料暫時無法載入」）：`/api/pages/blogs/:key`
+  為了回傳一個部落格的 90 天文章數，每次都重算整份 indexability projection（全部話題與全部部落格的統計；a45b06a 起不快取），
+  任何部落格頁都要 5.6–6.8 秒；ikukaroom 關係資料多，SSR 超過網頁端 10 秒讀取上限 → 500 → error.tsx。改為只查該部落格
+  （同樣只算 verified、期間內發布），每次即時查詢。API 6.3 秒 → 0.006 秒，回傳內容與舊版相同（posts 29、同一版本）；
+  正式站 ikukaroom 頁 0.7–0.9 秒，瀏覽器直接開與站內點入都無錯誤頁。話題頁 API 本來就走歷史路徑（0.03–0.12 秒）。
+- **/relations/ 列表**（使用者：互相提及的呈現與首頁不同）：最常被提及、互相提及改用首頁正文引用卡片的部落格 chip
+  （圖示＋名稱的圓角框），配對寫成「A ⇄ B」，下方「分別提及 x／y 篇」；原本標題下的雙向說明移到本頁底部說明區
+  （頁尾「引用與交流」也有同義說明）。手機淺／深色截圖無溢出。圖中連結明細維持原樣。
+- 驗收：vitest 1364、web node 231、topic-ui 176、tsc；隔離 18169 完整整合 46 套件通過（私有連線檔
+  `/home/deck/.t3/userdata/blog-integration-env/clone-18169.env`，0600，自容器設定產生）。切換後 `x-blog-release` 8b2510c、
+  generation 44、BUILD_ID 相符；`/` 3.7 秒、`/relations/`、`/topics/`、`/blogs/`、兩個部落格頁、`/api/topics` 200，tag 200。
+  截圖 `.reviews/gen44b/`。
+- 回填 run6 於 05:16Z 首頁中位數 6.8 秒進入 30 分鐘冷卻（cursor 25480），依規則自動恢復。
+- 保留：刪除 gen42 `b7648d9` release 與 checkout（worker 已移到 gen44）；工作 repo 與回填 worktree 的 node_modules 改連
+  `8b2510c`。保留 active、回滾 `f7f2dde`（回填 run6 的 WorkingDirectory）、`93060cc`、`af0e73c`、`blog-release-source-76a90e7`。
+
+## 現況（UTC 2026-10-16T05:05Z，gen43）
 
 正式站為 **green／gen43／`f7f2ddefcb4159a4710eb73aae9b2c484df17526`**，BUILD_ID `9Xr01QYB68SGPz7O8uo2-`，切換
 UTC 2026-10-16T04:58:57Z（transition 43）。回滾點 blue／gen42 `b7648d9`／`0oSLarRwu8aQwhsMiQeya`：
