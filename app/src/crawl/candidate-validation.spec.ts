@@ -151,6 +151,17 @@ describe('automatic discovery verification', () => {
     expect((await validateCandidate(listed, options(rss('https://other.test/blog', 'Quill.Test Blog'), plain))).eligible).toBe(false);
     expect((await validateCandidate(listed, options(rss(`${home}blog`, 'Some Blog', `${home}blog/old-post`), plain))).eligible).toBe(false);
   }, 20_000);
+  it('skips a stray title-less item (Hugo /archives/) but still refuses a feed that is mostly not articles', async () => {
+    const item = (title: string, link: string) =>
+      `<item><title>${title}</title><link>${link}</link><guid>${link}</guid><pubDate>Mon, 01 Jan 2001 00:00:00 GMT</pubDate></item>`;
+    const feedOf = (items: string[]) =>
+      `<rss version="2.0"><channel><title>Quill Writer</title><link>${home}</link>${items.join('')}</channel></rss>`;
+    const posts = Array.from({ length: 12 }, (_, i) => item(`Post ${i}`, `${home}posts/${i}`));
+    const one = await validateCandidate(candidate, options(feedOf([...posts, item('', `${home}archives/`)])));
+    expect(one).toMatchObject({ eligible: true, feed: { entries: 12 } });
+    const mostlyPages = [item('Post', `${home}posts/1`), item('', `${home}a/`), item('', `${home}b/`)];
+    expect((await validateCandidate(candidate, options(feedOf(mostlyPages)))).reason).toBe('empty_feed');
+  }, 20_000);
   it('enriches article anchor into independently verified homepage and RSS identity', async () => {
     const check = await validateCandidate(
       { ...candidate, source_type: 'article-link', name: 'An unrelated linked article' },

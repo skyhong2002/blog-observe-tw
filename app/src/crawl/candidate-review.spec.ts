@@ -98,9 +98,11 @@ describe('resumable candidate review batch', () => {
     const [sql, params] = (h.c.query.mock.calls as unknown as [string, unknown[]][]).find(([q]) =>
       q.includes('FROM discovery_candidates'),
     )!;
-    expect(sql).toContain("automaticReview.reason'))='candidate_host_budget_exhausted' AND JSON_UNQUOTE");
+    expect(sql).toContain("automaticReview.reason')) IN ('candidate_host_budget_exhausted','daily_admission_budget_exhausted') AND");
     expect(params[2]).toBe(`${new Date().toISOString().slice(0, 10)}T00:00:00.000Z`);
     expect(params).toHaveLength(4);
+    // BlogBlog.Club-listed homes are reviewed first: the directory is the collection's priority.
+    expect(sql).toMatch(/ORDER BY JSON_EXTRACT\(source_evidence,'\$\.directoryListing'\) IS NULL,\s*COALESCE/);
   });
   it('checks lease again after a slow network request, before any write', async () => {
     const h = harness();

@@ -112,10 +112,11 @@ export async function runCandidateReviewBatch(
      ids.length
        ? 'd.id IN (?)'
        : `(COALESCE(JSON_UNQUOTE(JSON_EXTRACT(source_evidence,'$.automaticReview.policy')),'')<>? OR COALESCE(JSON_UNQUOTE(JSON_EXTRACT(source_evidence,'$.automaticReview.checkedAt')),'') < ?
-   OR (JSON_UNQUOTE(JSON_EXTRACT(source_evidence,'$.automaticReview.reason'))='candidate_host_budget_exhausted' AND JSON_UNQUOTE(JSON_EXTRACT(source_evidence,'$.automaticReview.checkedAt')) < ?) OR EXISTS(SELECT 1 FROM ai_results ai WHERE ai.entity_type='candidate' AND ai.entity_id=d.id AND ai.task='classification' AND ai.status<>'ok' AND ai.attempts<3 AND ai.next_attempt_at<=UTC_TIMESTAMP()))`
+   OR (JSON_UNQUOTE(JSON_EXTRACT(source_evidence,'$.automaticReview.reason')) IN ('candidate_host_budget_exhausted','daily_admission_budget_exhausted') AND JSON_UNQUOTE(JSON_EXTRACT(source_evidence,'$.automaticReview.checkedAt')) < ?) OR EXISTS(SELECT 1 FROM ai_results ai WHERE ai.entity_type='candidate' AND ai.entity_id=d.id AND ai.task='classification' AND ai.status<>'ok' AND ai.attempts<3 AND ai.next_attempt_at<=UTC_TIMESTAMP()))`
    }
-   ORDER BY COALESCE(JSON_UNQUOTE(JSON_EXTRACT(source_evidence,'$.automaticReview.checkedAt')),''),id LIMIT ?`,
-      // A spent per-host budget is retried once that budget resets (the next UTC day), not after the weekly recheck.
+   ORDER BY JSON_EXTRACT(source_evidence,'$.directoryListing') IS NULL,
+     COALESCE(JSON_UNQUOTE(JSON_EXTRACT(source_evidence,'$.automaticReview.checkedAt')),''),id LIMIT ?`,
+      // A spent per-host or admission budget is retried once it resets (the next UTC day), not after the weekly recheck.
       ids.length
         ? [ids, limit]
         : [

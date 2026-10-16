@@ -7,7 +7,8 @@ import { type FeedCrawlerOptions, isAllowedCrawlUrl, parseFeed, politeFetch, rea
 import { seedIdentityKey } from './seed-url-resolution.ts';
 import { isSeedPlatformRoot, type SeedUrlValidation, validateSeedUrl } from './seed-url-validation.ts';
 
-export const CANDIDATE_POLICY = 'personal-rss-publication-v4-directory';
+// v5 (2026-10-16): domain-named identities, listed homes' blog-section feeds, Hugo index.xml, stray feed items skipped.
+export const CANDIDATE_POLICY = 'personal-rss-publication-v5-directory';
 export type DiscoveryCandidate = {
   id: number;
   url: string;
@@ -285,17 +286,17 @@ export async function validateCandidate(candidate: DiscoveryCandidate, options: 
       result.reason = 'feed_name_identity_mismatch';
       return result;
     }
-    const entries = parseFeed(xml, response.url || source.url);
-    if (
-      !entries.length ||
-      entries.some(
-        (e) =>
-          !e.title.trim() ||
-          e.title === '未命名文章' ||
-          seedIdentityKey(e.url) === seedIdentityKey(source.url) ||
-          seedIdentityKey(e.url) === seedIdentityKey(verification.finalUrl!),
-      )
-    ) {
+    const parsed = parseFeed(xml, response.url || source.url);
+    // A title-less or self-pointing item (Hugo lists its /archives/ page) is skipped, not fatal; the feed must still
+    // be articles: nine in ten items real posts.
+    const entries = parsed.filter(
+      (e) =>
+        e.title.trim() &&
+        e.title !== '未命名文章' &&
+        seedIdentityKey(e.url) !== seedIdentityKey(source.url) &&
+        seedIdentityKey(e.url) !== seedIdentityKey(verification.finalUrl!),
+    );
+    if (!entries.length || entries.length < 0.9 * parsed.length) {
       result.reason = 'empty_feed';
       return result;
     }
