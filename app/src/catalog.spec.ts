@@ -91,7 +91,7 @@ describe('complete blog catalog', () => {
     expect(countSql).toContain('FROM blog_urls u WHERE u.blog_id=b.id');
     const [listSql, listParams] = pool.query.mock.calls[4];
     expect(listSql).toMatch(/ORDER BY CASE WHEN b\.name=\? THEN 0 .* END ASC,postCount DESC,b\.id ASC/s);
-    expect(listParams.slice(3, 5)).toEqual(['iku room 100%_ iku', 'iku room 100=%=_ iku%']);
+    expect(listParams?.slice(3, 5)).toEqual(['iku room 100%_ iku', 'iku room 100=%=_ iku%']);
     // A column the reader chose still wins over relevance; relevance alone without a search is the default sort.
     expect(catalogFilters({ q: 'iku', sort: 'posts' })).toMatchObject({ sort: 'posts' });
     expect(catalogFilters({ sort: 'relevance' })).toMatchObject({ sort: 'latest' });
