@@ -16,7 +16,8 @@ const value = (query: QueryReader, key: string) => query.get(key) ?? undefined;
 
 const CATALOG_KEYS = ['q', 'category', 'status', 'sort', 'dir', 'page', 'limit'] as const;
 const catalogSorts = ['name', 'category', 'posts', 'authors', 'latest', 'crawl', 'status'] as const;
-export type CatalogSort = (typeof catalogSorts)[number];
+/** A column of the table, or (only while searching) best match first. */
+export type CatalogSort = (typeof catalogSorts)[number] | 'relevance';
 export type CatalogFilters = {
   q: string;
   category: string;
@@ -47,9 +48,11 @@ const positive = (text: string | undefined, fallback: number) => {
 
 /** Mirrors the gateway's catalogFilters (app/src/catalog.js) so a pending view highlights what was asked. */
 export function catalogFiltersOf(query: CatalogQuery): CatalogFilters {
-  const sort = catalogSorts.includes(query.sort as CatalogSort) ? (query.sort as CatalogSort) : 'latest';
+  const q = chars(query.q, 100);
+  const column = catalogSorts.find((sort) => sort === query.sort);
+  const sort: CatalogSort = column ?? (q ? 'relevance' : 'latest');
   return {
-    q: chars(query.q, 100),
+    q,
     category: chars(query.category, 255),
     status: chars(query.status, 64),
     sort,

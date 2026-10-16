@@ -18,8 +18,17 @@ const sortColumns = {
   crawl: 'b.last_crawl_success_at',
   status: statusLabel,
 };
-/** The directory opens on the most recently updated blogs. */
+/** The directory opens on the most recently updated blogs; a search opens on the best matches. */
 const DEFAULT_SORT = 'latest';
+const SEARCH_SORT = 'relevance';
+/** Search text as tag.observe.tw folds it: NFKC (full-width ＡＢ → AB), lower case, single spaces. */
+export const searchText = (value) => value.normalize('NFKC').toLowerCase().replace(/\s+/gu, ' ').trim();
+/** Up to five space-separated words; each must appear in the blog's name, address, slug, other addresses or description. */
+const searchWords = (q) => [...new Set(searchText(q).split(' ').filter(Boolean))].slice(0, 5);
+// Explicit escape character makes percent, underscore and '=' literal search text.
+const like = (word) => word.replace(/[=%_]/g, '=$&');
+const searchFields = `CONCAT_WS(' ',b.name,b.url,b.slug,b.description,
+  (SELECT GROUP_CONCAT(u.url SEPARATOR ' ') FROM blog_urls u WHERE u.blog_id=b.id))`;
 const text = (value, length) => (typeof value === 'string' ? Array.from(value.trim()).slice(0, length).join('') : '');
 const integer = (value, fallback) => {
   if (typeof value !== 'string' || !/^\d+$/.test(value)) return fallback;
@@ -27,9 +36,16 @@ const integer = (value, fallback) => {
   return Number.isSafeInteger(number) ? Math.max(1, number) : Number.MAX_SAFE_INTEGER;
 };
 export function catalogFilters(query = {}) {
-  const sort = typeof query.sort === 'string' && Object.hasOwn(sortColumns, query.sort) ? query.sort : DEFAULT_SORT;
+  const q = text(query.q, 100);
+  // An explicit column sort wins; otherwise a search ranks by match and the plain directory by latest article.
+  const sort =
+    typeof query.sort === 'string' && (Object.hasOwn(sortColumns, query.sort) || (query.sort === SEARCH_SORT && q))
+      ? query.sort
+      : q
+        ? SEARCH_SORT
+        : DEFAULT_SORT;
   return {
-    q: text(query.q, 100),
+    q,
     category: text(query.category, 255),
     status: text(query.status, 64),
     sort,
@@ -42,11 +58,11 @@ export async function loadCatalog(pool, query = {}) {
   const filters = catalogFilters(query);
   const where = ["b.status='verified'"];
   const parameters = [];
-  if (filters.q) {
-    // Explicit escape character makes percent, underscore and '=' literal search text.
-    const pattern = `%${filters.q.toLowerCase().replace(/[=%_]/g, '=$&')}%`;
-    where.push("(LOWER(b.name) LIKE ? ESCAPE '=' OR LOWER(b.url) LIKE ? ESCAPE '=')");
-    parameters.push(pattern, pattern);
+  const words = filters.q ? searchWords(filters.q) : [];
+  for (const word of words) {
+    // utf8mb4_unicode_ci already ignores case; the words are NFKC-folded above.
+    where.push(`${searchFields} LIKE ? ESCAPE '='`);
+    parameters.push(`%${like(word)}%`);
   }
   if (filters.category) {
     where.push(`${categoryLabel}=?`);
@@ -76,13 +92,24 @@ export async function loadCatalog(pool, query = {}) {
   const total = Number(countResult[0][0].total);
   const pages = Math.max(1, Math.ceil(total / filters.limit));
   const page = Math.min(filters.page, pages);
+  // Relevance: the whole query as the name, then name start, address start, name, address, then the rest
+  // (description or an older address); ties go to the blog with more articles.
+  const whole = searchText(filters.q);
+  const host = "REGEXP_REPLACE(COALESCE(b.url,''),'^https?://(www[.])?','')";
+  const relevance = `CASE WHEN b.name=? THEN 0 WHEN b.name LIKE ? ESCAPE '=' THEN 1 WHEN ${host} LIKE ? ESCAPE '=' THEN 2
+    WHEN b.name LIKE ? ESCAPE '=' THEN 3 WHEN b.url LIKE ? ESCAPE '=' OR b.slug LIKE ? ESCAPE '=' THEN 4 ELSE 5 END`;
+  const ranked = filters.sort === SEARCH_SORT;
+  const order = ranked ? `${relevance} ASC,postCount DESC,b.id ASC` : `${sortColumns[filters.sort]} ${filters.dir.toUpperCase()},b.id ASC`;
+  const orderParameters = ranked
+    ? [whole, `${like(whole)}%`, `${like(whole)}%`, `%${like(whole)}%`, `%${like(whole)}%`, `%${like(whole)}%`]
+    : [];
   const [blogs] = await pool.query(
     `SELECT b.id,b.slug,b.name,b.url,${categoryLabel} AS category,${statusLabel} AS statusLabel,
       b.last_crawl_success_at AS lastCrawlSuccessAt,${latestPublished} AS lastPublishedAt,${authorCount} AS authorCount,
       b.expected_interval_hours AS expectedIntervalHours,
       (SELECT COUNT(*) FROM posts p WHERE p.blog_id=b.id AND (p.published_at IS NULL OR p.published_at<=UTC_TIMESTAMP())) AS postCount
-      FROM blogs b WHERE ${condition} ORDER BY ${sortColumns[filters.sort]} ${filters.dir.toUpperCase()},b.id ASC LIMIT ? OFFSET ?`,
-    [...parameters, filters.limit, (page - 1) * filters.limit],
+      FROM blogs b WHERE ${condition} ORDER BY ${order} LIMIT ? OFFSET ?`,
+    [...parameters, ...orderParameters, filters.limit, (page - 1) * filters.limit],
   );
   const icons = await iconManifest();
   const totals = totalsResult[0][0];

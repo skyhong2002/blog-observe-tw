@@ -5,6 +5,7 @@
 // query; see app/blogs/page.tsx.
 
 import { useSearchParams } from 'next/navigation';
+import { type ReactNode, useEffect, useRef, useState } from 'react';
 import BlogIcon from '@/components/BlogIcon';
 import MediaTabs from '@/components/MediaTabs';
 import Link from '@/components/NoPrefetchLink';
@@ -30,12 +31,127 @@ type Status = 'ready' | 'pending' | 'error';
  * filter-independent parts (totals, facets, update time) are shown, beside the
  * asked `filters`, so no other query's rows appear while this one loads.
  */
-export default function BlogCatalogView({ catalog: data, filters, status }: { catalog: Catalog; filters: CatalogFilters; status: Status }) {
+/** Search text as the gateway folds it (catalog.js searchText): NFKC, lower case, single spaces. */
+const fold = (text: string) => text.normalize('NFKC').toLowerCase().replace(/\s+/gu, ' ').trim();
+
+/** Marks every place a search word appears (tag.observe.tw SuggestInput's Highlight, for each word). */
+function Highlight({ text, words }: { text: string; words: string[] }) {
+  const lower = text.toLowerCase();
+  const marks: [number, number][] = [];
+  for (const word of words)
+    for (let at = lower.indexOf(word); word && at >= 0; at = lower.indexOf(word, at + word.length)) marks.push([at, at + word.length]);
+  if (!marks.length) return <>{text}</>;
+  marks.sort((a, b) => a[0] - b[0]);
+  const parts: ReactNode[] = [];
+  let from = 0;
+  for (const [start, end] of marks) {
+    if (start < from) continue;
+    parts.push(
+      text.slice(from, start),
+      <mark key={start} className="rounded-sm bg-brand-100 text-inherit dark:bg-brand-900/60">
+        {text.slice(start, end)}
+      </mark>,
+    );
+    from = end;
+  }
+  parts.push(text.slice(from));
+  return <>{parts}</>;
+}
+
+/**
+ * Filters as you type, like tag.observe.tw's /media/traffic/: the URL's ?q= follows the box (replaceState, no reload)
+ * 250 ms after the last keystroke, or at once on Enter. Paging restarts; a column sort the reader chose is kept.
+ */
+function SearchBox({ q, query }: { q: string; query: Record<string, string | undefined> }) {
+  const [text, setText] = useState(q);
+  const input = useRef<HTMLInputElement>(null);
+  const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  // Back/forward or a chip changes ?q=; never overwrite what the reader is typing.
+  useEffect(() => {
+    if (document.activeElement !== input.current) setText(q);
+  }, [q]);
+  useEffect(() => () => clearTimeout(timer.current), []);
+  const go = (value: string) => {
+    clearTimeout(timer.current);
+    const params = new URLSearchParams(Object.entries(query).filter((entry): entry is [string, string] => typeof entry[1] === 'string'));
+    params.delete('page');
+    if (params.get('sort') === 'relevance') params.delete('sort');
+    if (value.trim()) params.set('q', value.trim());
+    else params.delete('q');
+    const search = params.toString();
+    window.history.replaceState(null, '', search ? `/blogs/?${search}` : '/blogs/');
+  };
+  return (
+    <form
+      className="relative w-full sm:w-80"
+      onSubmit={(event) => {
+        event.preventDefault();
+        go(text);
+      }}
+    >
+      <label htmlFor="blog-query" className="sr-only">
+        搜尋部落格：名稱、網址或簡介
+      </label>
+      <input
+        ref={input}
+        id="blog-query"
+        type="search"
+        name="q"
+        value={text}
+        autoComplete="off"
+        enterKeyHint="search"
+        placeholder="搜尋名稱、網址或簡介"
+        onChange={(event) => {
+          setText(event.target.value);
+          clearTimeout(timer.current);
+          const value = event.target.value;
+          timer.current = setTimeout(() => go(value), 250);
+        }}
+        onKeyDown={(event) => {
+          if (event.key === 'Escape' && text) {
+            event.preventDefault();
+            setText('');
+            go('');
+          }
+        }}
+        className="min-h-9 w-full rounded-lg border border-zinc-300 bg-white py-1.5 pr-8 pl-3 text-base sm:text-sm dark:border-zinc-700 dark:bg-zinc-900 [&::-webkit-search-cancel-button]:hidden"
+      />
+      {text ? (
+        <button
+          type="button"
+          aria-label="清除搜尋"
+          onClick={() => {
+            setText('');
+            go('');
+            input.current?.focus();
+          }}
+          className="absolute top-1/2 right-1.5 flex size-6 -translate-y-1/2 items-center justify-center rounded text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100"
+        >
+          ×
+        </button>
+      ) : null}
+    </form>
+  );
+}
+
+export default function BlogCatalogView({
+  catalog: data,
+  filters,
+  status,
+  busy = false,
+}: {
+  catalog: Catalog;
+  filters: CatalogFilters;
+  status: Status;
+  /** Showing the previous answer while the next search loads. */
+  busy?: boolean;
+}) {
   const { q, sort, dir, category, status: blogStatus, limit } = filters;
   const query = { q, sort, dir, category, status: blogStatus, ...(limit !== 50 ? { limit: String(limit) } : {}) };
   const { categories, statuses, blogs: rows } = data;
   const { page, pages, total } = data.pagination;
   const ready = status === 'ready';
+  const words = q ? [...new Set(fold(q).split(' ').filter(Boolean))] : [];
   const ascendingFirst = new Set<CatalogSort>(['name', 'category', 'status']);
   const href = (patch: Record<string, string | null>) => {
     const params = new URLSearchParams(Object.entries(query).filter((entry): entry is [string, string] => typeof entry[1] === 'string'));
@@ -112,43 +228,24 @@ export default function BlogCatalogView({ catalog: data, filters, status }: { ca
           </Link>
         ))}
       </div>
-      <form className="flex flex-wrap items-center justify-between gap-2">
-        <div className="flex min-w-0 items-center gap-2">
-          <label htmlFor="blog-query" className="sr-only">
-            搜尋部落格名稱或網址
-          </label>
-          <input
-            key={q}
-            id="blog-query"
-            name="q"
-            defaultValue={q}
-            placeholder="搜尋名稱或網址"
-            className="min-h-8 w-48 min-w-0 rounded-lg border border-zinc-300 bg-white px-3 text-xs dark:border-zinc-700 dark:bg-zinc-900"
-          />
-          {Object.entries(query)
-            .filter(([key]) => !['q', 'page'].includes(key))
-            .map(([key, value]) => (
-              <input key={key} type="hidden" name={key} value={value ?? ''} />
-            ))}
-          <button
-            type="submit"
-            className="min-h-8 rounded-lg border border-zinc-300 px-3 text-xs hover:text-brand-700 dark:border-zinc-700 dark:hover:text-brand-400"
-          >
-            搜尋
-          </button>
-        </div>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <SearchBox q={q} query={query} />
         <span role="status" className="text-xs text-zinc-500">
-          {ready
-            ? `共 ${total} 個部落格 · 沒有近期文章不代表網站失效`
-            : status === 'pending'
-              ? '正在載入符合條件的部落格…'
-              : '部落格目錄暫時無法載入'}
+          {busy
+            ? '正在搜尋…'
+            : ready
+              ? q
+                ? `符合「${q}」的部落格 ${total} 個${sort === 'relevance' ? ' · 依相符程度排序' : ''}`
+                : `共 ${total} 個部落格 · 沒有近期文章不代表網站失效`
+              : status === 'pending'
+                ? '正在載入符合條件的部落格…'
+                : '部落格目錄暫時無法載入'}
         </span>
-      </form>
+      </div>
       {ready ? (
         <>
           <TableScroller card label="部落格與文章數表格，可左右捲動">
-            <table className="w-full min-w-[56rem] whitespace-nowrap text-sm">
+            <table aria-busy={busy} className={`w-full min-w-[56rem] whitespace-nowrap text-sm ${busy ? 'opacity-60' : ''}`}>
               <thead className="bg-zinc-50 text-left text-xs text-zinc-600 dark:bg-zinc-950 dark:text-zinc-400">
                 <tr>
                   <Th col="name" label="部落格" className={table.leadHead} />
@@ -175,7 +272,7 @@ export default function BlogCatalogView({ catalog: data, filters, status }: { ca
                             <BlogIcon media={blog.slug} iconUrl={blog.iconUrl} title={blog.name} />
                           </span>
                           <span className={`${table.leadText} sm:max-w-60`} title={blog.name}>
-                            {blog.name}
+                            <Highlight text={blog.name} words={words} />
                           </span>
                         </Link>
                         {blog.url && (
@@ -183,7 +280,7 @@ export default function BlogCatalogView({ catalog: data, filters, status }: { ca
                             className={`${table.leadExtra} ${table.leadText} shrink-[999] text-xs text-zinc-500 sm:max-w-40 dark:text-zinc-400`}
                             title={blog.url}
                           >
-                            {blog.url.replace(/^https?:\/\//, '').replace(/\/$/, '')}
+                            <Highlight text={blog.url.replace(/^https?:\/\//, '').replace(/\/$/, '')} words={words} />
                           </span>
                         )}
                       </div>
@@ -207,7 +304,13 @@ export default function BlogCatalogView({ catalog: data, filters, status }: { ca
               </tbody>
             </table>
           </TableScroller>
-          {!rows.length && <p className="py-8 text-zinc-500">沒有符合條件的部落格。</p>}
+          {!rows.length && (
+            <p className="py-8 text-zinc-500">
+              {q
+                ? `沒有符合「${q}」的部落格。可以試試網址的一部分、較短的關鍵字${category || blogStatus ? '，或清除分類與狀態篩選' : ''}。`
+                : '沒有符合條件的部落格。'}
+            </p>
+          )}
           <nav aria-label="部落格分頁" className="flex justify-between text-sm">
             {page > 1 ? (
               <Link className="py-2 text-brand-700 dark:text-brand-400" href={href({ page: String(page - 1) })}>
@@ -250,7 +353,12 @@ export function BlogCatalogFromUrl({ baseline }: { baseline: Catalog }) {
   const asked = catalogQueryOf(useSearchParams());
   const baselineAsked = isCatalogBaseline(asked);
   const load = usePublicJson(baselineAsked ? null : catalogApiPath(asked), parseCatalog);
+  // While typing, each search keeps the previous answer on screen (dimmed) instead of a loading box.
+  const shown = useRef<Catalog>(baseline);
+  if (!load) shown.current = baseline;
+  else if (load.status === 'ready') shown.current = load.data;
   if (!load) return <BlogCatalogView catalog={baseline} filters={baseline.filters} status="ready" />;
   if (load.status === 'ready') return <BlogCatalogView catalog={load.data} filters={load.data.filters} status="ready" />;
-  return <BlogCatalogView catalog={baseline} filters={catalogFiltersOf(asked)} status={load.status === 'pending' ? 'pending' : 'error'} />;
+  if (load.status === 'pending') return <BlogCatalogView catalog={shown.current} filters={catalogFiltersOf(asked)} status="ready" busy />;
+  return <BlogCatalogView catalog={baseline} filters={catalogFiltersOf(asked)} status="error" />;
 }

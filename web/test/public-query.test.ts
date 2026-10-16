@@ -61,6 +61,12 @@ test('catalog query: pending filters match the gateway normaliser', () => {
     'page=abc&limit=-1',
     'page=99999999999999999999',
     `q=${'長'.repeat(150)}`,
+    // A search opens on best match; a chosen column still wins; relevance means nothing without a search.
+    'q=ikukaroom',
+    'q=iku&sort=posts&dir=asc',
+    'q=iku&sort=relevance',
+    'sort=relevance',
+    'q=%20%20',
   ]) {
     const asked = catalogQueryOf(q(search));
     assert.deepEqual(catalogFiltersOf(asked), catalogFilters(asked), search);

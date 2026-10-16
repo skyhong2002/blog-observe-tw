@@ -51,11 +51,11 @@ describe('complete blog catalog', () => {
   it('uses identical parameterized filters for count and rows, with literal wildcard search and global facets', async () => {
     const pool = fixture(3);
     const data = await loadCatalog(pool, { q: " A%_'= ", category: '旅行', status: '已核對', sort: 'posts', dir: 'desc', page: '2' });
-    const expected = ["%a=%=_'==%", "%a=%=_'==%", '旅行', '已核對'];
+    const expected = ["%a=%=_'==%", '旅行', '已核對'];
     expect(pool.query.mock.calls[3][1]).toEqual(expected);
     expect(pool.query.mock.calls[4][1]).toEqual([...expected, 50, 0]);
     expect(pool.query.mock.calls[4][0]).toContain('ORDER BY postCount DESC,b.id ASC');
-    expect(pool.query.mock.calls[3][0]).toContain("LOWER(b.url) LIKE ? ESCAPE '='");
+    expect(pool.query.mock.calls[3][0]).toMatch(/CONCAT_WS\(.*\) LIKE \? ESCAPE '='/s);
     expect(pool.query.mock.calls[3][0]).not.toContain('旅行');
     expect(pool.query.mock.calls.slice(0, 3).every(([, params]) => params === undefined)).toBe(true);
     expect(data.pagination).toEqual({ page: 1, pages: 1, pageSize: 50, total: 3 });
@@ -67,7 +67,35 @@ describe('complete blog catalog', () => {
     expect(data.blogs).toEqual([]);
     expect(data.pagination).toEqual({ page: 1, pages: 1, pageSize: 50, total: 0 });
     expect(data.totals.blogs).toBe(275);
-    expect(pool.query.mock.calls[4][1]).toEqual(['%missing%', '%missing%', 50, 0]);
+    expect(pool.query.mock.calls[4][1]).toEqual([
+      '%missing%',
+      'missing',
+      'missing%',
+      'missing%',
+      '%missing%',
+      '%missing%',
+      '%missing%',
+      50,
+      0,
+    ]);
+  });
+
+  it('searches like tag.observe.tw: folded words, every word somewhere in the blog, best matches first', async () => {
+    const pool = fixture(0, []);
+    const data = await loadCatalog(pool, { q: '  ＩＫＵ   Room  100%_ ikU ' });
+    expect(data.filters).toMatchObject({ sort: 'relevance' });
+    const [countSql, countParams] = pool.query.mock.calls[3];
+    // NFKC + lower case, duplicates dropped, LIKE metacharacters literal; each word is its own condition.
+    expect(countParams).toEqual(['%iku%', '%room%', '%100=%=_%']);
+    expect(countSql.match(/CONCAT_WS\(' ',b\.name,b\.url,b\.slug,b\.description/g)).toHaveLength(3);
+    expect(countSql).toContain('FROM blog_urls u WHERE u.blog_id=b.id');
+    const [listSql, listParams] = pool.query.mock.calls[4];
+    expect(listSql).toMatch(/ORDER BY CASE WHEN b\.name=\? THEN 0 .* END ASC,postCount DESC,b\.id ASC/s);
+    expect(listParams.slice(3, 5)).toEqual(['iku room 100%_ iku', 'iku room 100=%=_ iku%']);
+    // A column the reader chose still wins over relevance; relevance alone without a search is the default sort.
+    expect(catalogFilters({ q: 'iku', sort: 'posts' })).toMatchObject({ sort: 'posts' });
+    expect(catalogFilters({ sort: 'relevance' })).toMatchObject({ sort: 'latest' });
+    expect(catalogFilters({ q: 'iku', sort: 'relevance' })).toMatchObject({ sort: 'relevance' });
   });
 
   it('bounds inputs and limits and never interpolates unknown sort expressions or directions', async () => {
