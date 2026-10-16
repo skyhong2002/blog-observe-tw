@@ -62,9 +62,10 @@ export default function BlogRelationGraph({ nodes, edges }: { nodes: RelationNod
     // Mentions received: the most-cited blogs are drawn larger, and their names win when names would collide.
     const incoming = new Map<number, number>();
     for (const e of edges) incoming.set(e.targetBlogId, (incoming.get(e.targetBlogId) ?? 0) + e.count);
-    const symbolSize = (n: RelationNode) => Math.round(20 + Math.min(16, 4 * Math.log2(1 + (incoming.get(n.id) ?? 0))));
-    // Phones: shorter edges keep nodes apart inside a 390px canvas.
+      // Phones: shorter edges and smaller symbols keep nodes (and some names) apart inside a 390px canvas.
     const isNarrow = () => chart.getWidth() < 480;
+    const symbolSize = (n: RelationNode) =>
+      Math.round((isNarrow() ? 0.75 : 1) * (20 + Math.min(16, 4 * Math.log2(1 + (incoming.get(n.id) ?? 0)))));
     const labelStyle = () => {
       const narrow = isNarrow();
       return {
@@ -205,7 +206,7 @@ export default function BlogRelationGraph({ nodes, edges }: { nodes: RelationNod
   return (
     <div
       ref={ref}
-      className="h-[440px] w-full lg:h-[600px]"
+      className="h-[520px] w-full lg:h-[600px]"
       role="img"
       aria-label="部落格正文提及關係圖；箭頭指向被提及的部落格，詳細資料列於下方表格"
     />
