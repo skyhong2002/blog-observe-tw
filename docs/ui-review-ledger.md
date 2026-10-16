@@ -1,6 +1,33 @@
 # UI 逐頁審查紀錄
 
-## Current state（UTC 2026-10-16T06:50Z，gen46）
+## Current state（UTC 2026-10-16T07:25Z，gen47）
+
+正式站為 **green／gen47／`831aac861b79abbbb851bc1ae56b642f0062aac2`**，BUILD_ID `43tdIBD78RDHig0qKNrFO`，切換
+UTC 2026-10-16T07:15:43Z（transition 47）。回滾點 blue／gen46 `5119e58`（建置 gen48 期間暫時停用）：
+
+```bash
+bash /home/deck/.cache/blog-home-cloud-b3-20261014/tools/deploy-blue-green.sh rollback blue
+```
+
+Worker 跟隨 gen47：drop-in `95-release-831aac8.conf`。
+
+- **wiwi.blog 改名**（使用者）：「官大為的部落格 | Wiwi.Blog」，直接更新 blogs.name 並寫 `admin_audits`（`blog.rename`，actor NULL，
+  note 記使用者要求）。寫入端命名順序為 og:site_name > feed 標題 > 首頁標題，wiwi 無 og:site_name 才取到 feed 標題。
+- **每天發文、每天抓**：RSS 排程本來就是每 6 小時一輪（`BLOG_CRAWL_INTERVAL_MS=21600000`；過去 7 小時 434／436 站抓過）。
+  頁面「預期更新 約每 168 小時」是從未更新的欄位預設值，改為「發文頻率」（最近 21 篇的間隔中位數：約每天／約每 N 天／週／月）
+  與「檢查頻率」（每 6 小時檢查 RSS）。wiwi.blog 顯示約每天。
+- **單站額度延後的候選一次性重審**（14 筆）：真實結果多為非部落格（web.archive.org、Meta、Mozilla、飯店、銀行、媒體）或無 RSS。
+  名單站 hshuang.com／eddielv.com（Hugo `/index.xml` 未宣告）、j2hongming.com（feed 仍指向舊 github.io 網域，未處理）。
+  系統修正：Hugo `/index.xml` 列入試探；單站額度用完改為下個 UTC 日重排；每站每日 40 次（一次審核可超過 20 次）。
+- **React #418**：Node ICU 在日期與時間之間輸出 U+2009，Chrome 為一般空白，所有顯示時間的頁面 hydration 失敗、整棵樹在瀏覽器
+  重繪。`taipei()` 與 `/api/status/`、API 金鑰頁的時間統一一般空白；green 七頁 0 錯誤（blue 舊版仍有）。
+- 驗收：vitest 全通過（主機負載高時有個別逾時，單獨重跑皆通過）、web node 235、topic-ui 176、tsc。切換後 generation 47、
+  BUILD_ID 相符，主要頁面 200，tag 200。隔離整合測試容器仍不存在，未跑。
+- **主機**：tag-db 於 UTC 05:59 被重建（不是本 thread），InnoDB buffer pool 由 1 GB 改為 3 GB，冷快取；NAS restic／rclone 備份與
+  IO pressure 60–70%，load 15–27，blog 首頁一度 9.8–11.3 秒（gateway 話題 API 1–5 秒）。建置只在 load ≤12、tag <2 秒、
+  blog <6.17 秒時進行。
+
+## 現況（UTC 2026-10-16T06:50Z，gen46）
 
 正式站為 **blue／gen46／`5119e581ba56f0eb7af438cb5cb32f6c96d827b1`**，BUILD_ID `1pmOG-T6lcX9Y8bjW2_4M`，切換
 UTC 2026-10-16T06:37:32Z（transition 46）。gen45 green `7f20a42`／`SW9tizfIPxpoWnU4a36M8`（06:24:16Z）為回滾點：
