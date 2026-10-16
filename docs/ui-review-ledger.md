@@ -1,6 +1,38 @@
 # UI 逐頁審查紀錄
 
-## Current state（UTC 2026-10-16T05:30Z，gen44）
+## Current state（UTC 2026-10-16T06:50Z，gen46）
+
+正式站為 **blue／gen46／`5119e581ba56f0eb7af438cb5cb32f6c96d827b1`**，BUILD_ID `1pmOG-T6lcX9Y8bjW2_4M`，切換
+UTC 2026-10-16T06:37:32Z（transition 46）。gen45 green `7f20a42`／`SW9tizfIPxpoWnU4a36M8`（06:24:16Z）為回滾點：
+
+```bash
+bash /home/deck/.cache/blog-home-cloud-b3-20261014/tools/deploy-blue-green.sh rollback green
+```
+
+Worker 跟隨 gen46：drop-in `95-release-5119e58.conf`。回滾：WorkingDirectory／NODE_PATH 改到 `7f20a42`、daemon-reload、restart。
+
+- **/blogs/ 搜尋**（使用者：搜尋很差，參考 tag）。tag 沒有搜尋引擎，`/media/traffic/` 是即時篩選＋NFKC＋前綴優先。
+  改為：輸入即篩（250 ms，Enter 立即；`?q=` 以 replaceState 更新、不重載，載入中保留上一份結果變淡）；NFKC＋小寫；
+  空白分詞，每個詞須出現在名稱、網址、slug、其他網址（blog_urls）或簡介；有搜尋時依相符程度排序（名稱完全相同 >
+  名稱開頭 > 網域開頭 > 名稱包含 > 網址 > 其他，再依文章數），使用者點過的欄位排序優先；名稱與網址標出相符字、
+  狀態列與空結果寫出查詢字、Esc／× 清除；手機輸入框 16px 避免 iOS 放大。正式資料查詢 17–143 ms。
+- **wiwi.blog 收錄並開始爬**（使用者指定）。名單首頁候選 #6544（blogblog.club/party 直接列出）卡在：名稱即網域被濾光、
+  RSS 5.4 MiB 超過 5 MiB、feed `<link>` 是 `/blog` 而非首頁、10/15 被記為單站額度用完（7 天後才重審）。修正：名稱／首頁／feed
+  都寫出自身網域時視為身分相符；名單直接列出的首頁可用同站首頁範圍內的 blog 區段 feed（一般候選的分類 feed 仍拒絕，
+  寫入端同步檢查）；回應上限 8 MiB（文件同步）；`tools/review-candidates.ts --id N` 人工重審指定候選（同樣排除人工決定、
+  同樣驗證與寫入），用獨立每日 200 次額度（自動審核 1,500 次在 UTC 日早段即用完）。結果：blog 448「Wiwi.Blog Blog」
+  （BlogBlog.Club 名單自動收錄），`crawl-once --history --ids 448` 匯入 1,011 篇（RSS 全文），補可讀網址 `/blogs/wiwi.blog/`
+  與網站圖示。
+- 驗收：vitest 1369、web node 233、topic-ui 176、tsc（root＋web）。**隔離整合測試未跑**：`blog-observe-relations-test`
+  容器在 13:2x 被移除（同時 tag-f1-restore-db 等也被停，非本 thread 操作），未自行重建。切換後 release、generation、
+  BUILD_ID 相符；`/`、`/blogs/`、`/blogs/?q=iku`、ikukaroom 頁、`/relations/`、`/topics/`、`/api/topics` 200，tag 200。
+  互動實測（green／blue）：只載入 1 次 document、焦點保留、全形／多詞／空結果／Esc 正確。截圖 `.reviews/gen45/`、`gen46b/`。
+- 主機：14:00 起 load 10–17（NAS restic／rclone 備份、另一個 mariadbd、/home du）；建置改用文件門檻 load ≤12 並先量
+  tag／blog 首頁。回填改為 run7（WorkingDirectory gen46，cursor 25480），目前因 load 自動暫停。
+- 保留：刪除 gen44 `8b2510c`、gen43 `f7f2dde` 及未上線的 `f205174`、`0f78d62` release 與 checkout；工作 repo 與回填 worktree
+  的 node_modules 改連 `5119e58`。保留 active、回滾 `7f20a42`、`93060cc`、`af0e73c`、`blog-release-source-76a90e7`。
+
+## 現況（UTC 2026-10-16T05:30Z，gen44）
 
 正式站為 **blue／gen44／`8b2510cc2848950f3c980abfea116b7b1a6a4836`**，BUILD_ID `9lxYgivAgYPQ40FORG5XL`，切換
 UTC 2026-10-16T05:25:51Z（transition 44）。回滾點 green／gen43 `f7f2dde`／`9Xr01QYB68SGPz7O8uo2-`：
