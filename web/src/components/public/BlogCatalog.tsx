@@ -62,7 +62,7 @@ function Highlight({ text, words }: { text: string; words: string[] }) {
  * Filters as you type, like tag.observe.tw's /media/traffic/: the URL's ?q= follows the box (replaceState, no reload)
  * 250 ms after the last keystroke, or at once on Enter. Paging restarts; a column sort the reader chose is kept.
  */
-function SearchBox({ q, query }: { q: string; query: Record<string, string | undefined> }) {
+function SearchBox({ q }: { q: string }) {
   const [text, setText] = useState(q);
   const input = useRef<HTMLInputElement>(null);
   const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
@@ -73,8 +73,10 @@ function SearchBox({ q, query }: { q: string; query: Record<string, string | und
   useEffect(() => () => clearTimeout(timer.current), []);
   const go = (value: string) => {
     clearTimeout(timer.current);
-    const params = new URLSearchParams(Object.entries(query).filter((entry): entry is [string, string] => typeof entry[1] === 'string'));
-    params.delete('page');
+    // From the address bar, not the normalised filters: only a column the reader actually clicked stays (the
+    // default latest-first order would otherwise override best-match ranking).
+    const params = new URLSearchParams(window.location.search);
+    for (const key of ['page', ...['category', 'status'].filter((key) => !params.get(key))]) params.delete(key);
     if (params.get('sort') === 'relevance') params.delete('sort');
     if (value.trim()) params.set('q', value.trim());
     else params.delete('q');
@@ -154,7 +156,15 @@ export default function BlogCatalogView({
   const words = q ? [...new Set(fold(q).split(' ').filter(Boolean))] : [];
   const ascendingFirst = new Set<CatalogSort>(['name', 'category', 'status']);
   const href = (patch: Record<string, string | null>) => {
-    const params = new URLSearchParams(Object.entries(query).filter((entry): entry is [string, string] => typeof entry[1] === 'string'));
+    // Empty filters and the default orders (latest first; best match while searching) stay out of the link, so a
+    // search started from it still ranks by match.
+    const params = new URLSearchParams(
+      Object.entries(query).filter((entry): entry is [string, string] => typeof entry[1] === 'string' && entry[1] !== ''),
+    );
+    if (sort === 'relevance' || (sort === 'latest' && dir === 'desc')) {
+      params.delete('sort');
+      params.delete('dir');
+    }
     params.delete('page');
     for (const [key, value] of Object.entries(patch)) {
       if (value === null) params.delete(key);
@@ -229,7 +239,7 @@ export default function BlogCatalogView({
         ))}
       </div>
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <SearchBox q={q} query={query} />
+        <SearchBox q={q} />
         <span role="status" className="text-xs text-zinc-500">
           {busy
             ? '正在搜尋…'
