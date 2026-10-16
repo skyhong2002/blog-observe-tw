@@ -68,6 +68,30 @@ describe('resumable candidate review batch', () => {
     expect(sql).not.toContain('automaticReview.policy');
     expect(params).toEqual([[20, 31], 25]);
   });
+  it('an operator re-review spends its own daily total, still within the per-host limit', async () => {
+    const scopes: string[] = [];
+    vi.mocked(validateCandidate).mockImplementation(async (_row, options) => {
+      await options?.fetcher?.('https://writer.test/');
+      return {
+        policy: 'test',
+        id: 1,
+        inputUrl: 'https://writer.test',
+        checkedAt: new Date().toISOString(),
+        eligible: false,
+        reason: 'test',
+      };
+    });
+    const budget = await import('../jobs/budget.ts');
+    const reserve = vi.spyOn(budget, 'reserveBudget').mockImplementation(async (_pool, [r]) => {
+      scopes.push(`${r.scope.replace(/:[0-9a-f]{64}$/, ':<host>')}/${r.limit}`);
+      return true;
+    });
+    const fetcher = vi.fn(async () => new Response(''));
+    await runCandidateReviewBatch(harness().pool, { apply: true, ids: [1], fetcher });
+    await runCandidateReviewBatch(harness().pool, { apply: true, fetcher });
+    expect(scopes).toEqual(['candidates:host:<host>/20', 'candidates:operator/200', 'candidates:host:<host>/20', 'candidates:http/1500']);
+    reserve.mockRestore();
+  });
   it('checks lease again after a slow network request, before any write', async () => {
     const h = harness();
     vi.mocked(validateCandidate).mockImplementation(async () => {

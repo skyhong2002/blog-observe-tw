@@ -9,7 +9,9 @@ import type { FeedCrawlerOptions, FeedFetcher } from './feed.ts';
 
 /** Daily candidate-review requests in total and per host. */
 export const CANDIDATE_HTTP_DAILY = 1500,
-  CANDIDATE_HOST_DAILY = 20;
+  CANDIDATE_HOST_DAILY = 20,
+  /** Operator re-reviews (--id) draw on their own daily total, so a spent automatic budget never blocks them. */
+  CANDIDATE_OPERATOR_DAILY = 200;
 /**
  * Counts robots and each redirect immediately before the existing pinned dispatcher performs I/O. A spent total
  * budget stops the batch; a spent per-host budget fails only the current candidate (`onHostBudget`), so one host can
@@ -22,6 +24,7 @@ export function budgetedCandidateFetcher(
   deadline: number,
   onStop: () => void,
   onHostBudget: () => void = onStop,
+  total: { scope: string; limit: number } = { scope: 'candidates:http', limit: CANDIDATE_HTTP_DAILY },
 ): FeedFetcher {
   const fetcher = options.fetcher ?? (undiciFetch as FeedFetcher);
   return async (input, init) => {
@@ -37,7 +40,7 @@ export function budgetedCandidateFetcher(
       onHostBudget();
       throw Error('candidate_host_budget');
     }
-    if (!(await reserveBudget(pool, [{ scope: 'candidates:http', amount: 1, limit: CANDIDATE_HTTP_DAILY }], day))) {
+    if (!(await reserveBudget(pool, [{ scope: total.scope, amount: 1, limit: total.limit }], day))) {
       onStop();
       throw Error('candidate_http_budget');
     }
@@ -126,6 +129,7 @@ export async function runCandidateReviewBatch(
               () => {
                 hostSpent = true;
               },
+              ids.length ? { scope: 'candidates:operator', limit: CANDIDATE_OPERATOR_DAILY } : undefined,
             ),
           }
         : options;
