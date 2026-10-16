@@ -1,6 +1,25 @@
 # UI 逐頁審查紀錄
 
-## Current state（UTC 2026-10-16T08:25Z，gen49）
+## Current state（UTC 2026-10-16T12:20Z，gen50）
+
+正式站為 **blue／gen50／`4684abcef308a35039b77832025842c5b511448f`**，BUILD_ID `4JsKI9jRCyssUnb2GWFED`，切換
+UTC 2026-10-16T12:07:07Z（transition 50）。gen49 green `c578e11`／`3j9PAEl0Gd4IHvTVib9ZW` 仍在執行，為回滾點：
+
+```bash
+bash /home/deck/.cache/blog-db-reads-20261016/tools/deploy-blue-green.sh rollback green
+```
+
+Worker 跟隨 gen50：drop-in `95-release-4684abc.conf`（回滾改回 `c578e11`；舊程式與新索引相容）。回填 run8 未動（WorkingDirectory `6e08aed`）。
+
+- **共用 tag-db 讀取量**（依 `/home/deck/Backups/optimization-2026-10-16.md` 的 blog 項目）：排程候選改走索引，結果與原查詢逐列相同
+  （新增 `relation-candidates`／`topic-history-candidates`／`content-candidates` integration，以原 SQL 為 oracle）。正式 DB 唯讀比對：
+  topic history 候選 24.4 s → 0.39 s、relations 7.5 s → 68 ms、content ~9 s（slow log 平均）→ 0.2 s、完整 overview 作者 740 ms → 37 ms。
+- **Migration 0028**（`content_bodies_schedule` 索引，INPLACE／LOCK=NONE，7.8 s）**單獨**套用並寫入 ledger；備份依據為 NAS restic
+  `tag-analysis` snapshot `f3a660ee`（2026-10-16T08:16Z，`--all-databases` dump）。**0023–0026 仍未套用**，勿直接跑
+  `migrate-drizzle.mjs`；`blogs-vocabulary` 因缺 0026 的 `topic_generation_proof_contracts` 每次失敗（gen49 前已如此）。
+- 驗收：vitest 1375、tsc、integration 49 suites／28 migrations（隔離 18169）；blue 與 green `/api/overview` 相同；切換後主要頁面 200。
+
+## 現況（UTC 2026-10-16T08:25Z，gen49）
 
 正式站為 **green／gen49／`c578e11dbf8f32da8c35730900fa100ab884b432`**，BUILD_ID `3j9PAEl0Gd4IHvTVib9ZW`，切換
 UTC 2026-10-16T08:20:59Z（transition 49）。gen48 blue `6e08aed`／`Gv2pNmXxjHRvwNztz87HW`（07:59:48Z）為回滾點：
