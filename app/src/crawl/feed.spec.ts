@@ -390,7 +390,7 @@ describe('bounded compressed XML sources', () => {
     expect(await readFeedBody(new Response(xml, { headers: { 'content-encoding': 'gzip' } }))).toBe(xml);
   });
 
-  it('rejects gzip output exceeding 5 MiB, even with a tiny compressed body', async () => {
+  it('rejects gzip output exceeding 8 MiB, even with a tiny compressed body', async () => {
     const compressed = gzipSync('x'.repeat(MAX_RESPONSE_BYTES + 1));
     expect(compressed.length).toBeLessThan(10_000);
     await expect(readFeedBody(new Response(compressed))).rejects.toThrow(`decompressed crawl response exceeds ${MAX_RESPONSE_BYTES} bytes`);

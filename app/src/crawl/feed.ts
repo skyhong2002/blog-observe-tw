@@ -102,7 +102,8 @@ const parser = new XMLParser({
 const hostNextAt = new Map<string, number>();
 const robotsCache = new Map<string, { expiresAt: number; disallow: string[] }>();
 const DEFAULT_DELAY_MS = Math.max(250, Number(process.env.BLOG_CRAWL_DELAY_MS || 1200));
-export const MAX_RESPONSE_BYTES = 5 * 1024 * 1024;
+// 8 MiB: full-content feeds of ~1,000 posts pass 5 MiB (wiwi.blog's RSS is 5.4 MiB).
+export const MAX_RESPONSE_BYTES = 8 * 1024 * 1024;
 
 /** Read XML fetched through politeFetch. Some sitemap.xml.gz files have no Content-Encoding.
  * Detect bytes instead of the URL/header, because fetch already decompresses HTTP content encodings. */

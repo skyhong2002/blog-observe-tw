@@ -14,7 +14,7 @@
 
 所有 HTML、manifest、圖片及每一跳轉址都經由既有 `politeFetch`，共用 robots、可識別 User-Agent、每站延遲、DNS／IP 安全驗證與連線釘選。工具只有一個 worker，單請求 timeout 8 秒，每個站點開始新請求前檢查 30 秒時間預算；候選來源去重後最多 24 個，受相同時間預算限制，保留 ETag／Last-Modified 做條件請求。HTTP 狀態 304 沿用已驗證的圖示或已解析的來源清單；HTML 解析快取帶版本，新增解析規則時重新下載首頁，避免永久沿用舊空清單。
 
-圖片必須回傳 `image/*`，所有 response 限制 5 MiB；解碼限制 16,777,216 pixels，SVG 禁止外部資源、內嵌圖片與 XML entities；不收動畫多頁圖、不接受小於 16 px 的來源。ICO 限制 256 個目錄項目，解碼前驗證資料邊界及分配大小。轉換後為 192×192 PNG，保存 SHA-256 revision。沒有通過下載、MIME 與實際解碼的來源不會設定 `verified: true`。
+圖片必須回傳 `image/*`，所有 response 限制 8 MiB；解碼限制 16,777,216 pixels，SVG 禁止外部資源、內嵌圖片與 XML entities；不收動畫多頁圖、不接受小於 16 px 的來源。ICO 限制 256 個目錄項目，解碼前驗證資料邊界及分配大小。轉換後為 192×192 PNG，保存 SHA-256 revision。沒有通過下載、MIME 與實際解碼的來源不會設定 `verified: true`。
 
 `app/data/.favicon-refresh.lock` 以 exclusive-create 防止兩個批次重疊；不自動接管疑似過期鎖。若程序異常退出，先核對檔內 PID 確實已終止，才由維運移除鎖。每處理一筆就原子更新 catalog／local checkpoint，中斷後可重跑；已成功圖示預設略過。
 

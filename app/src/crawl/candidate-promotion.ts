@@ -167,7 +167,8 @@ export async function recordCandidateCheck(
         check.feed.entries < 1 ||
         !check.feed.sample.length ||
         check.feed.sample.some((u) => !publicationContains(u, v.finalUrl!)) ||
-        safeKey(check.feed.identityUrl) !== safeKey(v.finalUrl)
+        // A BlogBlog.Club-listed home may name its blog section (wiwi.blog/blog) as the feed's home; see validateCandidate.
+        (safeKey(check.feed.identityUrl) !== safeKey(v.finalUrl) && !(listed && publicationContains(check.feed.identityUrl, v.finalUrl)))
       ) {
         decline('publication_rss_evidence_invalid');
         break admission;

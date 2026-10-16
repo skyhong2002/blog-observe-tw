@@ -105,9 +105,20 @@ const normalized = (s: string) =>
 /** Partial shared words are insufficient for unattended approval (Quill Writer != Another Writer). */
 export function candidateIdentityConfirmed(
   name: string | null,
-  verification: Pick<SeedUrlValidation, 'title' | 'siteName' | 'author'>,
+  verification: Pick<SeedUrlValidation, 'title' | 'siteName' | 'author'> & { finalUrl?: string | null },
   feedTitle: string,
 ): boolean {
+  // A name that is (or contains) the publication's own domain, as in 「官大為的部落格 | Wiwi.Blog」, is confirmed when the
+  // homepage and the feed both name that same domain; a domain is otherwise stripped from the name below.
+  const host = verification.finalUrl ? new URL(verification.finalUrl).hostname.replace(/^www\./, '').toLowerCase() : '';
+  const names = (text: string) => text.toLowerCase().includes(host);
+  if (
+    host.includes('.') &&
+    names(name || '') &&
+    names(feedTitle) &&
+    [verification.title, verification.siteName, verification.author].some((text) => names(text))
+  )
+    return true;
   const identity = normalized((name || '').replace(/(?:https?:\/\/)?(?:www\.)?(?:[a-z0-9-]+\.)+[a-z]{2,}(?:\/[^\s]*)?/gi, ''));
   if (
     identity.length < 2 ||
@@ -253,9 +264,15 @@ export async function validateCandidate(candidate: DiscoveryCandidate, options: 
           ? [String(object(l)['@_href'])]
           : [],
     );
+    // The feed names the publication home. For a home listed by BlogBlog.Club, a blog section of that same home
+    // (wiwi.blog's feed names https://wiwi.blog/blog) also counts; any other home's category feed still does not.
     const identity = identities.find((u) => {
       try {
-        return seedIdentityKey(new URL(u, source.url).href) === seedIdentityKey(verification.finalUrl!);
+        const href = new URL(u, source.url).href;
+        return (
+          seedIdentityKey(href) === seedIdentityKey(verification.finalUrl!) ||
+          (Boolean(listed) && publicationContains(href, verification.finalUrl!))
+        );
       } catch {
         return false;
       }

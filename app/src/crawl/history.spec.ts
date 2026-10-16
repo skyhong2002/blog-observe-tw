@@ -321,7 +321,7 @@ it('classifies failures without persisting private URLs, SQL messages or arbitra
   const cases: Array<[unknown, string]> = [
     [Object.assign(new Error(secret), { name: 'TimeoutError' }), 'history_timeout'],
     [Object.assign(new Error(secret), { cause: { code: 'UND_ERR_BODY_TIMEOUT' } }), 'history_timeout'],
-    [new Error(`crawl response exceeds 5242880 bytes ${secret}`), 'history_body_limit'],
+    [new Error(`crawl response exceeds 8388608 bytes ${secret}`), 'history_body_limit'],
     [new Error('invalid_xml_source'), 'history_invalid_xml'],
     [new SyntaxError(`Unexpected token ${secret}`), 'history_invalid_json'],
     [Object.assign(new Error(`INSERT secret ${secret}`), { code: 'ER_DATA_TOO_LONG' }), 'history_sql_er_data_too_long'],

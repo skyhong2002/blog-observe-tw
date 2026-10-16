@@ -129,6 +129,28 @@ describe('automatic discovery verification', () => {
     const elsewhere = { ...listed, source_evidence: { directoryListing: { page: 'https://blogblog.club.evil.test/' } } };
     expect((await validateCandidate(elsewhere, options(rss(), plain))).eligible).toBe(false);
   });
+  it('a listed home whose feed names its blog section and its own domain (wiwi.blog) is admitted; others are not', async () => {
+    const listed = {
+      ...candidate,
+      name: null,
+      source_evidence: { directoryListing: { page: 'https://blogblog.club/party', candidateId: 9, linkedUrl: home } },
+    };
+    // Name and feed title are the domain itself: the homepage, the feed and the name all say quill.test.
+    const plain = `<title>小林的部落格 | Quill.Test</title><link rel="alternate" type="application/rss+xml" href="/feed/">`;
+    const section = rss(`${home}blog`, 'Quill.Test Blog', `${home}blog/old-post`);
+    expect(await validateCandidate(listed, options(section, plain))).toMatchObject({
+      eligible: true,
+      reason: 'verified_homepage_and_rss_directory_listed',
+      feed: { identityUrl: `${home}blog` },
+    });
+    // Not listed: a section or category feed still does not stand for the home.
+    expect((await validateCandidate({ ...candidate, name: 'Quill.Test' }, options(section, plain))).reason).toBe(
+      'feed_home_identity_mismatch',
+    );
+    // A section on another host never counts, nor a feed that does not name the domain.
+    expect((await validateCandidate(listed, options(rss('https://other.test/blog', 'Quill.Test Blog'), plain))).eligible).toBe(false);
+    expect((await validateCandidate(listed, options(rss(`${home}blog`, 'Some Blog', `${home}blog/old-post`), plain))).eligible).toBe(false);
+  }, 20_000);
   it('enriches article anchor into independently verified homepage and RSS identity', async () => {
     const check = await validateCandidate(
       { ...candidate, source_type: 'article-link', name: 'An unrelated linked article' },

@@ -170,7 +170,7 @@ describe('bounded blogroll discovery', () => {
   });
   it('rejects oversized child HTML and still releases the lease', async () => {
     const huge = 'https://huge-child.test/blogroll';
-    const f = fixture({ [root]: table([huge]), [huge]: 'x'.repeat(5 * 1024 * 1024 + 1) });
+    const f = fixture({ [root]: table([huge]), [huge]: 'x'.repeat(8 * 1024 * 1024 + 1) });
     const r = await discoverBlogrolls(f.store, f.options);
     expect(r.pages.find((p) => p.url === huge)?.error).toBe('response-too-large');
     expect(f.store.release).toHaveBeenCalledOnce();

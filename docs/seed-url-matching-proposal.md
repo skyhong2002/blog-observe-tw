@@ -8,7 +8,7 @@
 
 `tools/resolve-seed-urls.ts` 每次重新抓取首頁與來源。首頁 title、og:site_name 或作者須與完整站名／有出處的官方別名相符，且至少驗證一個 RSS、Atom 或 sitemap。跨網域轉址要求完整身份，不接受「廚房」「旅行日記」等泛稱。平台總站不得冒充個人出版者；保留 Medium 等平台的作者路徑。RSS 須為實際有效 XML，留言 feed 不作文章來源；sitemap index 會再驗證其子 sitemap。
 
-所有抓取沿用 DNS 驗證及連線釘選、每跳轉址檢查、robots、識別 UA、每站延遲、20 秒以下 timeout 與 5 MiB 上限。403、robots 禁止或驗證頁不繞過。沒有 RSS／sitemap 即使官方身份已找到，也仍保留 unresolved 與理由。
+所有抓取沿用 DNS 驗證及連線釘選、每跳轉址檢查、robots、識別 UA、每站延遲、20 秒以下 timeout 與 8 MiB 上限。403、robots 禁止或驗證頁不繞過。沒有 RSS／sitemap 即使官方身份已找到，也仍保留 unresolved 與理由。
 
 ## 執行
 
