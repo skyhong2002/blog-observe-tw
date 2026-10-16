@@ -18,3 +18,10 @@ test('relation lists keep each icon and name on one line', () => {
   assert.match(map, /<li className="flex items-center justify-between gap-4 py-3 text-sm"/);
   assert.match(map, /className="flex flex-wrap items-center gap-x-1\.5 gap-y-1"/);
 });
+
+test('relation graph: fitted into view at every width; only blogs mentioned twice or more keep a permanent name', () => {
+  const graph = read('components/BlogRelationGraph.tsx');
+  assert.doesNotMatch(graph, /fitted = !narrow/);
+  assert.match(graph, /label: \{ show: \(incoming\.get\(n\.id\) \?\? 0\) >= LABELLED_MENTIONS \}/);
+  assert.match(graph, /emphasis: \{ focus: 'adjacency', label: \{ show: true \} \}/);
+});

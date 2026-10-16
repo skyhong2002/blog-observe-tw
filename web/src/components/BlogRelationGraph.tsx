@@ -12,8 +12,10 @@ import { blogHref } from '@/lib/page-links';
 import type { RelationEdge, RelationNode } from '@/lib/relations';
 
 echarts.use([GraphChart, TooltipComponent, CanvasRenderer]);
-const LABEL_WIDTH_NARROW = 96;
+const LABEL_WIDTH_NARROW = 96,
+  LABEL_WIDTH = 128;
 const ICON_WAIT_MS = 2500;
+const LABELLED_MENTIONS = 2;
 type GraphData = { count(): number; getItemLayout(i: number): unknown };
 /** The icon URLs that actually load within ICON_WAIT_MS; a node whose icon fails keeps the green dot. */
 function loadedIcons(urls: string[]): Promise<Set<string>> {
@@ -54,7 +56,7 @@ export default function BlogRelationGraph({ nodes, edges }: { nodes: RelationNod
       const dark = document.documentElement.dataset.theme === 'dark';
       // Phones: shorter edges keep nodes apart inside a 390px canvas.
       const narrow = (ref.current?.clientWidth ?? 0) < 480;
-      fitted = !narrow;
+      fitted = false;
       chart.setOption({
         animation: false,
         tooltip: {
@@ -74,8 +76,10 @@ export default function BlogRelationGraph({ nodes, edges }: { nodes: RelationNod
             edgeSymbol: ['none', 'arrow'],
             edgeSymbolSize: 7,
             // Full names wrap onto a second line instead of being cut with an ellipsis; in the page's own font.
-            // Overlapping labels are hidden, the smaller node's first (echarts ranks labels by symbol area).
+            // Only blogs mentioned at least LABELLED_MENTIONS times keep a name on the map; the rest show it on hover,
+            // and overlapping labels are hidden, the smaller node's first (echarts ranks labels by symbol area).
             labelLayout: { hideOverlap: true },
+            emphasis: { focus: 'adjacency', label: { show: true } },
             label: {
               show: true,
               position: 'bottom',
@@ -83,11 +87,10 @@ export default function BlogRelationGraph({ nodes, edges }: { nodes: RelationNod
               color: dark ? '#d4d4d8' : '#3f3f46',
               fontSize: narrow ? 13 : 12,
               lineHeight: narrow ? 16 : 15,
-              width: narrow ? LABEL_WIDTH_NARROW : 128,
+              width: narrow ? LABEL_WIDTH_NARROW : LABEL_WIDTH,
               overflow: 'break',
             },
             lineStyle: { color: dark ? '#a1a1aa' : '#71717a', opacity: 0.55, curveness: 0.12 },
-            emphasis: { focus: 'adjacency' },
             // Each blog is drawn as its own icon; without one (or when it does not load), a green dot.
             data: linked.map((n) => {
               const src = icon.get(n.id);
@@ -96,6 +99,7 @@ export default function BlogRelationGraph({ nodes, edges }: { nodes: RelationNod
                 name: n.name,
                 symbol: src && loaded.has(src) ? `image://${src}` : 'circle',
                 symbolSize: Math.round(20 + Math.min(16, 4 * Math.log2(1 + (incoming.get(n.id) ?? 0)))),
+                label: { show: (incoming.get(n.id) ?? 0) >= LABELLED_MENTIONS },
                 itemStyle: { color: brandMark(dark) },
               };
             }),
@@ -109,7 +113,7 @@ export default function BlogRelationGraph({ nodes, edges }: { nodes: RelationNod
         ],
       });
     };
-    // A force layout has no bounds: on a phone a node can settle at the canvas edge with its label cut off.
+    // A force layout has no bounds: a node can settle at (or past) the canvas edge with its label cut off.
     // Once laid out, pan and (only ever) shrink the view so every node and its label fits the canvas.
     chart.on('finished', () => {
       if (fitted) return;
@@ -125,7 +129,7 @@ export default function BlogRelationGraph({ nodes, edges }: { nodes: RelationNod
       const xs = points.map((p) => p[0]),
         ys = points.map((p) => p[1]);
       const [left, right, top, bottom] = [Math.min(...xs), Math.max(...xs), Math.min(...ys), Math.max(...ys)];
-      const side = LABEL_WIDTH_NARROW / 2 + 6,
+      const side = (chart.getWidth() < 480 ? LABEL_WIDTH_NARROW : LABEL_WIDTH) / 2 + 6,
         above = 18,
         below = 54;
       const width = chart.getWidth(),
@@ -163,7 +167,7 @@ export default function BlogRelationGraph({ nodes, edges }: { nodes: RelationNod
   return (
     <div
       ref={ref}
-      className="h-[440px] w-full"
+      className="h-[440px] w-full lg:h-[600px]"
       role="img"
       aria-label="部落格正文提及關係圖；箭頭指向被提及的部落格，詳細資料列於下方表格"
     />
