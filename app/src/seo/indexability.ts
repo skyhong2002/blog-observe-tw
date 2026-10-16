@@ -81,19 +81,36 @@ class PageIndexabilityStore {
       }
     });
   }
+  /**
+   * One blog's page reads only that blog's row: the same counts the projection holds for it (verified blogs only,
+   * posts published in the window), without aggregating every topic and blog on each request (5–7 s on production).
+   */
+  private async blog(entityId: string): Promise<PageIndexability> {
+    const now = new Date(),
+      since = new Date(now.getTime() - INDEXABILITY_WINDOW_DAYS * 86400_000);
+    const [[[current]], [[row]]] = await Promise.all([
+      this.pool.query<RowDataPacket[]>(
+        "SELECT s.id FROM topic_current c JOIN topic_snapshots s ON s.id=c.snapshot_id WHERE c.source=? AND s.status='published'",
+        [SOURCE],
+      ),
+      this.pool.query<RowDataPacket[]>(
+        `SELECT COUNT(p.id) posts FROM blogs b JOIN posts p ON p.blog_id=b.id
+         WHERE b.id=? AND b.status='verified' AND p.published_at>=? AND p.published_at<=?`,
+        [entityId, since, now],
+      ),
+    ]);
+    return {
+      indexable: true,
+      indexabilityReason: null,
+      windowDays: 90,
+      posts: Number(row?.posts ?? 0),
+      blogs: 1,
+      currentVersion: current?.id ?? null,
+    };
+  }
   async page(kind: PublicPageKind, entityId: string): Promise<PageIndexability> {
+    if (kind === 'blog') return this.blog(entityId);
     const projection = await this.projection();
-    if (kind === 'blog') {
-      const row = projection.blogs.get(entityId);
-      return {
-        indexable: true,
-        indexabilityReason: null,
-        windowDays: 90,
-        posts: row?.posts ?? 0,
-        blogs: 1,
-        currentVersion: projection.version,
-      };
-    }
     const matched = projection.topics.get(entityId);
     if (matched)
       return topicIndexability({ posts: matched.posts, blogs: matched.blogs }, projection.version, {

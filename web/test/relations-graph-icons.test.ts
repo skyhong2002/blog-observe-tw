@@ -15,8 +15,9 @@ test('relation graph: blogs drawn as their icons (green dot only without one), l
 test('relation lists keep each icon and name on one line', () => {
   const map = read('components/public/RelationMap.tsx');
   assert.match(map, /className="inline-flex min-w-0 items-center gap-1\.5/);
-  assert.match(map, /<li className="flex items-center justify-between gap-4 py-3 text-sm"/);
-  assert.match(map, /className="flex flex-wrap items-center gap-x-1\.5 gap-y-1"/);
+  assert.match(map, /<li className="flex items-center justify-between gap-4 py-2\.5 text-sm"/);
+  assert.match(map, /rounded-full border border-zinc-300/);
+  assert.doesNotMatch(map, /<p className="mt-1 text-xs text-zinc-500">期間內兩個方向/);
 });
 
 test('relation graph: fitted into view at every width; only blogs mentioned twice or more keep a permanent name', () => {

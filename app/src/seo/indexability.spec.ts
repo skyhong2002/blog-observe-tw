@@ -26,74 +26,43 @@ describe('shared topic page indexability', () => {
     for (const label of ['C++', 'C#', 'AI', '台灣'])
       expect(topicIndexability(counts, 'current', { ...active, label }).indexable).toBe(true);
   });
-  it('runs independent bounded projections and preserves the low-frequency blog policy', async () => {
-    const query = vi.fn(async (sql: string) => {
+  it("reads only the requested blog's row, never the site-wide projection, and keeps the low-frequency blog policy", async () => {
+    const posts = new Map([
+      ['1', 0],
+      ['3', 4],
+    ]);
+    const query = vi.fn(async (sql: string, params: unknown[]) => {
       if (sql.includes('FROM topic_current')) return [[{ id: 'current' }]];
-      if (sql.startsWith('WITH ')) return [[]];
-      return [
-        [
-          { entity_id: '1', slug: 'low-frequency', status: 'verified', url: 'https://low-frequency.example/', posts: 0, lastmod: null },
-          { entity_id: '2', slug: 'seed-blog', status: 'seed', url: null, posts: 0, lastmod: null },
-        ],
-      ];
+      // Only verified blogs count (2 is a seed); 1 has no recent post and is still indexable.
+      return [[{ posts: posts.get(String(params[0])) ?? 0 }]];
     });
-    const connection = {
-      query,
-      beginTransaction: vi.fn(async () => {}),
-      commit: vi.fn(async () => {}),
-      rollback: vi.fn(async () => {}),
-      release: vi.fn(),
-    };
-    const pool = { getConnection: vi.fn(async () => connection) } as unknown as Pool;
-    const results = await Promise.all(Array.from({ length: 8 }, () => getPageIndexability(pool, 'blog', '1')));
-    expect(results.every((row) => row.indexable && row.posts === 0 && row.currentVersion === 'current')).toBe(true);
-    expect(pool.getConnection).toHaveBeenCalledTimes(8);
-    expect(query).toHaveBeenCalledTimes(24);
-    await getPageIndexability(pool, 'blog', '1');
-    expect(query).toHaveBeenCalledTimes(27);
+    const pool = { query, getConnection: vi.fn() } as unknown as Pool;
+    expect(await getPageIndexability(pool, 'blog', '1')).toEqual({
+      indexable: true,
+      indexabilityReason: null,
+      windowDays: 90,
+      posts: 0,
+      blogs: 1,
+      currentVersion: 'current',
+    });
+    expect((await getPageIndexability(pool, 'blog', '3')).posts).toBe(4);
     expect(await getPageIndexability(pool, 'blog', '2')).toMatchObject({ indexable: true, indexabilityReason: null, posts: 0 });
-  });
-  it('does not reuse an older projection still awaiting transaction completion', async () => {
-    const entered = Promise.withResolvers<void>(),
-      release = Promise.withResolvers<void>();
-    let visible = true,
-      held = false,
-      reads = 0;
-    const pool = {
-      getConnection: async () => ({
-        beginTransaction: async () => {},
-        rollback: async () => {},
-        release: () => {},
-        commit: async () => {
-          if (!held) {
-            held = true;
-            entered.resolve();
-            await release.promise;
-          }
-        },
-        query: async (sql: string) => {
-          reads++;
-          if (sql.includes('FROM topic_current')) return [[{ id: 'current' }]];
-          if (sql.startsWith('WITH ')) return [[]];
-          return [
-            visible
-              ? [{ entity_id: '1', slug: 'writer', status: 'verified', url: 'https://writer.example/', posts: 1, lastmod: null }]
-              : [],
-          ];
-        },
-      }),
-    } as unknown as Pool;
-    const a = getPageIndexability(pool, 'blog', '1');
-    await entered.promise;
-    visible = false;
-    try {
-      const before = reads;
-      expect((await getPageIndexability(pool, 'blog', '1')).posts).toBe(0);
-      expect(reads).toBeGreaterThan(before);
-    } finally {
-      release.resolve();
+    expect(pool.getConnection).not.toHaveBeenCalled();
+    const counts = query.mock.calls.map(([sql]) => sql).filter((sql) => !sql.includes('FROM topic_current'));
+    expect(counts).toHaveLength(3);
+    for (const sql of counts) {
+      expect(sql).toMatch(/WHERE b\.id=\? AND b\.status='verified'/);
+      expect(sql).not.toMatch(/GROUP BY|^WITH /);
     }
-    expect((await a).posts).toBe(1);
+  });
+  it('shows a change on the very next read (no cached blog counts)', async () => {
+    let posts = 1;
+    const pool = {
+      query: async (sql: string) => (sql.includes('FROM topic_current') ? [[{ id: 'current' }]] : [[{ posts }]]),
+    } as unknown as Pool;
+    expect((await getPageIndexability(pool, 'blog', '1')).posts).toBe(1);
+    posts = 0;
+    expect((await getPageIndexability(pool, 'blog', '1')).posts).toBe(0);
   });
   it('keeps a one-post, one-blog topic in the deployed sitemap set', async () => {
     const id = 'a'.repeat(64);

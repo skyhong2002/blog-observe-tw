@@ -56,6 +56,22 @@ function RelationDetails({ data }: { data: Relations }) {
       <span>部落格 #{id}</span>
     );
   };
+  // The homepage's blog chip (home.module.css .mentionChip): icon and name in one bordered pill.
+  const chip = (id: number) => {
+    const n = nodes.get(id);
+    return n ? (
+      <Link
+        className="inline-flex h-6 min-w-0 max-w-full items-center gap-1.5 rounded-full border border-zinc-300 pr-2.5 pl-1.5 text-xs leading-none text-zinc-900 hover:border-brand-700 dark:border-zinc-800 dark:text-zinc-100 dark:hover:border-brand-400"
+        {...blogLink(n.slug, n.canonicalPath)}
+        title={n.name}
+      >
+        <BlogIcon media={n.slug} iconUrl={n.iconUrl} title={n.name} size={16} />
+        <span className="min-w-0 truncate">{n.name}</span>
+      </Link>
+    ) : (
+      <span className="text-xs">部落格 #{id}</span>
+    );
+  };
   return (
     <>
       <section className="rounded-xl border border-zinc-300 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">
@@ -75,9 +91,9 @@ function RelationDetails({ data }: { data: Relations }) {
           <h2 className="font-semibold">最常被提及</h2>
           <ol className="mt-3 divide-y divide-zinc-200 dark:divide-zinc-800">
             {data.mostMentioned.map((r) => (
-              <li className="flex items-center justify-between gap-4 py-3 text-sm" key={r.blogId}>
-                {blog(r.blogId)}
-                <span className="shrink-0 tabular-nums">
+              <li className="flex items-center justify-between gap-4 py-2.5 text-sm" key={r.blogId}>
+                {chip(r.blogId)}
+                <span className="shrink-0 text-xs tabular-nums text-zinc-600 dark:text-zinc-400">
                   {r.incomingBlogs} 站 · {r.mentions} 篇
                 </span>
               </li>
@@ -87,19 +103,20 @@ function RelationDetails({ data }: { data: Relations }) {
         </section>
         <section className="rounded-xl border border-zinc-300 p-4 dark:border-zinc-800">
           <h2 className="font-semibold">互相提及</h2>
-          <p className="mt-1 text-xs text-zinc-500">期間內兩個方向都有正文提及；各自的文章日期可能相隔很久，不代表同時期互相回應。</p>
+          {/* Same pills as the homepage's citation cards. Each direction is its own articles and dates (see the foot's
+              引用與交流), so the counts stay per direction and the pair is never called a same-time exchange. */}
           <ol className="mt-3 divide-y divide-zinc-200 dark:divide-zinc-800">
             {data.mutual.map((r) => (
-              <li className="py-3 text-sm" key={`${r.sourceBlogId}:${r.targetBlogId}`}>
-                <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1">
-                  {blog(r.sourceBlogId)}
-                  <span aria-hidden="true" className="text-zinc-500">
-                    ↔
+              <li className="py-2.5" key={`${r.sourceBlogId}:${r.targetBlogId}`}>
+                <p className="flex min-w-0 items-center gap-1.5">
+                  {chip(r.sourceBlogId)}
+                  <span aria-hidden="true" className="text-xs text-zinc-500">
+                    ⇄
                   </span>
                   <span className="sr-only">與</span>
-                  {blog(r.targetBlogId)}
-                </div>
-                <p className="mt-1 text-xs text-zinc-500">
+                  {chip(r.targetBlogId)}
+                </p>
+                <p className="mt-1 text-xs tabular-nums text-zinc-600 dark:text-zinc-400">
                   分別提及 {r.forwardCount}／{r.reverseCount} 篇
                 </p>
               </li>
@@ -134,6 +151,7 @@ function RelationDetails({ data }: { data: Relations }) {
           {countText(data.coverage.failedPosts)} 篇；日期未知 {countText(data.coverage.unknownDatePosts)} 篇不列入期間排行。尚未辨識目標{' '}
           {countText(data.coverage.unresolvedLinks)} 條，解析達上限 {countText(data.coverage.truncatedPosts)} 篇。
         </p>
+        <p>互相提及：期間內兩個方向都有正文提及；各自的文章日期可能相隔很久，不代表同時期互相回應。</p>
         <p>{taipei(data.generatedAt)} 計算。已收錄資料的連結觀測不代表實際造訪來源或完整網路關係。</p>
       </footer>
     </>
