@@ -13,6 +13,7 @@ import { registerContentRoutes } from './content/routes.ts';
 import { createDb } from './db/client.ts';
 import { loadOverview } from './overview.js';
 import { overviewFailureDetails } from './overview-diagnostics.ts';
+import { withPostTags } from './post-tags.ts';
 import { crawlIntervalHours, postingIntervalHours } from './posting-interval.js';
 import { gatewayRateKey, gatewayRateMax } from './public-api/client-ip.ts';
 import { installPublicApiPolicy, publicApiPath } from './public-api/middleware.ts';
@@ -144,7 +145,11 @@ export async function buildApp(config, { logger = false, store = null } = {}) {
     try {
       return await loadOverview(pool, {
         home: request.query?.view === 'home',
-        onFailure: (details) => request.log.error({ operation: 'overview', view: 'home', ...details }, 'public overview read degraded'),
+        onFailure: (details) =>
+          request.log.error(
+            { operation: 'overview', view: request.query?.view === 'home' ? 'home' : 'full', ...details },
+            'public overview read degraded',
+          ),
       });
     } catch (error) {
       // Log only a bounded database error code, never SQL, text, credentials or headers.
@@ -172,7 +177,10 @@ export async function buildApp(config, { logger = false, store = null } = {}) {
       FROM blogs b WHERE b.status='verified' AND (EXISTS (SELECT 1 FROM blog_tags bt WHERE bt.blog_id=b.id AND bt.tag_id=? AND bt.status='active') OR EXISTS (SELECT 1 FROM posts p JOIN post_tags pt ON pt.post_id=p.id WHERE p.blog_id=b.id AND pt.tag_id=? AND pt.status='active' AND (p.published_at IS NULL OR p.published_at<=UTC_TIMESTAMP()))) ORDER BY b.name LIMIT 200`,
       [tags[0].id, tags[0].id],
     );
-    return { tag: tags[0], posts: posts.map(publicPost), blogs };
+    const tagged = await withPostTags(pool, posts, {
+      onFailure: () => request.log.warn({ operation: 'tag.postTags' }, 'post tags unavailable'),
+    });
+    return { tag: tags[0], posts: tagged.map(publicPost), blogs };
   });
 
   app.get('/api/blogs', async (request) => {
@@ -215,6 +223,9 @@ export async function buildApp(config, { logger = false, store = null } = {}) {
       'SELECT published_at AS at FROM posts WHERE blog_id=? AND published_at IS NOT NULL AND published_at<=UTC_TIMESTAMP() ORDER BY published_at DESC LIMIT 21',
       [blogs[0].id],
     );
+    const tagged = await withPostTags(pool, posts, {
+      onFailure: () => request.log.warn({ operation: 'blog.postTags' }, 'post tags unavailable'),
+    });
     return {
       blog: {
         ...blogs[0],
@@ -225,7 +236,7 @@ export async function buildApp(config, { logger = false, store = null } = {}) {
         postingIntervalHours: postingIntervalHours(dates.map((row) => row.at)),
         crawlIntervalHours: crawlIntervalHours(),
       },
-      posts: posts.map(publicPost),
+      posts: tagged.map(publicPost),
     };
   });
 

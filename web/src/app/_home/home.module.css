@@ -320,6 +320,8 @@
 .recentPost { font-size: 14px; line-height: 1.6; font-weight: 500; color: var(--ink); overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 a.recentPost:hover { color: var(--accent); }
 .recentMissing { font-size: 12px; line-height: 1.6; color: var(--muted); }
+/* Author hashtags (PostTags) on the line under a title. */
+.postTags { margin-top: 2px; }
 .recentBlogs > .more { margin-top: 0; padding: 12px; border: 0; border-top: 1px solid var(--soft-line); border-radius: 0; }
 
 /* Masthead cloud: the masthead in the middle of the 正在發酵 cloud. One of three

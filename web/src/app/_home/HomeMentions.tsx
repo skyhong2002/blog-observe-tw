@@ -7,6 +7,7 @@
 
 import BlogIcon from '@/components/BlogIcon';
 import Link from '@/components/NoPrefetchLink';
+import PostTags from '@/components/PostTags';
 import { displayTitle, type HomeMention, type HomeMentions, taipei } from '@/lib/api';
 import { externalHref } from '@/lib/images';
 import { blogLink } from '@/lib/page-links';
@@ -57,6 +58,7 @@ function MentionCardView({ card }: { card: MentionCard }) {
             <span>{title}</span>
           )}
         </h3>
+        <PostTags tags={m.postTags} total={m.postTagCount} max={3} className={styles.postTags} />
         <ul className={styles.mentionTargets} aria-label="這篇文章在正文連到的部落格">
           {card.targets.map((t) => {
             const quote = mentionQuote(t);

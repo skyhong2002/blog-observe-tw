@@ -163,6 +163,8 @@ function postOf(item: Record<string, unknown>, title: string): Post {
       .slice(0, 20)
       .map((tag) => ({ slug: (tag.slug as string).slice(0, 255), label: (tag.label as string).slice(0, 255) }) as Tag);
     if (tags.length) post.tags = tags;
+    const tagCount = positive(item.tagCount);
+    if (tags.length && tagCount !== null) post.tagCount = tagCount;
   }
   return post;
 }

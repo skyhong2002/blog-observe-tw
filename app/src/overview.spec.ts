@@ -79,7 +79,9 @@ describe('read-only frontend projection', () => {
     expect(b.totals.blogs).toBe(0);
     release();
     expect((await a).mentions.items).toHaveLength(1);
-    expect(query).toHaveBeenCalledTimes(8);
+    // Four reads each, plus one post-tag read for the older request's one shown article; none for the empty one.
+    expect(query).toHaveBeenCalledTimes(9);
+    expect(query.mock.calls.filter(([sql]) => sql.includes('FROM post_tags pt'))).toHaveLength(1);
   });
   it('overview view input is bounded and all outcomes stay no-store', async () => {
     const query = vi.fn(async (sql: string) => [sql.includes('AS blogs,') ? [{ blogs: 0, posts: 0, updatedAt: null }] : []]);

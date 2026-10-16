@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import type { Pool, RowDataPacket } from 'mysql2/promise';
+import { withPostTags } from './post-tags.ts';
 import { publicPost, publicSummary } from './public-post.ts';
-import { loadFulltextSearch } from './search-fulltext.ts';
 import { loadIndexedBodySearch } from './search-body-index.ts';
 import {
   boundedSearchStatement,
@@ -11,6 +11,7 @@ import {
   SEARCH_MATCH_VERSION,
   SEARCH_STATEMENT_MS,
 } from './search-bounds.ts';
+import { loadFulltextSearch } from './search-fulltext.ts';
 
 export const SEARCH_SCOPE_LIMIT = 1000;
 // Opt-in, partial local prefix index. No global historical body LIKE scan.
@@ -118,7 +119,12 @@ export function registerSearchRoutes(app: FastifyInstance, pool: Pool) {
       if (active >= 2) throw Object.assign(Error('search_busy'), { statusCode: 503 });
       active++;
       try {
-        return { ...(await loadSearch(pool, filters)), query: filters.q, generatedAt: new Date().toISOString(), cacheSeconds: 0 };
+        const result = await loadSearch(pool, filters);
+        const items = await withPostTags(pool, result.items as Record<string, unknown>[], {
+          id: (item) => item.articleId,
+          onFailure: () => req.log.warn({ operation: 'search.postTags' }, 'post tags unavailable'),
+        });
+        return { ...result, items, query: filters.q, generatedAt: new Date().toISOString(), cacheSeconds: 0 };
       } finally {
         active--;
       }

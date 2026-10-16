@@ -5,6 +5,7 @@ const stages = new Set([
   'home.totals',
   'home.recentBlogs',
   'home.icons',
+  'home.postTags',
   'full.posts',
   'full.tags',
   'full.authors',
@@ -12,6 +13,7 @@ const stages = new Set([
   'full.totals',
   'full.recentBlogs',
   'full.icons',
+  'full.postTags',
 ]);
 const networkCodes = new Set(['ETIMEDOUT', 'ECONNRESET', 'ECONNREFUSED', 'EPIPE', 'ENOTFOUND', 'EAI_AGAIN']);
 const integer = (value: unknown, max = 100_000): number | null =>

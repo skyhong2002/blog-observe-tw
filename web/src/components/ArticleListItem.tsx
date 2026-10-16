@@ -1,6 +1,7 @@
 import ArticleThumbnail from '@/components/ArticleThumbnail';
 import BlogIcon from '@/components/BlogIcon';
 import Link from '@/components/NoPrefetchLink';
+import PostTags from '@/components/PostTags';
 import SourceLink from '@/components/SourceLink';
 import { displayTitle, type Post, plainText, taipei } from '@/lib/api';
 import { blogLink } from '@/lib/page-links';
@@ -27,7 +28,6 @@ export default function ArticleListItem({
     url: post.url ?? null,
     image: post.imageUrl ?? null,
     description: plainText(post.summary),
-    tags: post.tags ?? [],
     authors: post.author ? [post.author] : [],
     media: post.blogSlug,
     mediaTitle: post.blogName,
@@ -57,6 +57,7 @@ export default function ArticleListItem({
               title
             )}
           </h3>
+          <PostTags tags={post.tags} total={post.tagCount} max={5} />
           {(snippet || matchSource) && (
             <p className="mt-1 line-clamp-3 text-xs leading-5 text-zinc-600 dark:text-zinc-400">
               {matchSource && (
@@ -97,20 +98,6 @@ export default function ArticleListItem({
             {article.authors.length > 0 && <span className="max-w-40 truncate">{article.authors.join('、')}</span>}
             <SourceLink url={article.url} showUrl className="!min-h-5 !text-[11px]" />
           </div>
-          {article.tags.length > 0 && (
-            <ul aria-label="關鍵字" className="mt-0.5 flex flex-wrap gap-x-2 text-[11px] leading-5">
-              {article.tags.slice(0, 6).map((tag) => (
-                <li key={tag.slug}>
-                  <Link
-                    href={`/tags/?tag=${encodeURIComponent(tag.slug)}`}
-                    className="text-zinc-500 hover:text-brand-700 hover:underline dark:text-zinc-400 dark:hover:text-brand-400"
-                  >
-                    #{tag.label}
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          )}
         </div>
         {href && <ArticleThumbnail src={article.image} href={href} title={headline.title} />}
       </article>

@@ -181,13 +181,6 @@
     },
     {
       "path": "app/src/crawl/feed.ts",
-      "digest": "074bef1d938761227db8a6cd1283d4b0bf0c3218da2a8ffda8a304d03ef42982",
-      "tables": [],
-      "dynamic": true,
-      "occurrences": 1
-    },
-    {
-      "path": "app/src/crawl/feed.ts",
       "digest": "104220ae0fa714ed6161d4de976f7527564ddac3371869888983cb871497c6bb",
       "tables": [],
       "dynamic": true,
@@ -209,6 +202,13 @@
         "blogs"
       ],
       "dynamic": false,
+      "occurrences": 1
+    },
+    {
+      "path": "app/src/crawl/feed.ts",
+      "digest": "79da12e0086b8498e4ae512b2cdb85fc0c08399498b74221316b19124d696288",
+      "tables": [],
+      "dynamic": true,
       "occurrences": 1
     },
     {

@@ -3,6 +3,7 @@
 import { Suspense } from 'react';
 import BlogIcon from '@/components/BlogIcon';
 import Link from '@/components/NoPrefetchLink';
+import PostTags from '@/components/PostTags';
 import { displayTitle, taipei } from '@/lib/api';
 import { recentBlogRows } from '@/lib/home';
 import { externalHref } from '@/lib/images';
@@ -102,6 +103,7 @@ export default async function HomePage() {
                         ) : (
                           <p className={styles.recentMissing}>{missing === 'none' ? '尚未收錄文章' : '最新文章標題暫缺'}</p>
                         )}
+                        {latest && <PostTags tags={latest.tags} total={latest.tagCount} max={3} className={styles.postTags} />}
                       </li>
                     );
                   })}

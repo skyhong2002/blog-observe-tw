@@ -33,6 +33,9 @@ const PUBLIC_POST_FIELDS = [
   'imageUrl',
   'blogSlug',
   'blogName',
+  // Author's feed categories, attached by post-tags.ts withPostTags.
+  'tags',
+  'tagCount',
 ] as const;
 /** Explicit allowlist prevents a future SELECT/JOIN from exposing body snapshots or provenance payloads. */
 export function publicPost(row: Record<string, unknown>) {

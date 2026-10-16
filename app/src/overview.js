@@ -1,4 +1,5 @@
 import { overviewFailureDetails, overviewRead } from './overview-diagnostics.ts';
+import { loadPostTags } from './post-tags.ts';
 import { publicPost } from './public-post.ts';
 import { loadHomeMentions } from './relations/home-feed.ts';
 import { TopicResponseCache } from './topics/cache.ts';
@@ -6,13 +7,17 @@ import { iconManifest } from './v1/favicon-routes.ts';
 import { iconUrl } from './v1/icons.ts';
 
 const overviewCaches = new WeakMap();
+/** The homepage's narrow columns show at most three tags per title (lists show POST_TAG_LIMIT). */
+const HOME_POST_TAG_LIMIT = 3;
 export function loadOverview(pool, { home = false, onFailure } = {}) {
   let cache = overviewCaches.get(pool);
   if (!cache) {
     cache = new TopicResponseCache(60000, 1);
     overviewCaches.set(pool, cache);
   }
-  return cache.get(home ? 'overview:home' : 'overview', () => (home ? loadHomeProjection(pool, { onFailure }) : loadProjection(pool)));
+  return cache.get(home ? 'overview:home' : 'overview', () =>
+    home ? loadHomeProjection(pool, { onFailure }) : loadProjection(pool, { onFailure }),
+  );
 }
 export function invalidateOverviewCache(pool) {
   overviewCaches.get(pool)?.clear();
@@ -79,15 +84,26 @@ async function loadHomeProjection(pool, { onFailure } = {}) {
   }
   const [authorRows, totalRows] = await Promise.all([
     overviewRead(pool, 'home.authors', () => pool.query(HOME_AUTHORS_SQL)),
-    overviewRead(pool, 'home.totals', () => pool.query(`SELECT (SELECT COUNT(*) FROM blogs WHERE status='verified') AS blogs,
+    overviewRead(pool, 'home.totals', () =>
+      pool.query(`SELECT (SELECT COUNT(*) FROM blogs WHERE status='verified') AS blogs,
       (SELECT COUNT(*) FROM posts p JOIN blogs b ON b.id=p.blog_id WHERE b.status='verified' AND (p.published_at IS NULL OR p.published_at<=UTC_TIMESTAMP())) AS posts,
-      (SELECT MAX(last_crawl_success_at) FROM blogs WHERE status='verified') AS updatedAt`)),
+      (SELECT MAX(last_crawl_success_at) FROM blogs WHERE status='verified') AS updatedAt`),
+    ),
   ]);
-  const [recentRows] = await overviewRead(pool, 'home.recentBlogs', () => pool.query(`SELECT b.id,b.slug,b.name,b.url,b.last_published_at AS lastPublishedAt,
+  const [recentRows] = await overviewRead(pool, 'home.recentBlogs', () =>
+    pool.query(`SELECT b.id,b.slug,b.name,b.url,b.last_published_at AS lastPublishedAt,
     latest.id latestPostId,latest.title latestPostTitle,latest.url latestPostUrl,latest.published_at latestPostPublishedAt
     FROM blogs b ${latestJoin} WHERE b.status='verified' AND latest.published_at IS NOT NULL
-    ORDER BY latest.published_at DESC,latest.id DESC,b.id LIMIT 10`));
+    ORDER BY latest.published_at DESC,latest.id DESC,b.id LIMIT 10`),
+  );
   const icons = await overviewRead(pool, 'home.icons', () => iconManifest());
+  // One tag read for every article the homepage shows; a failure leaves titles untagged, never the page down.
+  const shownIds = [...mentions.items.map((m) => m.postId), ...recentRows.map((r) => r.latestPostId)];
+  const postTags = await overviewRead(pool, 'home.postTags', () => loadPostTags(pool, shownIds, HOME_POST_TAG_LIMIT)).catch((error) => {
+    onFailure?.(overviewFailureDetails(error, pool));
+    return new Map();
+  });
+  const tagsOf = (id) => postTags.get(Number(id)) ?? null;
   const row = totalRows[0][0];
   return {
     view: 'home',
@@ -95,7 +111,13 @@ async function loadHomeProjection(pool, { onFailure } = {}) {
     cacheSeconds: 0,
     posts: [],
     tags: [],
-    mentions,
+    mentions: {
+      ...mentions,
+      items: mentions.items.map((m) => {
+        const found = tagsOf(m.postId);
+        return found ? { ...m, postTags: found.tags, postTagCount: found.tagCount } : m;
+      }),
+    },
     authors: authorRows[0],
     blogs: [],
     recentBlogs: recentRows.map(({ latestPostId, latestPostTitle, latestPostUrl, latestPostPublishedAt, ...blog }) => ({
@@ -107,6 +129,7 @@ async function loadHomeProjection(pool, { onFailure } = {}) {
             title: latestPostTitle,
             url: latestPostUrl,
             publishedAt: latestPostPublishedAt,
+            ...tagsOf(latestPostId),
           }
         : null,
     })),
@@ -117,29 +140,48 @@ async function loadHomeProjection(pool, { onFailure } = {}) {
 
 /** Read-only projection for the shared Next UI. Counts describe indexed data,
  * not traffic, quality, or growth. No sibling database is queried. */
-async function loadProjection(pool) {
+async function loadProjection(pool, { onFailure } = {}) {
   const [postRows, tagRows, authorRows, blogRows, totalRows, recentRows] = await Promise.all([
-    overviewRead(pool, 'full.posts', () => pool.query(`SELECT p.id,p.guid,p.title,p.url,p.summary,p.author,p.published_at AS publishedAt,p.image_url AS imageUrl,
+    overviewRead(pool, 'full.posts', () =>
+      pool.query(`SELECT p.id,p.guid,p.title,p.url,p.summary,p.author,p.published_at AS publishedAt,p.image_url AS imageUrl,
       b.slug AS blogSlug,b.name AS blogName FROM posts p JOIN blogs b ON b.id=p.blog_id
-      WHERE b.status='verified' AND (p.published_at IS NULL OR p.published_at<=UTC_TIMESTAMP()) ORDER BY p.published_at DESC,p.id DESC LIMIT 200`)),
-    overviewRead(pool, 'full.tags', () => pool.query(`SELECT t.slug,t.label,COUNT(DISTINCT p.id) AS postCount,COUNT(DISTINCT p.blog_id) AS blogCount
+      WHERE b.status='verified' AND (p.published_at IS NULL OR p.published_at<=UTC_TIMESTAMP()) ORDER BY p.published_at DESC,p.id DESC LIMIT 200`),
+    ),
+    overviewRead(pool, 'full.tags', () =>
+      pool.query(`SELECT t.slug,t.label,COUNT(DISTINCT p.id) AS postCount,COUNT(DISTINCT p.blog_id) AS blogCount
       FROM tags t JOIN post_tags pt ON pt.tag_id=t.id JOIN posts p ON p.id=pt.post_id JOIN blogs b ON b.id=p.blog_id
       WHERE b.status='verified' AND t.visibility='public' AND t.status='active' AND pt.status='active' AND (p.published_at IS NULL OR p.published_at<=UTC_TIMESTAMP())
-      GROUP BY t.id,t.slug,t.label ORDER BY blogCount DESC,postCount DESC,t.slug LIMIT 100`)),
+      GROUP BY t.id,t.slug,t.label ORDER BY blogCount DESC,postCount DESC,t.slug LIMIT 100`),
+    ),
     overviewRead(pool, 'full.authors', () => pool.query(FULL_AUTHORS_SQL)),
-    overviewRead(pool, 'full.blogs', () => pool.query(`SELECT ${blogFields} FROM blogs b ${latestJoin} WHERE b.status='verified' ORDER BY postCount DESC,b.name LIMIT 200`)),
-    overviewRead(pool, 'full.totals', () => pool.query(`SELECT (SELECT COUNT(*) FROM blogs WHERE status='verified') AS blogs,
+    overviewRead(pool, 'full.blogs', () =>
+      pool.query(`SELECT ${blogFields} FROM blogs b ${latestJoin} WHERE b.status='verified' ORDER BY postCount DESC,b.name LIMIT 200`),
+    ),
+    overviewRead(pool, 'full.totals', () =>
+      pool.query(`SELECT (SELECT COUNT(*) FROM blogs WHERE status='verified') AS blogs,
       (SELECT COUNT(*) FROM posts p JOIN blogs b ON b.id=p.blog_id WHERE b.status='verified' AND (p.published_at IS NULL OR p.published_at<=UTC_TIMESTAMP())) AS posts,
-      (SELECT MAX(last_crawl_success_at) FROM blogs WHERE status='verified') AS updatedAt`)),
-    overviewRead(pool, 'full.recentBlogs', () => pool.query(`SELECT ${blogFields} FROM blogs b ${latestJoin} WHERE b.status='verified' AND latest.published_at IS NOT NULL
-      ORDER BY latest.published_at DESC,latest.id DESC,b.id LIMIT 20`)),
+      (SELECT MAX(last_crawl_success_at) FROM blogs WHERE status='verified') AS updatedAt`),
+    ),
+    overviewRead(pool, 'full.recentBlogs', () =>
+      pool.query(`SELECT ${blogFields} FROM blogs b ${latestJoin} WHERE b.status='verified' AND latest.published_at IS NOT NULL
+      ORDER BY latest.published_at DESC,latest.id DESC,b.id LIMIT 20`),
+    ),
   ]);
   const icons = await overviewRead(pool, 'full.icons', () => iconManifest());
+  const postTags = await overviewRead(pool, 'full.postTags', () =>
+    loadPostTags(
+      pool,
+      postRows[0].map((p) => p.id),
+    ),
+  ).catch((error) => {
+    onFailure?.(overviewFailureDetails(error, pool));
+    return new Map();
+  });
   const row = totalRows[0][0];
   return {
     generatedAt: new Date().toISOString(),
     cacheSeconds: 0,
-    posts: postRows[0].map(publicPost),
+    posts: postRows[0].map((post) => publicPost({ ...post, ...postTags.get(Number(post.id)) })),
     tags: tagRows[0],
     authors: authorRows[0],
     blogs: blogRows[0].map((blog) => blogDto(blog, icons)),

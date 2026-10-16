@@ -1,7 +1,15 @@
-import type { Blog, Overview, Post } from './api';
+import type { Blog, Overview, Post, Tag } from './api';
 
 /** The newest post shown under a blog on the homepage; `id` is absent when it came from `posts`. */
-export type RecentPost = { id?: number; title: string; url: string | null; publishedAt: string | null };
+export type RecentPost = {
+  id?: number;
+  title: string;
+  url: string | null;
+  publishedAt: string | null;
+  /** The author's feed categories and their full count, when the gateway sent them. */
+  tags?: Tag[];
+  tagCount?: number;
+};
 
 /**
  * One row of 最新更新的部落格. `latest` is null when no title is known, and
@@ -33,7 +41,13 @@ export function latestPostsBySlug(posts: Post[]): Map<string, RecentPost> {
       const known = time(current.publishedAt);
       if (candidate === null || (known !== null && known >= candidate)) continue;
     }
-    out.set(post.blogSlug, { id: post.id, title: post.title, url: post.url ?? null, publishedAt: post.publishedAt ?? null });
+    out.set(post.blogSlug, {
+      id: post.id,
+      title: post.title,
+      url: post.url ?? null,
+      publishedAt: post.publishedAt ?? null,
+      ...(post.tags ? { tags: post.tags, tagCount: post.tagCount } : {}),
+    });
   }
   return out;
 }

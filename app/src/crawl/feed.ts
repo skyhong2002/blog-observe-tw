@@ -1001,9 +1001,12 @@ export async function writeFeedEntries(
         [authorId, 0, 'crawler', source.url, JSON.stringify({ guid: entry.guid }), now, now, now, now, blog.id, entry.guid.slice(0, 1024)],
       );
     }
+    let tagPosition = 0;
     for (const rawTag of entry.categories) {
       const label = rawTag.trim().slice(0, 255);
       if (!label) continue;
+      // The author's feed order, so lists can show their first categories first.
+      const position = tagPosition++;
       const normalized = label.normalize('NFKC').toLocaleLowerCase('zh-TW').replace(/\s+/g, ' ').trim();
       const slug =
         normalized
@@ -1016,10 +1019,22 @@ export async function writeFeedEntries(
         [slug, label, normalized, source.url, JSON.stringify({ guid: entry.guid }), now, now, now, now],
       );
       await pool.execute(
-        `INSERT INTO post_tags (post_id,tag_id,source_type,source_url,source_evidence,first_seen_at,last_seen_at,created_at,updated_at)
-           SELECT id,(SELECT id FROM tags WHERE slug=?),?,?,?,?,?,?,? FROM posts WHERE blog_id=? AND guid=?
+        `INSERT INTO post_tags (post_id,tag_id,position,source_type,source_url,source_evidence,first_seen_at,last_seen_at,created_at,updated_at)
+           SELECT id,(SELECT id FROM tags WHERE slug=?),?,?,?,?,?,?,?,? FROM posts WHERE blog_id=? AND guid=?
            ON DUPLICATE KEY UPDATE last_seen_at=IF(post_tags.source_type IN ('manual','community'),post_tags.last_seen_at,VALUES(last_seen_at)),updated_at=VALUES(updated_at)`,
-        [slug, 'crawler', source.url, JSON.stringify({ guid: entry.guid }), now, now, now, now, blog.id, entry.guid.slice(0, 1024)],
+        [
+          slug,
+          position,
+          'crawler',
+          source.url,
+          JSON.stringify({ guid: entry.guid }),
+          now,
+          now,
+          now,
+          now,
+          blog.id,
+          entry.guid.slice(0, 1024),
+        ],
       );
       await pool.execute(
         `INSERT INTO blog_tags (blog_id,tag_id,role,status,source_type,source_url,source_evidence,first_seen_at,last_seen_at,created_at,updated_at)

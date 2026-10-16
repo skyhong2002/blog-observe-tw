@@ -61,7 +61,10 @@ export type Post = {
   blogCanonicalPath?: string;
   blogName?: string;
   imageUrl?: string | null;
+  /** The author's feed categories, at most a few (app/src/post-tags.ts); absent when none or not sent. */
   tags?: Tag[];
+  /** The post's full tag count, for "+N" beside the shown `tags`. */
+  tagCount?: number;
 };
 export type Follow = Pick<Blog, 'slug' | 'name' | 'url' | 'category' | 'iconUrl' | 'canonicalPath'>;
 export type Overview = {
@@ -105,6 +108,9 @@ export type HomeMention = {
   context: string;
   /** The sentence holding the link, with 「…」 where text before or after it was left out. */
   quote?: string;
+  /** The source article's own feed categories (at most 3) and their full count; absent when none or not sent. */
+  postTags?: Tag[];
+  postTagCount?: number;
   observedAt: string | null;
   matchVersion: string;
   /** Public enum: the context was taken from the article body. Never an internal extraction id. */

@@ -572,3 +572,49 @@ describe('masthead cloud: the local 30-day topic ranking only', () => {
     }
   });
 });
+
+describe('homepage: author hashtags under article titles', () => {
+  const tag = (slug: string, label = slug) => ({ slug, label });
+  test('a citation card and a recent blog row show at most three tags right under the title, with +N for the rest', async () => {
+    answer(
+      OVERVIEW,
+      overview({
+        mentions: mentions([mention({ postTags: [tag('css', 'CSS'), tag('html'), tag('台北美食')], postTagCount: 7 })]),
+        recentBlogs: [
+          {
+            slug: 'c',
+            name: '丙',
+            latestPost: { id: 3, title: '丙的文章', url: 'https://c.example/p/3', publishedAt: PUBLISHED, tags: [tag('ai')], tagCount: 1 },
+          },
+        ],
+      }),
+    );
+    const $ = await renderHome();
+    const card = $('[data-mention-card="1:20875"]');
+    const cardTags = card.find('h3').next('ul[aria-label="作者標籤"]');
+    expect(
+      cardTags
+        .find('a')
+        .map((_, a) => $(a).text())
+        .get(),
+    ).toEqual(['#CSS', '#html', '#台北美食']);
+    expect(cardTags.find('a').first().attr('href')).toBe('/tags/?tag=css');
+    expect(cardTags.find('a').eq(2).attr('href')).toBe(`/tags/?tag=${encodeURIComponent('台北美食')}`);
+    expect(cardTags.children('li').last().text()).toBe('+4');
+    const rowTags = $('aside[aria-label="部落格收錄概況"] li').find('ul[aria-label="作者標籤"]');
+    expect(rowTags.prev().text()).toBe('丙的文章');
+    expect(
+      rowTags
+        .find('a')
+        .map((_, a) => $(a).text())
+        .get(),
+    ).toEqual(['#ai']);
+    expect(rowTags.text()).not.toContain('+');
+  });
+
+  test('older answers without tags render no tag line at all', async () => {
+    answer(OVERVIEW, overview({ mentions: mentions([mention()]) }));
+    const $ = await renderHome();
+    expect($('ul[aria-label="作者標籤"]').length).toBe(0);
+  });
+});
