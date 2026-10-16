@@ -1,6 +1,38 @@
 # UI 逐頁審查紀錄
 
-## Current state（UTC 2026-10-15T20:05Z，gen42）
+## Current state（UTC 2026-10-16T05:05Z，gen43）
+
+正式站為 **green／gen43／`f7f2ddefcb4159a4710eb73aae9b2c484df17526`**，BUILD_ID `9Xr01QYB68SGPz7O8uo2-`，切換
+UTC 2026-10-16T04:58:57Z（transition 43）。回滾點 blue／gen42 `b7648d9`／`0oSLarRwu8aQwhsMiQeya`：
+
+```bash
+bash /home/deck/.cache/blog-home-cloud-b3-20261014/tools/deploy-blue-green.sh rollback blue
+```
+
+Worker 不變，仍跑 `b7648d9`（本版只改網頁元件）。
+
+- **/relations/ 使用者回饋**：(1) 「最常被提及」「互相提及」圖示與名稱恢復同一行；(2) 關係圖節點改畫各部落格自己的
+  圖示，2.5 秒內載不到或沒有圖示才用綠點；(3) 圖上文字改用頁面字型且不得重疊。
+- 重疊的根因：echarts `labelLayout.hideOverlap` 對 force 佈局不可靠（第一版截圖中央名稱整團疊在一起）。改為 force
+  佈局穩定後固定座標（`layout: 'none'`，series 方框設為點的範圍＝恆等映射），由 `web/src/lib/graph-labels.ts`
+  依畫布撐滿（單軸最多拉伸 1.6 倍）、名稱依被提及次數排序，依序試下／上／右／左，不碰其他名稱或圖示才顯示；
+  被提及前 5 名一定顯示（可蓋圖示，不蓋名稱），名稱加背景色外框。被提及少於 2 次只在滑過時顯示。
+  手機版節點縮為 0.75 倍、畫布 520px。視窗縮放沿用同一佈局重新擺放。
+- 另修：圖示載入前 ResizeObserver 觸發的 `finished` 事件讀不到 model 而丟 `getSeriesByIndex` 例外（8433f05 才有）。
+- 中間建置 8433f05、1f8f526、e86dbb8、2c63bcd 只在 green 預備並截圖（`.reviews/gen43`–`gen46`），未上線。正式版截圖
+  `.reviews/gen47/green47-relations-{1280,390}{,-graph,-list}.png`（`/favicons/` 轉給 edge 以顯示真實圖示）。
+  電腦版約 22 個名稱、無重疊；手機版前幾名有名稱，其餘可拖曳縮放後滑過查看。
+- 已知、非本版：`/relations/` 有 React #418（hydration 文字不一致），blue／gen42 同樣存在，待查。
+- 驗收：web node 231（新增 fitPoints／placeLabels 單元測試）、tsc。切換後 `x-blog-release` f7f2dde、generation 43、
+  BUILD_ID 相符；`/`、`/relations/`、`/topics/`、`/blogs/`、`/api/topics` 200，tag 200。首頁 2.3–5.4 秒、`/topics/`
+  3.4–7.2 秒，當時 load 6.7（tag matcher、youtube、tag 詞彙匯出、NAS 備份），首請求 8.9 秒為新 slot 冷啟動。
+- **回填**：run5 於 UTC 2026-10-15T19:41Z 因首頁中位數 11 秒並出現一次 500，依保護規則停止（cursor 25462，之後未推進）。
+  以 `blog-fulltext-backfill-20261016-run6` 重啟，WorkingDirectory 改為正式 release `f7f2dde`，參數同 run5，log 不變。
+- 保留：刪除 8433f05、1f8f526、e86dbb8、2c63bcd 與 gen41 `91ee7da` release、prepared-release 紀錄及拋棄式 checkout
+  （約 4.3 GB）。回填 worktree 與本工作 repo 的 node_modules 改連 `b7648d9`。保留 active、回滾 `b7648d9`（worker）、
+  `93060cc`（edge/code）、`af0e73c`、`blog-release-source-76a90e7`。
+
+## 現況（UTC 2026-10-15T20:05Z，gen42）
 
 正式站為 **blue／gen42／`b7648d9b286482fdf0caecf3abe22d3849c59f1d`**，BUILD_ID `0oSLarRwu8aQwhsMiQeya`，切換
 UTC 2026-10-15T19:56:28.223Z（transition 42）。回滾點 green／gen41 `91ee7da`／`IckLDw5TLWeYzYIQ33NZp`：
