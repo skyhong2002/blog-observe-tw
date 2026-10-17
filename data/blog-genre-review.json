@@ -1,0 +1,2378 @@
+{
+  "version": 1,
+  "observedAt": "2026-10-17T07:43:51.099Z",
+  "totalBlogs": 455,
+  "entries": [
+    {
+      "slug": "achingfoodie-940",
+      "name": "阿青 achingfoodie",
+      "genres": [
+        {
+          "genre": "food",
+          "matchingLabels": 7,
+          "sampledLabels": 15,
+          "evidence": [
+            "feed-category: 愛食記",
+            "feed-category: 台中美食",
+            "feed-category: 小吃",
+            "feed-category: 北屯美食",
+            "feed-category: 台北美食"
+          ]
+        },
+        {
+          "genre": "travel",
+          "matchingLabels": 0,
+          "sampledLabels": 15,
+          "evidence": [
+            "identity: 旅遊"
+          ]
+        }
+      ]
+    },
+    {
+      "slug": "agdstock-club-1086",
+      "name": "阿股達 agdstock.club",
+      "genres": [
+        {
+          "genre": "finance",
+          "matchingLabels": 0,
+          "sampledLabels": 0,
+          "evidence": [
+            "identity: 財經"
+          ]
+        }
+      ]
+    },
+    {
+      "slug": "alinalife-tw-567",
+      "name": "alinalife.tw",
+      "genres": [
+        {
+          "genre": "travel",
+          "matchingLabels": 18,
+          "sampledLabels": 30,
+          "evidence": [
+            "identity: 旅遊",
+            "feed-category: 東京自由行",
+            "feed-category: 上野住宿",
+            "feed-category: 東京迪士尼住宿",
+            "feed-category: 沖繩自由行",
+            "feed-category: 關西自由行"
+          ]
+        }
+      ]
+    },
+    {
+      "slug": "almablog-556",
+      "name": "艾瑪 almablog",
+      "genres": [
+        {
+          "genre": "food",
+          "matchingLabels": 12,
+          "sampledLabels": 60,
+          "evidence": [
+            "feed-category: 嘉義美食",
+            "feed-category: 桃園美食",
+            "feed-category: 高雄美食",
+            "feed-category: 高雄小吃",
+            "feed-category: 市場美食"
+          ]
+        },
+        {
+          "genre": "travel",
+          "matchingLabels": 0,
+          "sampledLabels": 60,
+          "evidence": [
+            "identity: 旅遊"
+          ]
+        }
+      ]
+    },
+    {
+      "slug": "angelala-tw-681",
+      "name": "美食好芃友 angelala.tw",
+      "genres": [
+        {
+          "genre": "food",
+          "matchingLabels": 2,
+          "sampledLabels": 8,
+          "evidence": [
+            "identity: 美食好芃友 angelala.tw",
+            "feed-category: 愛食記新文章",
+            "feed-category: 冰品甜點"
+          ]
+        },
+        {
+          "genre": "travel",
+          "matchingLabels": 0,
+          "sampledLabels": 8,
+          "evidence": [
+            "identity: 旅遊"
+          ]
+        }
+      ]
+    },
+    {
+      "slug": "anikofoodie-709",
+      "name": "anikofoodie",
+      "genres": [
+        {
+          "genre": "food",
+          "matchingLabels": 14,
+          "sampledLabels": 40,
+          "evidence": [
+            "feed-category: 台北美食",
+            "feed-category: 台北小吃",
+            "feed-category: 金山美食",
+            "feed-category: 法式餐廳",
+            "feed-category: 信義區美食"
+          ]
+        },
+        {
+          "genre": "travel",
+          "matchingLabels": 0,
+          "sampledLabels": 40,
+          "evidence": [
+            "identity: 旅遊"
+          ]
+        }
+      ]
+    },
+    {
+      "slug": "anise-tw-534",
+      "name": "愛吃鬼芸芸 anise.tw",
+      "genres": [
+        {
+          "genre": "food",
+          "matchingLabels": 14,
+          "sampledLabels": 60,
+          "evidence": [
+            "feed-category: 北海岸美食",
+            "feed-category: 桃園美食",
+            "feed-category: 台北美食",
+            "feed-category: 桃竹苗美食",
+            "feed-category: 北橫美食"
+          ]
+        },
+        {
+          "genre": "travel",
+          "matchingLabels": 9,
+          "sampledLabels": 60,
+          "evidence": [
+            "identity: 旅遊",
+            "feed-category: 世界旅行",
+            "feed-category: 亞利桑那景點",
+            "feed-category: 鳳凰城景點",
+            "feed-category: 金門住宿",
+            "feed-category: 金門旅遊"
+          ]
+        }
+      ]
+    },
+    {
+      "slug": "bear-976",
+      "name": "貪吃鬼熊熊 bear",
+      "genres": [
+        {
+          "genre": "food",
+          "matchingLabels": 32,
+          "sampledLabels": 60,
+          "evidence": [
+            "feed-category: 嘉義美食",
+            "feed-category: 高雄美食",
+            "feed-category: 三民區美食",
+            "feed-category: 左營美食",
+            "feed-category: 苓雅美食"
+          ]
+        },
+        {
+          "genre": "travel",
+          "matchingLabels": 1,
+          "sampledLabels": 60,
+          "evidence": [
+            "identity: 旅遊",
+            "feed-category: 宜蘭旅遊"
+          ]
+        }
+      ]
+    },
+    {
+      "slug": "bearlovefood-978",
+      "name": "吟詩旅人bearlovefood",
+      "genres": [
+        {
+          "genre": "food",
+          "matchingLabels": 9,
+          "sampledLabels": 60,
+          "evidence": [
+            "feed-category: 台中餐廳",
+            "feed-category: 高雄餐廳",
+            "feed-category: 台北餐廳",
+            "feed-category: 宜蘭餐廳",
+            "feed-category: 桃園餐廳"
+          ]
+        },
+        {
+          "genre": "travel",
+          "matchingLabels": 14,
+          "sampledLabels": 60,
+          "evidence": [
+            "identity: 旅遊",
+            "feed-category: 南投景點",
+            "feed-category: 新北景點",
+            "feed-category: 桃園景點",
+            "feed-category: 台中景點",
+            "feed-category: 彰化景點"
+          ]
+        }
+      ]
+    },
+    {
+      "slug": "beurlife-279",
+      "name": "這就是人生beurlife",
+      "genres": [
+        {
+          "genre": "travel",
+          "matchingLabels": 5,
+          "sampledLabels": 18,
+          "evidence": [
+            "feed-category: 日本旅遊",
+            "feed-category: 人生旅遊局",
+            "feed-category: 人生旅遊局, 人生理財局",
+            "feed-category: 人生採購局, 人生旅遊局",
+            "feed-category: 人生旅遊局, 人生通訊局"
+          ]
+        },
+        {
+          "genre": "life",
+          "matchingLabels": 0,
+          "sampledLabels": 18,
+          "evidence": [
+            "identity: 生活內容, 財經"
+          ]
+        },
+        {
+          "genre": "finance",
+          "matchingLabels": 5,
+          "sampledLabels": 18,
+          "evidence": [
+            "identity: 生活內容, 財經",
+            "feed-category: 信用卡介紹",
+            "feed-category: 人生理財局",
+            "feed-category: 理財諮詢",
+            "feed-category: 信用卡懶人包",
+            "feed-category: 人生旅遊局, 人生理財局"
+          ]
+        }
+      ]
+    },
+    {
+      "slug": "bewithnene-tw-802",
+      "name": "捏捏 bewithnene.tw",
+      "genres": [
+        {
+          "genre": "travel",
+          "matchingLabels": 0,
+          "sampledLabels": 6,
+          "evidence": [
+            "identity: 旅遊"
+          ]
+        }
+      ]
+    },
+    {
+      "slug": "blake-com-410",
+      "name": "布雷克 blake.com",
+      "genres": [
+        {
+          "genre": "travel",
+          "matchingLabels": 0,
+          "sampledLabels": 60,
+          "evidence": [
+            "identity: 旅遊"
+          ]
+        }
+      ]
+    },
+    {
+      "slug": "bobbyfun-248",
+      "name": "波比 (BobbyFun)",
+      "genres": [
+        {
+          "genre": "travel",
+          "matchingLabels": 9,
+          "sampledLabels": 29,
+          "evidence": [
+            "identity: 旅遊",
+            "feed-category: 東京自由行",
+            "feed-category: 東京景點",
+            "feed-category: 沖繩住宿",
+            "feed-category: 日本自由行",
+            "feed-category: 韓國住宿"
+          ]
+        }
+      ]
+    },
+    {
+      "slug": "bonie-tw-1014",
+      "name": "朱寶妮 bonie.tw",
+      "genres": [
+        {
+          "genre": "food",
+          "matchingLabels": 33,
+          "sampledLabels": 60,
+          "evidence": [
+            "feed-category: 美食",
+            "feed-category: 愛食記收錄專用",
+            "feed-category: 台南美食",
+            "feed-category: 台南中西區美食",
+            "feed-category: 高雄美食"
+          ]
+        },
+        {
+          "genre": "travel",
+          "matchingLabels": 0,
+          "sampledLabels": 60,
+          "evidence": [
+            "identity: 旅遊"
+          ]
+        }
+      ]
+    },
+    {
+      "slug": "bunnyann-235",
+      "name": "小兔 bunnyann",
+      "genres": [
+        {
+          "genre": "food",
+          "matchingLabels": 19,
+          "sampledLabels": 60,
+          "evidence": [
+            "feed-category: 嘉義美食",
+            "feed-category: 屏東美食",
+            "feed-category: 台東美食",
+            "feed-category: 宜蘭美食",
+            "feed-category: 台北美食"
+          ]
+        },
+        {
+          "genre": "travel",
+          "matchingLabels": 25,
+          "sampledLabels": 60,
+          "evidence": [
+            "identity: 旅遊",
+            "feed-category: 南投景點",
+            "feed-category: 埔里景點",
+            "feed-category: 新北景點",
+            "feed-category: 五股景點",
+            "feed-category: 桃園景點"
+          ]
+        }
+      ]
+    },
+    {
+      "slug": "carol-691",
+      "name": "Carol自在生活",
+      "genres": [
+        {
+          "genre": "life",
+          "matchingLabels": 0,
+          "sampledLabels": 60,
+          "evidence": [
+            "identity: 生活內容"
+          ]
+        }
+      ]
+    },
+    {
+      "slug": "caven-700",
+      "name": "投資成長家 caven",
+      "genres": [
+        {
+          "genre": "finance",
+          "matchingLabels": 0,
+          "sampledLabels": 0,
+          "evidence": [
+            "identity: 財經"
+          ]
+        }
+      ]
+    },
+    {
+      "slug": "cmeyy-663",
+      "name": "可人之家cmeyy",
+      "genres": [
+        {
+          "genre": "travel",
+          "matchingLabels": 14,
+          "sampledLabels": 55,
+          "evidence": [
+            "identity: 旅遊",
+            "feed-category: 南投景點",
+            "feed-category: 親子景點",
+            "feed-category: 台中景點",
+            "feed-category: 彰化景點",
+            "feed-category: 宜蘭景點"
+          ]
+        }
+      ]
+    },
+    {
+      "slug": "curly-559",
+      "name": "捲捲頭 curly",
+      "genres": [
+        {
+          "genre": "food",
+          "matchingLabels": 6,
+          "sampledLabels": 60,
+          "evidence": [
+            "feed-category: 宜蘭美食",
+            "feed-category: 台北美食",
+            "feed-category: 公館美食",
+            "feed-category: 水源市場美食",
+            "feed-category: 台北銅板美食"
+          ]
+        },
+        {
+          "genre": "travel",
+          "matchingLabels": 16,
+          "sampledLabels": 60,
+          "evidence": [
+            "identity: 旅遊",
+            "feed-category: 旅遊",
+            "feed-category: 五股景點",
+            "feed-category: 台中景點",
+            "feed-category: 台北景點",
+            "feed-category: 月眉交流道景點"
+          ]
+        }
+      ]
+    },
+    {
+      "slug": "dacota",
+      "name": "雲爸 dacota.tw",
+      "genres": [
+        {
+          "genre": "gadgets",
+          "matchingLabels": 8,
+          "sampledLabels": 29,
+          "evidence": [
+            "identity: 科技產品、生活觀察與使用心得，從作者視角持續記錄。",
+            "feed-category: iPhone",
+            "feed-category: iPhone Case",
+            "feed-category: iPhone 18 pro CASETiFY",
+            "feed-category: KPOP 明星 手機殼",
+            "feed-category: 手機"
+          ]
+        }
+      ]
+    },
+    {
+      "slug": "decing-355",
+      "name": "decing 熱血",
+      "genres": [
+        {
+          "genre": "food",
+          "matchingLabels": 6,
+          "sampledLabels": 30,
+          "evidence": [
+            "feed-category: 台南美食",
+            "feed-category: 台南中西區美食",
+            "feed-category: 台南東區美食",
+            "feed-category: 台南北區美食",
+            "feed-category: 台南吃到飽餐廳"
+          ]
+        },
+        {
+          "genre": "travel",
+          "matchingLabels": 2,
+          "sampledLabels": 30,
+          "evidence": [
+            "identity: 旅遊",
+            "feed-category: 台南親子景點",
+            "feed-category: 台南室內景點"
+          ]
+        }
+      ]
+    },
+    {
+      "slug": "discovered-16b13d7ff9574ee1b7a5",
+      "name": "Zeroplex 生活隨筆",
+      "genres": [
+        {
+          "genre": "life",
+          "matchingLabels": 0,
+          "sampledLabels": 26,
+          "evidence": [
+            "identity: Zeroplex 生活隨筆"
+          ]
+        }
+      ]
+    },
+    {
+      "slug": "discovered-1c59375a44923c75f2a2",
+      "name": "PJCHENder那些沒告訴你的小細節",
+      "genres": [
+        {
+          "genre": "programming",
+          "matchingLabels": 7,
+          "sampledLabels": 60,
+          "evidence": [
+            "feed-category: JavaScript",
+            "feed-category: DevOps",
+            "feed-category: typescript",
+            "feed-category: golang",
+            "feed-category: learning algorithm in javascript from scratch"
+          ]
+        }
+      ]
+    },
+    {
+      "slug": "discovered-2c449775457af82f7348",
+      "name": "Javascript Snippets",
+      "genres": [
+        {
+          "genre": "programming",
+          "matchingLabels": 4,
+          "sampledLabels": 7,
+          "evidence": [
+            "feed-category: JavaScript",
+            "feed-category: jqueryrotate jquery javascript",
+            "feed-category: jQueryPlugin rotate javascript",
+            "feed-category: javascript class inheritance prototype"
+          ]
+        }
+      ]
+    },
+    {
+      "slug": "discovered-859cb7ca78f948c10dc6",
+      "name": "カレー補完計畫",
+      "genres": [
+        {
+          "genre": "travel",
+          "matchingLabels": 6,
+          "sampledLabels": 60,
+          "evidence": [
+            "feed-category: 咖哩外帶, 奧地利旅行, 建築, 旅行",
+            "feed-category: 咖哩外帶, 展覽, 旅行, 英國旅行",
+            "feed-category: 咖哩外帶, 建築, 德國旅行, 旅行",
+            "feed-category: 咖哩外帶, 展覽, 旅行, 英國冷門景點, 英國旅行",
+            "feed-category: 咖哩外帶, 德國旅行, 旅行"
+          ]
+        }
+      ]
+    },
+    {
+      "slug": "discovered-f6fd5a0c3c2e00c86b36",
+      "name": "Staylogue｜旅行、攝影與生活筆記",
+      "genres": [
+        {
+          "genre": "travel",
+          "matchingLabels": 2,
+          "sampledLabels": 5,
+          "evidence": [
+            "identity: Staylogue｜旅行、攝影與生活筆記",
+            "feed-category: 旅行",
+            "feed-category: 旅行隨筆"
+          ]
+        }
+      ]
+    },
+    {
+      "slug": "donna-tw-998",
+      "name": "跟著 donna.tw",
+      "genres": [
+        {
+          "genre": "food",
+          "matchingLabels": 13,
+          "sampledLabels": 60,
+          "evidence": [
+            "feed-category: 台北美食",
+            "feed-category: 信義區美食",
+            "feed-category: 台北餐廳",
+            "feed-category: 忠孝敦化美食",
+            "feed-category: 士林區美食"
+          ]
+        },
+        {
+          "genre": "travel",
+          "matchingLabels": 1,
+          "sampledLabels": 60,
+          "evidence": [
+            "identity: 旅遊",
+            "feed-category: 台中景點"
+          ]
+        }
+      ]
+    },
+    {
+      "slug": "earning-tw-732",
+      "name": "懶人經濟學 earning.tw",
+      "genres": [
+        {
+          "genre": "finance",
+          "matchingLabels": 0,
+          "sampledLabels": 3,
+          "evidence": [
+            "identity: 財經"
+          ]
+        }
+      ]
+    },
+    {
+      "slug": "eggie-tw-570",
+      "name": "蛋寶趴趴走 eggie.tw",
+      "genres": [
+        {
+          "genre": "travel",
+          "matchingLabels": 1,
+          "sampledLabels": 60,
+          "evidence": [
+            "identity: 旅遊",
+            "feed-category: 台北住宿"
+          ]
+        }
+      ]
+    },
+    {
+      "slug": "ez3c-657",
+      "name": "哇哇 ez3c",
+      "genres": [
+        {
+          "genre": "gadgets",
+          "matchingLabels": 0,
+          "sampledLabels": 0,
+          "evidence": [
+            "identity: 哇哇 ez3c"
+          ]
+        }
+      ]
+    },
+    {
+      "slug": "fullfenblog-366",
+      "name": "滿分 fullfenblog",
+      "genres": [
+        {
+          "genre": "food",
+          "matchingLabels": 12,
+          "sampledLabels": 60,
+          "evidence": [
+            "feed-category: 嘉義美食",
+            "feed-category: 高雄美食",
+            "feed-category: 屏東美食",
+            "feed-category: 台東美食",
+            "feed-category: 南投美食"
+          ]
+        },
+        {
+          "genre": "travel",
+          "matchingLabels": 34,
+          "sampledLabels": 60,
+          "evidence": [
+            "identity: 旅遊",
+            "feed-category: 南投景點",
+            "feed-category: 埔里景點",
+            "feed-category: 新北景點",
+            "feed-category: 桃園景點",
+            "feed-category: 台中景點"
+          ]
+        }
+      ]
+    },
+    {
+      "slug": "g-1090",
+      "name": "G子的漫畫生活",
+      "genres": [
+        {
+          "genre": "food",
+          "matchingLabels": 17,
+          "sampledLabels": 60,
+          "evidence": [
+            "feed-category: 台北美食",
+            "feed-category: 新莊美食",
+            "feed-category: 中和美食",
+            "feed-category: 中永和美食",
+            "feed-category: 中和平價美食"
+          ]
+        },
+        {
+          "genre": "travel",
+          "matchingLabels": 4,
+          "sampledLabels": 60,
+          "evidence": [
+            "identity: 旅遊, 生活內容",
+            "feed-category: 日本自由行",
+            "feed-category: G子旅遊",
+            "feed-category: 國外旅遊.國外景點",
+            "feed-category: 日本旅行"
+          ]
+        },
+        {
+          "genre": "life",
+          "matchingLabels": 0,
+          "sampledLabels": 60,
+          "evidence": [
+            "identity: 旅遊, 生活內容"
+          ]
+        }
+      ]
+    },
+    {
+      "slug": "girlslifeplan-958",
+      "name": "女子休假計劃 girlslifeplan",
+      "genres": [
+        {
+          "genre": "food",
+          "matchingLabels": 10,
+          "sampledLabels": 60,
+          "evidence": [
+            "feed-category: 嘉義美食",
+            "feed-category: 宜蘭美食",
+            "feed-category: 板橋美食",
+            "feed-category: 宜蘭食記",
+            "feed-category: 川渝小吃坊"
+          ]
+        },
+        {
+          "genre": "travel",
+          "matchingLabels": 1,
+          "sampledLabels": 60,
+          "evidence": [
+            "identity: 旅遊",
+            "feed-category: 住宿"
+          ]
+        }
+      ]
+    },
+    {
+      "slug": "gogojp-tw-535",
+      "name": "福寶媽衝日本 gogojp.tw",
+      "genres": [
+        {
+          "genre": "travel",
+          "matchingLabels": 16,
+          "sampledLabels": 60,
+          "evidence": [
+            "identity: 旅遊",
+            "feed-category: 九州自由行",
+            "feed-category: 大阪一日遊",
+            "feed-category: 大阪自由行",
+            "feed-category: 福岡自由行",
+            "feed-category: 由布院自由行"
+          ]
+        }
+      ]
+    },
+    {
+      "slug": "gototravel-403",
+      "name": "gototravel 叭噗",
+      "genres": [
+        {
+          "genre": "travel",
+          "matchingLabels": 8,
+          "sampledLabels": 60,
+          "evidence": [
+            "identity: 旅遊",
+            "feed-category: 東京景點",
+            "feed-category: 關東景點",
+            "feed-category: 京都景點",
+            "feed-category: 嵐山景點",
+            "feed-category: 上野景點"
+          ]
+        }
+      ]
+    },
+    {
+      "slug": "gowith-marknhazyl-1051",
+      "name": "gowith marknhazyl",
+      "genres": [
+        {
+          "genre": "travel",
+          "matchingLabels": 37,
+          "sampledLabels": 45,
+          "evidence": [
+            "identity: 旅遊",
+            "feed-category: 歐洲旅遊",
+            "feed-category: 亞洲旅遊",
+            "feed-category: 名古屋景點",
+            "feed-category: 歐洲旅遊, 西班牙",
+            "feed-category: 亞洲旅遊, 新加坡"
+          ]
+        }
+      ]
+    },
+    {
+      "slug": "gwan-679",
+      "name": "吃關關 gwan",
+      "genres": [
+        {
+          "genre": "food",
+          "matchingLabels": 6,
+          "sampledLabels": 41,
+          "evidence": [
+            "feed-category: 台灣各地美食",
+            "feed-category: 收錄愛食記",
+            "feed-category: 高雄仁武美食推薦",
+            "feed-category: 台中尾牙餐廳",
+            "feed-category: 台中春酒餐廳"
+          ]
+        },
+        {
+          "genre": "travel",
+          "matchingLabels": 6,
+          "sampledLabels": 41,
+          "evidence": [
+            "identity: 旅遊",
+            "feed-category: 親子景點",
+            "feed-category: 屏東旅行",
+            "feed-category: 關關愛旅行(國內)",
+            "feed-category: 台中旅行",
+            "feed-category: 高雄旅行"
+          ]
+        }
+      ]
+    },
+    {
+      "slug": "happytravel-1003",
+      "name": "黑皮的旅遊 happytravel",
+      "genres": [
+        {
+          "genre": "food",
+          "matchingLabels": 17,
+          "sampledLabels": 40,
+          "evidence": [
+            "feed-category: 美食",
+            "feed-category: 桃園美食",
+            "feed-category: 屏東美食",
+            "feed-category: 新北美食",
+            "feed-category: 墾丁美食"
+          ]
+        },
+        {
+          "genre": "travel",
+          "matchingLabels": 5,
+          "sampledLabels": 40,
+          "evidence": [
+            "identity: 黑皮的旅遊 happytravel",
+            "identity: 旅遊",
+            "feed-category: 旅遊",
+            "feed-category: 新北景點",
+            "feed-category: 屏東景點",
+            "feed-category: 墾丁景點",
+            "feed-category: 車城住宿"
+          ]
+        }
+      ]
+    },
+    {
+      "slug": "https-13shaniu-tw-839",
+      "name": "傻妞 https://13shaniu.tw",
+      "genres": [
+        {
+          "genre": "food",
+          "matchingLabels": 7,
+          "sampledLabels": 37,
+          "evidence": [
+            "feed-category: 台南美食",
+            "feed-category: 台南東區美食",
+            "feed-category: 台南安平區美食",
+            "feed-category: 台南約會餐廳",
+            "feed-category: 南紡購物中心週邊美食"
+          ]
+        },
+        {
+          "genre": "travel",
+          "matchingLabels": 1,
+          "sampledLabels": 37,
+          "evidence": [
+            "identity: 旅遊",
+            "feed-category: 旅遊生活"
+          ]
+        }
+      ]
+    },
+    {
+      "slug": "https-longson1001-wordpress-com-1062",
+      "name": "https://longson1001.wordpress.com/",
+      "genres": [
+        {
+          "genre": "life",
+          "matchingLabels": 0,
+          "sampledLabels": 42,
+          "evidence": [
+            "identity: 生活內容"
+          ]
+        }
+      ]
+    },
+    {
+      "slug": "https-maxfoodfun-com-1116",
+      "name": "馬克斯 https://maxfoodfun.com/",
+      "genres": [
+        {
+          "genre": "food",
+          "matchingLabels": 25,
+          "sampledLabels": 60,
+          "evidence": [
+            "feed-category: 嘉義美食",
+            "feed-category: 桃園美食",
+            "feed-category: 台南美食",
+            "feed-category: 高雄美食",
+            "feed-category: 台中美食"
+          ]
+        },
+        {
+          "genre": "travel",
+          "matchingLabels": 18,
+          "sampledLabels": 60,
+          "evidence": [
+            "identity: 旅遊",
+            "feed-category: 南投景點",
+            "feed-category: 桃園景點",
+            "feed-category: 台中景點",
+            "feed-category: 台灣旅遊",
+            "feed-category: 高雄景點"
+          ]
+        }
+      ]
+    },
+    {
+      "slug": "icecreamcat-tw-526",
+      "name": "冰淇淋貓 icecreamcat.tw",
+      "genres": [
+        {
+          "genre": "food",
+          "matchingLabels": 10,
+          "sampledLabels": 60,
+          "evidence": [
+            "feed-category: 愛食記收錄專用",
+            "feed-category: 香港美食",
+            "feed-category: 釜山美食",
+            "feed-category: 宜蘭美食",
+            "feed-category: 台北美食"
+          ]
+        },
+        {
+          "genre": "travel",
+          "matchingLabels": 0,
+          "sampledLabels": 60,
+          "evidence": [
+            "identity: 旅遊"
+          ]
+        }
+      ]
+    },
+    {
+      "slug": "inmap-610",
+      "name": "高雄美食地圖inmap",
+      "genres": [
+        {
+          "genre": "food",
+          "matchingLabels": 17,
+          "sampledLabels": 60,
+          "evidence": [
+            "identity: 高雄美食地圖inmap",
+            "feed-category: 台南美食",
+            "feed-category: 高雄美食",
+            "feed-category: 高雄小吃",
+            "feed-category: 左營美食",
+            "feed-category: 市場美食"
+          ]
+        },
+        {
+          "genre": "travel",
+          "matchingLabels": 2,
+          "sampledLabels": 60,
+          "evidence": [
+            "identity: 旅遊",
+            "feed-category: 高雄景點",
+            "feed-category: 國外旅遊"
+          ]
+        }
+      ]
+    },
+    {
+      "slug": "jerremy-986",
+      "name": "Jerremy以食為天",
+      "genres": [
+        {
+          "genre": "food",
+          "matchingLabels": 57,
+          "sampledLabels": 60,
+          "evidence": [
+            "feed-category: 三民區美食",
+            "feed-category: 新興區美食",
+            "feed-category: 鹽埕區美食",
+            "feed-category: 前金區美食",
+            "feed-category: 苓雅區美食"
+          ]
+        },
+        {
+          "genre": "travel",
+          "matchingLabels": 2,
+          "sampledLabels": 60,
+          "evidence": [
+            "identity: 旅遊",
+            "feed-category: 旅遊",
+            "feed-category: 國外旅遊"
+          ]
+        }
+      ]
+    },
+    {
+      "slug": "jessy-tw-1103",
+      "name": "jessy.tw",
+      "genres": [
+        {
+          "genre": "travel",
+          "matchingLabels": 4,
+          "sampledLabels": 43,
+          "evidence": [
+            "identity: 旅遊",
+            "feed-category: 住宿體驗",
+            "feed-category: 熊本住宿",
+            "feed-category: 熊本景點",
+            "feed-category: 偶爾世界旅行"
+          ]
+        }
+      ]
+    },
+    {
+      "slug": "journey-tw-419",
+      "name": "旅行圖中journey.tw",
+      "genres": [
+        {
+          "genre": "food",
+          "matchingLabels": 7,
+          "sampledLabels": 60,
+          "evidence": [
+            "feed-category: 美食推薦",
+            "feed-category: 四國美食",
+            "feed-category: 德島美食",
+            "feed-category: 德島市美食",
+            "feed-category: 高知美食"
+          ]
+        },
+        {
+          "genre": "travel",
+          "matchingLabels": 27,
+          "sampledLabels": 60,
+          "evidence": [
+            "identity: 旅行圖中journey.tw",
+            "identity: 旅遊",
+            "feed-category: 國外旅行",
+            "feed-category: 香川自由行",
+            "feed-category: 四國自由行",
+            "feed-category: 香川景點",
+            "feed-category: 四國景點"
+          ]
+        }
+      ]
+    },
+    {
+      "slug": "kavana-tw-817",
+      "name": "kavana.tw",
+      "genres": [
+        {
+          "genre": "travel",
+          "matchingLabels": 0,
+          "sampledLabels": 20,
+          "evidence": [
+            "identity: 旅遊"
+          ]
+        }
+      ]
+    },
+    {
+      "slug": "kellylife-tw-1102",
+      "name": "台南凱莉kellylife.tw",
+      "genres": [
+        {
+          "genre": "food",
+          "matchingLabels": 9,
+          "sampledLabels": 17,
+          "evidence": [
+            "feed-category: 嘉義美食",
+            "feed-category: 台南美食",
+            "feed-category: 高雄美食",
+            "feed-category: 台中美食",
+            "feed-category: 宅配美食"
+          ]
+        },
+        {
+          "genre": "travel",
+          "matchingLabels": 2,
+          "sampledLabels": 17,
+          "evidence": [
+            "identity: 旅遊",
+            "feed-category: 台灣旅遊",
+            "feed-category: 台南住宿"
+          ]
+        }
+      ]
+    },
+    {
+      "slug": "ken-alice-982",
+      "name": "Ken&Alice",
+      "genres": [
+        {
+          "genre": "food",
+          "matchingLabels": 22,
+          "sampledLabels": 60,
+          "evidence": [
+            "feed-category: 包廂餐廳",
+            "feed-category: 團購美食",
+            "feed-category: 宅配美食",
+            "feed-category: 慶生餐廳",
+            "feed-category: 宜蘭美食"
+          ]
+        },
+        {
+          "genre": "travel",
+          "matchingLabels": 7,
+          "sampledLabels": 60,
+          "evidence": [
+            "identity: 旅遊",
+            "feed-category: 北海道自由行",
+            "feed-category: 日本自由行",
+            "feed-category: 花蓮住宿",
+            "feed-category: 花蓮住宿｜美食｜景點",
+            "feed-category: 壽豐住宿"
+          ]
+        }
+      ]
+    },
+    {
+      "slug": "kocpc",
+      "name": "電腦王阿達",
+      "genres": [
+        {
+          "genre": "gadgets",
+          "matchingLabels": 5,
+          "sampledLabels": 60,
+          "evidence": [
+            "identity: 科技、消費電子、3C 與生活工具的長期介紹與教學。",
+            "feed-category: Android",
+            "feed-category: 智慧手錶",
+            "feed-category: Android Auto",
+            "feed-category: iPhone",
+            "feed-category: AI 手機"
+          ]
+        }
+      ]
+    },
+    {
+      "slug": "ksk-593",
+      "name": "凱子凱 ksk",
+      "genres": [
+        {
+          "genre": "travel",
+          "matchingLabels": 3,
+          "sampledLabels": 11,
+          "evidence": [
+            "identity: 旅遊",
+            "feed-category: 日本住宿-東京/關東",
+            "feed-category: 日本住宿-綜合",
+            "feed-category: 日本住宿-長野新潟山梨"
+          ]
+        }
+      ]
+    },
+    {
+      "slug": "lexie-tw-1112",
+      "name": "lexie.tw",
+      "genres": [
+        {
+          "genre": "travel",
+          "matchingLabels": 0,
+          "sampledLabels": 4,
+          "evidence": [
+            "identity: 旅遊"
+          ]
+        }
+      ]
+    },
+    {
+      "slug": "lordcat-471",
+      "name": "貓大爺 lordcat",
+      "genres": [
+        {
+          "genre": "food",
+          "matchingLabels": 11,
+          "sampledLabels": 20,
+          "evidence": [
+            "feed-category: 文湖線美食",
+            "feed-category: 台北市美食",
+            "feed-category: 小巨蛋站美食",
+            "feed-category: 松山線美食",
+            "feed-category: 貓大爺推薦美食"
+          ]
+        },
+        {
+          "genre": "travel",
+          "matchingLabels": 2,
+          "sampledLabels": 20,
+          "evidence": [
+            "identity: 旅遊",
+            "feed-category: 濟州島旅遊與美食",
+            "feed-category: 台北市旅遊"
+          ]
+        }
+      ]
+    },
+    {
+      "slug": "lyes-tw-618",
+      "name": "涼子是也 lyes.tw",
+      "genres": [
+        {
+          "genre": "food",
+          "matchingLabels": 17,
+          "sampledLabels": 60,
+          "evidence": [
+            "feed-category: 台中小吃",
+            "feed-category: 台中美食",
+            "feed-category: 屏東美食",
+            "feed-category: 沖繩美食",
+            "feed-category: 埔里美食"
+          ]
+        },
+        {
+          "genre": "travel",
+          "matchingLabels": 20,
+          "sampledLabels": 60,
+          "evidence": [
+            "identity: 旅遊",
+            "feed-category: 南投景點",
+            "feed-category: 埔里景點",
+            "feed-category: 沖繩住宿推薦",
+            "feed-category: 親子飯店",
+            "feed-category: 沖繩親子住宿"
+          ]
+        }
+      ]
+    },
+    {
+      "slug": "marcy-685",
+      "name": "瑪西隨筆 marcy",
+      "genres": [
+        {
+          "genre": "food",
+          "matchingLabels": 31,
+          "sampledLabels": 60,
+          "evidence": [
+            "feed-category: 美食",
+            "feed-category: 桃園美食",
+            "feed-category: 高雄美食",
+            "feed-category: 台中美食",
+            "feed-category: 宅配美食"
+          ]
+        },
+        {
+          "genre": "travel",
+          "matchingLabels": 10,
+          "sampledLabels": 60,
+          "evidence": [
+            "identity: 旅遊",
+            "feed-category: 旅遊",
+            "feed-category: 東京景點",
+            "feed-category: 日本旅遊",
+            "feed-category: 國內旅遊",
+            "feed-category: 宜蘭住宿"
+          ]
+        }
+      ]
+    },
+    {
+      "slug": "marifoodie-796",
+      "name": "瑪莉食報 marifoodie",
+      "genres": [
+        {
+          "genre": "food",
+          "matchingLabels": 22,
+          "sampledLabels": 60,
+          "evidence": [
+            "feed-category: 台中美食",
+            "feed-category: 北屯美食",
+            "feed-category: 西屯美食",
+            "feed-category: 東區美食",
+            "feed-category: 科博館美食"
+          ]
+        },
+        {
+          "genre": "travel",
+          "matchingLabels": 0,
+          "sampledLabels": 60,
+          "evidence": [
+            "identity: 旅遊"
+          ]
+        }
+      ]
+    },
+    {
+      "slug": "mecocute-537",
+      "name": "陳小可 mecocute",
+      "genres": [
+        {
+          "genre": "food",
+          "matchingLabels": 22,
+          "sampledLabels": 60,
+          "evidence": [
+            "feed-category: 美食",
+            "feed-category: 台北大巨蛋美食",
+            "feed-category: 南投美食",
+            "feed-category: 埔里美食",
+            "feed-category: 萬華美食"
+          ]
+        },
+        {
+          "genre": "travel",
+          "matchingLabels": 4,
+          "sampledLabels": 60,
+          "evidence": [
+            "identity: 旅遊",
+            "feed-category: 台北-基隆-旅遊-住宿",
+            "feed-category: 台北北投住宿",
+            "feed-category: 宜蘭美食小吃旅遊景點",
+            "feed-category: 南投美食小吃旅遊景點"
+          ]
+        }
+      ]
+    },
+    {
+      "slug": "mimi-mimigo-511",
+      "name": "MiMi韓(Mimigo)",
+      "genres": [
+        {
+          "genre": "travel",
+          "matchingLabels": 33,
+          "sampledLabels": 60,
+          "evidence": [
+            "identity: 旅遊",
+            "feed-category: 香港自由行",
+            "feed-category: 東京自由行",
+            "feed-category: 北海道自由行",
+            "feed-category: 小樽住宿",
+            "feed-category: 沖繩自由行"
+          ]
+        }
+      ]
+    },
+    {
+      "slug": "minako-tw-695",
+      "name": "美奈子 minako.tw",
+      "genres": [
+        {
+          "genre": "travel",
+          "matchingLabels": 1,
+          "sampledLabels": 50,
+          "evidence": [
+            "identity: 旅遊",
+            "feed-category: 世界的微旅行"
+          ]
+        }
+      ]
+    },
+    {
+      "slug": "moneymate-space-794",
+      "name": "理財學伴 moneymate.space",
+      "genres": [
+        {
+          "genre": "finance",
+          "matchingLabels": 13,
+          "sampledLabels": 36,
+          "evidence": [
+            "identity: 理財學伴 moneymate.space",
+            "identity: 財經",
+            "feed-category: 美股投資",
+            "feed-category: 信用卡攻略",
+            "feed-category: 個人與家庭理財",
+            "feed-category: 理財入門",
+            "feed-category: 投資入門"
+          ]
+        }
+      ]
+    },
+    {
+      "slug": "murmurcats-com-716",
+      "name": "坭喃貓 murmurcats.com",
+      "genres": [
+        {
+          "genre": "finance",
+          "matchingLabels": 6,
+          "sampledLabels": 50,
+          "evidence": [
+            "identity: 財經",
+            "feed-category: 信用卡",
+            "feed-category: 小資理財術",
+            "feed-category: ETF 投資",
+            "feed-category: 基本投資觀念",
+            "feed-category: 股市投資"
+          ]
+        }
+      ]
+    },
+    {
+      "slug": "nash-tw-312",
+      "name": "Nash.tw 神之領域",
+      "genres": [
+        {
+          "genre": "food",
+          "matchingLabels": 8,
+          "sampledLabels": 54,
+          "evidence": [
+            "feed-category: 愛食記收錄專用",
+            "feed-category: 北海岸美食",
+            "feed-category: 桃園美食",
+            "feed-category: 台中美食",
+            "feed-category: 基隆美食"
+          ]
+        },
+        {
+          "genre": "travel",
+          "matchingLabels": 0,
+          "sampledLabels": 54,
+          "evidence": [
+            "identity: 旅遊"
+          ]
+        }
+      ]
+    },
+    {
+      "slug": "nasheat-964",
+      "name": "Nasheat神之領域",
+      "genres": [
+        {
+          "genre": "travel",
+          "matchingLabels": 0,
+          "sampledLabels": 0,
+          "evidence": [
+            "identity: 旅遊"
+          ]
+        }
+      ]
+    },
+    {
+      "slug": "nellydyu-420",
+      "name": "尼力 (nellydyu)",
+      "genres": [
+        {
+          "genre": "food",
+          "matchingLabels": 10,
+          "sampledLabels": 60,
+          "evidence": [
+            "feed-category: 美食",
+            "feed-category: 高雄美食",
+            "feed-category: 高雄小吃",
+            "feed-category: 三民區美食",
+            "feed-category: 河堤社區美食"
+          ]
+        },
+        {
+          "genre": "travel",
+          "matchingLabels": 11,
+          "sampledLabels": 60,
+          "evidence": [
+            "identity: 旅遊",
+            "feed-category: 旅遊",
+            "feed-category: 親子景點",
+            "feed-category: 沖繩自由行",
+            "feed-category: 台南親子景點",
+            "feed-category: 中央平日住宿獎助"
+          ]
+        }
+      ]
+    },
+    {
+      "slug": "nico-niniyeh-447",
+      "name": "Nico niniyeh",
+      "genres": [
+        {
+          "genre": "travel",
+          "matchingLabels": 5,
+          "sampledLabels": 56,
+          "evidence": [
+            "identity: 旅遊",
+            "feed-category: 親子景點",
+            "feed-category: 免費景點",
+            "feed-category: 古蹟景點",
+            "feed-category: 文青景點",
+            "feed-category: 九州自由行"
+          ]
+        }
+      ]
+    },
+    {
+      "slug": "nini-and-blue-383",
+      "name": "Nini and Blue",
+      "genres": [
+        {
+          "genre": "food",
+          "matchingLabels": 7,
+          "sampledLabels": 59,
+          "evidence": [
+            "feed-category: 愛食記",
+            "feed-category: 台中小吃",
+            "feed-category: 中國醫商圈美食",
+            "feed-category: 永興街美食",
+            "feed-category: 愛食記收錄"
+          ]
+        },
+        {
+          "genre": "travel",
+          "matchingLabels": 11,
+          "sampledLabels": 59,
+          "evidence": [
+            "identity: 旅遊",
+            "feed-category: 親子景點",
+            "feed-category: ★台中景點推薦",
+            "feed-category: 台中景點",
+            "feed-category: 台中旅遊",
+            "feed-category: 清水景點"
+          ]
+        }
+      ]
+    },
+    {
+      "slug": "onegeek-1117",
+      "name": "壹哥 onegeek",
+      "genres": [
+        {
+          "genre": "gadgets",
+          "matchingLabels": 4,
+          "sampledLabels": 13,
+          "evidence": [
+            "feed-category: iPhone",
+            "feed-category: 3C科技",
+            "feed-category: 3C採訪",
+            "feed-category: 手機平板"
+          ]
+        }
+      ]
+    },
+    {
+      "slug": "rich01-217",
+      "name": "市場先生 rich01",
+      "genres": [
+        {
+          "genre": "finance",
+          "matchingLabels": 10,
+          "sampledLabels": 23,
+          "evidence": [
+            "identity: 財經",
+            "feed-category: 信用卡多卡比較",
+            "feed-category: 理財入門知識",
+            "feed-category: 信用卡比較",
+            "feed-category: 信用卡推薦",
+            "feed-category: 信用卡"
+          ]
+        }
+      ]
+    },
+    {
+      "slug": "seed-1013",
+      "name": "萌芽",
+      "genres": [
+        {
+          "genre": "life",
+          "matchingLabels": 0,
+          "sampledLabels": 11,
+          "evidence": [
+            "identity: 生活內容"
+          ]
+        }
+      ]
+    },
+    {
+      "slug": "seed-1036",
+      "name": "大口",
+      "genres": [
+        {
+          "genre": "travel",
+          "matchingLabels": 4,
+          "sampledLabels": 35,
+          "evidence": [
+            "identity: 旅遊",
+            "feed-category: 國外旅遊",
+            "feed-category: 國內旅遊",
+            "feed-category: 山形景點",
+            "feed-category: 山形自由行"
+          ]
+        }
+      ]
+    },
+    {
+      "slug": "seed-292",
+      "name": "寶寶溫",
+      "genres": [
+        {
+          "genre": "travel",
+          "matchingLabels": 13,
+          "sampledLabels": 60,
+          "evidence": [
+            "identity: 旅遊",
+            "feed-category: 南投景點",
+            "feed-category: 夏天玩水景點",
+            "feed-category: 親子景點",
+            "feed-category: 旅遊行程懶人包",
+            "feed-category: 苗栗一日遊"
+          ]
+        }
+      ]
+    },
+    {
+      "slug": "seed-338",
+      "name": "大方",
+      "genres": [
+        {
+          "genre": "travel",
+          "matchingLabels": 29,
+          "sampledLabels": 60,
+          "evidence": [
+            "identity: 旅遊",
+            "feed-category: 日本賞櫻景點",
+            "feed-category: 東北賞櫻景點",
+            "feed-category: 東京賞櫻景點",
+            "feed-category: 曼谷 BTS 住宿推薦",
+            "feed-category: 曼谷 BTS 飯店推薦"
+          ]
+        }
+      ]
+    },
+    {
+      "slug": "seed-367",
+      "name": "虎麗",
+      "genres": [
+        {
+          "genre": "food",
+          "matchingLabels": 11,
+          "sampledLabels": 44,
+          "evidence": [
+            "feed-category: 愛食記",
+            "feed-category: 高雄美食",
+            "feed-category: 前鎮美食",
+            "feed-category: 高雄小吃",
+            "feed-category: 前鎮夜市美食"
+          ]
+        },
+        {
+          "genre": "travel",
+          "matchingLabels": 0,
+          "sampledLabels": 44,
+          "evidence": [
+            "identity: 旅遊"
+          ]
+        }
+      ]
+    },
+    {
+      "slug": "seed-392",
+      "name": "喵爸喵媽",
+      "genres": [
+        {
+          "genre": "travel",
+          "matchingLabels": 5,
+          "sampledLabels": 10,
+          "evidence": [
+            "identity: 旅遊",
+            "feed-category: 瑞士自由行",
+            "feed-category: 瑞士自助旅遊",
+            "feed-category: 瑞士住宿推薦",
+            "feed-category: 瑞士景點",
+            "feed-category: 瑞士火車旅遊"
+          ]
+        }
+      ]
+    },
+    {
+      "slug": "seed-423",
+      "name": "重灌狂人",
+      "genres": [
+        {
+          "genre": "gadgets",
+          "matchingLabels": 12,
+          "sampledLabels": 49,
+          "evidence": [
+            "feed-category: Android Screen Off icon",
+            "feed-category: 安卓手機螢幕鎖定按鈕",
+            "feed-category: 手機：Android 安卓 App",
+            "feed-category: 尋找遺失的手機-安卓",
+            "feed-category: 手機不見了怎麼辦"
+          ]
+        }
+      ]
+    },
+    {
+      "slug": "seed-437",
+      "name": "小氣少年",
+      "genres": [
+        {
+          "genre": "travel",
+          "matchingLabels": 1,
+          "sampledLabels": 15,
+          "evidence": [
+            "identity: 旅遊",
+            "feed-category: 東京-風景-美食-住宿"
+          ]
+        }
+      ]
+    },
+    {
+      "slug": "seed-510",
+      "name": "鯊魚大口咬",
+      "genres": [
+        {
+          "genre": "food",
+          "matchingLabels": 23,
+          "sampledLabels": 60,
+          "evidence": [
+            "feed-category: 美食",
+            "feed-category: 愛食記收錄專用",
+            "feed-category: 台南美食",
+            "feed-category: 台中小吃",
+            "feed-category: 台中美食"
+          ]
+        },
+        {
+          "genre": "travel",
+          "matchingLabels": 5,
+          "sampledLabels": 60,
+          "evidence": [
+            "identity: 旅遊",
+            "feed-category: 南投景點",
+            "feed-category: 台中旅遊",
+            "feed-category: 歐洲旅遊",
+            "feed-category: 英國旅遊",
+            "feed-category: 國外旅遊"
+          ]
+        }
+      ]
+    },
+    {
+      "slug": "seed-524",
+      "name": "飛天璇",
+      "genres": [
+        {
+          "genre": "food",
+          "matchingLabels": 21,
+          "sampledLabels": 60,
+          "evidence": [
+            "feed-category: 台中美食",
+            "feed-category: 在地美食",
+            "feed-category: 排隊美食",
+            "feed-category: 古早味美食",
+            "feed-category: 銅板美食"
+          ]
+        },
+        {
+          "genre": "travel",
+          "matchingLabels": 2,
+          "sampledLabels": 60,
+          "evidence": [
+            "identity: 旅遊",
+            "feed-category: 南投景點",
+            "feed-category: ★台中景點推薦"
+          ]
+        }
+      ]
+    },
+    {
+      "slug": "seed-529",
+      "name": "慢活夫妻",
+      "genres": [
+        {
+          "genre": "finance",
+          "matchingLabels": 9,
+          "sampledLabels": 26,
+          "evidence": [
+            "identity: 財經",
+            "feed-category: 儲蓄險及保險, 理財及其他賺錢方法",
+            "feed-category: 理財及其他賺錢方法",
+            "feed-category: 儲蓄險及保險",
+            "feed-category: 台股新手教學, 理財及其他賺錢方法, 美股新手教學",
+            "feed-category: 理財及其他賺錢方法, 美股新手教學"
+          ]
+        }
+      ]
+    },
+    {
+      "slug": "seed-541",
+      "name": "莉莉嗯",
+      "genres": [
+        {
+          "genre": "travel",
+          "matchingLabels": 22,
+          "sampledLabels": 60,
+          "evidence": [
+            "identity: 旅遊",
+            "feed-category: 合掌村自由行",
+            "feed-category: 巴爾幹自由行",
+            "feed-category: 波士尼亞自由行",
+            "feed-category: 波赫自由行",
+            "feed-category: 塞拉耶佛自由行"
+          ]
+        }
+      ]
+    },
+    {
+      "slug": "seed-692",
+      "name": "熊貓愛吃魚",
+      "genres": [
+        {
+          "genre": "food",
+          "matchingLabels": 7,
+          "sampledLabels": 60,
+          "evidence": [
+            "feed-category: 台灣美食",
+            "feed-category: 台灣美食, 桃園美食",
+            "feed-category: 台北美食, 台灣美食",
+            "feed-category: 台灣美食, 宜蘭美食",
+            "feed-category: 台灣美食, 新北美食"
+          ]
+        },
+        {
+          "genre": "travel",
+          "matchingLabels": 52,
+          "sampledLabels": 60,
+          "evidence": [
+            "identity: 旅遊",
+            "feed-category: 台中景點",
+            "feed-category: 台灣旅遊",
+            "feed-category: 台灣住宿",
+            "feed-category: 國外旅遊",
+            "feed-category: 住宿開箱"
+          ]
+        }
+      ]
+    },
+    {
+      "slug": "seed-702",
+      "name": "米寶麻",
+      "genres": [
+        {
+          "genre": "food",
+          "matchingLabels": 23,
+          "sampledLabels": 60,
+          "evidence": [
+            "feed-category: 台中美食",
+            "feed-category: 台北美食",
+            "feed-category: 萬華美食",
+            "feed-category: 台北小吃",
+            "feed-category: 板橋美食"
+          ]
+        },
+        {
+          "genre": "travel",
+          "matchingLabels": 0,
+          "sampledLabels": 60,
+          "evidence": [
+            "identity: 旅遊"
+          ]
+        }
+      ]
+    },
+    {
+      "slug": "seed-740",
+      "name": "綠角",
+      "genres": [
+        {
+          "genre": "finance",
+          "matchingLabels": 0,
+          "sampledLabels": 0,
+          "evidence": [
+            "identity: 財經"
+          ]
+        }
+      ]
+    },
+    {
+      "slug": "seed-805",
+      "name": "樂活台南",
+      "genres": [
+        {
+          "genre": "food",
+          "matchingLabels": 55,
+          "sampledLabels": 60,
+          "evidence": [
+            "feed-category: 台南食記-依區域-701東區",
+            "feed-category: 台南食記-依種類-熱炒、合菜",
+            "feed-category: 台南食記-依區域-708安平區",
+            "feed-category: 台南食記-依種類-水餃",
+            "feed-category: 台南食記-依種類-麵店、滷味"
+          ]
+        },
+        {
+          "genre": "travel",
+          "matchingLabels": 1,
+          "sampledLabels": 60,
+          "evidence": [
+            "identity: 旅遊",
+            "feed-category: 台南旅行遊記-730新營區"
+          ]
+        }
+      ]
+    },
+    {
+      "slug": "seed-822",
+      "name": "馬克解讀",
+      "genres": [
+        {
+          "genre": "finance",
+          "matchingLabels": 0,
+          "sampledLabels": 0,
+          "evidence": [
+            "identity: 財經"
+          ]
+        }
+      ]
+    },
+    {
+      "slug": "seed-835",
+      "name": "直雲",
+      "genres": [
+        {
+          "genre": "finance",
+          "matchingLabels": 0,
+          "sampledLabels": 0,
+          "evidence": [
+            "identity: 財經"
+          ]
+        }
+      ]
+    },
+    {
+      "slug": "seed-944",
+      "name": "青青小熊",
+      "genres": [
+        {
+          "genre": "travel",
+          "matchingLabels": 26,
+          "sampledLabels": 35,
+          "evidence": [
+            "identity: 旅遊",
+            "feed-category: 苗栗一日遊",
+            "feed-category: 台中景點",
+            "feed-category: 日月潭一日遊",
+            "feed-category: 南投旅遊",
+            "feed-category: 宜蘭景點"
+          ]
+        }
+      ]
+    },
+    {
+      "slug": "seed-971",
+      "name": "大丈夫週記",
+      "genres": [
+        {
+          "genre": "life",
+          "matchingLabels": 0,
+          "sampledLabels": 0,
+          "evidence": [
+            "identity: 生活內容"
+          ]
+        }
+      ]
+    },
+    {
+      "slug": "seed-975",
+      "name": "冒險安迪",
+      "genres": [
+        {
+          "genre": "travel",
+          "matchingLabels": 4,
+          "sampledLabels": 16,
+          "evidence": [
+            "identity: 旅遊",
+            "feed-category: 台灣景點",
+            "feed-category: 土耳其旅遊",
+            "feed-category: 葡萄牙景點",
+            "feed-category: 中國自由行"
+          ]
+        }
+      ]
+    },
+    {
+      "slug": "steven-722",
+      "name": "稀飯套餐 steven",
+      "genres": [
+        {
+          "genre": "finance",
+          "matchingLabels": 5,
+          "sampledLabels": 46,
+          "evidence": [
+            "identity: 財經",
+            "feed-category: 美股投資",
+            "feed-category: 股票質押",
+            "feed-category: 信用卡",
+            "feed-category: 投資小工具",
+            "feed-category: 投資理財"
+          ]
+        }
+      ]
+    },
+    {
+      "slug": "sunnylife-tw-591",
+      "name": "商妮 sunnylife.tw",
+      "genres": [
+        {
+          "genre": "food",
+          "matchingLabels": 19,
+          "sampledLabels": 60,
+          "evidence": [
+            "feed-category: 台中美食",
+            "feed-category: 宅配美食",
+            "feed-category: 南屯美食",
+            "feed-category: 台中爵士音樂節週邊美食",
+            "feed-category: 公益路商圈美食"
+          ]
+        },
+        {
+          "genre": "travel",
+          "matchingLabels": 0,
+          "sampledLabels": 60,
+          "evidence": [
+            "identity: 旅遊"
+          ]
+        }
+      ]
+    },
+    {
+      "slug": "tenjo-360",
+      "name": "周花花 (tenjo)",
+      "genres": [
+        {
+          "genre": "food",
+          "matchingLabels": 11,
+          "sampledLabels": 60,
+          "evidence": [
+            "feed-category: 街坊小吃",
+            "feed-category: 板橋新埔美食",
+            "feed-category: 愛食記",
+            "feed-category: 台中梧棲咖啡廳",
+            "feed-category: 台中海線咖啡廳"
+          ]
+        },
+        {
+          "genre": "travel",
+          "matchingLabels": 1,
+          "sampledLabels": 60,
+          "evidence": [
+            "identity: 旅遊",
+            "feed-category: 神戶景點"
+          ]
+        }
+      ]
+    },
+    {
+      "slug": "tiss-694",
+      "name": "TISS玩味食尚",
+      "genres": [
+        {
+          "genre": "travel",
+          "matchingLabels": 31,
+          "sampledLabels": 60,
+          "evidence": [
+            "identity: 旅遊",
+            "feed-category: 沖繩住宿推薦",
+            "feed-category: 沖繩自由行",
+            "feed-category: 京阪神自由行",
+            "feed-category: 高雄景點",
+            "feed-category: 親子飯店"
+          ]
+        },
+        {
+          "genre": "parenting",
+          "matchingLabels": 13,
+          "sampledLabels": 60,
+          "evidence": [
+            "feed-category: 親子飯店",
+            "feed-category: 親子住宿",
+            "feed-category: 宜蘭景點親子",
+            "feed-category: 親子飯店推薦",
+            "feed-category: 親子飯店泳池"
+          ]
+        }
+      ]
+    },
+    {
+      "slug": "tony-611",
+      "name": "猴屁 tony",
+      "genres": [
+        {
+          "genre": "food",
+          "matchingLabels": 27,
+          "sampledLabels": 60,
+          "evidence": [
+            "feed-category: 愛食記",
+            "feed-category: 台中小吃",
+            "feed-category: 台中美食",
+            "feed-category: 青海路美食",
+            "feed-category: 台中餐廳"
+          ]
+        },
+        {
+          "genre": "travel",
+          "matchingLabels": 1,
+          "sampledLabels": 60,
+          "evidence": [
+            "identity: 旅遊",
+            "feed-category: 台中飯店餐廳吃到飽"
+          ]
+        }
+      ]
+    },
+    {
+      "slug": "travel-with-leo-684",
+      "name": "Travel with Leo",
+      "genres": [
+        {
+          "genre": "travel",
+          "matchingLabels": 12,
+          "sampledLabels": 60,
+          "evidence": [
+            "identity: 旅遊",
+            "feed-category: 歐洲旅行",
+            "feed-category: 德國旅行",
+            "feed-category: 瑞士旅行",
+            "feed-category: 奧地利旅行",
+            "feed-category: 澳洲旅行"
+          ]
+        }
+      ]
+    },
+    {
+      "slug": "tsnio-479",
+      "name": "TSNio蔡小妞依玲",
+      "genres": [
+        {
+          "genre": "travel",
+          "matchingLabels": 2,
+          "sampledLabels": 16,
+          "evidence": [
+            "identity: 旅遊",
+            "feed-category: 釜山景點",
+            "feed-category: 釜山飯店"
+          ]
+        }
+      ]
+    },
+    {
+      "slug": "upssmile-com-492",
+      "name": "upssmile.com/",
+      "genres": [
+        {
+          "genre": "travel",
+          "matchingLabels": 4,
+          "sampledLabels": 55,
+          "evidence": [
+            "identity: 旅遊",
+            "feed-category: 北部景點",
+            "feed-category: 攝影達人景點推薦",
+            "feed-category: 旅行台灣",
+            "feed-category: 陸客＆外國觀光客來台必去景點"
+          ]
+        }
+      ]
+    },
+    {
+      "slug": "v-vivianexplore-464",
+      "name": "V妞 vivianexplore",
+      "genres": [
+        {
+          "genre": "travel",
+          "matchingLabels": 47,
+          "sampledLabels": 60,
+          "evidence": [
+            "identity: 旅遊",
+            "feed-category: 台中旅遊",
+            "feed-category: 台灣旅遊",
+            "feed-category: 歐洲旅遊",
+            "feed-category: 住宿攻略",
+            "feed-category: 台灣住宿"
+          ]
+        }
+      ]
+    },
+    {
+      "slug": "wendyjourney-com-532",
+      "name": "wendyjourney.com/",
+      "genres": [
+        {
+          "genre": "food",
+          "matchingLabels": 6,
+          "sampledLabels": 60,
+          "evidence": [
+            "feed-category: 台北美食, 台灣美食",
+            "feed-category: 台灣美食, 宜蘭美食",
+            "feed-category: 台中美食, 台灣美食",
+            "feed-category: 台灣美食, 宅配美食",
+            "feed-category: 台灣美食, 高雄美食"
+          ]
+        },
+        {
+          "genre": "travel",
+          "matchingLabels": 33,
+          "sampledLabels": 60,
+          "evidence": [
+            "identity: 旅遊",
+            "feed-category: 東京自由行",
+            "feed-category: 沖繩自由行",
+            "feed-category: 瑞士自由行",
+            "feed-category: 東京景點",
+            "feed-category: 九州自由行"
+          ]
+        }
+      ]
+    },
+    {
+      "slug": "whos-talking-com-1098",
+      "name": "胡說 whos-talking.com",
+      "genres": [
+        {
+          "genre": "food",
+          "matchingLabels": 36,
+          "sampledLabels": 60,
+          "evidence": [
+            "feed-category: 台南美食",
+            "feed-category: 在地美食",
+            "feed-category: 小吃",
+            "feed-category: 台北咖啡廳",
+            "feed-category: 咖啡廳"
+          ]
+        },
+        {
+          "genre": "travel",
+          "matchingLabels": 1,
+          "sampledLabels": 60,
+          "evidence": [
+            "identity: 旅遊",
+            "feed-category: 國內旅遊"
+          ]
+        }
+      ]
+    },
+    {
+      "slug": "yama-1044",
+      "name": "Yama 金大佛",
+      "genres": [
+        {
+          "genre": "food",
+          "matchingLabels": 3,
+          "sampledLabels": 12,
+          "evidence": [
+            "feed-category: 高雄美食",
+            "feed-category: 左營高鐵美食",
+            "feed-category: 西班牙料理餐廳"
+          ]
+        },
+        {
+          "genre": "travel",
+          "matchingLabels": 7,
+          "sampledLabels": 12,
+          "evidence": [
+            "identity: 旅遊",
+            "feed-category: 台中景點",
+            "feed-category: 台中旅遊",
+            "feed-category: 媽祖景點",
+            "feed-category: 花蓮旅遊",
+            "feed-category: 花蓮景點"
+          ]
+        }
+      ]
+    },
+    {
+      "slug": "yiwu-trip-662",
+      "name": "依武 yiwu trip",
+      "genres": [
+        {
+          "genre": "travel",
+          "matchingLabels": 7,
+          "sampledLabels": 32,
+          "evidence": [
+            "identity: 旅遊",
+            "feed-category: 旅遊",
+            "feed-category: 國外旅遊",
+            "feed-category: 新疆旅遊",
+            "feed-category: 苗栗旅遊",
+            "feed-category: 國內旅遊"
+          ]
+        },
+        {
+          "genre": "gadgets",
+          "matchingLabels": 9,
+          "sampledLabels": 32,
+          "evidence": [
+            "feed-category: 智慧手錶",
+            "feed-category: 3C家電推薦",
+            "feed-category: 智慧手錶推薦",
+            "feed-category: 學生筆電",
+            "feed-category: 筆電推薦"
+          ]
+        }
+      ]
+    },
+    {
+      "slug": "yololab-1187",
+      "name": "YoloLab",
+      "genres": [
+        {
+          "genre": "life",
+          "matchingLabels": 0,
+          "sampledLabels": 34,
+          "evidence": [
+            "identity: 生活內容"
+          ]
+        }
+      ]
+    },
+    {
+      "slug": "yp-finance-com-643",
+      "name": "yp-finance.com",
+      "genres": [
+        {
+          "genre": "finance",
+          "matchingLabels": 8,
+          "sampledLabels": 60,
+          "evidence": [
+            "identity: 財經 (其他)",
+            "feed-category: 理財",
+            "feed-category: 投資觀念",
+            "feed-category: 小資理財",
+            "feed-category: 理財規劃",
+            "feed-category: 分散式投資"
+          ]
+        }
+      ]
+    },
+    {
+      "slug": "yuki-tw-1091",
+      "name": "Yuki.tw",
+      "genres": [
+        {
+          "genre": "travel",
+          "matchingLabels": 30,
+          "sampledLabels": 60,
+          "evidence": [
+            "identity: 旅遊",
+            "feed-category: 桃園景點",
+            "feed-category: 親子景點",
+            "feed-category: 國外旅行",
+            "feed-category: 台北景點",
+            "feed-category: 台灣旅行"
+          ]
+        },
+        {
+          "genre": "parenting",
+          "matchingLabels": 9,
+          "sampledLabels": 60,
+          "evidence": [
+            "feed-category: 親子景點",
+            "feed-category: 觀光工廠、親子館",
+            "feed-category: 台北親子景點",
+            "feed-category: 台北親子一日遊",
+            "feed-category: 親子餐廳"
+          ]
+        }
+      ]
+    }
+  ]
+}

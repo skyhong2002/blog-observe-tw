@@ -546,3 +546,10 @@ test('contracts: a full payload cannot pass for a homepage one, nor a malformed 
   for (const [kind, key, value] of cases)
     assert.equal(validPublicPayload(kind, with_(kind, key, value)), false, `${kind}.${key} = ${JSON.stringify(value)}`);
 });
+
+test('latest article blog genres are optional for older gateways but validated when present', () => {
+  assert.equal(PUBLIC_CONTRACTS.overview(with_('overview', 'posts', [{ title: 'Legacy' }])), true);
+  assert.equal(PUBLIC_CONTRACTS.overview(with_('overview', 'posts', [{ blogGenres: [] }, { blogGenres: ['food', 'travel'] }])), true);
+  for (const blogGenres of [null, 'food', [null], ['unknown'], ['constructor']])
+    assert.equal(PUBLIC_CONTRACTS.overview(with_('overview', 'posts', [{ blogGenres }])), false);
+});

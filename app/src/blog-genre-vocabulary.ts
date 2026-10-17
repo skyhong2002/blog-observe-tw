@@ -1,0 +1,13 @@
+/** Deliberately small, multi-label vocabulary for reader preferences, separate from author tags. */
+export const BLOG_GENRES = {
+  food: '美食',
+  travel: '旅遊',
+  gadgets: '3C／科技產品',
+  programming: '程式／技術',
+  life: '生活／日記',
+  parenting: '親子',
+  news: '新聞／媒體',
+  finance: '財經',
+} as const;
+export type BlogGenre = keyof typeof BLOG_GENRES;
+export const isBlogGenre = (value: string): value is BlogGenre => Object.hasOwn(BLOG_GENRES, value);

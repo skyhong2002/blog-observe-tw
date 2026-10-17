@@ -11,6 +11,7 @@
  * list is non-empty: an empty list, a null profile or "unavailable" vocabulary
  * are valid answers. Pure: node --test imports this file.
  */
+import { isBlogGenre } from '../../../app/src/blog-genre-vocabulary.ts';
 import { pageInfoOf } from './page-links.ts';
 import type { PublicKind } from './public-paths.ts';
 
@@ -132,7 +133,7 @@ const sharedTags = (value: unknown) => {
 
 /** The full overview's keys (app/src/overview.js loadProjection). */
 const overviewShape = {
-  posts: rows,
+  posts: (value: unknown) => rows(value, { blogGenres: optional((v) => list(v) && v.every((g) => text(g) && isBlogGenre(g as string))) }),
   tags: rows,
   authors: rows,
   blogs: rows,

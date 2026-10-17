@@ -7,6 +7,7 @@ import ArticleListItem from '@/components/ArticleListItem';
 import Link from '@/components/NoPrefetchLink';
 import SectionTabs from '@/components/SectionTabs';
 import { type Post, taipei } from '@/lib/api';
+import { type ArticleFilters, articleFiltersOf, BLOG_CAPS, filterLatestPosts, NO_ARTICLE_FILTERS } from '@/lib/article-filters';
 import { blogHref } from '@/lib/page-links';
 import {
   bytesText,
@@ -23,6 +24,7 @@ import {
   searchPath,
 } from '@/lib/search';
 import { type PublicLoad, usePublicJson } from '@/lib/use-public-json';
+import { BLOG_GENRES } from '../../../../app/src/blog-genre-vocabulary.ts';
 
 function Pager({ asked, result }: { asked: SearchParams; result: SearchResult }) {
   if (result.page <= 1 && !result.hasMore) return null;
@@ -48,7 +50,12 @@ function Pager({ asked, result }: { asked: SearchParams; result: SearchResult })
 }
 
 const WHOLE_BODY_INDEX = 'nfkc-bigram-whole-body-v1';
-const METADATA_FIELD_TEXT: Record<string, string> = { title: '標題', summary: '摘要', 'blog-name': '部落格名稱', 'public-tags': '公開標籤' };
+const METADATA_FIELD_TEXT: Record<string, string> = {
+  title: '標題',
+  summary: '摘要',
+  'blog-name': '部落格名稱',
+  'public-tags': '公開標籤',
+};
 
 /** The historical-body part of the scope, in the gateway's own terms; no state is read as "none found" or "everything". */
 function historicalBodyText(body: HistoricalBodyCoverage | null, wholeBody: boolean) {
@@ -79,9 +86,7 @@ function metadataText({ limit, scannedPosts, truncated, metadataScope, metadataF
       .map((f) => METADATA_FIELD_TEXT[f] ?? f)
       .join('、');
     return `${fields}：搜尋所有已建索引的公開文章（含歷史文章）。${
-      truncated === true
-        ? `符合的文章超過 ${limit === null ? MISSING : limit.toLocaleString('zh-TW')} 篇候選上限，只列出其中一部分。`
-        : ''
+      truncated === true ? `符合的文章超過 ${limit === null ? MISSING : limit.toLocaleString('zh-TW')} 篇候選上限，只列出其中一部分。` : ''
     }`;
   }
   return `標題、摘要、部落格名稱與公開標籤：${
@@ -197,17 +202,69 @@ function SearchResults({ asked, search }: { asked: SearchParams; search: PublicL
   );
 }
 
+function LatestFilters({ filters }: { filters: ArticleFilters }) {
+  return (
+    <form
+      key={JSON.stringify(filters)}
+      action="/articles/"
+      className="space-y-3 rounded-xl border border-zinc-200 p-4 text-sm dark:border-zinc-800"
+      aria-label="最新文章篩選"
+    >
+      <div className="flex flex-wrap items-center gap-2">
+        <label htmlFor="articles-per-blog">每個部落格最多顯示</label>
+        <select
+          id="articles-per-blog"
+          name="maxPerBlog"
+          defaultValue={filters.maxPerBlog}
+          className="rounded border border-zinc-300 bg-white p-2 dark:border-zinc-700 dark:bg-zinc-900"
+        >
+          {BLOG_CAPS.map((cap) => (
+            <option key={cap} value={cap}>
+              {cap ? `${cap} 篇` : '不限'}
+            </option>
+          ))}
+        </select>
+      </div>
+      <fieldset>
+        <legend className="mb-2">排除部落格類型</legend>
+        <div className="flex flex-wrap gap-x-4 gap-y-2">
+          {Object.entries(BLOG_GENRES).map(([genre, label]) => (
+            <label key={genre} className="inline-flex min-h-8 items-center gap-2">
+              <input type="checkbox" name="exclude" value={genre} defaultChecked={filters.exclude.some((v) => v === genre)} />
+              {label}
+            </label>
+          ))}
+        </div>
+      </fieldset>
+      <p className="text-xs leading-5 text-zinc-500 dark:text-zinc-400">
+        類型依站名、簡介與訂閱分類初步整理，可能有誤；分類尚未完整，未分類部落格一律保留。多類型部落格只要符合任一排除類型，整站文章就會隱藏；這不是單篇文章的標籤篩選。
+      </p>
+      <div className="flex items-center gap-4">
+        <button type="submit" className="rounded-lg bg-brand-700 px-4 py-2 text-white hover:bg-brand-800">
+          套用篩選
+        </button>
+        <Link href="/articles/" className="text-brand-700 hover:underline dark:text-brand-400">
+          清除篩選
+        </Link>
+      </div>
+    </form>
+  );
+}
+
 /** `search` is null when the URL has no query: the latest posts are listed instead. */
 export default function ArticlesView({
   asked,
   latest,
   search,
+  filters = NO_ARTICLE_FILTERS,
 }: {
+  filters?: ArticleFilters;
   asked: SearchParams;
   latest: Post[];
   search: PublicLoad<SearchResult> | null;
 }) {
   const searching = search !== null;
+  const filtered = filterLatestPosts(latest, filters);
   return (
     <div className="space-y-5 pb-8">
       <header>
@@ -253,18 +310,35 @@ export default function ArticlesView({
         </p>
       )}
       {search ? (
-        <SearchResults asked={asked} search={search} />
+        <>
+          <p className="text-xs text-zinc-500 dark:text-zinc-400">最新文章篩選只適用於最新清單，搜尋結果不套用每站篇數與類型排除。</p>
+          <SearchResults asked={asked} search={search} />
+        </>
       ) : (
         <>
-          <p className="text-xs text-zinc-500 dark:text-zinc-400">最近收錄的 {latest.length} 篇 · 輸入關鍵字可搜尋內文</p>
-          {latest.length ? (
+          <LatestFilters filters={filters} />
+          <div role="status" className="space-y-1 text-xs leading-5 text-zinc-500 dark:text-zinc-400">
+            <p>
+              最近收錄的 {latest.length} 篇中顯示 {filtered.items.length} 篇 · 類型排除 {filtered.hiddenGenre} 篇、每站篇數限制隱藏{' '}
+              {filtered.hiddenCap} 篇。
+            </p>
+            <p>
+              每站{filters.maxPerBlog ? `最多 ${filters.maxPerBlog} 篇` : '不限篇數'}；排除類型：
+              {filters.exclude.length ? filters.exclude.map((genre) => BLOG_GENRES[genre]).join('、') : '無'}。未分類文章{' '}
+              {filtered.unclassified} 篇，不受類型排除影響。
+            </p>
+            <p>只篩選這批最新文章，不會補入更早文章；搜尋結果不套用此篩選。</p>
+          </div>
+          {filtered.items.length ? (
             <ul className="divide-y divide-zinc-200 dark:divide-zinc-800">
-              {latest.map((post) => (
+              {filtered.items.map((post) => (
                 <ArticleListItem key={post.id ?? post.url} post={post} />
               ))}
             </ul>
           ) : (
-            <p className="py-8 text-zinc-500 dark:text-zinc-400">目前還沒有收錄文章。</p>
+            <p className="py-8 text-zinc-500 dark:text-zinc-400">
+              {latest.length ? '這批文章都被篩選隱藏了，可清除篩選重新瀏覽。' : '目前還沒有收錄文章。'}
+            </p>
           )}
         </>
       )}
@@ -280,7 +354,9 @@ const parseSearch = (raw: unknown, path: string) => normalizeSearch(raw, askedOf
 
 /** Reads ?q=&page=&blog= (inside the page's Suspense boundary) and searches through /api/search. */
 export function ArticlesFromUrl({ latest }: { latest: Post[] }) {
-  const asked = askedOf(useSearchParams());
+  const params = useSearchParams();
+  const asked = askedOf(params);
+  const filters = articleFiltersOf(params);
   const search = usePublicJson(asked.q ? searchPath(asked) : null, parseSearch);
-  return <ArticlesView asked={asked} latest={latest} search={search} />;
+  return <ArticlesView asked={asked} latest={latest} search={search} filters={filters} />;
 }

@@ -33,6 +33,7 @@ const PUBLIC_POST_FIELDS = [
   'imageUrl',
   'blogSlug',
   'blogName',
+  'blogGenres',
   // Author's feed categories, attached by post-tags.ts withPostTags.
   'tags',
   'tagCount',

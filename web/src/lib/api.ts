@@ -1,3 +1,5 @@
+import type { BlogGenre } from '../../../app/src/blog-genre-vocabulary.ts';
+
 // Optional readable page URLs from the gateway's page registry, next to the
 // stable slug/id they never replace (links: page-links.ts; absent = legacy URL).
 export type Blog = {
@@ -61,6 +63,8 @@ export type Post = {
   blogCanonicalPath?: string;
   blogName?: string;
   imageUrl?: string | null;
+  /** Reader genres from the reviewable blog map; absent on older gateways, empty when unclassified. */
+  blogGenres?: BlogGenre[];
   /** The author's feed categories, at most a few (app/src/post-tags.ts); absent when none or not sent. */
   tags?: Tag[];
   /** The post's full tag count, for "+N" beside the shown `tags`. */

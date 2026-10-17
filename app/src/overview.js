@@ -1,3 +1,4 @@
+import blogGenres from '../../data/blog-genres.json' with { type: 'json' };
 import { overviewFailureDetails, overviewRead } from './overview-diagnostics.ts';
 import { loadPostTags } from './post-tags.ts';
 import { publicPost } from './public-post.ts';
@@ -181,7 +182,13 @@ async function loadProjection(pool, { onFailure } = {}) {
   return {
     generatedAt: new Date().toISOString(),
     cacheSeconds: 0,
-    posts: postRows[0].map((post) => publicPost({ ...post, ...postTags.get(Number(post.id)) })),
+    posts: postRows[0].map((post) =>
+      publicPost({
+        ...post,
+        blogGenres: Object.hasOwn(blogGenres, post.blogSlug) ? blogGenres[post.blogSlug] : [],
+        ...postTags.get(Number(post.id)),
+      }),
+    ),
     tags: tagRows[0],
     authors: authorRows[0],
     blogs: blogRows[0].map((blog) => blogDto(blog, icons)),

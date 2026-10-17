@@ -276,12 +276,16 @@ const PUBLIC_DATA_PAGES = [
   'app/tags/page.tsx',
 ];
 
-test('route contract: public data pages are force-dynamic, never ISR or built, and read no request data', () => {
+test('route contract: public data pages stay force-dynamic; only article preferences read public query data', () => {
   for (const page of PUBLIC_DATA_PAGES) {
     const source = read(page);
     assert.match(source, /^export const dynamic = 'force-dynamic';$/m, page);
     assert.doesNotMatch(source, /export const (?:revalidate|dynamicParams|fetchCache)|generateStaticParams|force-static/, page);
-    assert.doesNotMatch(source, /searchParams|next\/headers|server-gateway|connection\(|noStore/, page);
+    assert.doesNotMatch(source, /next\/headers|server-gateway|connection\(|noStore/, page);
+    if (page === 'app/articles/page.tsx') {
+      assert.match(source, /articleFiltersOf\(query\)/);
+      assert.match(source, /filters=\{filters\}/);
+    } else assert.doesNotMatch(source, /searchParams/, page);
   }
 });
 
