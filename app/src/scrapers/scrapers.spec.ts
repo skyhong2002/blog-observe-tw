@@ -112,7 +112,7 @@ describe.skipIf(!available)('scraper generation on live pages', () => {
       { home, trigger: 'new_candidate' },
       { fetchOptions: site(), renderAvailable: false, gateway, reserveRound: async () => false },
     );
-    expect(result).toMatchObject({ ok: false, reason: 'daily_budget_exhausted', rounds: 0 });
+    expect(result).toMatchObject({ ok: false, reason: 'model_budget_unavailable', rounds: 0 });
     expect(gateway).not.toHaveBeenCalled();
   });
   it('crawls only unknown articles into feed entries with tags, author and body', async () => {

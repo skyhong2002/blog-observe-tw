@@ -36,7 +36,7 @@ function parsePost({ url, html, $ }) // → { title, author, publishedAt, tags, 
 2. 真實頁面試跑：列表至少列出文章；抽 3 篇（不足 3 篇則全抽）都要有在該頁出現過的標題、經 `extractContent` 認可且 ≥ 50 字的內文（至少一篇 ≥ 200 字），且標題、內文彼此不同（防寫死）。翻頁失敗不算失敗，只讀第一頁。沒有日期也不算失敗（例如數位花園筆記站）：日期依序取文章頁、列表頁，都沒有就用首次抓到的時間（使用者決定，2026-10-17）。
 3. 不通過就把問題、舊程式碼與失敗頁的骨架回饋給模型，最多 3 輪；每輪佔 `scraper:gateway` 每日 18 次額度。
 
-## 觸發（`repair.ts`，獨立 queue `<BLOG_QUEUE_NAME>-scrapers`，每 30 分鐘一個目標）
+## 觸發（`repair.ts`，獨立 queue `<BLOG_QUEUE_NAME>-scrapers`，每 30 分鐘一輪）
 
 依序挑：
 
@@ -45,7 +45,23 @@ function parsePost({ url, html, $ }) // → { title, author, publishedAt, tags, 
 3. **新候選**：候選審查原因為 `rss_or_article_sitemap_required`／`no_verified_feed_or_sitemap`，且已證明是個人首頁或列在 BlogBlog.Club（多數無 feed 的候選是商店、機構，不花額度）。重新跑 `validateCandidate`；若 feed 出現就走一般審查。通過後經 `recordCandidateCheck` 收錄（同一交易鎖定並啟用 `blog_scrapers` 列，不寫 `feed_sources`，沿用每日收錄上限，稽核來源 `automatic-scraper-review`）。
 4. **內文抽不到**：`content_blog_rules` 為 `missing／no-semantic-body` 且 14 天沒成功。啟用後該站 missing／partial 內文立即重排。
 
-每個目標的結果寫入 `scraper_generation_attempts`：失敗或略過冷卻 14 天，成功冷卻 3 天。`scraper:generations` 每日 6 個目標。修復 worker 用自己的兩條連線 pool，不佔爬取 worker 的連線。
+每個目標的結果寫入 `scraper_generation_attempts`：失敗或略過冷卻 14 天，成功冷卻 3 天。修復 worker 用自己的兩條連線 pool，不佔爬取 worker 的連線。
+
+## 依 Codex 剩餘額度調整（`ai/quota.ts`）
+
+用多少由剩餘額度決定，沒有固定的每日上限（使用者決定，2026-10-17）：
+
+| 剩餘額度 | 每輪（30 分鐘）處理的目標 |
+|---|---|
+| ≥ 80 % | 4 |
+| 50–80 % | 2 |
+| 20–50 % | 1 |
+| < 20 % 或查不到 | 0（完全不跑） |
+
+- 剩餘額度：每個啟用中的 Codex 帳號取 5 小時與每週兩個視窗中較緊的那個（100 − used_percent），再對帳號取平均；任一視窗到上限算 0。
+- 讀法：CLIProxyAPI 管理 API（`BLOG_CPA_MANAGEMENT_URL`，預設 sky-mini `http://100.71.224.62:8318/v0/management`）。`/auth-files` 列帳號，`/api-call` 由 proxy 以該帳號 token（`$TOKEN$`）查 `chatgpt.com/backend-api/wham/usage`，帶 `ChatGPT-Account-Id`；本程式不經手 token。管理金鑰放 `~/.config/ai-gateway/cpa-management.key`（0600）或 `CLI_PROXY_MANAGEMENT_KEY`。讀數快取 5 分鐘。
+- 每一次模型呼叫前重查（快取內不重打），額度掉到 20 % 以下就中途停，原因 `model_budget_unavailable`，該目標不記冷卻。
+- 防失控的保險：每日最多 100 個目標、300 次模型呼叫（`work_budgets` 的 `scraper:*`）。`tools/scraper-once.ts --quota` 印出目前讀數與每輪目標數；操作者手動執行不受額度門檻限制。
 
 ## 上線後怎麼跑
 

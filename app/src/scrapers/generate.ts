@@ -317,7 +317,7 @@ export async function generateScraper(target: GenerationTarget, deps: Generation
   if (canRender && scriptShell(homePage.html, homePage.url)) homePage = (await startRendered()) ?? homePage;
   while (rounds < (deps.maxRounds ?? MAX_ROUNDS)) {
     if (deps.signal?.aborted) return fail('batch_stopped');
-    if (deps.reserveRound && !(await deps.reserveRound())) return fail('daily_budget_exhausted');
+    if (deps.reserveRound && !(await deps.reserveRound())) return fail('model_budget_unavailable');
     const feedback =
       last && report
         ? {

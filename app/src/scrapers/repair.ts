@@ -1,5 +1,6 @@
 import type { Pool, RowDataPacket } from 'mysql2/promise';
 import type { callScraperGateway } from '../ai/gateway.ts';
+import { type CodexQuota, readCodexQuota, scraperTargetsFor } from '../ai/quota.ts';
 import { recordCandidateCheck } from '../crawl/candidate-promotion.ts';
 import { type CandidateCheck, candidatePreflight, type DiscoveryCandidate, validateCandidate } from '../crawl/candidate-validation.ts';
 import type { BlogToCrawl, FeedCrawlerOptions } from '../crawl/feed.ts';
@@ -10,8 +11,9 @@ import { type GenerationResult, type GenerationTarget, generateScraper } from '.
 import type { SandboxRunner } from './sandbox.ts';
 import { activateScraper, codeSha256, recordGenerationAttempt, saveValidatedScraper } from './store.ts';
 
-export const GENERATIONS_DAILY = 6;
-export const GATEWAY_CALLS_DAILY = 18;
+/** Runaway guards only: how much runs is set by the remaining Codex quota (ai/quota.ts). */
+export const GENERATIONS_DAILY = 100;
+export const GATEWAY_CALLS_DAILY = 300;
 const DAY = 86400000;
 /** Candidate review reasons that mean "a publication home, just without a feed". */
 export const NO_FEED_REASONS = ['rss_or_article_sitemap_required', 'no_verified_feed_or_sitemap'];
@@ -32,12 +34,14 @@ export type RepairOptions = FeedCrawlerOptions & {
   now?: () => Date;
   gateway?: typeof callScraperGateway;
   sandbox?: SandboxRunner;
-  /** Operator runs (tools/scraper-once.ts) skip the daily generation budget, never the per-call one. */
+  /** Operator runs (tools/scraper-once.ts) skip the quota gate and the daily target guard, never the per-call one. */
   operator?: boolean;
+  /** Test seam for the Codex quota reading. */
+  quota?: () => Promise<CodexQuota | null>;
 };
 export type RepairOutcome = {
   target: { type: 'candidate' | 'blog'; id: number; url: string; trigger: ScraperTrigger } | null;
-  status: 'idle' | 'busy' | 'budget' | 'skipped' | 'failed' | 'dry-run' | 'activated' | 'admitted' | 'declined' | 'reviewed';
+  status: 'idle' | 'busy' | 'budget' | 'quota' | 'skipped' | 'failed' | 'dry-run' | 'activated' | 'admitted' | 'declined' | 'reviewed';
   reason: string | null;
   generation?: GenerationResult;
   scraperId?: number;
@@ -239,7 +243,9 @@ function generate(target: GenerationTarget, pool: Pool, options: RepairOptions) 
     sandbox: options.sandbox,
     signal: options.signal,
     now: options.now,
-    reserveRound: () =>
+    // Every model call rechecks the quota (cached five minutes): a run stops mid-way once headroom is gone.
+    reserveRound: async () =>
+      (options.operator || scraperTargetsFor(await (options.quota ?? readCodexQuota)()) > 0) &&
       reserveBudget(pool, [{ scope: 'scraper:gateway', amount: 1, limit: GATEWAY_CALLS_DAILY }], options.now?.() ?? new Date()),
   });
 }
@@ -271,7 +277,12 @@ export async function runScraperRepairBatch(pool: Pool, options: RepairOptions =
         };
       }
       // A spent budget or a busy admission is no verdict on the target; neither is a dry run.
-      if (options.apply && outcome.target && !['busy', 'reviewed'].includes(outcome.status) && outcome.reason !== 'daily_budget_exhausted')
+      if (
+        options.apply &&
+        outcome.target &&
+        !['busy', 'reviewed'].includes(outcome.status) &&
+        outcome.reason !== 'model_budget_unavailable'
+      )
         await recordGenerationAttempt(
           pool,
           {
@@ -290,4 +301,17 @@ export async function runScraperRepairBatch(pool: Pool, options: RepairOptions =
       return outcome;
     })) ?? ({ target: null, status: 'busy', reason: 'lease_held' } satisfies RepairOutcome)
   );
+}
+/** The worker's run: as many targets as the remaining Codex quota allows (none when it is low or unknown). */
+export async function runScraperRepairJob(pool: Pool, options: RepairOptions = {}) {
+  const quota = await (options.quota ?? readCodexQuota)();
+  const allowed = scraperTargetsFor(quota);
+  const outcomes: RepairOutcome[] = [];
+  for (let i = 0; i < allowed; i++) {
+    if (options.signal?.aborted) break;
+    const outcome = await runScraperRepairBatch(pool, options);
+    outcomes.push(outcome);
+    if (!outcome.target || outcome.reason === 'model_budget_unavailable') break;
+  }
+  return { remainingPercent: quota?.remainingPercent ?? null, allowed, outcomes };
 }

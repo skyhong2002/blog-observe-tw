@@ -1,7 +1,9 @@
+import { readCodexQuota, scraperTargetsFor } from '../app/src/ai/quota.ts';
 import { loadConfig } from '../app/src/config.js';
 import { createDb } from '../app/src/db/client.ts';
 import { runScraperRepairBatch } from '../app/src/scrapers/repair.ts';
 
+// npm run scraper:once -- --quota   (remaining Codex quota and the targets per run it allows)
 // npm run scraper:once -- [--candidate ID | --blog ID [--trigger feed_dead|scraper_failing|content_failing]] [--code] [--apply]
 // Without a target it picks what the worker would. Without --apply nothing is written: the code and its live
 // validation report are printed for review. Operator runs skip the daily generation budget, not the model-call one.
@@ -15,6 +17,11 @@ const id = (flag: string) => {
 };
 const trigger = args.includes('--trigger') ? args[args.indexOf('--trigger') + 1] : undefined;
 if (trigger && !['feed_dead', 'scraper_failing', 'content_failing'].includes(trigger)) throw Error('invalid --trigger');
+if (args.includes('--quota')) {
+  const quota = await readCodexQuota();
+  console.log(JSON.stringify({ ...quota, targetsPerRun: scraperTargetsFor(quota) }, null, 2));
+  process.exit(0);
+}
 const config = loadConfig();
 const db = createDb(config.blogDbUrl, { poolSize: 2 });
 try {

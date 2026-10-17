@@ -1,8 +1,9 @@
+import * as cheerio from 'cheerio';
 import { XMLParser, XMLValidator } from 'fast-xml-parser';
 import { type PersonalEvidence, personalHomepage } from '../ai/personal.ts';
 import { type SitemapArticleEvidence, verifyArticleSitemap } from '../ai/publication-sitemap.ts';
 import { identityKey, publicationDecision } from '../relations/identity.ts';
-import { directoryListing } from './directory-listing.ts';
+import { chineseContent, listingOf } from './directory-listing.ts';
 import { type FeedCrawlerOptions, isAllowedCrawlUrl, parseFeed, politeFetch, readFeedBody } from './feed.ts';
 import { seedIdentityKey } from './seed-url-resolution.ts';
 import { isSeedPlatformRoot, type SeedUrlValidation, validateSeedUrl } from './seed-url-validation.ts';
@@ -165,7 +166,7 @@ export async function validateCandidate(candidate: DiscoveryCandidate, options: 
     eligible: false,
     reason: candidatePreflight(candidate) || 'unverified',
   };
-  const listed = candidate.source_type === 'blogblog-club' ? directoryListing(candidate.source_evidence) : null;
+  const listed = listingOf(candidate.source_type, candidate.source_evidence);
   if (listed) result.directoryListing = listed;
   // Directory-listed homes are added without a name; like discovered links, they take the homepage's own.
   const mayEnrich = ['article-link', 'blogroll'].includes(candidate.source_type) || Boolean(listed);
@@ -179,7 +180,18 @@ export async function validateCandidate(candidate: DiscoveryCandidate, options: 
       await home.body?.cancel();
       return result;
     }
-    const observed = personalHomepage(await readFeedBody(home));
+    const html = await readFeedBody(home);
+    // IndieWeb members are listed only when their home is in Chinese; others stay ordinary, unreviewed candidates.
+    if (candidate.source_type === 'indieweb-wiki') {
+      const $ = cheerio.load(html);
+      $('script,style,noscript,template').remove();
+      if (!chineseContent($('html').attr('lang') || '', $('body').text().slice(0, 20000))) {
+        delete result.directoryListing;
+        result.reason = 'indieweb_listing_not_chinese';
+        return result;
+      }
+    }
+    const observed = personalHomepage(html);
     result.personalEvidence = observed.evidence;
     if (mayEnrich && !observed.siteName) {
       result.reason = 'missing_identity_name';

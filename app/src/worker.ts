@@ -11,12 +11,13 @@ import { refreshMissingBlogFavicons } from './crawl/favicon-batch.ts';
 import { crawlBlog } from './crawl/feed.ts';
 import { runHistoryBatch } from './crawl/history.ts';
 import { createHistoryStore, selectHistoryBlogs } from './crawl/history-store.ts';
+import { discoverIndieweb } from './crawl/indieweb.ts';
 import { createTagSimilarSitesClient } from './crawl/similarweb-client.ts';
 import { createDb } from './db/client.ts';
 import { runPublicationDiscoveryBatch } from './relations/home.ts';
 import { runRelationSnapshotBatch } from './relations/routes.ts';
 import { RELATION_STORED_PER_RUN, runRelationBatch } from './relations/worker.ts';
-import { runScraperRepairBatch } from './scrapers/repair.ts';
+import { runScraperRepairJob } from './scrapers/repair.ts';
 import { indexFulltextPosts, indexMissingFulltextPosts, runFulltextBatch } from './search-fulltext.ts';
 import { createIndexJobClaim, createIndexJobEnqueue, runSearchIndexJob, SEARCH_INDEX_JOB } from './search-index-job.ts';
 import { backfillPublicRoutes, backfillTopicRouteAliases } from './seo/page-routes.ts';
@@ -230,7 +231,12 @@ const worker = new Worker(
       });
     }
     if (job.name === 'blogs-discovery') {
-      return discoverBlogblog(store.pool, config.crawlUserAgent);
+      const blogblog = await discoverBlogblog(store.pool, config.crawlUserAgent);
+      // A failed wiki fetch must not discard the directory crawl's result.
+      const indieweb = await discoverIndieweb(store.pool, { userAgent: config.crawlUserAgent }).catch((error: Error) => ({
+        error: error.message,
+      }));
+      return { blogblog, indieweb };
     }
     if (job.name === 'blogs-similarweb') {
       const [domains] = (await store.pool.query(
@@ -285,16 +291,16 @@ const scraperWorker = scraperStore
   ? new Worker(
       scraperQueueName,
       async () => {
-        const outcome = await runScraperRepairBatch(scraperStore.pool, {
+        const run = await runScraperRepairJob(scraperStore.pool, {
           apply: true,
           signal: shutdown.signal,
           userAgent: config.crawlUserAgent,
           delayMs: config.crawlDelayMs,
           timeoutMs: 15000,
         });
-        const { generation, ...summary } = outcome;
-        if (outcome.target) log.info({ scraperRepair: { ...summary, rounds: generation?.rounds } }, 'scraper repair outcome');
-        return summary;
+        const outcomes = run.outcomes.map(({ generation, ...summary }) => ({ ...summary, rounds: generation?.rounds }));
+        log.info({ scraperRepair: { remainingPercent: run.remainingPercent, allowed: run.allowed, outcomes } }, 'scraper repair run');
+        return { remainingPercent: run.remainingPercent, allowed: run.allowed, outcomes };
       },
       { connection, prefix: config.queuePrefix, concurrency: 1, lockDuration: 120000 },
     )

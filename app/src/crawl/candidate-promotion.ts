@@ -12,7 +12,7 @@ import {
   candidatePreflight,
   publicationContains,
 } from './candidate-validation.ts';
-import { DIRECTORY_ADMISSIONS_DAILY, directoryListing } from './directory-listing.ts';
+import { DIRECTORY_ADMISSIONS_DAILY, listingLabel, listingOf } from './directory-listing.ts';
 import { isAllowedCrawlUrl } from './feed.ts';
 import { seedIdentityKey } from './seed-url-resolution.ts';
 
@@ -131,7 +131,9 @@ export async function recordCandidateCheck(
       }
     }
     // Re-read from the locked row, never from the check: a BlogBlog.Club listing replaces the personal-homepage proof.
-    const listed = candidate.source_type === 'blogblog-club' ? directoryListing(sourceEvidence) : null;
+    const listing = listingOf(candidate.source_type, sourceEvidence);
+    // An IndieWeb listing counts only once validation found the home Chinese (it then carries the listing).
+    const listed = listing && (candidate.source_type !== 'indieweb-wiki' || check.directoryListing === listing) ? listing : null;
     const effectiveName =
       check.enrichedName && (['article-link', 'blogroll'].includes(candidate.source_type) || listed) ? check.enrichedName : candidate.name;
     if (check.eligible) {
@@ -240,7 +242,14 @@ export async function recordCandidateCheck(
               .join('');
             const [insert] = await c.execute<ResultSetHeader>(
               "INSERT INTO blogs (slug,name,url,canonical_host,status,status_label,discovered_at,stale_policy) VALUES (?,?,?,?,'verified',?,?,'low_frequency')",
-              [slug, name, v.finalUrl, new URL(v.finalUrl).hostname, listed ? 'BlogBlog.Club 名單自動收錄' : '個人部落格自動驗證', now],
+              [
+                slug,
+                name,
+                v.finalUrl,
+                new URL(v.finalUrl).hostname,
+                listed ? listingLabel(candidate.source_type) : '個人部落格自動驗證',
+                now,
+              ],
             );
             blogId = insert.insertId;
             created = true;

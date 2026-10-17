@@ -34,3 +34,8 @@ node --env-file=/home/deck/.config/blog-observe.env tools/review-candidates.ts -
 本輪 2,174 筆待審候選全部完成驗證：193 筆通過，新增 190 個部落格、3 筆關聯既有站。1,981 筆保留候選且保存具體原因，不要求使用者逐筆人工處理；其中 1,407 筆是文章／分類等非首頁路徑，其他包括名稱或 RSS 身分不符、沒有有效 RSS、403／robots、連線／來源失效。舊 120 筆核准保留，因此總候選 2,294 筆中共 313 approved、1,981 candidate。
 
 新增站隨即以同一 crawler 收錄文章、補本地圖示，之後交由背景排程。目錄與作者頁改用完整資料庫分頁，不再依首頁排行前 200 筆顯示，避免新站／新作者看不到。
+
+## IndieWeb 名單（2026-10-17）
+
+`indieweb.org/chat-names` 列出的 IndieWeb 成員（`User:<網域>`）每週隨 directory 爬取加入候選，`source_type='indieweb-wiki'`（`crawl/indieweb.ts`，遵守 robots 的 4 秒延遲；`/wiki/`、`Special:` 被 robots 禁止，所以不用 MediaWiki API）。只有首頁宣告 `zh` 或以漢字為主（非日文）的成員才視同 BlogBlog.Club 名單：免個人首頁證明、沒有 feed 也會產生爬蟲（docs/generated-scrapers.md），收錄標記為「IndieWeb 名單自動收錄」。其他成員保留候選，原因 `indieweb_listing_not_chinese`。indieweb.org 本身是 wiki，不是部落格：blog 469 改為 `status='rejected'`（標示為發掘來源），爬蟲停用，候選 6554 標為人工拒絕。
+

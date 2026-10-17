@@ -39,6 +39,31 @@ export function directoryListing(evidence: unknown): string | null {
   return (pages.find(onDirectory) as string | undefined) ?? null;
 }
 
+/** The IndieWeb wiki's member list (each `User:<domain>` is a member's own site); see crawl/indieweb.ts. Only members
+ * whose homes are written in Chinese count as listed (the user's scope, 2026-10-17); candidate-validation.ts checks it. */
+export const INDIEWEB_LISTING = 'https://indieweb.org/chat-names';
+export function indiewebListing(evidence: unknown): string | null {
+  const page = object(object(evidence).indiewebListing).page;
+  return page === INDIEWEB_LISTING ? page : null;
+}
+/** The directory listing a candidate of this source carries, else null. */
+export function listingOf(sourceType: string, evidence: unknown): string | null {
+  if (sourceType === 'blogblog-club') return directoryListing(evidence);
+  if (sourceType === 'indieweb-wiki') return indiewebListing(evidence);
+  return null;
+}
+export const listingLabel = (sourceType: string) =>
+  sourceType === 'indieweb-wiki' ? 'IndieWeb 名單自動收錄' : 'BlogBlog.Club 名單自動收錄';
+/** Mostly Chinese: declared zh, or Han characters dominate the visible text (and it is not Japanese kana text). */
+export function chineseContent(lang: string, text: string) {
+  if (/^zh\b/i.test(lang.trim())) return true;
+  if (/^(?:ja|ko)\b/i.test(lang.trim())) return false;
+  const han = (text.match(/\p{Script=Han}/gu) ?? []).length;
+  const kana = (text.match(/[\p{Script=Hiragana}\p{Script=Katakana}]/gu) ?? []).length;
+  const latin = (text.match(/\p{Script=Latin}/gu) ?? []).length;
+  return han >= 80 && han >= 0.3 * (han + latin) && kana < 0.1 * han;
+}
+
 /**
  * Directory pages link to a member's blogroll page or party post, which the review rejects as not a publication home.
  * For each such BlogBlog.Club candidate this adds (or marks) a candidate for its publication home carrying the listing,
