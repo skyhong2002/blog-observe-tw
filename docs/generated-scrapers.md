@@ -58,8 +58,7 @@ function parsePost({ url, html, $ }) // → { title, author, publishedAt, tags, 
 | 20–50 % | 1 |
 | < 20 % 或查不到 | 0（完全不跑） |
 
-- 剩餘額度：每個啟用中的 Codex 帳號取 5 小時與每週兩個視窗中較緊的那個（100 − used_percent），再對帳號取平均；任一視窗到上限算 0。
-- 讀法：CLIProxyAPI 管理 API（`BLOG_CPA_MANAGEMENT_URL`，預設 sky-mini `http://100.71.224.62:8318/v0/management`）。`/auth-files` 列帳號，`/api-call` 由 proxy 以該帳號 token（`$TOKEN$`）查 `chatgpt.com/backend-api/wham/usage`，帶 `ChatGPT-Account-Id`；本程式不經手 token。管理金鑰放 `~/.config/ai-gateway/cpa-management.key`（0600）或 `CLI_PROXY_MANAGEMENT_KEY`。讀數快取 5 分鐘。
+- 剩餘額度：讀 status.skyhong.tw 的公開 JSON（`/api/status`，`BLOG_QUOTA_STATUS_URL` 可覆寫，不需金鑰）。各 gateway 主機每 5 分鐘回報 CLIProxyAPI 帳號的 `remainingPercent`；取 Codex 帳號（各主機同步的同一批登入只算一次），去掉停用、登入被拒、有錯誤或 down 的，再取平均。主機回報超過 20 分鐘或標示不新鮮就不採用；沒有可用帳號即視為查不到。`gateway.usage` 那一區量的是另一個帳號（`accountMatches: false`），不採用。讀數快取 5 分鐘。
 - 每一次模型呼叫前重查（快取內不重打），額度掉到 20 % 以下就中途停，原因 `model_budget_unavailable`，該目標不記冷卻。
 - 防失控的保險：每日最多 100 個目標、300 次模型呼叫（`work_budgets` 的 `scraper:*`）。`tools/scraper-once.ts --quota` 印出目前讀數與每輪目標數；操作者手動執行不受額度門檻限制。
 
