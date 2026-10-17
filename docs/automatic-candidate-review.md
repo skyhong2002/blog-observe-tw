@@ -37,5 +37,5 @@ node --env-file=/home/deck/.config/blog-observe.env tools/review-candidates.ts -
 
 ## IndieWeb 名單（2026-10-17）
 
-`indieweb.org/chat-names` 列出的 IndieWeb 成員（`User:<網域>`）每週隨 directory 爬取加入候選，`source_type='indieweb-wiki'`（`crawl/indieweb.ts`，遵守 robots 的 4 秒延遲；`/wiki/`、`Special:` 被 robots 禁止，所以不用 MediaWiki API）。只有首頁宣告 `zh` 或以漢字為主（非日文）的成員才視同 BlogBlog.Club 名單：免個人首頁證明、沒有 feed 也會產生爬蟲（docs/generated-scrapers.md），收錄標記為「IndieWeb 名單自動收錄」。其他成員保留候選，原因 `indieweb_listing_not_chinese`。indieweb.org 本身是 wiki，不是部落格：blog 469 改為 `status='rejected'`（標示為發掘來源），爬蟲停用，候選 6554 標為人工拒絕。
+`indieweb.org/chat-names` 列出的 IndieWeb 成員（`User:<網域>`）每週隨 directory 爬取加入候選，`source_type='indieweb-wiki'`（`crawl/indieweb.ts`，遵守 robots 的 4 秒延遲；`/wiki/`、`Special:` 被 robots 禁止，所以不用 MediaWiki API）。只有首頁宣告 `zh` 或以漢字為主（非日文）的成員才視同 BlogBlog.Club 名單：免個人首頁證明、沒有 feed 也會產生爬蟲（docs/generated-scrapers.md），收錄標記為「IndieWeb 名單自動收錄」，審查順序與 BlogBlog.Club 名單同等優先。其他成員保留候選，原因 `indieweb_listing_not_chinese`。indieweb.org 本身是 wiki，不是部落格：blog 469 改為 `status='rejected'`（標示為發掘來源），爬蟲停用，候選 6554 標為人工拒絕。
 
