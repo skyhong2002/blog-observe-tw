@@ -8,13 +8,14 @@ const REPEAT_MS = 10 * 60_000;
 /** Keeps the latest robots.txt read per host. Writes are fire-and-forget and never slow or fail a crawl. */
 export function recordRobotsObservations(pool: Pool) {
   const written = new Map<string, { key: string; at: number }>();
+  const pending = new Set<Promise<unknown>>();
   onRobotsObservation((o) => {
     const key = `${o.outcome}:${o.httpStatus}:${o.error}:${o.disallow.join('\n')}`;
     const last = written.get(o.host);
     if (last?.key === key && o.checkedAt.getTime() - last.at < REPEAT_MS) return;
     written.set(o.host, { key, at: o.checkedAt.getTime() });
     if (written.size > 5000) written.delete(written.keys().next().value!);
-    pool
+    const write = pool
       .execute(
         `INSERT INTO robots_observations (host,outcome,http_status,error,disallow,checked_at,readable_at) VALUES (?,?,?,?,?,?,?)
          ON DUPLICATE KEY UPDATE outcome=VALUES(outcome),http_status=VALUES(http_status),error=VALUES(error),
@@ -29,8 +30,12 @@ export function recordRobotsObservations(pool: Pool) {
           o.outcome === 'unreachable' ? null : o.checkedAt,
         ],
       )
-      .catch(() => {});
+      .catch(() => {})
+      .finally(() => pending.delete(write));
+    pending.add(write);
   });
+  /** Settles once every write started so far has finished (a one-off tool waits for it before exiting). */
+  return { idle: async () => void (await Promise.all([...pending])) };
 }
 
 export function robotsHost(url: string | null | undefined): string | null {

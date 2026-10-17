@@ -101,9 +101,9 @@ const parser = new XMLParser({
 });
 const hostNextAt = new Map<string, number>();
 const robotsCache = new Map<string, { expiresAt: number; disallow: string[] }>();
-/** What one read of a host's robots.txt said about our agent. `missing` (404/410) and `allowed` admit everything,
- * `partial` blocks some paths, `blocked` blocks `/`; `unreachable` (any other status, a timeout or a network error)
- * is held as a disallow, so an outage is not mistaken for permission. */
+/** What one read of a host's robots.txt said about our agent. `missing` (a 4xx other than 429: no rules) and
+ * `allowed` admit everything, `partial` blocks some paths, `blocked` blocks `/`; `unreachable` (5xx, 429, a timeout
+ * or a network error) is held as a disallow, so an outage is not mistaken for permission. */
 export type RobotsObservation = {
   host: string;
   outcome: 'allowed' | 'missing' | 'partial' | 'blocked' | 'unreachable';
@@ -467,24 +467,20 @@ async function robotsAllows(
         robotsUrl = new URL(location, robotsUrl).toString();
         if (hop === 5) throw new Error(`too many robots redirects from ${url}`);
       }
-      // A missing robots.txt grants access; an unavailable robots server is
-      // treated as disallow to avoid turning a transient outage into a burst.
-      if (response.status === 404 || response.status === 410) disallow = [];
-      else if (!response.ok) {
+      // RFC 9309 §2.3.1.3–4: a 4xx robots.txt (no file, or none for us) sets no rules; a server error, 429 or an
+      // unreachable server is held as a disallow so a transient outage never turns into a burst.
+      const unruled = response.status >= 400 && response.status < 500 && response.status !== 429;
+      if (unruled) {
+        await response.body?.cancel().catch(() => {});
+        disallow = [];
+      } else if (!response.ok) {
         await response.body?.cancel().catch(() => {});
         observeRobots(parsed.host, { outcome: 'unreachable', httpStatus: response.status, error: null, disallow: [] });
         return 'unreachable';
       } else disallow = robotsRules(await response.text(), userAgent);
       robotsCache.set(origin, { expiresAt: Date.now() + 3_600_000, disallow });
       observeRobots(parsed.host, {
-        outcome:
-          response.status === 404 || response.status === 410
-            ? 'missing'
-            : disallow.includes('/')
-              ? 'blocked'
-              : disallow.length
-                ? 'partial'
-                : 'allowed',
+        outcome: unruled ? 'missing' : disallow.includes('/') ? 'blocked' : disallow.length ? 'partial' : 'allowed',
         httpStatus: response.status,
         error: null,
         disallow,
@@ -508,6 +504,20 @@ async function robotsAllows(
     }
   }
   return !(disallow ?? []).some((rule) => parsed.pathname.startsWith(rule));
+}
+
+/** One fresh robots.txt read for the URL's host (tools/robots-refresh.ts); the answer also reaches
+ * onRobotsObservation. No host delay: it is the only request the caller makes to that host. */
+export async function readRobots(value: string, options: FeedCrawlerOptions = {}) {
+  const url = new URL(value);
+  robotsCache.delete(url.origin);
+  return robotsAllows(
+    url.toString(),
+    options.userAgent?.trim() || USER_AGENT,
+    options.timeoutMs ?? 20_000,
+    options.resolveHost ?? defaultResolveHost,
+    options.fetcher ?? (undiciFetch as FeedFetcher),
+  );
 }
 
 /** Every request goes through this gate: one host delay and one robots check. */

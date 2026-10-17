@@ -23,7 +23,13 @@ export function robotsLabel(robots: RobotsStatus | null | undefined): {
     case 'allowed':
       return { label: '允許', tone: 'ok', title: `robots.txt 沒有限制本站爬蟲 · ${read}` };
     case 'missing':
-      return { label: '無檔案', tone: 'ok', title: `網站沒有 robots.txt（HTTP ${robots.httpStatus}），視為允許 · ${read}` };
+      return robots.httpStatus === 404 || robots.httpStatus === 410
+        ? { label: '無檔案', tone: 'ok', title: `網站沒有 robots.txt（HTTP ${robots.httpStatus}），視為允許 · ${read}` }
+        : {
+            label: `無規則（HTTP ${robots.httpStatus}）`,
+            tone: 'ok',
+            title: `robots.txt 回應 HTTP ${robots.httpStatus}，依 RFC 9309 視為沒有限制 · ${read}`,
+          };
     case 'partial':
       return { label: '部分路徑限制', tone: 'ok', title: `禁止：${paths} · ${read}` };
     case 'blocked':
@@ -40,7 +46,7 @@ export function robotsLabel(robots: RobotsStatus | null | undefined): {
       return {
         label: `讀不到（${why}）`,
         tone: 'warn',
-        title: `robots.txt 讀不到時一律視為禁止，暫停抓取 · ${last} · ${read}`,
+        title: `robots.txt 伺服器錯誤或連不上時視為禁止，暫停抓取 · ${last} · ${read}`,
       };
     }
   }

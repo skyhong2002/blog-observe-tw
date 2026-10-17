@@ -101,8 +101,13 @@ describe('resumable candidate review batch', () => {
     expect(sql).toContain("automaticReview.reason')) IN ('candidate_host_budget_exhausted','daily_admission_budget_exhausted') AND");
     expect(params[2]).toBe(`${new Date().toISOString().slice(0, 10)}T00:00:00.000Z`);
     expect(params).toHaveLength(4);
+    // A robots-held candidate comes back as soon as a later read of its host's robots.txt is open.
+    expect(sql).toMatch(/IN \('robots_disallowed','robots_unreachable'\)\s+AND EXISTS\(SELECT 1 FROM robots_observations r/);
+    expect(sql).toContain("r.outcome IN ('allowed','missing','partial')");
     // BlogBlog.Club- and IndieWeb-listed homes are reviewed first: the directory is the collection's priority.
-    expect(sql).toMatch(/ORDER BY JSON_EXTRACT\(source_evidence,'\$\.directoryListing'\) IS NULL AND JSON_EXTRACT\(source_evidence,'\$\.indiewebListing'\) IS NULL,\s*COALESCE/);
+    expect(sql).toMatch(
+      /ORDER BY JSON_EXTRACT\(source_evidence,'\$\.directoryListing'\) IS NULL AND JSON_EXTRACT\(source_evidence,'\$\.indiewebListing'\) IS NULL,\s*COALESCE/,
+    );
   });
   it('checks lease again after a slow network request, before any write', async () => {
     const h = harness();

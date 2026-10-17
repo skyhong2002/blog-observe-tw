@@ -186,7 +186,7 @@ describe('crawl request safety', () => {
     expect(observer.mock.calls[0][0]).toMatchObject({ requestedUrl: url, url, error: 'robots' });
   });
 
-  it('reports each robots.txt read: allowed, partial, blocked, missing or unreachable', async () => {
+  it('reports each robots.txt read: allowed, partial, blocked, no rules (4xx) or unreachable', async () => {
     const seen: RobotsObservation[] = [];
     onRobotsObservation((o) => seen.push(o));
     const bodies: Record<string, Response | Error> = {
@@ -194,7 +194,9 @@ describe('crawl request safety', () => {
       'allow-partial': new Response('User-agent: *\nDisallow: /wp-json/\n'),
       'allow-blocked': new Response('User-agent: Googlebot\nAllow: /\n\nUser-agent: *\nDisallow: /\n'),
       'allow-missing': new Response('', { status: 404 }),
+      'allow-forbidden': new Response('', { status: 403 }),
       'allow-5xx': new Response('', { status: 530 }),
+      'allow-429': new Response('', { status: 429 }),
       'allow-timeout': new Error('The operation was aborted due to timeout'),
     };
     try {
@@ -217,7 +219,10 @@ describe('crawl request safety', () => {
       ['partial', 200, null, ['/wp-json/']],
       ['blocked', 200, null, ['/']],
       ['missing', 404, null, []],
+      // RFC 9309: any 4xx but 429 sets no rules; server errors and 429 hold the site closed.
+      ['missing', 403, null, []],
       ['unreachable', 530, null, []],
+      ['unreachable', 429, null, []],
       ['unreachable', null, 'timeout', []],
     ]);
     const unreachable = await politeFetch(
