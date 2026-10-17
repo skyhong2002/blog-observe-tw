@@ -141,7 +141,9 @@ async function repairCandidate(pool: Pool, target: Extract<RepairTarget, { kind:
   const skip = (reason: string) => ({ target: base, status: 'skipped', reason }) satisfies RepairOutcome;
   if (!personal && !check.directoryListing) return skip(check.personalEvidence?.reason || 'personal_identity_uncertain');
   if (!v?.finalUrl || !v.evidence.identityMatches.length) return skip('identity_not_confirmed');
-  if (candidatePreflight({ ...candidate, url: v.finalUrl })) return skip('redirect_not_publication_home');
+  // Listed homes arrive without a name; validateCandidate took the homepage's own, as admission will.
+  const preflight = candidatePreflight({ ...candidate, name: check.enrichedName ?? candidate.name, url: v.finalUrl });
+  if (preflight) return skip(preflight);
   const generation = await generate({ home: v.finalUrl, trigger: target.trigger }, pool, options);
   if (!generation.ok || !options.apply)
     return {
