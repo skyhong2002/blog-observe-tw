@@ -26,8 +26,6 @@ const PRIVATE_ROUTES = [
   '/admin/',
   '/admin/blogs/',
   '/admin/overrides/',
-  '/admin/relations/',
-  '/admin/similarweb/',
   '/admin/accounts/',
   '/admin/audits/',
   '/observe/opt-out/',

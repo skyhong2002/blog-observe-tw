@@ -40,9 +40,10 @@ and raw request headers are never recorded in audits.
 
 The management pages share one row of tabs, each at its own URL:
 候選來源 `/admin/`, 部落格 `/admin/blogs/`, 簡介與標籤 `/admin/overrides/`
-(`?blog=<slug>` opens with that blog chosen), 連結關係 `/admin/relations/`,
-Similarweb `/admin/similarweb/`, 帳號 `/admin/accounts/` and 稽核紀錄
-`/admin/audits/`. They provide:
+(`?blog=<slug>` opens with that blog chosen), 帳號 `/admin/accounts/` and 稽核紀錄
+`/admin/audits/` (newest first, with actor and blog names; `.intent` rows hidden).
+On 2026-10-17 the user removed the 連結關係 and Similarweb pages as not worth managing; their
+`/api/admin/relations` and `/api/admin/similarweb` endpoints remain for trusted-host use. They provide:
 
 - Every blog in one sortable table (`GET /api/admin/blogs`): category, the genres
   readers see (admin-set or hidden ones marked), manual tags, a derived crawl state

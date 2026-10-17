@@ -389,9 +389,14 @@ export function registerAdminRoutes(app: FastifyInstance, config: AdminOptions) 
     const q = object(req.query),
       cursor = Number(q.cursor || 0);
     if (!Number.isSafeInteger(cursor) || cursor < 0) invalid();
+    // Newest first, with who acted and which blog it was; the `.intent` bookkeeping rows beside each write are left out.
     const [rows] = await config.pool.query<RowDataPacket[]>(
-      'SELECT id,actor_user_id actorUserId,action,entity_type entityType,entity_id entityId,before_json beforeJson,after_json afterJson,note,created_at createdAt FROM admin_audits WHERE id>? ORDER BY id LIMIT 101',
-      [cursor],
+      `SELECT a.id,a.actor_user_id actorUserId,u.name actorName,u.email actorEmail,a.action,a.entity_type entityType,a.entity_id entityId,
+         b.name entityName,b.slug entitySlug,a.before_json beforeJson,a.after_json afterJson,a.note,a.created_at createdAt
+       FROM admin_audits a LEFT JOIN users u ON u.id=a.actor_user_id
+       LEFT JOIN blogs b ON a.entity_type='blog' AND b.id=CAST(a.entity_id AS UNSIGNED)
+       WHERE (?=0 OR a.id<?) AND a.action NOT LIKE '%.intent' ORDER BY a.id DESC LIMIT 101`,
+      [cursor, cursor],
     );
     return { items: rows.slice(0, 100), nextCursor: rows.length > 100 ? rows[99].id : null };
   });

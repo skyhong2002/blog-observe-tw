@@ -252,9 +252,9 @@ export default function Candidates({ run, busy }: { run: RunAction; busy: boolea
                     </tr>
                     {open === c.id ? (
                       <tr>
-                        <td colSpan={pending ? 6 : 5} className="whitespace-normal bg-zinc-50 px-3 py-2 dark:bg-zinc-950">
+                        <td colSpan={pending ? 6 : 5} className="whitespace-normal px-3 pb-3">
                           <p className="text-xs text-zinc-500">發現路徑、blogroll 與 RSS 驗證證據</p>
-                          <Evidence value={c.sourceEvidence} label="展開原始資料" />
+                          <Evidence value={c.sourceEvidence} label="原始資料" open />
                         </td>
                       </tr>
                     ) : null}

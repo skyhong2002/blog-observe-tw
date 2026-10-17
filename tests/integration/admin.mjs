@@ -182,7 +182,15 @@ export async function runAdminIntegration(pool) {
     check(stillApproved.status === 'approved', 'approved status retained');
     const list = await app.inject({ url: '/api/admin/discovery?q=Quill&status=approved', headers });
     check(list.statusCode === 200, list.body);
-    check((await app.inject({ url: '/api/admin/audits', headers })).statusCode === 200, 'audit list');
+    const auditList = await app.inject({ url: '/api/admin/audits', headers });
+    check(auditList.statusCode === 200, 'audit list');
+    const auditItems = auditList.json().items;
+    check(
+      auditItems.every((a, i) => i === 0 || auditItems[i - 1].id > a.id) && !auditItems.some((a) => a.action.endsWith('.intent')),
+      'audit list newest first without intent rows',
+    );
+    const tagAudit = auditItems.find((a) => a.action === 'tags.manual' && a.actorUserId === uid);
+    check(tagAudit?.actorName === 'Test admin' && tagAudit.entityName === 'Admin fixture', `audit names ${JSON.stringify(tagAudit)}`);
     const accountList = await app.inject({ url: '/api/admin/accounts', headers });
     check(accountList.statusCode === 200, accountList.body);
     const me = accountList.json().accounts.find((a) => a.id === uid);

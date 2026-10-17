@@ -7,8 +7,7 @@ import Audits from './Audits';
 import Blogs from './Blogs';
 import Candidates from './Candidates';
 import Overrides from './Overrides';
-import Relations from './Relations';
-import { button, Evidence, input, panel, primary, type RunAction } from './shared';
+import { button, Evidence, primary, type RunAction } from './shared';
 
 const labels: Record<string, string> = {
   approved: '已核准',
@@ -37,49 +36,6 @@ function summary(value: unknown) {
     return [...counts].map(([s, n]) => `${s} ${n} 筆`).join('；') || '此次沒有變更。';
   }
   return v.status ? (labels[v.status] ?? v.status) : v.ok ? '已儲存，並留下稽核紀錄。' : '操作已回傳，請查看處理結果。';
-}
-function Similarweb({ run, busy }: { run: RunAction; busy: boolean }) {
-  const [domain, setDomain] = useState('');
-  const [kind, setKind] = useState('traffic');
-  return (
-    <section className={panel}>
-      <h2 className="text-lg font-semibold">提交 Similarweb 工作</h2>
-      <p className="text-sm text-zinc-500">
-        只接受已核准部落格的網域，由新文易數統一排程，沿用每日額度與退避規則。相似網站可能沒有資料；結果只作候選線索。
-      </p>
-      <form
-        className="space-y-4"
-        onSubmit={(e) => {
-          e.preventDefault();
-          void run('/api/admin/similarweb', { domain: domain.trim(), kind }).catch(() => {});
-        }}
-      >
-        <label className="block text-sm">
-          部落格網域
-          <input
-            className={input}
-            value={domain}
-            onChange={(e) => setDomain(e.target.value)}
-            maxLength={255}
-            placeholder="example.com"
-            autoCapitalize="none"
-            spellCheck={false}
-            required
-          />
-        </label>
-        <label className="block text-sm">
-          工作類型
-          <select className={input} value={kind} onChange={(e) => setKind(e.target.value)}>
-            <option value="traffic">流量摘要</option>
-            <option value="similar_sites">相似網站候選</option>
-          </select>
-        </label>
-        <button type="submit" className={primary} disabled={busy || !domain.trim()}>
-          提交排程
-        </button>
-      </form>
-    </section>
-  );
 }
 /** One /admin/ page: the shared tabs, then `section` once the admin session is confirmed. */
 export default function AdminConsole({ section }: { section: AdminSection }) {
@@ -150,7 +106,7 @@ export default function AdminConsole({ section }: { section: AdminSection }) {
       {loading ? (
         <p role="status">確認管理員工作階段中…</p>
       ) : authError ? (
-        <section className={panel}>
+        <section className="space-y-3">
           <p role="alert">{authError}</p>
           <div className="flex flex-wrap gap-3">
             {loginNeeded ? (
@@ -170,7 +126,7 @@ export default function AdminConsole({ section }: { section: AdminSection }) {
         <>
           {message ? (
             <div
-              className={`rounded-lg border p-3 text-sm ${failed ? 'border-red-300 text-red-700 dark:border-red-800 dark:text-red-400' : 'border-zinc-300 dark:border-zinc-700'}`}
+              className={`space-y-1 text-sm ${failed ? 'text-red-700 dark:text-red-400' : 'text-zinc-700 dark:text-zinc-300'}`}
               role={failed ? 'alert' : 'status'}
               aria-live="polite"
             >
@@ -188,10 +144,6 @@ export default function AdminConsole({ section }: { section: AdminSection }) {
               <Accounts />
             ) : section === 'overrides' ? (
               <Overrides run={run} busy={busy} />
-            ) : section === 'relations' ? (
-              <Relations run={run} busy={busy} />
-            ) : section === 'similarweb' ? (
-              <Similarweb run={run} busy={busy} />
             ) : (
               <Audits />
             )}
