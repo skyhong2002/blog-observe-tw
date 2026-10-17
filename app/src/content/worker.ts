@@ -5,6 +5,7 @@ import type { BatchOptions, BatchResult } from '../jobs/contracts.ts';
 import { withJobLease } from '../jobs/lease.ts';
 import { budgetedRelationFetcher, RELATION_PAGES_DAILY, relationBudgetAvailable, relationFailureCode } from '../relations/worker.ts';
 import { parsedPost, scraperArticleHtml } from '../scrapers/contract.ts';
+import { renderVetted } from '../scrapers/render.ts';
 import { runInSandbox } from '../scrapers/sandbox.ts';
 import { activeScraper, type StoredScraper } from '../scrapers/store.ts';
 import { type AdoptionEnqueue, createSearchIndexAdoption } from '../search-index-adoption.ts';
@@ -62,10 +63,12 @@ async function noteFailure(pool: Pool, post: RowDataPacket, rule: ContentRule, r
 }
 /** A blog's generated scraper (app/src/scrapers) knows where its body is; the extractor then reads only that.
  * Any scraper failure falls back to the page as fetched. */
-async function scraperBody(scraper: StoredScraper | null, articleUrl: string, sourceUrl: string, html: string) {
+async function scraperBody(scraper: StoredScraper | null, articleUrl: string, sourceUrl: string, html: string, userAgent?: string) {
   if (!scraper) return html;
   try {
-    const post = parsedPost(await runInSandbox(scraper.code, 'parsePost', { url: sourceUrl, html }));
+    // The page already passed politeFetch (robots, address); a rendering scraper reads it after its scripts ran.
+    const page = scraper.render ? await renderVetted(sourceUrl, userAgent) : { url: sourceUrl, html };
+    const post = parsedPost(await runInSandbox(scraper.code, 'parsePost', page));
     return post ? scraperArticleHtml(post, articleUrl) : html;
   } catch {
     return html;
@@ -201,7 +204,11 @@ export async function runContentBatch(
             const evidence: ContentEvidence | null =
               request.method === 'wordpress-api'
                 ? wordpressEvidence(raw, base)
-                : { ...base, html: await scraperBody(scrapers.get(post.blog_id) ?? null, post.url, final, raw), kind: 'article-html' };
+                : {
+                    ...base,
+                    html: await scraperBody(scrapers.get(post.blog_id) ?? null, post.url, final, raw, options.userAgent),
+                    kind: 'article-html',
+                  };
             if (!evidence) throw Error('content_api_no_matching_post');
             await assertLease();
             const c = await pool.getConnection();

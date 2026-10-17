@@ -560,6 +560,8 @@ export const blogScrapers = mysqlTable(
     codeSha256: char('code_sha256', { length: 64 }).notNull(),
     listUrls: json('list_urls').$type<string[]>().notNull(),
     maxPages: int('max_pages').notNull().default(1),
+    /** Pages are read after a headless browser runs their scripts (scrapers/render.ts). */
+    render: boolean('render').notNull().default(false),
     model: varchar('model', { length: 64 }).notNull(),
     actualModel: varchar('actual_model', { length: 180 }),
     validation: json('validation'),

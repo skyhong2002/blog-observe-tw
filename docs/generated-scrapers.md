@@ -13,6 +13,14 @@ function parsePost({ url, html, $ }) // → { title, author, publishedAt, tags, 
 
 `$` 是已載入該頁的 cheerio（列表頁若是站方自己的 RSS／Atom／sitemap，則為 XML 模式）。爬蟲**只解析一頁 HTML**：抓頁一律由受信任的 `politeFetch` 負責（robots、DNS 釘選、每站延遲、8 MiB 上限），輸出再經 `contract.ts` 驗證——只留同 publication 的文章網址、合理日期、≤ 20 個標籤、≤ 512 KiB 內文。
 
+## 需要 JS 的網站（`render.ts`）
+
+- **內嵌資料**：骨架保留 `script#__NEXT_DATA__`、`type="application/json"`、JSON-LD 與 `window.__NUXT__` 這類狀態，JSON 壓縮成形狀（陣列留 2 項加數量、字串截短，保證仍是合法 JSON），爬蟲可在沙箱裡 `JSON.parse`。多數 Next／Nuxt 站不必開瀏覽器。
+- **無頭瀏覽器**：`playwright-core` 帶動 Playwright 自己的 chromium headless shell（Chromium 沙箱開啟），經 `render-scope.sh` 放進獨立 systemd scope（MemoryMax 640M、CPUQuota 50%），不佔 worker 的 768M。每頁先經 `politeFetch`（robots、公開位址、HTML），再渲染同一頁；圖片、影音、字型不載，子請求逐一檢查公開位址，主框架不能導到別的站，service worker 停用。一次只渲染一頁，閒置 60 秒關閉。
+- **何時渲染**：首頁幾乎沒有文字、站內連結少且沒有內嵌資料時，第一輪就用渲染頁；否則原始 HTML 那輪若列不出文章、抽不到內文，或模型回報 `needsRender`／`noArticles`，下一輪改用渲染頁（只切換一次）。通過的爬蟲記下 `blog_scrapers.render`，日常爬取與內文 worker 都照這個模式抓頁。`BLOG_SCRAPER_RENDER=false` 或沒有瀏覽器時只讀原始 HTML。
+- **空部落格**：模型回報 `noArticles` 且驗證也列不出文章（已看過渲染頁）就提早結束，原因 `site_has_no_articles`。soufflesound.com 的原始 HTML 只有「Coming Soon」，渲染後才出現文章，所以會先渲染再下結論。
+- **標籤**：爬蟲抽到的 `blog`、`posts`、`Uncategorized`、`未分類` 等區段／佔位名稱會被濾掉（`contract.ts` 的 `GENERIC_TAGS`）；RSS 分類不受影響。
+
 ## 沙箱（`sandbox.ts`，任一層缺少即拒絕執行）
 
 1. `bwrap --unshare-all --clearenv`：沒有網路 namespace（連 127.0.0.1:8317 也碰不到）、沒有 /home、沒有環境變數（拿不到 API key、DB URL）；只唯讀掛載 `/usr`、node、`node_modules` 與 runner。
@@ -20,7 +28,7 @@ function parsePost({ url, html, $ }) // → { title, author, publishedAt, tags, 
 3. `vm` context 只有 `__page`、`URL`、`URLSearchParams`，2 秒 timeout；父程序 5 秒 SIGKILL、stdout 2 MiB 上限。
 4. 靜態檢查（輔助，不是邊界）：≤ 40 KiB，不得出現 `require`、`process`、`constructor`、`fetch`、`eval` 等識別字。
 
-`sandbox.spec.ts` 直接驗證以上各層（逃逸、網路、env、/home、子程序、無窮迴圈、輸出與記憶體炸彈）。worker 的 systemd unit（`NoNewPrivileges=true`）下 bwrap 可用。
+`sandbox.spec.ts` 直接驗證以上各層（逃逸、網路、env、/home、子程序、無窮迴圈、輸出與記憶體炸彈）。worker 的 systemd unit（`NoNewPrivileges=true`）下 bwrap 可用。這些層只套在模型寫的程式碼上；瀏覽器執行的是網站自己的 JS，由 Chromium 沙箱與上一節的請求規則限制。
 
 ## 產生與驗證（`generate.ts`）
 

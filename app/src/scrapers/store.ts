@@ -9,6 +9,8 @@ export type StoredScraper = {
   code: string;
   listUrls: string[];
   maxPages: number;
+  /** Read its pages through the headless browser (render.ts). */
+  render: boolean;
   consecutiveFailures: number;
 };
 type Sql = Pick<Pool, 'execute'>;
@@ -22,13 +24,14 @@ const stored = (row: RowDataPacket): StoredScraper => ({
   code: String(row.code),
   listUrls: listUrls(row.list_urls),
   maxPages: Number(row.max_pages) || 1,
+  render: Boolean(Number(row.render)),
   consecutiveFailures: Number(row.consecutive_failures) || 0,
 });
 export const codeSha256 = (code: string) => createHash('sha256').update(code).digest('hex');
 
 export async function activeScraper(db: Sql, blogId: number): Promise<StoredScraper | null> {
   const [rows] = await db.execute<RowDataPacket[]>(
-    "SELECT id,blog_id,code,list_urls,max_pages,consecutive_failures FROM blog_scrapers WHERE blog_id=? AND status='active' ORDER BY id DESC LIMIT 1",
+    "SELECT id,blog_id,code,list_urls,max_pages,render,consecutive_failures FROM blog_scrapers WHERE blog_id=? AND status='active' ORDER BY id DESC LIMIT 1",
     [blogId],
   );
   return rows[0] ? stored(rows[0]) : null;
@@ -50,8 +53,8 @@ export async function saveValidatedScraper(
     [input.blogId, input.candidateId],
   );
   const [insert] = await db.execute<ResultSetHeader>(
-    `INSERT INTO blog_scrapers (blog_id,candidate_id,revision,status,\`trigger\`,code,code_sha256,list_urls,max_pages,model,actual_model,validation,created_at)
-     VALUES (?,?,?,'validated',?,?,?,?,?,?,?,?,?)`,
+    `INSERT INTO blog_scrapers (blog_id,candidate_id,revision,status,\`trigger\`,code,code_sha256,list_urls,max_pages,render,model,actual_model,validation,created_at)
+     VALUES (?,?,?,'validated',?,?,?,?,?,?,?,?,?,?)`,
     [
       input.blogId,
       input.candidateId,
@@ -61,6 +64,7 @@ export async function saveValidatedScraper(
       codeSha256(input.scraper.code),
       JSON.stringify(input.scraper.listUrls),
       input.scraper.maxPages,
+      input.scraper.render,
       MODEL_ALIAS,
       input.actualModel.slice(0, 180),
       JSON.stringify(input.validation),

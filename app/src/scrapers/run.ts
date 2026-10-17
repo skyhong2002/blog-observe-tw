@@ -1,11 +1,13 @@
 import { type BlogToCrawl, boundedFeedContent, type FeedCrawlerOptions, type FeedEntry, publicSummary } from '../crawl/feed.ts';
 import { type ListedPost, listedPage, MAX_HISTORY_PAGES, MAX_LIST_PAGES, parsedPost, scraperArticleHtml } from './contract.ts';
 import { fetchFailure, fetchHtml } from './pages.ts';
+import { fetchRendered } from './render.ts';
 import { runInSandbox, type SandboxRunner } from './sandbox.ts';
 import type { StoredScraper } from './store.ts';
 
 export type ScrapeResult = { entries: FeedEntry[]; listed: number; error: string | null };
-const failure = (error: unknown) => (error instanceof Error && /^scraper_/.test(error.message) ? error.message : fetchFailure(error));
+const failure = (error: unknown) =>
+  error instanceof Error && /^(?:scraper|render)_/.test(error.message) ? error.message : fetchFailure(error);
 
 /** New articles from a generated scraper, as feed entries for writeFeedEntries. Listing pages are followed only
  * while they still list unknown articles; the error is set when the scraper itself no longer works. */
@@ -13,10 +15,11 @@ export async function scrapeBlog(
   scraper: StoredScraper,
   blog: BlogToCrawl,
   known: (urls: string[]) => Promise<Set<string>>,
-  options: FeedCrawlerOptions & { sandbox?: SandboxRunner; maxPosts?: number; signal?: AbortSignal } = {},
+  options: FeedCrawlerOptions & { sandbox?: SandboxRunner; render?: typeof fetchRendered; maxPosts?: number; signal?: AbortSignal } = {},
   now = new Date(),
 ): Promise<ScrapeResult> {
   const sandbox = options.sandbox ?? runInSandbox;
+  const fetchPage = scraper.render ? (options.render ?? fetchRendered) : fetchHtml;
   // History replays every listing page it can reach; a normal run stops at the first page of known articles.
   const pageLimit = options.historyImport ? MAX_HISTORY_PAGES : Math.min(scraper.maxPages, MAX_LIST_PAGES);
   const postLimit = options.maxPosts ?? (options.historyImport ? 50 : 10);
@@ -28,7 +31,7 @@ export async function scrapeBlog(
     for (let page = 0; url && page < pageLimit && fresh.length < postLimit; page++) {
       let result: ReturnType<typeof listedPage>;
       try {
-        const html = await fetchHtml(url, options, true);
+        const html = await fetchPage(url, options, true);
         result = listedPage(await sandbox(scraper.code, 'listPosts', html), html.url, blog.url, now);
       } catch (error) {
         if (page === 0) listError ??= failure(error);
@@ -50,7 +53,7 @@ export async function scrapeBlog(
   for (const item of fresh.slice(0, postLimit)) {
     if (options.signal?.aborted) break;
     try {
-      const page = await fetchHtml(item.url, options);
+      const page = await fetchPage(item.url, options);
       const post = parsedPost(await sandbox(scraper.code, 'parsePost', page), now);
       if (!post) {
         postErrors++;

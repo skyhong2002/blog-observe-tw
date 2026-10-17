@@ -82,12 +82,14 @@ export const SCRAPER_INPUT_LIMIT = 160 * 1024;
 const scraperSchema = {
   type: 'object',
   additionalProperties: false,
-  required: ['listUrls', 'maxPages', 'code', 'notes'],
+  required: ['listUrls', 'maxPages', 'code', 'notes', 'noArticles', 'needsRender'],
   properties: {
     listUrls: { type: 'array', minItems: 1, maxItems: 3, items: { type: 'string', maxLength: 2048 } },
     maxPages: { type: 'integer', minimum: 1, maximum: 3 },
     code: { type: 'string', maxLength: 40960 },
     notes: { type: 'string', maxLength: 1000 },
+    noArticles: { type: 'boolean' },
+    needsRender: { type: 'boolean' },
   },
 };
 const SCRAPER_SYSTEM = `You write one blog's scraper as plain JavaScript. Return only the JSON schema.
@@ -105,7 +107,13 @@ categories as plain strings, [] if none) and bodyHtml (inner HTML of the article
 comments, share buttons, related posts or footer). Prefer stable selectors (semantic tags, itemprop, JSON-LD) over
 generated class names. listUrls: the listing page(s) to start from (the home when it lists the articles), same site only.
 A listing may be the site's own RSS/Atom/sitemap XML when it has one; such a page arrives with $ in XML mode.
-maxPages: listing pages worth following for new articles (1-3). notes: one short line on how the site is structured.`;
+Many sites embed their data as JSON (script#__NEXT_DATA__, type="application/json", window.__NUXT__ and similar); the
+skeleton shows it pruned (arrays cut to two items, long strings shortened). Reading it with
+JSON.parse($('script#__NEXT_DATA__').text()) is fine and often the most stable source; JSON exists.
+A page marked rendered:true was read after a browser ran its scripts; the scraper will then always get rendered pages.
+maxPages: listing pages worth following for new articles (1-3). notes: one short line on how the site is structured.
+noArticles: true only when the site plainly has no published articles yet ("Coming Soon", an empty blog list).
+needsRender: true when the articles or their bodies only appear after JavaScript runs and no embedded JSON has them.`;
 export function scraperGatewayBody(input: string) {
   return JSON.stringify({
     model: MODEL_ALIAS,

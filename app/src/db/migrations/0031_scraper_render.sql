@@ -1,0 +1,1 @@
+ALTER TABLE `blog_scrapers` ADD `render` boolean DEFAULT false NOT NULL;

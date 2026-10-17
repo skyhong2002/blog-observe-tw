@@ -218,6 +218,13 @@
       "when": 1792227549956,
       "tag": "0030_blog_scrapers",
       "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "5",
+      "when": 1792232954691,
+      "tag": "0031_scraper_render",
+      "breakpoints": true
     }
   ]
 }

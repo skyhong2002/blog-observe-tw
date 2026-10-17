@@ -4,13 +4,52 @@ import { utf8Prefix } from '../content/contracts.ts';
 import { articleInPublication, canonicalArticleUrl } from '../crawl/feed.ts';
 
 const KEEP = new Set(['id', 'class', 'href', 'datetime', 'rel', 'itemprop', 'itemtype', 'property', 'name', 'content', 'role', 'type']);
-const DROP =
-  'script:not([type="application/ld+json"]),style,noscript,template,svg,iframe,canvas,video,audio,picture source,link:not([rel])';
+const DROP = 'style,noscript,template,svg,iframe,canvas,video,audio,picture source,link:not([rel])';
+/** Embedded page data the scraper may JSON.parse: kept, pruned to its shape. */
+const DATA = 'script[type="application/ld+json"],script[type="application/json"],script#__NEXT_DATA__,script#__NUXT_DATA__';
+const STATE = /window\.__(?:NUXT|INITIAL_STATE|APOLLO_STATE|PRELOADED_STATE)__\s*=/;
+/** Arrays keep a few items plus a count, strings a few dozen characters: the paths survive, the payload does not. */
+export function pruneJson(value: unknown, items = 2, chars = 80, depth = 0, maxDepth = 14): unknown {
+  if (depth > maxDepth) return '…';
+  if (typeof value === 'string') return value.length > chars ? `${value.slice(0, chars)}…` : value;
+  const next = (v: unknown) => pruneJson(v, items, chars, depth + 1, maxDepth);
+  if (Array.isArray(value))
+    return [...value.slice(0, items).map(next), ...(value.length > items ? [`…+${value.length - items} more`] : [])];
+  if (value && typeof value === 'object') return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, next(v)]));
+  return value;
+}
+/** Valid JSON whenever the source is: prunes harder until the shape fits, cuts only as a last resort. */
+function shownJson(source: string, max = 8000) {
+  let value: unknown;
+  try {
+    value = JSON.parse(source);
+  } catch {
+    return source.length > max ? `${source.slice(0, max)}…` : source;
+  }
+  for (const [items, chars, depth] of [
+    [2, 80, 14],
+    [1, 40, 12],
+    [1, 24, 9],
+    [1, 16, 7],
+  ]) {
+    const shown = JSON.stringify(pruneJson(value, items, chars, 0, depth));
+    if (shown.length <= max) return shown;
+  }
+  const shown = JSON.stringify(pruneJson(value, 1, 16, 0, 7));
+  return `${shown.slice(0, max)}…`;
+}
 
 /** A page skeleton for the model: structure and selectors survive, scripts and long prose do not. */
 export function compactHtml(html: string, maxBytes = 50 * 1024, xml = false): string {
   const $ = cheerio.load(html, { xml });
   $(DROP).remove();
+  $('script').each((_, el) => {
+    const node = $(el);
+    const source = node.text();
+    if (node.is(DATA)) node.text(shownJson(source));
+    else if (STATE.test(source)) node.text(source.length > 3000 ? `${source.slice(0, 3000)}…` : source);
+    else node.remove();
+  });
   $('*').each((_, el) => {
     if (el.type !== 'tag') return;
     for (const name of Object.keys(el.attribs)) {
@@ -19,15 +58,12 @@ export function compactHtml(html: string, maxBytes = 50 * 1024, xml = false): st
       else if (value.length > 200) el.attribs[name] = `${value.slice(0, 200)}…`;
     }
   });
-  $('script[type="application/ld+json"]').each((_, el) => {
-    const json = $(el).text();
-    if (json.length > 3000) $(el).text(`${json.slice(0, 3000)}…`);
-  });
   const shorten = (node: AnyNode) => {
     if (node.type === 'text') {
       const value = node.data.replace(/\s+/g, ' ');
       node.data = value.length > 160 ? `${value.slice(0, 160)}…` : value;
-    } else if ('children' in node) for (const child of node.children) shorten(child);
+    } else if ('children' in node && !(node.type === 'script' || ('name' in node && node.name === 'script')))
+      for (const child of node.children) shorten(child);
   };
   for (const node of $.root().children().toArray()) shorten(node);
   return utf8Prefix(((xml ? null : $('html').html()) ?? $.root().html() ?? '').replace(/\n\s*\n+/g, '\n'), maxBytes);

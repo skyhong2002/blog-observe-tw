@@ -5,7 +5,17 @@ export const MAX_CODE_BYTES = 40 * 1024;
 export const MAX_LIST_PAGES = 3;
 export const MAX_HISTORY_PAGES = 20;
 export type ScraperTrigger = 'new_candidate' | 'feed_dead' | 'scraper_failing' | 'content_failing';
-export type GeneratedScraper = { listUrls: string[]; maxPages: number; code: string; notes: string };
+/** render: pages are read after a headless browser runs them (render.ts). The other two flags are the model's
+ * reading of the site for this round only: no articles published yet, or content that needs scripts to appear. */
+export type GeneratedScraper = {
+  listUrls: string[];
+  maxPages: number;
+  code: string;
+  notes: string;
+  render: boolean;
+  noArticles: boolean;
+  needsRender: boolean;
+};
 export type ListedPost = { url: string; title: string | null; publishedAt: Date | null };
 export type ListedPage = { posts: ListedPost[]; next: string | null };
 export type ParsedPost = { title: string; author: string | null; publishedAt: Date | null; tags: string[]; bodyHtml: string };
@@ -58,16 +68,45 @@ export function listedPage(value: unknown, pageUrl: string, home: string, now = 
   const next = resolved(raw.next, pageUrl);
   return { posts, next: next && next !== canonicalArticleUrl(pageUrl) && articleInPublication(next, home) ? next : null };
 }
+/** Site-section and placeholder labels that say nothing about an article (Hugo's `blog` section, WordPress's
+ * Uncategorized). Only scraper tags are filtered; feed categories stay as their authors wrote them. */
+export const GENERIC_TAGS = new Set([
+  'blog',
+  'blogs',
+  'post',
+  'posts',
+  'article',
+  'articles',
+  'news',
+  'home',
+  'uncategorized',
+  'uncategorised',
+  'general',
+  'misc',
+  'default',
+  '未分類',
+  '未分类',
+  '無分類',
+  '其他',
+  '文章',
+  '部落格',
+  '博客',
+  '網誌',
+  '首頁',
+]);
 export function parsedPost(value: unknown, now = new Date()): ParsedPost | null {
   const raw = value && typeof value === 'object' ? (value as Record<string, unknown>) : null;
   if (!raw) return null;
   const title = text(raw.title, 512);
   const bodyHtml = typeof raw.bodyHtml === 'string' ? raw.bodyHtml : '';
   if (!title || !bodyHtml.trim() || Buffer.byteLength(bodyHtml) > 512 * 1024) return null;
-  const tags = [...new Set((Array.isArray(raw.tags) ? raw.tags : []).map((tag) => text(tag, 60).replace(/^#/, '')).filter(Boolean))].slice(
-    0,
-    20,
-  );
+  const tags = [
+    ...new Set(
+      (Array.isArray(raw.tags) ? raw.tags : [])
+        .map((tag) => text(tag, 60).replace(/^#/, ''))
+        .filter((tag) => tag && !GENERIC_TAGS.has(tag.normalize('NFKC').toLowerCase())),
+    ),
+  ].slice(0, 20);
   return { title, author: text(raw.author, 255) || null, publishedAt: scraperDate(raw.publishedAt, now), tags, bodyHtml };
 }
 export function generatedScraper(value: unknown, home: string): GeneratedScraper {
@@ -79,7 +118,15 @@ export function generatedScraper(value: unknown, home: string): GeneratedScraper
     .slice(0, 3);
   if (!listUrls.length) listUrls.push(canonicalArticleUrl(home));
   const maxPages = Math.max(1, Math.min(MAX_LIST_PAGES, Number.isSafeInteger(raw.maxPages) ? Number(raw.maxPages) : 1));
-  return { listUrls, maxPages, code: typeof raw.code === 'string' ? raw.code : '', notes: text(raw.notes, 1000) };
+  return {
+    listUrls,
+    maxPages,
+    code: typeof raw.code === 'string' ? raw.code : '',
+    notes: text(raw.notes, 1000),
+    render: false,
+    noArticles: raw.noArticles === true,
+    needsRender: raw.needsRender === true,
+  };
 }
 /** The body parsePost chose, as a page the existing extractor reads like any article (content/article-content.ts). */
 export function scraperArticleHtml(post: ParsedPost, url: string) {
