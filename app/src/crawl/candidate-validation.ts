@@ -4,7 +4,7 @@ import { type PersonalEvidence, personalHomepage } from '../ai/personal.ts';
 import { type SitemapArticleEvidence, verifyArticleSitemap } from '../ai/publication-sitemap.ts';
 import { identityKey, publicationDecision } from '../relations/identity.ts';
 import { chineseContent, listingOf } from './directory-listing.ts';
-import { type FeedCrawlerOptions, isAllowedCrawlUrl, parseFeed, politeFetch, readFeedBody } from './feed.ts';
+import { type FeedCrawlerOptions, isAllowedCrawlUrl, parseFeed, politeFetch, ROBOTS_UNREACHABLE, readFeedBody } from './feed.ts';
 import { seedIdentityKey } from './seed-url-resolution.ts';
 import { isSeedPlatformRoot, type SeedUrlValidation, validateSeedUrl } from './seed-url-validation.ts';
 
@@ -202,9 +202,12 @@ export async function validateCandidate(candidate: DiscoveryCandidate, options: 
       candidate = { ...candidate, name: observed.siteName };
     }
   } catch (error) {
-    result.reason = /robots/i.test(error instanceof Error ? error.message : '')
-      ? 'robots_disallowed'
-      : 'homepage_personal_verification_failed';
+    const m = error instanceof Error ? error.message : '';
+    result.reason = m.includes(ROBOTS_UNREACHABLE)
+      ? 'robots_unreachable'
+      : /robots/i.test(m)
+        ? 'robots_disallowed'
+        : 'homepage_personal_verification_failed';
     return result;
   }
   const verification = await validateSeedUrl(
@@ -339,13 +342,15 @@ export async function validateCandidate(candidate: DiscoveryCandidate, options: 
       : result.personalEvidence?.reason || 'personal_identity_uncertain';
   } catch (error) {
     const m = error instanceof Error ? error.message : '';
-    result.reason = /robots/i.test(m)
-      ? 'robots_disallowed'
-      : /unsafe/i.test(m)
-        ? 'unsafe_destination'
-        : /timeout|aborted/i.test(m)
-          ? 'timeout'
-          : 'feed_verification_failed';
+    result.reason = m.includes(ROBOTS_UNREACHABLE)
+      ? 'robots_unreachable'
+      : /robots/i.test(m)
+        ? 'robots_disallowed'
+        : /unsafe/i.test(m)
+          ? 'unsafe_destination'
+          : /timeout|aborted/i.test(m)
+            ? 'timeout'
+            : 'feed_verification_failed';
   }
   return result;
 }

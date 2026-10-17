@@ -2,7 +2,15 @@ import { createHash } from 'node:crypto';
 import * as cheerio from 'cheerio';
 import { XMLParser, XMLValidator } from 'fast-xml-parser';
 import { publicationDecision } from '../relations/identity.ts';
-import { type FeedCrawlerOptions, type FeedLink, isAllowedCrawlUrl, politeFetch, rankedSitemapUrls, readFeedBody } from './feed.ts';
+import {
+  type FeedCrawlerOptions,
+  type FeedLink,
+  isAllowedCrawlUrl,
+  politeFetch,
+  ROBOTS_UNREACHABLE,
+  rankedSitemapUrls,
+  readFeedBody,
+} from './feed.ts';
 
 export type SeedResearchEvidence = { alias: string; sourceUrl: string; excerpt: string };
 export type SeedUrlInput = {
@@ -196,6 +204,7 @@ function safeEvidence(input: SeedUrlInput, finalUrl: string): SeedResearchEviden
 
 function errorCode(error: unknown): string {
   const message = error instanceof Error ? error.message : '';
+  if (message.includes(ROBOTS_UNREACHABLE)) return 'robots_unreachable';
   if (message.includes('robots disallow')) return 'robots_disallowed';
   if (message.includes('unsafe crawl') || message.includes('validated DNS')) return 'unsafe_destination';
   if (message.includes('exceeds')) return 'response_too_large';

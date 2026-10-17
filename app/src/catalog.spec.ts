@@ -28,7 +28,9 @@ describe('complete blog catalog', () => {
     const pool = fixture();
     const data = await loadCatalog(pool, { page: '999' });
     expect(data.pagination).toEqual({ page: 6, pages: 6, pageSize: 50, total: 275 });
-    expect(data.blogs).toEqual([{ id: 251, slug: 'after-200', name: '第 251 個站', postCount: 4, authorCount: 2, iconUrl: null }]);
+    expect(data.blogs).toEqual([
+      { id: 251, slug: 'after-200', name: '第 251 個站', postCount: 4, authorCount: 2, iconUrl: null, robots: null },
+    ]);
     expect(data.totals).toEqual({ blogs: 275, posts: 12000, withUrls: 264, authors: 230 });
     expect(data.categories).toEqual([
       { value: '生活', count: 210 },
@@ -59,6 +61,39 @@ describe('complete blog catalog', () => {
     expect(pool.query.mock.calls[3][0]).not.toContain('旅行');
     expect(pool.query.mock.calls.slice(0, 3).every(([, params]) => params === undefined)).toBe(true);
     expect(data.pagination).toEqual({ page: 1, pages: 1, pageSize: 50, total: 3 });
+  });
+
+  it("shows each blog's latest robots.txt read, also when it landed on the www host", async () => {
+    const pool = fixture(1, [{ id: 7, slug: 'gs', name: 'GS', url: 'https://blog.example.tw/', postCount: '1', authorCount: '1' }]);
+    const robotsRow = {
+      host: 'www.blog.example.tw',
+      outcome: 'unreachable',
+      http_status: null,
+      error: 'timeout',
+      disallow: '[]',
+      checked_at: new Date('2026-10-17T12:00:00Z'),
+      readable_at: null,
+    };
+    const query = vi.fn(async (sql: string, parameters?: unknown[]) =>
+      sql.includes('robots_observations') ? [[robotsRow]] : pool.query(sql, parameters),
+    );
+    const data = await loadCatalog({ query } as never, {});
+    expect(data.blogs[0].robots).toEqual({
+      outcome: 'unreachable',
+      httpStatus: null,
+      error: 'timeout',
+      disallow: [],
+      checkedAt: '2026-10-17T12:00:00.000Z',
+      readableAt: null,
+    });
+    expect(query.mock.calls.at(-1)?.[1]).toEqual([['blog.example.tw', 'www.blog.example.tw']]);
+    // A directory without the table (before its migration) still answers.
+    const plain = fixture(1, [{ id: 7, slug: 'gs', name: 'GS', url: 'https://blog.example.tw/' }]);
+    const broken = vi.fn(async (sql: string, parameters?: unknown[]) => {
+      if (sql.includes('robots_observations')) throw Error('no such table');
+      return plain.query(sql, parameters);
+    });
+    expect((await loadCatalog({ query: broken } as never, {})).blogs[0].robots).toBeNull();
   });
 
   it('keeps empty search results on page one while retaining complete catalog totals', async () => {

@@ -1,5 +1,6 @@
 import type { BlogGenre } from '../../../app/src/blog-genre-vocabulary.ts';
 import type { GenreState } from '../../../app/src/blog-genres/resolve.ts';
+import type { RobotsStatus } from './robots';
 
 // Optional readable page URLs from the gateway's page registry, next to the
 // stable slug/id they never replace (links: page-links.ts; absent = legacy URL).
@@ -28,6 +29,8 @@ export type Blog = {
   postCount?: number;
   /** /api/catalog: distinct active authors recorded for the blog. */
   authorCount?: number;
+  /** /api/catalog: the latest robots.txt read for the blog's host; `null` before the first read. */
+  robots?: RobotsStatus | null;
   /** /api/overview: the blog's newest collected post; `null` means none. Absent on older gateways. */
   latestPost?: LatestPost | null;
 };

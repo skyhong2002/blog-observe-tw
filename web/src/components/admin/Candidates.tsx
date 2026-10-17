@@ -1,6 +1,7 @@
 'use client';
 import { useCallback, useEffect, useState } from 'react';
 import { adminGet } from '@/lib/admin-client';
+import { type RobotsStatus, robotsLabel, robotsTone } from '@/lib/robots';
 import { button, Evidence, External, input, Pager, panel, primary, type RunAction, useAdminPaging } from './shared';
 
 type Candidate = {
@@ -12,7 +13,17 @@ type Candidate = {
   sourceEvidence: unknown;
   status: string;
   discoveredAt: string;
+  robots?: RobotsStatus | null;
 };
+function RobotsLine({ robots }: { robots?: RobotsStatus | null }) {
+  const { label, tone, title } = robotsLabel(robots);
+  return (
+    <p className="text-xs text-zinc-500">
+      robots.txt：<span className={robotsTone[tone]}>{label}</span>
+      <span className="ml-1 break-words">{title}</span>
+    </p>
+  );
+}
 type Payload = { candidates: Candidate[]; nextCursor: number | null };
 export default function Candidates({ run, busy }: { run: RunAction; busy: boolean }) {
   const [query, setQuery] = useState('');
@@ -127,6 +138,7 @@ export default function Candidates({ run, busy }: { run: RunAction; busy: boolea
                   <p className="text-xs text-zinc-500">
                     來源：{c.sourceType} · 發現於 {new Date(c.discoveredAt).toLocaleString('zh-TW')}
                   </p>
+                  <RobotsLine robots={c.robots} />
                   <p>
                     發現頁面：
                     <External url={c.sourceUrl} />

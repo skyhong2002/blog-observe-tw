@@ -1,3 +1,4 @@
+import { robotsFor, robotsStatuses } from './crawl/robots-observations.ts';
 import { iconManifest } from './v1/favicon-routes.ts';
 import { iconUrl } from './v1/icons.ts';
 
@@ -112,6 +113,11 @@ export async function loadCatalog(pool, query = {}) {
     [...parameters, ...orderParameters, filters.limit, (page - 1) * filters.limit],
   );
   const icons = await iconManifest();
+  // The directory still answers when robots reads are unavailable (e.g. before the table's migration).
+  const robots = await robotsStatuses(
+    pool,
+    blogs.map((blog) => blog.url),
+  ).catch(() => new Map());
   const totals = totalsResult[0][0];
   const facets = (rows) => rows.map((row) => ({ value: row.value, count: Number(row.count) }));
   return {
@@ -120,6 +126,7 @@ export async function loadCatalog(pool, query = {}) {
       iconUrl: iconUrl(blog.slug, icons),
       postCount: Number(blog.postCount),
       authorCount: Number(blog.authorCount),
+      robots: robotsFor(robots, blog.url),
     })),
     totals: {
       blogs: Number(totals.blogs),

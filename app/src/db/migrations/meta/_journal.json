@@ -225,6 +225,13 @@
       "when": 1792232954691,
       "tag": "0031_scraper_render",
       "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "5",
+      "when": 1792242392190,
+      "tag": "0032_robots_observations",
+      "breakpoints": true
     }
   ]
 }

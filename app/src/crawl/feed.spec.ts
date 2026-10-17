@@ -9,9 +9,11 @@ import {
   isBlockedAddress,
   isNonSyndicationSource,
   MAX_RESPONSE_BYTES,
+  onRobotsObservation,
   parseFeed,
   parseSitemap,
   politeFetch,
+  type RobotsObservation,
   rankedSitemapUrls,
   readFeedBody,
   validateCrawlUrl,
@@ -182,6 +184,48 @@ describe('crawl request safety', () => {
     expect(String(fetcher.mock.calls[0][0])).toBe('https://observer-budget-text-url.test/robots.txt');
     expect(observer).toHaveBeenCalledOnce();
     expect(observer.mock.calls[0][0]).toMatchObject({ requestedUrl: url, url, error: 'robots' });
+  });
+
+  it('reports each robots.txt read: allowed, partial, blocked, missing or unreachable', async () => {
+    const seen: RobotsObservation[] = [];
+    onRobotsObservation((o) => seen.push(o));
+    const bodies: Record<string, Response | Error> = {
+      'allow-ok': new Response('User-agent: *\nDisallow:\n'),
+      'allow-partial': new Response('User-agent: *\nDisallow: /wp-json/\n'),
+      'allow-blocked': new Response('User-agent: Googlebot\nAllow: /\n\nUser-agent: *\nDisallow: /\n'),
+      'allow-missing': new Response('', { status: 404 }),
+      'allow-5xx': new Response('', { status: 530 }),
+      'allow-timeout': new Error('The operation was aborted due to timeout'),
+    };
+    try {
+      for (const name of Object.keys(bodies)) {
+        const host = `${name}-${Date.now()}.test`;
+        const fetcher = async (input: string | Request | URL) => {
+          const reply = String(input).endsWith('/robots.txt') ? bodies[name] : new Response('ok');
+          if (reply instanceof Error) throw reply;
+          return reply;
+        };
+        await politeFetch(`https://${host}/feed`, {}, { delayMs: 250, fetcher, resolveHost: async () => ['93.184.216.34'] }).catch(
+          (error: Error) => error,
+        );
+      }
+    } finally {
+      onRobotsObservation(null);
+    }
+    expect(seen.map((o) => [o.outcome, o.httpStatus, o.error, o.disallow])).toEqual([
+      ['allowed', 200, null, []],
+      ['partial', 200, null, ['/wp-json/']],
+      ['blocked', 200, null, ['/']],
+      ['missing', 404, null, []],
+      ['unreachable', 530, null, []],
+      ['unreachable', null, 'timeout', []],
+    ]);
+    const unreachable = await politeFetch(
+      `https://allow-again-${Date.now()}.test/feed`,
+      {},
+      { delayMs: 250, fetcher: async () => new Response('', { status: 503 }), resolveHost: async () => ['93.184.216.34'] },
+    ).catch((error: Error) => error.message);
+    expect(unreachable).toMatch(/^robots disallow \(robots\.txt unreachable\) /);
   });
 
   it('honors a matching robots disallow rule before requesting the feed', async () => {

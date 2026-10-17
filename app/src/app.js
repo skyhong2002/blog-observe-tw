@@ -12,6 +12,7 @@ import { installPrivateCachePolicy } from './cache-policy.ts';
 import { loadCatalog } from './catalog.js';
 import { loadAuthorCatalog } from './catalog-authors.js';
 import { registerContentRoutes } from './content/routes.ts';
+import { recordRobotsObservations } from './crawl/robots-observations.ts';
 import { createDb } from './db/client.ts';
 import { loadOverview } from './overview.js';
 import { overviewFailureDetails } from './overview-diagnostics.ts';
@@ -75,6 +76,8 @@ export async function buildApp(config, { logger = false, store = null } = {}) {
   });
   const own = store || createDb(config.blogDbUrl);
   const { pool } = own;
+  // Admin candidate checks read robots.txt here too; tests pass their own store and keep no listener.
+  if (!store) recordRobotsObservations(pool);
   registerPageLinks(app, pool);
   const startedAt = Date.now();
   const keys = createApiKeyService(pool);

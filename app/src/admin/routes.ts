@@ -5,6 +5,7 @@ import { readCookie, SESSION_COOKIE } from '../auth/google-login.ts';
 import { recordCandidateCheck } from '../crawl/candidate-promotion.ts';
 import { budgetedCandidateFetcher } from '../crawl/candidate-review.ts';
 import { type DiscoveryCandidate, validateCandidate } from '../crawl/candidate-validation.ts';
+import { robotsFor, robotsStatuses } from '../crawl/robots-observations.ts';
 import { createTagSimilarSitesClient, normalizeSimilarDomain } from '../crawl/similarweb-client.ts';
 import { cooldownUntil, mysqlSimilarwebStore } from '../crawl/similarweb-sync.ts';
 import { invalidateRelationCache } from '../relations/routes.ts';
@@ -77,7 +78,16 @@ export function registerAdminRoutes(app: FastifyInstance, config: AdminOptions) 
       "SELECT id,url,name,source_type sourceType,source_url sourceUrl,source_evidence sourceEvidence,status,discovered_at discoveredAt FROM discovery_candidates WHERE status=? AND id>? AND (?='' OR name LIKE ? OR url LIKE ?) ORDER BY id LIMIT ?",
       [status, cursor, search, `%${search}%`, `%${search}%`, limit + 1],
     );
-    return { candidates: rows.slice(0, limit), nextCursor: rows.length > limit ? rows[limit - 1].id : null, status };
+    const candidates = rows.slice(0, limit);
+    const robots = await robotsStatuses(
+      config.pool,
+      candidates.map((c) => c.url),
+    ).catch(() => new Map());
+    return {
+      candidates: candidates.map((c) => ({ ...c, robots: robotsFor(robots, c.url) })),
+      nextCursor: rows.length > limit ? rows[limit - 1].id : null,
+      status,
+    };
   });
   app.post('/api/admin/discovery/review', async (req) => {
     const b = object(req.body);

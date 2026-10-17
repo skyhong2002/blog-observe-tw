@@ -98,6 +98,11 @@ describe('automatic discovery verification', () => {
     const result = await validateCandidate({ ...candidate, url: 'https://blocked-candidate.test/' }, opts);
     expect(result.reason).toBe('robots_disallowed');
     expect(result.eligible).toBe(false);
+    // An unreadable robots.txt is still held closed, but reported apart from a real refusal.
+    opts.fetcher.mockImplementation(async () => new Response('down', { status: 530 }));
+    const down = await validateCandidate({ ...candidate, url: 'https://down-candidate.test/' }, opts);
+    expect(down.reason).toBe('robots_unreachable');
+    expect(down.eligible).toBe(false);
   });
   it('retains identity-matching media and ambiguous RSS sites without personal admission', async () => {
     for (const about of ['新聞媒體 編輯團隊', 'Quill Writer']) {

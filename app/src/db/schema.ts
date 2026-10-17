@@ -593,3 +593,15 @@ export const scraperGenerationAttempts = mysqlTable(
   },
   (table) => [index('scraper_attempts_target').on(table.targetType, table.targetId, table.createdAt)],
 );
+
+/** The latest robots.txt read per host (crawl/robots-observations.ts), shown next to blogs and candidates. */
+export const robotsObservations = mysqlTable('robots_observations', {
+  host: varchar('host', { length: 255 }).primaryKey(),
+  outcome: varchar('outcome', { length: 16 }).$type<'allowed' | 'missing' | 'partial' | 'blocked' | 'unreachable'>().notNull(),
+  httpStatus: int('http_status'),
+  error: varchar('error', { length: 32 }),
+  disallow: json('disallow').$type<string[]>(),
+  checkedAt: datetime('checked_at').notNull(),
+  /** Last time the file was read at all (any outcome but unreachable). */
+  readableAt: datetime('readable_at'),
+});

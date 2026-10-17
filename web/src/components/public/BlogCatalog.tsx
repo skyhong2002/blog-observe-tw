@@ -21,10 +21,23 @@ import {
   catalogQueryOf,
   isCatalogBaseline,
 } from '@/lib/public-query';
+import { type RobotsStatus, robotsLabel, robotsTone } from '@/lib/robots';
 import { table } from '@/lib/table-styles';
 import { asIs, usePublicJson } from '@/lib/use-public-json';
 
 type Status = 'ready' | 'pending' | 'error';
+
+/** What the blog's robots.txt last said to this crawler; the hover text names blocked paths and the read time. */
+function RobotsCell({ robots }: { robots?: RobotsStatus | null }) {
+  const { label, tone, title } = robotsLabel(robots);
+  return (
+    <td className={`${table.cell} text-xs ${robotsTone[tone]}`}>
+      <span className="block max-w-40 truncate" title={title}>
+        {label}
+      </span>
+    </td>
+  );
+}
 
 /**
  * `catalog` supplies the rows when `status` is ready; otherwise only its
@@ -255,7 +268,7 @@ export default function BlogCatalogView({
       {ready ? (
         <>
           <TableScroller card label="部落格與文章數表格，可左右捲動">
-            <table aria-busy={busy} className={`w-full min-w-[56rem] whitespace-nowrap text-sm ${busy ? 'opacity-60' : ''}`}>
+            <table aria-busy={busy} className={`w-full min-w-[64rem] whitespace-nowrap text-sm ${busy ? 'opacity-60' : ''}`}>
               <thead className="bg-zinc-50 text-left text-xs text-zinc-600 dark:bg-zinc-950 dark:text-zinc-400">
                 <tr>
                   <Th col="name" label="部落格" className={table.leadHead} />
@@ -264,6 +277,11 @@ export default function BlogCatalogView({
                   <Th col="authors" label="作者" className="text-right" />
                   <Th col="latest" label="最新文章" />
                   <Th col="crawl" label="抓取成功" />
+                  <th scope="col" className={table.cell}>
+                    <abbr title="這個網站的 robots.txt 對本站爬蟲的規則，滑過可看細節" className="no-underline">
+                      robots.txt
+                    </abbr>
+                  </th>
                   <Th col="status" label="狀態" />
                 </tr>
               </thead>
@@ -304,6 +322,7 @@ export default function BlogCatalogView({
                     <td className={table.num}>{blog.authorCount?.toLocaleString('zh-TW') ?? '—'}</td>
                     <td className={`${table.cell} text-xs tabular-nums text-zinc-500`}>{taipei(blog.lastPublishedAt)}</td>
                     <td className={`${table.cell} text-xs tabular-nums text-zinc-500`}>{taipei(blog.lastCrawlSuccessAt)}</td>
+                    <RobotsCell robots={blog.robots} />
                     <td className={`${table.cell} text-xs`}>
                       <span className="block max-w-40 truncate" title={blog.statusLabel ?? '待核對'}>
                         {blog.statusLabel ?? '待核對'}

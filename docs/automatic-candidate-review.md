@@ -9,6 +9,7 @@
 - RSS／Atom XML 有實際文章，channel／alternate link 與首頁身份相符，所有文章網址均在該 publication 範圍。排除留言 feed、空 feed、混合作者／跨站轉載 feed；僅有 sitemap 尚不符合此階段的自動核准門檻。
 - 保留平台作者的子網域／路徑。網站搬家須有同一次安全抓取的 redirect 與完整名稱證據；寫入原網址別名，不把平台總站或同筆名作者跨站合併。
 - 所有網路請求沿用 robots、公開 DNS 釘選、每跳 URL/IP 檢查、識別 UA、每站延遲、大小與 timeout 限制；403／robots 不繞過。
+- robots.txt 只有 404／410 視為沒有限制；其他狀態碼、逾時或連線失敗都當成禁止（避免把站方故障當成許可）。後者記為 `robots_unreachable`，跟真的被規則擋下的 `robots_disallowed` 分開。每次實際讀取 robots.txt 的結果依 host 存在 `robots_observations`（`crawl/robots-observations.ts`：允許／無檔案／部分路徑限制／禁止／讀不到，附 HTTP 狀態、被擋路徑、上次讀到時間），顯示在 `/blogs/` 的「robots.txt」欄與管理頁候選清單。
 
 ## 交易與續跑
 

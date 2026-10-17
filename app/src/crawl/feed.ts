@@ -101,6 +101,31 @@ const parser = new XMLParser({
 });
 const hostNextAt = new Map<string, number>();
 const robotsCache = new Map<string, { expiresAt: number; disallow: string[] }>();
+/** What one read of a host's robots.txt said about our agent. `missing` (404/410) and `allowed` admit everything,
+ * `partial` blocks some paths, `blocked` blocks `/`; `unreachable` (any other status, a timeout or a network error)
+ * is held as a disallow, so an outage is not mistaken for permission. */
+export type RobotsObservation = {
+  host: string;
+  outcome: 'allowed' | 'missing' | 'partial' | 'blocked' | 'unreachable';
+  httpStatus: number | null;
+  error: 'timeout' | 'network' | 'invalid-response' | null;
+  disallow: string[];
+  checkedAt: Date;
+};
+let robotsListener: ((observation: RobotsObservation) => void) | null = null;
+/** One listener per process (robots-observations.ts keeps the latest read per host for the directory). */
+export function onRobotsObservation(listener: ((observation: RobotsObservation) => void) | null) {
+  robotsListener = listener;
+}
+function observeRobots(host: string, observation: Omit<RobotsObservation, 'host' | 'checkedAt'>) {
+  try {
+    robotsListener?.({ host: host.toLowerCase(), checkedAt: new Date(), ...observation });
+  } catch {
+    // A listener never changes the crawl's decision.
+  }
+}
+/** Marks a robots refusal that came from an unreadable robots.txt; the message still starts with `robots disallow`. */
+export const ROBOTS_UNREACHABLE = 'robots.txt unreachable';
 const DEFAULT_DELAY_MS = Math.max(250, Number(process.env.BLOG_CRAWL_DELAY_MS || 1200));
 // 8 MiB: full-content feeds of ~1,000 posts pass 5 MiB (wiwi.blog's RSS is 5.4 MiB).
 export const MAX_RESPONSE_BYTES = 8 * 1024 * 1024;
@@ -424,7 +449,7 @@ async function robotsAllows(
   timeoutMs: number,
   resolveHost: HostResolver,
   fetcher: FeedFetcher,
-): Promise<boolean> {
+): Promise<boolean | 'unreachable'> {
   const parsed = new URL(url);
   const origin = parsed.origin;
   const cached = robotsCache.get(origin);
@@ -445,14 +470,41 @@ async function robotsAllows(
       // A missing robots.txt grants access; an unavailable robots server is
       // treated as disallow to avoid turning a transient outage into a burst.
       if (response.status === 404 || response.status === 410) disallow = [];
-      else if (!response.ok) return false;
-      else disallow = robotsRules(await response.text(), userAgent);
+      else if (!response.ok) {
+        await response.body?.cancel().catch(() => {});
+        observeRobots(parsed.host, { outcome: 'unreachable', httpStatus: response.status, error: null, disallow: [] });
+        return 'unreachable';
+      } else disallow = robotsRules(await response.text(), userAgent);
       robotsCache.set(origin, { expiresAt: Date.now() + 3_600_000, disallow });
+      observeRobots(parsed.host, {
+        outcome:
+          response.status === 404 || response.status === 410
+            ? 'missing'
+            : disallow.includes('/')
+              ? 'blocked'
+              : disallow.length
+                ? 'partial'
+                : 'allowed',
+        httpStatus: response.status,
+        error: null,
+        disallow,
+      });
     } catch (error) {
       // Local admission never contacted the site. Preserve its identity so the
       // outer passive tap does not misreport a site-side robots block.
       if (localAdmissionFailure(error)) throw error;
-      return false;
+      const message = error instanceof Error ? error.message : '';
+      observeRobots(parsed.host, {
+        outcome: 'unreachable',
+        httpStatus: null,
+        error: /timeout|abort/i.test(message)
+          ? 'timeout'
+          : /unsafe crawl|response exceeds|too many/.test(message)
+            ? 'invalid-response'
+            : 'network',
+        disallow: [],
+      });
+      return 'unreachable';
     }
   }
   return !(disallow ?? []).some((rule) => parsed.pathname.startsWith(rule));
@@ -484,7 +536,9 @@ export async function politeFetch(
       hostNextAt.set(host, scheduled + delayMs);
       const wait = scheduled - Date.now();
       if (wait > 0) await new Promise((resolve) => setTimeout(resolve, wait));
-      if (!(await robotsAllows(url.toString(), userAgent, timeoutMs, resolveHost, fetcher))) throw new Error(`robots disallow ${url}`);
+      const allowed = await robotsAllows(url.toString(), userAgent, timeoutMs, resolveHost, fetcher);
+      if (allowed === 'unreachable') throw new Error(`robots disallow (${ROBOTS_UNREACHABLE}) ${url}`);
+      if (!allowed) throw new Error(`robots disallow ${url}`);
       const response = await pinnedFetch(
         target,
         {
