@@ -16,10 +16,10 @@ export default async function ArticlesPage({ searchParams }: { searchParams: Pro
     for (const item of Array.isArray(value) ? value : value === undefined ? [] : [value]) query.append(key, item);
   }
   const filters = articleFiltersOf(query);
-  const { posts } = await overview();
+  const { posts, genreStatus } = await overview();
   return (
-    <Suspense fallback={<ArticlesView asked={NO_SEARCH} latest={posts} search={null} filters={filters} />}>
-      <ArticlesFromUrl latest={posts} />
+    <Suspense fallback={<ArticlesView asked={NO_SEARCH} latest={posts} search={null} filters={filters} genreStatus={genreStatus} />}>
+      <ArticlesFromUrl latest={posts} genreStatus={genreStatus} />
     </Suspense>
   );
 }

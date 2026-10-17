@@ -1,5 +1,10 @@
 # Article reader filters
 
+The initial classification below is historical. The follow-up
+[Blog genres and reader contributions](blog-genres-20261017.md) supersedes its
+seed/import/runtime design: all 455 exported blogs are now AI-labelled and live
+filters use resolved database assignments and reader votes.
+
 ## Recommendation
 
 Offer an opt-in per-blog display cap and a separate multi-label blog genre exclusion.
@@ -76,16 +81,13 @@ remain unclassified until the review file is updated.
   `{ observedAt, blogs: [{ slug, name, description?, category }], tags: [{ slug, labels }] }`.
   `labels` is a newline-separated string. Generation replaces the review file;
   preserve manual corrections when updating it. It never opens a database.
-- Edit `data/blog-genre-review.json`, then run
-  `node tools/apply-blog-genres.ts --dry-run` to inspect whether the runtime map
-  would change; `--apply` writes only `data/blog-genres.json`. Running it again
-  reports `changed:false`. Removing an assignment removes it from the generated
-  map, so corrections are reversible. This applies a repository artifact, not DB
-  rows; no schema change, migration, or extra runtime database query is needed.
-- `app/src/overview.js` adds optional `blogGenres` to public latest-post DTOs.
-  `app/src/public-post.ts` allowlists it. `web/src/lib/api.ts` and
-  `public-contracts.ts` accept absent fields on older gateways and validate
-  known genre arrays when present. Missing genres never cause genre exclusion.
+- `data/blog-genre-review.json` and `data/blog-genres.json` are historical
+  round-one comparison artifacts. `data/blog-genre-seed.json` is the reviewed AI
+  seed; `tools/apply-blog-genres.ts --dry-run | --apply` now targets database AI
+  assignment rows. See the follow-up for migration and import order.
+- `app/src/overview.js` now resolves DB genres with an explicit unavailable
+  fallback. Public fields remain optional on older gateways; no repository map
+  is used for runtime filtering.
 - `web/src/lib/article-filters.ts` parses and applies preferences;
   `web/src/components/public/Articles.tsx` renders the GET form and counts;
   `web/src/app/articles/page.tsx` reads query parameters for the SSR fallback.

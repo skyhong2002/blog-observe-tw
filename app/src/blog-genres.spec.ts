@@ -24,7 +24,7 @@ describe('reviewable reader genres', () => {
     expect(Object.hasOwn(reserved, '__proto__')).toBe(true);
     expect(Object.getPrototypeOf(reserved)).toBe(Object.prototype);
   });
-  it('attaches genres to public latest posts without any additional database read', async () => {
+  it('attaches resolved database genres in one bounded read, with failure fallback', async () => {
     const statements: string[] = [];
     const pool = {
       query: async (sql: string) => {
@@ -37,13 +37,25 @@ describe('reviewable reader genres', () => {
               { id: 3, title: 'reserved', blogSlug: '__proto__' },
             ],
           ];
+        if (sql.includes('FROM blogs b JOIN blog_genre_assignments'))
+          return [[{ slug: 'kocpc', genre: 'gadgets', ai: 1, agrees: 0, disagrees: 0 }]];
         if (sql.includes('AS blogs,')) return [[{ blogs: 2, posts: 2 }]];
         return [[]];
       },
     };
     const data = await loadOverview(pool);
     expect(data.posts.map((post: Record<string, unknown>) => post.blogGenres)).toEqual([['gadgets'], [], []]);
-    expect(statements).toHaveLength(7);
+    expect(statements).toHaveLength(8);
+    expect(data.genreStatus).toBe('ready');
+    const unavailable = await loadOverview({
+      query: async (sql: string) => {
+        if (sql.includes('blog_genre_assignments')) throw Error('DB unavailable');
+        return pool.query(sql);
+      },
+    });
+    expect(unavailable.genreStatus).toBe('unavailable');
+    expect(unavailable.posts).toHaveLength(3);
+    expect(unavailable.posts[0].blogGenres).toBeUndefined();
     expect(publicPost({ blogGenres: ['food'], private: true })).toEqual({ blogGenres: ['food'], summary: '' });
   });
 });

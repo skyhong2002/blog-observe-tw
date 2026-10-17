@@ -12,7 +12,7 @@ export type GenreReview = {
 };
 type BlogEvidence = { slug: string; name: string; description?: string | null; category: string };
 type TagEvidence = { slug: string; labels: string };
-const rules: Record<BlogGenre, { identity: RegExp; tags: RegExp }> = {
+const rules: Partial<Record<BlogGenre, { identity: RegExp; tags: RegExp }>> = {
   food: { identity: /美食|食記|吃貨|食旅/, tags: /美食|食記|餐廳|小吃|甜點|咖啡廳|愛食記/ },
   travel: { identity: /旅遊|旅行|自由行/, tags: /旅遊|旅行|自由行|景點|住宿|飯店|一日遊/ },
   gadgets: { identity: /3c|消費電子|科技產品|手機評測/i, tags: /3c|iphone|android|手機|筆電|耳機|智慧手錶|相機|平板/i },
@@ -34,7 +34,7 @@ export function proposeGenres(blogs: BlogEvidence[], tags: TagEvidence[], observ
       .toSorted((a, b) => a.slug.localeCompare(b.slug, 'en'))
       .flatMap((blog) => {
         const labels = bySlug.get(blog.slug) ?? [];
-        const genres = (Object.entries(rules) as [BlogGenre, (typeof rules)[BlogGenre]][]).flatMap(([genre, rule]) => {
+        const genres = (Object.entries(rules) as [BlogGenre, NonNullable<(typeof rules)[BlogGenre]>][]).flatMap(([genre, rule]) => {
           const identity = [blog.name, blog.description, blog.category].filter((v): v is string => !!v && rule.identity.test(v));
           const matching = labels.filter((label) => rule.tags.test(label));
           if (!identity.length && matching.length < 6 && (matching.length < 3 || matching.length / labels.length < 0.25)) return [];

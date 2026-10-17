@@ -202,7 +202,7 @@ function SearchResults({ asked, search }: { asked: SearchParams; search: PublicL
   );
 }
 
-function LatestFilters({ filters }: { filters: ArticleFilters }) {
+function LatestFilters({ filters, genresReady }: { filters: ArticleFilters; genresReady: boolean }) {
   return (
     <form
       key={JSON.stringify(filters)}
@@ -225,7 +225,8 @@ function LatestFilters({ filters }: { filters: ArticleFilters }) {
           ))}
         </select>
       </div>
-      <fieldset>
+      {!genresReady && filters.exclude.map((genre) => <input key={genre} type="hidden" name="exclude" value={genre} />)}
+      <fieldset disabled={!genresReady}>
         <legend className="mb-2">排除部落格類型</legend>
         <div className="flex flex-wrap gap-x-4 gap-y-2">
           {Object.entries(BLOG_GENRES).map(([genre, label]) => (
@@ -237,7 +238,8 @@ function LatestFilters({ filters }: { filters: ArticleFilters }) {
         </div>
       </fieldset>
       <p className="text-xs leading-5 text-zinc-500 dark:text-zinc-400">
-        類型依站名、簡介與訂閱分類初步整理，可能有誤；分類尚未完整，未分類部落格一律保留。多類型部落格只要符合任一排除類型，整站文章就會隱藏；這不是單篇文章的標籤篩選。
+        類型依 AI
+        初判、讀者投票與管理員覆核整理，可能有誤；尚未分類或目前沒有顯示類型的部落格一律保留。多類型部落格只要符合任一排除類型，整站文章就會隱藏；這不是單篇文章的標籤篩選。
       </p>
       <div className="flex items-center gap-4">
         <button type="submit" className="rounded-lg bg-brand-700 px-4 py-2 text-white hover:bg-brand-800">
@@ -257,14 +259,18 @@ export default function ArticlesView({
   latest,
   search,
   filters = NO_ARTICLE_FILTERS,
+  genreStatus,
 }: {
   filters?: ArticleFilters;
+  genreStatus?: 'ready' | 'unavailable';
   asked: SearchParams;
   latest: Post[];
   search: PublicLoad<SearchResult> | null;
 }) {
   const searching = search !== null;
-  const filtered = filterLatestPosts(latest, filters);
+  const genresReady = genreStatus === 'ready';
+  const effective = genresReady ? filters : { ...filters, exclude: [] };
+  const filtered = filterLatestPosts(latest, effective);
   return (
     <div className="space-y-5 pb-8">
       <header>
@@ -316,7 +322,12 @@ export default function ArticlesView({
         </>
       ) : (
         <>
-          <LatestFilters filters={filters} />
+          <LatestFilters filters={filters} genresReady={genresReady} />
+          {!genresReady && (
+            <p role="status" className="text-sm">
+              類型篩選暫時無法使用，本次未套用類型排除；每站篇數限制仍有效。
+            </p>
+          )}
           <div role="status" className="space-y-1 text-xs leading-5 text-zinc-500 dark:text-zinc-400">
             <p>
               最近收錄的 {latest.length} 篇中顯示 {filtered.items.length} 篇 · 類型排除 {filtered.hiddenGenre} 篇、每站篇數限制隱藏{' '}
@@ -324,8 +335,8 @@ export default function ArticlesView({
             </p>
             <p>
               每站{filters.maxPerBlog ? `最多 ${filters.maxPerBlog} 篇` : '不限篇數'}；排除類型：
-              {filters.exclude.length ? filters.exclude.map((genre) => BLOG_GENRES[genre]).join('、') : '無'}。未分類文章{' '}
-              {filtered.unclassified} 篇，不受類型排除影響。
+              {effective.exclude.length ? effective.exclude.map((genre) => BLOG_GENRES[genre]).join('、') : '無'}。
+              {genresReady && <>目前沒有顯示類型的文章 {filtered.unclassified} 篇，不受類型排除影響。</>}
             </p>
             <p>只篩選這批最新文章，不會補入更早文章；搜尋結果不套用此篩選。</p>
           </div>
@@ -353,10 +364,10 @@ const askedOf = (params: { get(key: string): string | null }) =>
 const parseSearch = (raw: unknown, path: string) => normalizeSearch(raw, askedOf(new URL(path, 'http://local').searchParams));
 
 /** Reads ?q=&page=&blog= (inside the page's Suspense boundary) and searches through /api/search. */
-export function ArticlesFromUrl({ latest }: { latest: Post[] }) {
+export function ArticlesFromUrl({ latest, genreStatus }: { latest: Post[]; genreStatus?: 'ready' | 'unavailable' }) {
   const params = useSearchParams();
   const asked = askedOf(params);
   const filters = articleFiltersOf(params);
   const search = usePublicJson(asked.q ? searchPath(asked) : null, parseSearch);
-  return <ArticlesView asked={asked} latest={latest} search={search} filters={filters} />;
+  return <ArticlesView asked={asked} latest={latest} search={search} filters={filters} genreStatus={genreStatus} />;
 }

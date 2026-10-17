@@ -131,8 +131,24 @@ const sharedTags = (value: unknown) => {
   });
 };
 
+const genreStatus = (value: unknown) => value === 'ready' || value === 'unavailable';
+const genreState = (value: unknown) =>
+  shape(value, {
+    status: genreStatus,
+    items: (items) =>
+      rows(items, {
+        genre: (v) => text(v) && isBlogGenre(v as string),
+        source: (v) => v === 'ai' || v === 'admin' || v === 'community',
+        visible: boolean,
+        agrees: count,
+        disagrees: count,
+        adminOverride: (v) => v === null || v === 'set' || v === 'hide',
+      }),
+  });
+
 /** The full overview's keys (app/src/overview.js loadProjection). */
 const overviewShape = {
+  genreStatus: optional(genreStatus),
   posts: (value: unknown) => rows(value, { blogGenres: optional((v) => list(v) && v.every((g) => text(g) && isBlogGenre(g as string))) }),
   tags: rows,
   authors: rows,
@@ -392,7 +408,8 @@ export const PUBLIC_CONTRACTS: Record<PublicKind, (raw: unknown) => boolean> = {
   tag: (raw) => shape(raw, { tag: (value) => shape(value, { slug: text, label: text }), posts: rows, blogs: rows }),
   blog: (raw) =>
     shape(raw, {
-      blog: (value) => shape(value, { slug: text, name: text, authors: optional(rows), tags: optional(rows) }),
+      blog: (value) =>
+        shape(value, { slug: text, name: text, authors: optional(rows), tags: optional(rows), genreState: optional(genreState) }),
       posts: rows,
     }),
   // The evidence, shared-tag and text-similarity keys are newer than some gateways: absent is "not provided" in the view.

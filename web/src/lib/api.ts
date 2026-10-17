@@ -1,8 +1,10 @@
 import type { BlogGenre } from '../../../app/src/blog-genre-vocabulary.ts';
+import type { GenreState } from '../../../app/src/blog-genres/resolve.ts';
 
 // Optional readable page URLs from the gateway's page registry, next to the
 // stable slug/id they never replace (links: page-links.ts; absent = legacy URL).
 export type Blog = {
+  genreState?: GenreState;
   id?: number;
   slug: string;
   canonicalPath?: string;
@@ -63,7 +65,7 @@ export type Post = {
   blogCanonicalPath?: string;
   blogName?: string;
   imageUrl?: string | null;
-  /** Reader genres from the reviewable blog map; absent on older gateways, empty when unclassified. */
+  /** Resolved database genres; absent on older gateways, empty when unclassified. */
   blogGenres?: BlogGenre[];
   /** The author's feed categories, at most a few (app/src/post-tags.ts); absent when none or not sent. */
   tags?: Tag[];
@@ -72,6 +74,7 @@ export type Post = {
 };
 export type Follow = Pick<Blog, 'slug' | 'name' | 'url' | 'category' | 'iconUrl' | 'canonicalPath'>;
 export type Overview = {
+  genreStatus?: 'ready' | 'unavailable';
   posts: Post[];
   tags: Array<Tag & { postCount: number; blogCount: number }>;
   authors: Author[];

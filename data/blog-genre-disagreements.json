@@ -1,0 +1,714 @@
+[
+  {
+    "slug": "kocpc",
+    "name": "電腦王阿達",
+    "heuristic": [
+      "gadgets"
+    ],
+    "ai": [
+      "gadgets",
+      "news"
+    ]
+  },
+  {
+    "slug": "bobbyfun-248",
+    "name": "波比 (BobbyFun)",
+    "heuristic": [
+      "travel"
+    ],
+    "ai": [
+      "travel",
+      "food"
+    ]
+  },
+  {
+    "slug": "beurlife-279",
+    "name": "這就是人生beurlife",
+    "heuristic": [
+      "finance",
+      "life",
+      "travel"
+    ],
+    "ai": [
+      "finance",
+      "travel"
+    ]
+  },
+  {
+    "slug": "seed-292",
+    "name": "寶寶溫",
+    "heuristic": [
+      "travel"
+    ],
+    "ai": [
+      "travel",
+      "parenting",
+      "food"
+    ]
+  },
+  {
+    "slug": "nash-tw-312",
+    "name": "Nash.tw 神之領域",
+    "heuristic": [
+      "food",
+      "travel"
+    ],
+    "ai": [
+      "food"
+    ]
+  },
+  {
+    "slug": "tenjo-360",
+    "name": "周花花 (tenjo)",
+    "heuristic": [
+      "food",
+      "travel"
+    ],
+    "ai": [
+      "food"
+    ]
+  },
+  {
+    "slug": "fullfenblog-366",
+    "name": "滿分 fullfenblog",
+    "heuristic": [
+      "food",
+      "travel"
+    ],
+    "ai": [
+      "travel",
+      "food",
+      "parenting"
+    ]
+  },
+  {
+    "slug": "seed-367",
+    "name": "虎麗",
+    "heuristic": [
+      "food",
+      "travel"
+    ],
+    "ai": [
+      "food"
+    ]
+  },
+  {
+    "slug": "blake-com-410",
+    "name": "布雷克 blake.com",
+    "heuristic": [
+      "travel"
+    ],
+    "ai": [
+      "food",
+      "travel"
+    ]
+  },
+  {
+    "slug": "nellydyu-420",
+    "name": "尼力 (nellydyu)",
+    "heuristic": [
+      "food",
+      "travel"
+    ],
+    "ai": [
+      "food",
+      "travel",
+      "parenting"
+    ]
+  },
+  {
+    "slug": "seed-423",
+    "name": "重灌狂人",
+    "heuristic": [
+      "gadgets"
+    ],
+    "ai": [
+      "programming"
+    ]
+  },
+  {
+    "slug": "nico-niniyeh-447",
+    "name": "Nico niniyeh",
+    "heuristic": [
+      "travel"
+    ],
+    "ai": [
+      "food",
+      "travel"
+    ]
+  },
+  {
+    "slug": "upssmile-com-492",
+    "name": "upssmile.com/",
+    "heuristic": [
+      "travel"
+    ],
+    "ai": [
+      "food",
+      "travel"
+    ]
+  },
+  {
+    "slug": "icecreamcat-tw-526",
+    "name": "冰淇淋貓 icecreamcat.tw",
+    "heuristic": [
+      "food",
+      "travel"
+    ],
+    "ai": [
+      "food"
+    ]
+  },
+  {
+    "slug": "wendyjourney-com-532",
+    "name": "wendyjourney.com/",
+    "heuristic": [
+      "food",
+      "travel"
+    ],
+    "ai": [
+      "travel",
+      "parenting"
+    ]
+  },
+  {
+    "slug": "curly-559",
+    "name": "捲捲頭 curly",
+    "heuristic": [
+      "food",
+      "travel"
+    ],
+    "ai": [
+      "travel",
+      "parenting",
+      "food"
+    ]
+  },
+  {
+    "slug": "eggie-tw-570",
+    "name": "蛋寶趴趴走 eggie.tw",
+    "heuristic": [
+      "travel"
+    ],
+    "ai": [
+      "food",
+      "travel"
+    ]
+  },
+  {
+    "slug": "sunnylife-tw-591",
+    "name": "商妮 sunnylife.tw",
+    "heuristic": [
+      "food",
+      "travel"
+    ],
+    "ai": [
+      "food"
+    ]
+  },
+  {
+    "slug": "inmap-610",
+    "name": "高雄美食地圖inmap",
+    "heuristic": [
+      "food",
+      "travel"
+    ],
+    "ai": [
+      "food"
+    ]
+  },
+  {
+    "slug": "tony-611",
+    "name": "猴屁 tony",
+    "heuristic": [
+      "food",
+      "travel"
+    ],
+    "ai": [
+      "food"
+    ]
+  },
+  {
+    "slug": "ez3c-657",
+    "name": "哇哇 ez3c",
+    "heuristic": [
+      "gadgets"
+    ],
+    "ai": [
+      "programming"
+    ]
+  },
+  {
+    "slug": "yiwu-trip-662",
+    "name": "依武 yiwu trip",
+    "heuristic": [
+      "gadgets",
+      "travel"
+    ],
+    "ai": [
+      "travel",
+      "gadgets",
+      "life"
+    ]
+  },
+  {
+    "slug": "cmeyy-663",
+    "name": "可人之家cmeyy",
+    "heuristic": [
+      "travel"
+    ],
+    "ai": [
+      "travel",
+      "parenting"
+    ]
+  },
+  {
+    "slug": "gwan-679",
+    "name": "吃關關 gwan",
+    "heuristic": [
+      "food",
+      "travel"
+    ],
+    "ai": [
+      "travel",
+      "parenting",
+      "food"
+    ]
+  },
+  {
+    "slug": "angelala-tw-681",
+    "name": "美食好芃友 angelala.tw",
+    "heuristic": [
+      "food",
+      "travel"
+    ],
+    "ai": [
+      "food"
+    ]
+  },
+  {
+    "slug": "marcy-685",
+    "name": "瑪西隨筆 marcy",
+    "heuristic": [
+      "food",
+      "travel"
+    ],
+    "ai": [
+      "food"
+    ]
+  },
+  {
+    "slug": "carol-691",
+    "name": "Carol自在生活",
+    "heuristic": [
+      "life"
+    ],
+    "ai": [
+      "food"
+    ]
+  },
+  {
+    "slug": "seed-692",
+    "name": "熊貓愛吃魚",
+    "heuristic": [
+      "food",
+      "travel"
+    ],
+    "ai": [
+      "travel"
+    ]
+  },
+  {
+    "slug": "seed-702",
+    "name": "米寶麻",
+    "heuristic": [
+      "food",
+      "travel"
+    ],
+    "ai": [
+      "food"
+    ]
+  },
+  {
+    "slug": "anikofoodie-709",
+    "name": "anikofoodie",
+    "heuristic": [
+      "food",
+      "travel"
+    ],
+    "ai": [
+      "food"
+    ]
+  },
+  {
+    "slug": "marifoodie-796",
+    "name": "瑪莉食報 marifoodie",
+    "heuristic": [
+      "food",
+      "travel"
+    ],
+    "ai": [
+      "food"
+    ]
+  },
+  {
+    "slug": "bewithnene-tw-802",
+    "name": "捏捏 bewithnene.tw",
+    "heuristic": [
+      "travel"
+    ],
+    "ai": [
+      "anime",
+      "culture"
+    ]
+  },
+  {
+    "slug": "seed-805",
+    "name": "樂活台南",
+    "heuristic": [
+      "food",
+      "travel"
+    ],
+    "ai": [
+      "food"
+    ]
+  },
+  {
+    "slug": "kavana-tw-817",
+    "name": "kavana.tw",
+    "heuristic": [
+      "travel"
+    ],
+    "ai": [
+      "food"
+    ]
+  },
+  {
+    "slug": "seed-822",
+    "name": "馬克解讀",
+    "heuristic": [
+      "finance"
+    ],
+    "ai": [
+      "finance",
+      "news"
+    ]
+  },
+  {
+    "slug": "https-13shaniu-tw-839",
+    "name": "傻妞 https://13shaniu.tw",
+    "heuristic": [
+      "food",
+      "travel"
+    ],
+    "ai": [
+      "food",
+      "life"
+    ]
+  },
+  {
+    "slug": "achingfoodie-940",
+    "name": "阿青 achingfoodie",
+    "heuristic": [
+      "food",
+      "travel"
+    ],
+    "ai": [
+      "food"
+    ]
+  },
+  {
+    "slug": "dacota",
+    "name": "雲爸 dacota.tw",
+    "heuristic": [
+      "gadgets"
+    ],
+    "ai": [
+      "gadgets",
+      "programming"
+    ]
+  },
+  {
+    "slug": "girlslifeplan-958",
+    "name": "女子休假計劃 girlslifeplan",
+    "heuristic": [
+      "food",
+      "travel"
+    ],
+    "ai": [
+      "food"
+    ]
+  },
+  {
+    "slug": "nasheat-964",
+    "name": "Nasheat神之領域",
+    "heuristic": [
+      "travel"
+    ],
+    "ai": [
+      "food",
+      "life"
+    ]
+  },
+  {
+    "slug": "seed-971",
+    "name": "大丈夫週記",
+    "heuristic": [
+      "life"
+    ],
+    "ai": [
+      "life",
+      "parenting",
+      "finance"
+    ]
+  },
+  {
+    "slug": "seed-975",
+    "name": "冒險安迪",
+    "heuristic": [
+      "travel"
+    ],
+    "ai": [
+      "travel",
+      "food"
+    ]
+  },
+  {
+    "slug": "bear-976",
+    "name": "貪吃鬼熊熊 bear",
+    "heuristic": [
+      "food",
+      "travel"
+    ],
+    "ai": [
+      "food"
+    ]
+  },
+  {
+    "slug": "bearlovefood-978",
+    "name": "吟詩旅人bearlovefood",
+    "heuristic": [
+      "food",
+      "travel"
+    ],
+    "ai": [
+      "food"
+    ]
+  },
+  {
+    "slug": "ken-alice-982",
+    "name": "Ken&Alice",
+    "heuristic": [
+      "food",
+      "travel"
+    ],
+    "ai": [
+      "food",
+      "travel",
+      "parenting"
+    ]
+  },
+  {
+    "slug": "jerremy-986",
+    "name": "Jerremy以食為天",
+    "heuristic": [
+      "food",
+      "travel"
+    ],
+    "ai": [
+      "food"
+    ]
+  },
+  {
+    "slug": "donna-tw-998",
+    "name": "跟著 donna.tw",
+    "heuristic": [
+      "food",
+      "travel"
+    ],
+    "ai": [
+      "food"
+    ]
+  },
+  {
+    "slug": "seed-1013",
+    "name": "萌芽",
+    "heuristic": [
+      "life"
+    ],
+    "ai": [
+      "life",
+      "programming"
+    ]
+  },
+  {
+    "slug": "bonie-tw-1014",
+    "name": "朱寶妮 bonie.tw",
+    "heuristic": [
+      "food",
+      "travel"
+    ],
+    "ai": [
+      "food"
+    ]
+  },
+  {
+    "slug": "seed-1036",
+    "name": "大口",
+    "heuristic": [
+      "travel"
+    ],
+    "ai": [
+      "food",
+      "travel"
+    ]
+  },
+  {
+    "slug": "gowith-marknhazyl-1051",
+    "name": "gowith marknhazyl",
+    "heuristic": [
+      "travel"
+    ],
+    "ai": [
+      "travel",
+      "parenting"
+    ]
+  },
+  {
+    "slug": "https-longson1001-wordpress-com-1062",
+    "name": "https://longson1001.wordpress.com/",
+    "heuristic": [
+      "life"
+    ],
+    "ai": [
+      "life",
+      "culture"
+    ]
+  },
+  {
+    "slug": "g-1090",
+    "name": "G子的漫畫生活",
+    "heuristic": [
+      "food",
+      "life",
+      "travel"
+    ],
+    "ai": [
+      "food",
+      "life",
+      "gadgets"
+    ]
+  },
+  {
+    "slug": "whos-talking-com-1098",
+    "name": "胡說 whos-talking.com",
+    "heuristic": [
+      "food",
+      "travel"
+    ],
+    "ai": [
+      "food"
+    ]
+  },
+  {
+    "slug": "kellylife-tw-1102",
+    "name": "台南凱莉kellylife.tw",
+    "heuristic": [
+      "food",
+      "travel"
+    ],
+    "ai": [
+      "food"
+    ]
+  },
+  {
+    "slug": "jessy-tw-1103",
+    "name": "jessy.tw",
+    "heuristic": [
+      "travel"
+    ],
+    "ai": [
+      "travel",
+      "culture",
+      "life"
+    ]
+  },
+  {
+    "slug": "lexie-tw-1112",
+    "name": "lexie.tw",
+    "heuristic": [
+      "travel"
+    ],
+    "ai": [
+      "food"
+    ]
+  },
+  {
+    "slug": "onegeek-1117",
+    "name": "壹哥 onegeek",
+    "heuristic": [
+      "gadgets"
+    ],
+    "ai": [
+      "gadgets",
+      "news"
+    ]
+  },
+  {
+    "slug": "yololab-1187",
+    "name": "YoloLab",
+    "heuristic": [
+      "life"
+    ],
+    "ai": [
+      "culture",
+      "programming",
+      "gadgets"
+    ]
+  },
+  {
+    "slug": "discovered-1c59375a44923c75f2a2",
+    "name": "PJCHENder那些沒告訴你的小細節",
+    "heuristic": [
+      "programming"
+    ],
+    "ai": [
+      "programming",
+      "life"
+    ]
+  },
+  {
+    "slug": "discovered-859cb7ca78f948c10dc6",
+    "name": "カレー補完計畫",
+    "heuristic": [
+      "travel"
+    ],
+    "ai": [
+      "anime",
+      "culture"
+    ]
+  },
+  {
+    "slug": "discovered-f6fd5a0c3c2e00c86b36",
+    "name": "Staylogue｜旅行、攝影與生活筆記",
+    "heuristic": [
+      "travel"
+    ],
+    "ai": [
+      "travel",
+      "creative",
+      "life"
+    ]
+  },
+  {
+    "slug": "discovered-16b13d7ff9574ee1b7a5",
+    "name": "Zeroplex 生活隨筆",
+    "heuristic": [
+      "life"
+    ],
+    "ai": [
+      "programming",
+      "life"
+    ]
+  }
+]

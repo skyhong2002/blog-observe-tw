@@ -1,4 +1,4 @@
-import blogGenres from '../../data/blog-genres.json' with { type: 'json' };
+import { readBlogGenres } from './blog-genres/store.ts';
 import { overviewFailureDetails, overviewRead } from './overview-diagnostics.ts';
 import { loadPostTags } from './post-tags.ts';
 import { publicPost } from './public-post.ts';
@@ -178,14 +178,30 @@ async function loadProjection(pool, { onFailure } = {}) {
     onFailure?.(overviewFailureDetails(error, pool));
     return new Map();
   });
+  const genres = await readBlogGenres(
+    pool,
+    postRows[0].map((post) => post.blogSlug),
+    () => {
+      onFailure?.({ operation: 'full.genres', message: 'blog genres unavailable' });
+    },
+  );
   const row = totalRows[0][0];
   return {
     generatedAt: new Date().toISOString(),
     cacheSeconds: 0,
+    genreStatus: genres.status,
     posts: postRows[0].map((post) =>
       publicPost({
         ...post,
-        blogGenres: Object.hasOwn(blogGenres, post.blogSlug) ? blogGenres[post.blogSlug] : [],
+        ...(genres.status === 'ready'
+          ? {
+              blogGenres:
+                genres.blogs
+                  .get(post.blogSlug)
+                  ?.items.filter((item) => item.visible)
+                  .map((item) => item.genre) ?? [],
+            }
+          : {}),
         ...postTags.get(Number(post.id)),
       }),
     ),

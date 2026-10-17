@@ -6,6 +6,8 @@ import { registerAdminRoutes } from './admin/routes.ts';
 import { registerAiRoutes } from './ai/routes.ts';
 import { registerLogin } from './auth/google-login.ts';
 import { dbLoginStore } from './auth/store.ts';
+import { registerBlogGenreRoutes } from './blog-genres/routes.ts';
+import { readBlogGenres } from './blog-genres/store.ts';
 import { installPrivateCachePolicy } from './cache-policy.ts';
 import { loadCatalog } from './catalog.js';
 import { loadAuthorCatalog } from './catalog-authors.js';
@@ -229,6 +231,9 @@ export async function buildApp(config, { logger = false, store = null } = {}) {
     return {
       blog: {
         ...blogs[0],
+        genreState: await readBlogGenres(pool, [blogs[0].slug], () =>
+          request.log.warn({ operation: 'blog.genres' }, 'blog genres unavailable'),
+        ).then((result) => result.blogs.get(blogs[0].slug) ?? { status: 'unavailable', items: [] }),
         iconUrl: iconUrl(blogs[0].slug, await iconManifest()),
         authors,
         tags,
@@ -255,6 +260,13 @@ export async function buildApp(config, { logger = false, store = null } = {}) {
     }
     return user;
   };
+  registerBlogGenreRoutes(app, {
+    pool,
+    requireUser,
+    adminEmails: config.adminEmails,
+    publicOrigin: config.publicOrigin,
+    sessionSecret: config.login?.sessionSecret || '',
+  });
   app.get('/api/me/follows', async (request, reply) => {
     const user = await requireUser(request, reply);
     if (!user) return reply;

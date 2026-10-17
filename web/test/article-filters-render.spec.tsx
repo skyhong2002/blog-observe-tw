@@ -22,7 +22,7 @@ vi.mock('next/link', async () => {
   };
 });
 vi.mock('@/components/BlogIcon', () => ({ default: () => null }));
-vi.mock('@/lib/public-api', () => ({ overview: async () => ({ posts: state.posts }) }));
+vi.mock('@/lib/public-api', () => ({ overview: async () => ({ posts: state.posts, genreStatus: 'ready' }) }));
 
 const posts: Post[] = [
   { id: 1, title: 'Food latest', blogSlug: 'food', blogGenres: ['food', 'travel'] },
@@ -39,7 +39,9 @@ beforeEach(() => {
 describe('latest article preferences: server rendering', () => {
   test('shows active preferences, partitioned counts, checked inputs and a reset link', () => {
     const $ = load(
-      renderToString(<ArticlesView asked={NO_SEARCH} latest={posts} search={null} filters={{ maxPerBlog: 1, exclude: ['food'] }} />),
+      renderToString(
+        <ArticlesView genreStatus="ready" asked={NO_SEARCH} latest={posts} search={null} filters={{ maxPerBlog: 1, exclude: ['food'] }} />,
+      ),
     );
     expect(
       $('h3')
@@ -55,7 +57,7 @@ describe('latest article preferences: server rendering', () => {
         .filter((_, el) => $(el).text() === '清除篩選')
         .attr('href'),
     ).toBe('/articles/');
-    expect($.text()).toContain('未分類部落格一律保留');
+    expect($.text()).toContain('尚未分類或目前沒有顯示類型的部落格一律保留');
     expect($.text()).toContain('不會補入更早文章');
   });
   test('the force-dynamic page fallback reads URL preferences on the server', async () => {
@@ -72,21 +74,40 @@ describe('latest article preferences: server rendering', () => {
   });
   test('client URL navigation reuses the same parser and leaves older-gateway posts visible', () => {
     state.query = 'maxPerBlog=1&exclude=food&exclude=gadgets';
-    const $ = load(renderToString(<ArticlesFromUrl latest={posts} />));
+    const $ = load(renderToString(<ArticlesFromUrl latest={posts} genreStatus="ready" />));
     expect(
       $('h3')
         .map((_, el) => $(el).text())
         .get(),
     ).toEqual(['Other latest']);
-    expect($.text()).toContain('未分類文章 2 篇');
+    expect($.text()).toContain('目前沒有顯示類型的文章 2 篇');
   });
   test('distinguishes filtered empty results from an empty source list', () => {
     const filtered = renderToString(
-      <ArticlesView asked={NO_SEARCH} latest={[posts[0]]} search={null} filters={{ maxPerBlog: 0, exclude: ['food'] }} />,
+      <ArticlesView
+        genreStatus="ready"
+        asked={NO_SEARCH}
+        latest={[posts[0]]}
+        search={null}
+        filters={{ maxPerBlog: 0, exclude: ['food'] }}
+      />,
     );
     expect(filtered).toContain('這批文章都被篩選隱藏了');
-    const empty = renderToString(<ArticlesView asked={NO_SEARCH} latest={[]} search={null} />);
+    const empty = renderToString(<ArticlesView genreStatus="ready" asked={NO_SEARCH} latest={[]} search={null} />);
     expect(empty).toContain('目前還沒有收錄文章');
+  });
+  test('an unavailable or older gateway disables genre exclusions while still applying the per-blog cap', () => {
+    const $ = load(
+      renderToString(<ArticlesView asked={NO_SEARCH} latest={posts} search={null} filters={{ maxPerBlog: 1, exclude: ['food'] }} />),
+    );
+    expect(
+      $('h3')
+        .map((_, el) => $(el).text())
+        .get(),
+    ).toEqual(['Food latest', 'Other latest', 'Gadget latest']);
+    expect($('fieldset').is('[disabled]')).toBe(true);
+    expect($.text()).toContain('本次未套用類型排除');
+    expect($.text()).toContain('每站篇數限制隱藏 1 篇');
   });
   test('search mode explicitly states its scope and does not show latest-only controls', () => {
     const $ = load(

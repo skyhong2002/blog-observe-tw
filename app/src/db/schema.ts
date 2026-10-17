@@ -2,6 +2,7 @@ import { sql } from 'drizzle-orm';
 import {
   boolean,
   char,
+  check,
   datetime,
   index,
   int,
@@ -513,3 +514,34 @@ export const postSearchDocuments = mysqlTable('post_search_documents', {
   tokens: mediumtext('tokens').notNull(),
   indexedAt: datetime('indexed_at').notNull(),
 });
+
+export const blogGenreAssignments = mysqlTable(
+  'blog_genre_assignments',
+  {
+    blogId: int('blog_id').notNull(),
+    genre: varchar('genre', { length: 32 }).notNull(),
+    source: varchar('source', { length: 16 }).$type<'ai' | 'admin' | 'community'>().notNull(),
+    status: varchar('status', { length: 16 }).$type<'active' | 'candidate' | 'hidden'>().notNull(),
+    reason: text('reason'),
+    actorUserId: int('actor_user_id'),
+    createdAt: datetime('created_at').notNull(),
+    updatedAt: datetime('updated_at').notNull(),
+  },
+  (table) => [primaryKey({ columns: [table.blogId, table.genre, table.source] })],
+);
+
+export const blogGenreVotes = mysqlTable(
+  'blog_genre_votes',
+  {
+    blogId: int('blog_id').notNull(),
+    genre: varchar('genre', { length: 32 }).notNull(),
+    userId: int('user_id').notNull(),
+    vote: int('vote').notNull(),
+    at: datetime('at').notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.blogId, table.genre, table.userId] }),
+    index('blog_genre_vote_counts').on(table.blogId, table.genre, table.vote),
+    check('blog_genre_vote_value', sql`${table.vote} IN (-1, 1)`),
+  ],
+);
