@@ -187,10 +187,26 @@
       "occurrences": 1
     },
     {
+      "path": "app/src/crawl/candidate-promotion.ts",
+      "digest": "b241ad9d2ff4a056a9a0c8044bd5b00361b5bcbe157459aa4aa3001a190aeb4a",
+      "tables": [],
+      "dynamic": true,
+      "occurrences": 1
+    },
+    {
       "path": "app/src/crawl/feed.ts",
       "digest": "104220ae0fa714ed6161d4de976f7527564ddac3371869888983cb871497c6bb",
       "tables": [],
       "dynamic": true,
+      "occurrences": 1
+    },
+    {
+      "path": "app/src/crawl/feed.ts",
+      "digest": "2ad714cd9aef377d77b626899e200184c86d3422afe52971674c8f66be55c994",
+      "tables": [
+        "blogs"
+      ],
+      "dynamic": false,
       "occurrences": 1
     },
     {
@@ -696,6 +712,29 @@
         "relation_observations"
       ],
       "dynamic": false,
+      "occurrences": 1
+    },
+    {
+      "path": "app/src/scrapers/repair.ts",
+      "digest": "83e1a63abb34859bbd3fb3cbd296b81305d3dbf0efd197d377d0b0168cdbbee1",
+      "tables": [
+        "content_post_bodies"
+      ],
+      "dynamic": false,
+      "occurrences": 1
+    },
+    {
+      "path": "app/src/scrapers/store.ts",
+      "digest": "3d5bd877bfdacff7bcf0ccbf9a8e86a0da98d2bd319ccc7534a86e643af60e6a",
+      "tables": [],
+      "dynamic": true,
+      "occurrences": 1
+    },
+    {
+      "path": "app/src/scrapers/store.ts",
+      "digest": "53613d993023b5f83418021a1b18035b32fc590162d21138b5fd8f7d6b56f7d0",
+      "tables": [],
+      "dynamic": true,
       "occurrences": 1
     },
     {

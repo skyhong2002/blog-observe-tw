@@ -4,6 +4,7 @@ import { type AdminActor, requireAdminTransaction, writeAudit } from '../admin/i
 import { AI_POLICY, inputKey, normalizeInput } from '../ai/contracts.ts';
 import { aiPersonalProof, deterministicPersonalProof } from '../ai/personal.ts';
 import { reserveBudgetOnConnection } from '../jobs/budget.ts';
+import { activateScraperOnConnection } from '../scrapers/store.ts';
 import {
   CANDIDATE_POLICY,
   type CandidateCheck,
@@ -149,9 +150,11 @@ export async function recordCandidateCheck(
     }
     // biome-ignore lint/suspicious/noConfusingLabels: all declines must reach the shared append-only audit below.
     admission: if (apply && check.eligible) {
+      // A generated scraper replaces the feed; the home must still be the identity-confirmed publication home.
+      const scraped = check.feed?.type === 'scraper' && Boolean(check.scraper);
       if (
         candidatePreflight({ ...candidate, status: 'candidate', name: effectiveName } as Parameters<typeof candidatePreflight>[0]) ||
-        !v?.validated ||
+        !(v?.validated || (scraped && v?.evidence.identityMatches.length)) ||
         !v.finalUrl ||
         v.inputUrl !== check.inputUrl ||
         v.id !== check.id ||
@@ -161,7 +164,7 @@ export async function recordCandidateCheck(
         !v.evidence.identityMatches.length ||
         !check.feed ||
         !candidateIdentityConfirmed(effectiveName, v, check.feed.title) ||
-        !['rss', 'atom', 'sitemap'].includes(check.feed.type) ||
+        !(['rss', 'atom', 'sitemap'].includes(check.feed.type) || scraped) ||
         !isAllowedCrawlUrl(check.feed.url) ||
         check.feed.url.length > 1024 ||
         check.feed.entries < 1 ||
@@ -193,6 +196,16 @@ export async function recordCandidateCheck(
         decline('article_sitemap_evidence_invalid');
         break admission;
       }
+      if (scraped) {
+        const [[row]] = await c.query<RowDataPacket[]>(
+          "SELECT id FROM blog_scrapers WHERE id=? AND candidate_id=? AND status='validated' AND code_sha256=? FOR UPDATE",
+          [check.scraper!.id, check.id, check.scraper!.codeSha256],
+        );
+        if (!row) {
+          decline('generated_scraper_missing');
+          break admission;
+        }
+      }
       const keys = new Set([safeKey(candidate.url), safeKey(v.finalUrl)]);
       const [rejected] = await c.query<RowDataPacket[]>("SELECT id,url FROM discovery_candidates WHERE status='rejected' FOR UPDATE");
       const [known] = await c.query<RowDataPacket[]>(
@@ -206,7 +219,7 @@ export async function recordCandidateCheck(
       else {
         const owner = [...owners.values()][0];
         const [feeds] = await c.query<RowDataPacket[]>('SELECT blog_id,url FROM feed_sources FOR UPDATE');
-        const feedOwners = feeds.filter((row) => safeKey(row.url) === safeKey(check.feed!.url));
+        const feedOwners = scraped ? [] : feeds.filter((row) => safeKey(row.url) === safeKey(check.feed!.url));
         const feedOwner = feedOwners[0];
         if (feedOwners.some((row) => row.blog_id !== owner?.id)) reason = 'feed_owned_by_other_blog';
         else {
@@ -259,7 +272,10 @@ export async function recordCandidateCheck(
               ]);
             }
           // Never transfer a feed or replace an existing publication's metadata.
-          if (!feedOwner)
+          if (scraped) {
+            if (!(await activateScraperOnConnection(c, check.scraper!.id, blogId!, check.scraper!.codeSha256, now)))
+              throw Error('generated scraper changed during admission');
+          } else if (!feedOwner)
             await c.execute('INSERT INTO feed_sources (blog_id,url,type,last_success_at,consecutive_failures) VALUES (?,?,?,?,0)', [
               blogId,
               check.feed.url,
@@ -287,7 +303,7 @@ export async function recordCandidateCheck(
         blogId ? (admin ? 'approve' : 'auto-approve') : admin ? 'verify' : 'auto-verify',
         candidate.status,
         status,
-        admin ? 'human-review' : 'automatic-rss-review',
+        admin ? 'human-review' : check.feed?.type === 'scraper' ? 'automatic-scraper-review' : 'automatic-rss-review',
         admin?.actor.id || null,
         candidate.url,
         JSON.stringify(review),

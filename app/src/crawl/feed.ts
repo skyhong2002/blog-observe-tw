@@ -11,7 +11,7 @@ import { ingestContentEvidence } from '../content/store.ts';
 import { identityKey, publicationDecision } from '../relations/identity.ts';
 import { type BodyIndexOptions, createBodyIndexStages } from '../search-index-staging.ts';
 
-export type FeedSourceType = 'rss' | 'atom' | 'sitemap' | 'wordpress';
+export type FeedSourceType = 'rss' | 'atom' | 'sitemap' | 'wordpress' | 'scraper';
 export type FeedLink = { url: string; type: FeedSourceType };
 /** Internal-only evidence. Public lists and RSS continue reading the bounded posts.summary. */
 export type FeedContent = {
@@ -1050,6 +1050,106 @@ export async function writeFeedEntries(
 
 /** Crawl one blog using the existing schema.  The worker supplies its own
  * pool; no queue, database, or session is shared with sibling services. */
+const SCRAPER_TAKEOVER_MS = 14 * 86400000;
+/** A generated scraper (app/src/scrapers) crawls a blog while none of its feeds has worked for 14 days. Loaded
+ * lazily: the scraper modules import this one. */
+async function scraperInCharge(pool: SqlPool, blogId: number, now: Date) {
+  const { activeScraper } = await import('../scrapers/store.ts');
+  const scraper = await activeScraper(pool, blogId);
+  if (!scraper) return null;
+  const [rows] = await pool.execute('SELECT 1 FROM feed_sources WHERE blog_id=? AND last_success_at>? LIMIT 1', [
+    blogId,
+    new Date(now.getTime() - SCRAPER_TAKEOVER_MS),
+  ]);
+  return Array.isArray(rows) && rows.length ? null : scraper;
+}
+async function crawlWithScraper(
+  pool: SqlPool,
+  blog: BlogToCrawl,
+  scraper: import('../scrapers/store.ts').StoredScraper,
+  options: FeedCrawlerOptions,
+  now: Date,
+): Promise<{ blog: string; sources: number; posts: number }> {
+  const [{ scrapeBlog }, { recordScraperRun }] = await Promise.all([import('../scrapers/run.ts'), import('../scrapers/store.ts')]);
+  // Passive relation observations follow feed pages only; scraper pages are not tapped.
+  options.passiveBatch?.discard();
+  const fetchOptions = { ...options, observer: undefined, passiveBatch: undefined };
+  const known = async (urls: string[]) => {
+    if (!urls.length) return new Set<string>();
+    const [rows] = await pool.execute(`SELECT url FROM posts WHERE blog_id=? AND url IN (${urls.map(() => '?').join(',')})`, [
+      blog.id,
+      ...urls,
+    ]);
+    return new Set((Array.isArray(rows) ? (rows as { url: string }[]) : []).map((row) => row.url));
+  };
+  const result = await scrapeBlog(scraper, blog, known, fetchOptions, now).catch(() => ({
+    entries: [],
+    listed: 0,
+    error: 'scraper_run_failed',
+  }));
+  const source: FeedLink = { url: scraper.listUrls[0] ?? blog.url, type: 'scraper' };
+  const posts = result.entries.length ? await commitFeedEntries(pool, blog, source, result.entries, now, fetchOptions, async () => {}) : 0;
+  await recordScraperRun(pool, scraper.id, result.error, now);
+  await pool.execute(
+    `UPDATE blogs SET last_crawled_at=?,last_crawl_success_at=IF(?, ?, last_crawl_success_at),
+     last_published_at=COALESCE((SELECT MAX(published_at) FROM posts WHERE blog_id=?),last_published_at) WHERE id=?`,
+    [now, !result.error, now, blog.id, blog.id],
+  );
+  return { blog: blog.slug, sources: result.error ? 0 : 1, posts };
+}
+/** One source's entries in one transaction; `acknowledge` runs last inside it, so a failed write is replayable.
+ * SQL work starts after all network requests. History uses the same writer in its task transaction, so both
+ * paths serialize on the blog row. */
+async function commitFeedEntries(
+  pool: SqlPool,
+  blog: BlogToCrawl,
+  source: FeedLink,
+  entries: FeedEntry[],
+  now: Date,
+  options: FeedCrawlerOptions,
+  acknowledge: (writer: SqlPool) => Promise<void>,
+): Promise<number> {
+  const connection = 'getConnection' in pool ? await (pool as Pool).getConnection() : null;
+  const writer = connection ?? pool;
+  const indexStages = createBodyIndexStages(options, 'feed');
+  const staged = indexStages.transaction();
+  let commitAttempted = false,
+    committed = false;
+  try {
+    if (connection) {
+      await connection.beginTransaction();
+      const [current] = await connection.execute('SELECT id,url,status FROM blogs WHERE id=? FOR UPDATE', [blog.id]);
+      const row = Array.isArray(current) ? (current[0] as { url?: string; status?: string } | undefined) : undefined;
+      if (row?.url !== blog.url || row?.status !== 'verified') throw new Error('crawl_blog_identity_changed');
+    }
+    const written = await writeFeedEntries(writer, blog, source, entries, now, staged.stage);
+    await acknowledge(writer);
+    if (connection) {
+      commitAttempted = true;
+      await connection.commit();
+      committed = true;
+    }
+    return written;
+  } catch (error) {
+    if (commitAttempted || !connection) staged.unproven();
+    else staged.discard();
+    options.passiveBatch?.discard();
+    if (connection) await connection.rollback();
+    throw error;
+  } finally {
+    try {
+      connection?.release();
+    } catch (error) {
+      staged.unproven();
+      // biome-ignore lint/correctness/noUnsafeFinally: Preserve the existing release exception; do not assert successful release.
+      throw error;
+    } finally {
+      if (committed) staged.committed();
+      else if (!connection) staged.unproven();
+      await indexStages.flush();
+    }
+  }
+}
 export async function crawlBlog(
   { pool }: { pool: SqlPool },
   blog: BlogToCrawl,
@@ -1057,6 +1157,8 @@ export async function crawlBlog(
 ): Promise<{ blog: string; sources: number; posts: number }> {
   if (options.passiveBatch) options = { ...options, observer: options.passiveBatch.observer };
   const now = new Date();
+  const scraper = await scraperInCharge(pool, blog.id, now);
+  if (scraper) return crawlWithScraper(pool, blog, scraper, options, now);
   let links: FeedLink[];
   try {
     // Verified seed resolution registers publication-specific sources. Reuse
@@ -1156,24 +1258,9 @@ export async function crawlBlog(
       sitemapBudget -= candidates.length;
       entries = await verifySitemapArticles(candidates, blog.url, options);
     } else entries = parseFeed(body, response.url || source.url);
-    // SQL work starts after all network requests. History uses the same writer
-    // in its task transaction, so both paths serialize on the blog row.
-    const connection = 'getConnection' in pool ? await (pool as Pool).getConnection() : null;
-    const writer = connection ?? pool;
-    const indexStages = createBodyIndexStages(options, 'feed');
-    const staged = indexStages.transaction();
-    let commitAttempted = false,
-      committed = false;
-    try {
-      if (connection) {
-        await connection.beginTransaction();
-        const [current] = await connection.execute('SELECT id,url,status FROM blogs WHERE id=? FOR UPDATE', [blog.id]);
-        const row = Array.isArray(current) ? (current[0] as { url?: string; status?: string } | undefined) : undefined;
-        if (row?.url !== blog.url || row?.status !== 'verified') throw new Error('crawl_blog_identity_changed');
-      }
-      total += await writeFeedEntries(writer, blog, source, entries, now, staged.stage);
-      // A validator acknowledges durable import of the entire source, including
-      // author/tag links. Persist it last so a failed write is replayable.
+    // A validator acknowledges durable import of the entire source, including
+    // author/tag links. Persist it last so a failed write is replayable.
+    total += await commitFeedEntries(pool, blog, source, entries, now, options, async (writer) => {
       const etag = response.headers.get('etag');
       const lastModified = response.headers.get('last-modified');
       await writer.execute(
@@ -1187,30 +1274,7 @@ export async function crawlBlog(
           now,
         ],
       );
-      if (connection) {
-        commitAttempted = true;
-        await connection.commit();
-        committed = true;
-      }
-    } catch (error) {
-      if (commitAttempted || !connection) staged.unproven();
-      else staged.discard();
-      options.passiveBatch?.discard();
-      if (connection) await connection.rollback();
-      throw error;
-    } finally {
-      try {
-        connection?.release();
-      } catch (error) {
-        staged.unproven();
-        // biome-ignore lint/correctness/noUnsafeFinally: Preserve the existing release exception; do not assert successful release.
-        throw error;
-      } finally {
-        if (committed) staged.committed();
-        else if (!connection) staged.unproven();
-        await indexStages.flush();
-      }
-    }
+    });
     await options.passiveBatch?.commit(entries.map((entry) => entry.url));
     sourceCount += 1;
   }

@@ -30,7 +30,16 @@ export type CandidateCheck = {
   personalEvidence?: PersonalEvidence;
   /** The BlogBlog.Club page listing this publication (directory-listing.ts); stands in for personal-homepage proof. */
   directoryListing?: string;
-  feed?: { url: string; type: 'rss' | 'atom' | 'sitemap'; title: string; identityUrl: string; entries: number; sample: string[] };
+  feed?: {
+    url: string;
+    type: 'rss' | 'atom' | 'sitemap' | 'scraper';
+    title: string;
+    identityUrl: string;
+    entries: number;
+    sample: string[];
+  };
+  /** A validated generated scraper (app/src/scrapers) standing in for the missing feed; feed.type is 'scraper'. */
+  scraper?: { id: number; codeSha256: string };
 };
 const platforms = new Set([
   'medium.com',

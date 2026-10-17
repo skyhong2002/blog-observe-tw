@@ -4,6 +4,9 @@ import { reserveBudget } from '../jobs/budget.ts';
 import type { BatchOptions, BatchResult } from '../jobs/contracts.ts';
 import { withJobLease } from '../jobs/lease.ts';
 import { budgetedRelationFetcher, RELATION_PAGES_DAILY, relationBudgetAvailable, relationFailureCode } from '../relations/worker.ts';
+import { parsedPost, scraperArticleHtml } from '../scrapers/contract.ts';
+import { runInSandbox } from '../scrapers/sandbox.ts';
+import { activeScraper, type StoredScraper } from '../scrapers/store.ts';
 import { type AdoptionEnqueue, createSearchIndexAdoption } from '../search-index-adoption.ts';
 import { createTechObserver } from '../tech/observer.ts';
 import { inPublication, wordpressEvidence } from './article-content.ts';
@@ -57,6 +60,17 @@ async function noteFailure(pool: Pool, post: RowDataPacket, rule: ContentRule, r
     c.release();
   }
 }
+/** A blog's generated scraper (app/src/scrapers) knows where its body is; the extractor then reads only that.
+ * Any scraper failure falls back to the page as fetched. */
+async function scraperBody(scraper: StoredScraper | null, articleUrl: string, sourceUrl: string, html: string) {
+  if (!scraper) return html;
+  try {
+    const post = parsedPost(await runInSandbox(scraper.code, 'parsePost', { url: sourceUrl, html }));
+    return post ? scraperArticleHtml(post, articleUrl) : html;
+  } catch {
+    return html;
+  }
+}
 const UPGRADE = "c.adapter_version<>? AND c.source_kind='article-html' AND c.status<>'ok'";
 /** The scheduler order over posts without a body, due bodies and older-adapter page failures, without reading
  * every stored body: each branch reads one index. No branch limit can drop a row from the first `limit`: posts
@@ -97,6 +111,7 @@ export async function runContentBatch(
       const posts = await selectContentCandidates(pool, options.blogId ?? null, now(), 50);
       const fetcher = budgetedRelationFetcher(pool, options, assertLease, deadline);
       let attempts = 0;
+      const scrapers = new Map<number, StoredScraper | null>();
       for (const post of posts) {
         if (attempts >= Math.max(1, Math.min(5, options.limit ?? 5))) break;
         if (options.signal?.aborted || Date.now() >= deadline) {
@@ -181,8 +196,12 @@ export async function runContentBatch(
               etag: response.headers.get('etag'),
               lastModified: response.headers.get('last-modified'),
             };
+            if (request.method === 'article-html' && !scrapers.has(post.blog_id))
+              scrapers.set(post.blog_id, await activeScraper(pool, post.blog_id));
             const evidence: ContentEvidence | null =
-              request.method === 'wordpress-api' ? wordpressEvidence(raw, base) : { ...base, html: raw, kind: 'article-html' };
+              request.method === 'wordpress-api'
+                ? wordpressEvidence(raw, base)
+                : { ...base, html: await scraperBody(scrapers.get(post.blog_id) ?? null, post.url, final, raw), kind: 'article-html' };
             if (!evidence) throw Error('content_api_no_matching_post');
             await assertLease();
             const c = await pool.getConnection();

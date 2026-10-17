@@ -545,3 +545,49 @@ export const blogGenreVotes = mysqlTable(
     check('blog_genre_vote_value', sql`${table.vote} IN (-1, 1)`),
   ],
 );
+
+/** Generated per-blog scrapers (app/src/scrapers): code only ever runs in the sandbox, at most one active per blog. */
+export const blogScrapers = mysqlTable(
+  'blog_scrapers',
+  {
+    id: int('id').autoincrement().primaryKey(),
+    blogId: int('blog_id'),
+    candidateId: int('candidate_id'),
+    revision: int('revision').notNull().default(1),
+    status: varchar('status', { length: 16 }).$type<'validated' | 'active' | 'superseded' | 'rejected'>().notNull(),
+    trigger: varchar('trigger', { length: 32 }).notNull(),
+    code: mediumtext('code').notNull(),
+    codeSha256: char('code_sha256', { length: 64 }).notNull(),
+    listUrls: json('list_urls').$type<string[]>().notNull(),
+    maxPages: int('max_pages').notNull().default(1),
+    model: varchar('model', { length: 64 }).notNull(),
+    actualModel: varchar('actual_model', { length: 180 }),
+    validation: json('validation'),
+    createdAt: datetime('created_at').notNull(),
+    activatedAt: datetime('activated_at'),
+    lastRunAt: datetime('last_run_at'),
+    lastSuccessAt: datetime('last_success_at'),
+    lastErrorAt: datetime('last_error_at'),
+    consecutiveFailures: int('consecutive_failures').notNull().default(0),
+    lastError: varchar('last_error', { length: 255 }),
+  },
+  (table) => [index('blog_scrapers_blog').on(table.blogId, table.status), index('blog_scrapers_candidate').on(table.candidateId)],
+);
+
+export const scraperGenerationAttempts = mysqlTable(
+  'scraper_generation_attempts',
+  {
+    id: int('id').autoincrement().primaryKey(),
+    targetType: varchar('target_type', { length: 16 }).$type<'candidate' | 'blog'>().notNull(),
+    targetId: int('target_id').notNull(),
+    trigger: varchar('trigger', { length: 32 }).notNull(),
+    status: varchar('status', { length: 16 }).notNull(),
+    reason: varchar('reason', { length: 255 }),
+    rounds: int('rounds').notNull().default(0),
+    scraperId: int('scraper_id'),
+    actualModel: varchar('actual_model', { length: 180 }),
+    report: json('report'),
+    createdAt: datetime('created_at').notNull(),
+  },
+  (table) => [index('scraper_attempts_target').on(table.targetType, table.targetId, table.createdAt)],
+);

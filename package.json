@@ -28,6 +28,7 @@
     "seed:resolve": "node --env-file-if-exists=.env tools/resolve-seed-urls.ts",
     "history:batch": "node --env-file-if-exists=.env tools/crawl-history.ts",
     "candidates:review": "node --env-file-if-exists=.env tools/review-candidates.ts",
+    "scraper:once": "node --env-file-if-exists=.env tools/scraper-once.ts",
     "relations:once": "node --env-file-if-exists=.env tools/relations-once.ts",
     "ai:once": "node --env-file-if-exists=.env tools/ai-once.ts",
     "topics:once": "node --env-file-if-exists=.env tools/topics-once.ts",

@@ -16,6 +16,7 @@ import { createDb } from './db/client.ts';
 import { runPublicationDiscoveryBatch } from './relations/home.ts';
 import { runRelationSnapshotBatch } from './relations/routes.ts';
 import { RELATION_STORED_PER_RUN, runRelationBatch } from './relations/worker.ts';
+import { runScraperRepairBatch } from './scrapers/repair.ts';
 import { indexFulltextPosts, indexMissingFulltextPosts, runFulltextBatch } from './search-fulltext.ts';
 import { createIndexJobClaim, createIndexJobEnqueue, runSearchIndexJob, SEARCH_INDEX_JOB } from './search-index-job.ts';
 import { backfillPublicRoutes, backfillTopicRouteAliases } from './seo/page-routes.ts';
@@ -267,6 +268,38 @@ const worker = new Worker(
   },
   { connection, prefix: config.queuePrefix, concurrency: 1 },
 );
+// Generating a scraper waits minutes on the model, so it has its own queue, worker and pool: the crawl queue keeps
+// moving, and a held repair lease cannot take the crawl worker's last connection.
+const scraperRepairEnabled = process.env.BLOG_SCRAPER_GENERATION_ENABLED === 'true';
+const scraperQueueName = `${config.queueName}-scrapers`;
+const scraperQueue = new Queue(scraperQueueName, { connection, prefix: config.queuePrefix });
+const scraperStore = scraperRepairEnabled ? createDb(config.blogDbUrl, { poolSize: 2 }) : null;
+if (scraperRepairEnabled)
+  await scraperQueue.upsertJobScheduler(
+    'blogs-scraper-repair',
+    { every: 30 * 60_000 },
+    { name: 'blogs-scraper-repair', data: {}, opts: { removeOnComplete: 20, removeOnFail: 20 } },
+  );
+else await scraperQueue.removeJobScheduler('blogs-scraper-repair');
+const scraperWorker = scraperStore
+  ? new Worker(
+      scraperQueueName,
+      async () => {
+        const outcome = await runScraperRepairBatch(scraperStore.pool, {
+          apply: true,
+          signal: shutdown.signal,
+          userAgent: config.crawlUserAgent,
+          delayMs: config.crawlDelayMs,
+          timeoutMs: 15000,
+        });
+        const { generation, ...summary } = outcome;
+        if (outcome.target) log.info({ scraperRepair: { ...summary, rounds: generation?.rounds } }, 'scraper repair outcome');
+        return summary;
+      },
+      { connection, prefix: config.queuePrefix, concurrency: 1, lockDuration: 120000 },
+    )
+  : null;
+scraperWorker?.on('failed', (job, error) => log.error({ job: job?.name, error: error.message }, 'scraper repair job failed'));
 worker.on('completed', (job) => log.info({ job: job.name }, 'blog worker job completed'));
 worker.on('failed', (job, error) => log.error({ job: job?.name, error: error.message }, 'blog worker job failed'));
 
@@ -275,6 +308,9 @@ async function close() {
   closing = true;
   shutdown.abort();
   await worker.close();
+  await scraperWorker?.close();
+  await scraperQueue.close();
+  await scraperStore?.close();
   await queue.close();
   await connection.quit();
   await store.close();

@@ -211,6 +211,13 @@
       "when": 1792224104900,
       "tag": "0029_blog_genres",
       "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "5",
+      "when": 1792227549956,
+      "tag": "0030_blog_scrapers",
+      "breakpoints": true
     }
   ]
 }
