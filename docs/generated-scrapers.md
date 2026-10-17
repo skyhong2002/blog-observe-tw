@@ -25,7 +25,7 @@ function parsePost({ url, html, $ }) // → { title, author, publishedAt, tags, 
 ## 產生與驗證（`generate.ts`）
 
 1. 抓首頁，啟發式挑一篇文章；HTML 壓成骨架（去 script／style、保留 class／id／href／datetime／itemprop／JSON-LD／onclick 等）送模型。頁面內容在 prompt 中明示為不可信資料。
-2. 真實頁面試跑：列表至少列出文章；抽 3 篇（不足 3 篇則全抽）都要有在該頁出現過的標題、日期（文章頁或列表頁）、經 `extractContent` 認可且 ≥ 50 字的內文（至少一篇 ≥ 200 字），且標題、內文彼此不同（防寫死）。翻頁失敗不算失敗，只讀第一頁。
+2. 真實頁面試跑：列表至少列出文章；抽 3 篇（不足 3 篇則全抽）都要有在該頁出現過的標題、經 `extractContent` 認可且 ≥ 50 字的內文（至少一篇 ≥ 200 字），且標題、內文彼此不同（防寫死）。翻頁失敗不算失敗，只讀第一頁。沒有日期也不算失敗（例如數位花園筆記站）：日期依序取文章頁、列表頁，都沒有就用首次抓到的時間（使用者決定，2026-10-17）。
 3. 不通過就把問題、舊程式碼與失敗頁的骨架回饋給模型，最多 3 輪；每輪佔 `scraper:gateway` 每日 18 次額度。
 
 ## 觸發（`repair.ts`，獨立 queue `<BLOG_QUEUE_NAME>-scrapers`，每 30 分鐘一個目標）

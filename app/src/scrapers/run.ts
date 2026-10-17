@@ -70,7 +70,8 @@ export async function scrapeBlog(
           obtainedAt: now.toISOString(),
         }),
         author: post.author,
-        publishedAt: post.publishedAt ?? item.publishedAt,
+        // Undated sites (digital gardens): first fetch stands in for publication, by the operator's decision.
+        publishedAt: post.publishedAt ?? item.publishedAt ?? now,
         updatedAt: null,
         imageUrl: null,
         categories: post.tags,

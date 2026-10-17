@@ -126,6 +126,22 @@ describe.skipIf(!available)('scraper generation on live pages', () => {
     expect(result.entries[0].content?.html).toContain('<article class="generated-scraper-body">');
     expect(result.entries[0].summary).toMatch(/^Green tea notes is what/);
   }, 30000);
+  it('dates an undated site by its first fetch instead of refusing it', async () => {
+    const undated = GOOD.replace(", publishedAt: $(el).find('.d').text()", '').replace(
+      "publishedAt: $('.post .d').text()",
+      'publishedAt: null',
+    );
+    const generated = await generateScraper(
+      { home, trigger: 'new_candidate' },
+      { fetchOptions: site(), gateway: vi.fn().mockResolvedValue(reply(undated)) },
+    );
+    expect(generated).toMatchObject({ ok: true, rounds: 1 });
+    expect(generated.report?.samples.every((s) => s.publishedAt === null)).toBe(true);
+    const now = new Date('2026-10-17T09:00:00Z');
+    const scraper = { id: 1, blogId: 7, code: undated, listUrls: [home], maxPages: 1, consecutiveFailures: 0 };
+    const result = await scrapeBlog(scraper, { id: 7, slug: 'quill', url: home }, async () => new Set(), site(), now);
+    expect(result.entries.map((e) => e.publishedAt)).toEqual([now, now, now]);
+  }, 30000);
   it('reports a scraper that no longer lists anything', async () => {
     const scraper = { id: 1, blogId: 7, code: EMPTY_LIST, listUrls: [home], maxPages: 1, consecutiveFailures: 0 };
     const result = await scrapeBlog(scraper, { id: 7, slug: 'quill', url: home }, async () => new Set(), site());

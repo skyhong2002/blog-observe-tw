@@ -99,7 +99,8 @@ export class PageCache {
 }
 
 /** Runs the scraper on live pages. Passing means: articles are listed, and sampled articles parse with a title found
- * on the page, a date, distinct titles and bodies the content extractor accepts. */
+ * on the page, distinct titles and bodies the content extractor accepts. A missing date is reported, not fatal: the
+ * crawl dates an undated article by when it was first fetched (run.ts). */
 export async function validateScraper(
   scraper: GeneratedScraper,
   home: string,
@@ -177,7 +178,6 @@ export async function validateScraper(
       const bodyChars = Array.from(extracted.bodyText).length;
       const reasons = [
         !pageCorpus(page.html).includes(normal(post.title)) && 'title_not_on_page',
-        !publishedAt && 'date_missing',
         !['ok', 'partial'].includes(extracted.status) && `body_${extracted.status}`,
         bodyChars < 50 && 'body_too_short',
         titles.has(normal(post.title)) && 'title_repeats_other_article',
