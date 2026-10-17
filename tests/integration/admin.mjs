@@ -183,6 +183,26 @@ export async function runAdminIntegration(pool) {
     const list = await app.inject({ url: '/api/admin/discovery?q=Quill&status=approved', headers });
     check(list.statusCode === 200, list.body);
     check((await app.inject({ url: '/api/admin/audits', headers })).statusCode === 200, 'audit list');
+    const accountList = await app.inject({ url: '/api/admin/accounts', headers });
+    check(accountList.statusCode === 200, accountList.body);
+    const me = accountList.json().accounts.find((a) => a.id === uid);
+    check(me?.admin === true && accountList.json().accounts.find((a) => a.id === other)?.admin === false, 'accounts admin flag');
+    // Two tags, one profile, hide + unhide; the .intent rows beside each write are not counted.
+    check(
+      me.counts.tags === 2 && me.counts.profiles === 1 && me.counts.relations === 2 && me.counts.candidates >= 1 && me.lastActiveAt,
+      `accounts edit counts ${JSON.stringify(me.counts)}`,
+    );
+    check(
+      (await app.inject({ url: '/api/admin/accounts', headers: { cookie: `blog_session=${readerCookie}` } })).statusCode === 403,
+      'accounts reader denied',
+    );
+    const blogList = await app.inject({ url: '/api/admin/blogs', headers });
+    check(blogList.statusCode === 200, blogList.body);
+    const fixtureRow = blogList.json().blogs.find((b) => b.id === blog.insertId);
+    check(
+      fixtureRow?.edits === 3 && fixtureRow.manualTags.length === 2 && fixtureRow.posts === 1 && fixtureRow.lastEdit?.by === 'Test admin',
+      `blogs fixture row ${JSON.stringify(fixtureRow)}`,
+    );
     check(
       (await post('/api/admin/similarweb', { domain: 'example.com', kind: 'traffic' })).statusCode === 409,
       'disabled Similarweb no I/O',

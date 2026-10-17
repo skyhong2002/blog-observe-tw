@@ -1,5 +1,5 @@
 'use client';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { adminGet, manualOverride } from '@/lib/admin-client';
 import { blogHref } from '@/lib/page-links';
 import { button, input, panel, primary, type RunAction } from './shared';
@@ -70,6 +70,16 @@ export default function Overrides({ run, busy }: { run: RunAction; busy: boolean
       if (version === generation.current) setSearching(false);
     }
   };
+  // Opened from a row of /admin/blogs/ (?blog=<slug>): choose that blog, or leave the slug in the search box if it
+  // cannot be read. Read in the browser, so no admin page reads searchParams (web/test/page-metadata.test.ts).
+  // Runs once; choose() is redefined every render.
+  useEffect(() => {
+    const slug = new URLSearchParams(window.location.search).get('blog');
+    if (!slug) return;
+    adminGet<{ blog: Blog }>(`/api/blogs/${encodeURIComponent(slug)}`)
+      .then(({ blog: b }) => choose({ id: b.id, slug: b.slug, name: b.name }))
+      .catch(() => setQ(slug));
+  }, []);
   const save = async () => {
     setError('');
     try {

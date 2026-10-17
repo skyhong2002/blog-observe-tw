@@ -38,8 +38,24 @@ network work is performed outside SQL transactions and rechecked before writes.
 All admin responses use `Cache-Control: no-store`. Session values, API credentials,
 and raw request headers are never recorded in audits.
 
-The management page provides:
+The management pages share one row of tabs, each at its own URL:
+候選來源 `/admin/`, 部落格 `/admin/blogs/`, 簡介與標籤 `/admin/overrides/`
+(`?blog=<slug>` opens with that blog chosen), 連結關係 `/admin/relations/`,
+Similarweb `/admin/similarweb/`, 帳號 `/admin/accounts/` and 稽核紀錄
+`/admin/audits/`. They provide:
 
+- Every blog in one sortable table (`GET /api/admin/blogs`): category, the genres
+  readers see (admin-set or hidden ones marked), manual tags, a derived crawl state
+  (正常, 久未更新 = no post in 90 days, 抓取失敗 = every feed failed 3+ times in a
+  row with no generated scraper, 未抓到, 不收錄 = not verified), robots.txt, 7-day
+  and total posts, and how many audited admin edits the blog had and the latest.
+  The browser filters by crawl state, genre and category.
+- Every signed-in account (`GET /api/admin/accounts`) with what it did: follows and
+  API keys (互動), genre votes and admin edits (貢獻). Admin edits are counted from
+  `admin_audits` by actor and grouped by action; the `.intent` rows, the
+  bootstrap pin and Similarweb outcome rows are not counted. Edits made from the
+  trusted-host CLI have no actor and count for nobody. Admins come only from
+  `BLOG_ADMIN_EMAILS`, so the page shows roles but cannot change them.
 - Candidate search, evidence, validation, approval, rejection, and batches up to 25.
   Approval still requires the personal-publication and RSS/sitemap checks, crawler
   safety, robots rules, ownership proof, and shared daily admission/network budgets.

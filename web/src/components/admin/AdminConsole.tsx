@@ -1,20 +1,15 @@
 'use client';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AdminApiError, AdminWriter, adminGet } from '@/lib/admin-client';
+import Accounts from './Accounts';
+import AdminTabs, { ADMIN_SECTIONS, type AdminSection } from './AdminTabs';
 import Audits from './Audits';
+import Blogs from './Blogs';
 import Candidates from './Candidates';
 import Overrides from './Overrides';
 import Relations from './Relations';
 import { button, Evidence, input, panel, primary, type RunAction } from './shared';
 
-type Section = 'discovery' | 'overrides' | 'relations' | 'similarweb' | 'audits';
-const sections: [Section, string][] = [
-  ['discovery', '候選來源'],
-  ['overrides', '簡介與標籤'],
-  ['relations', '連結關係'],
-  ['similarweb', 'Similarweb'],
-  ['audits', '稽核紀錄'],
-];
 const labels: Record<string, string> = {
   approved: '已核准',
   rejected: '已拒絕',
@@ -86,8 +81,9 @@ function Similarweb({ run, busy }: { run: RunAction; busy: boolean }) {
     </section>
   );
 }
-export default function AdminConsole() {
-  const [section, setSection] = useState<Section>('discovery');
+/** One /admin/ page: the shared tabs, then `section` once the admin session is confirmed. */
+export default function AdminConsole({ section }: { section: AdminSection }) {
+  const { href, label, intro } = ADMIN_SECTIONS[section];
   const [csrf, setCsrf] = useState('');
   const [loading, setLoading] = useState(true);
   const [authError, setAuthError] = useState('');
@@ -146,9 +142,10 @@ export default function AdminConsole() {
   };
   return (
     <div className="space-y-5 pb-8">
+      <AdminTabs current={section} />
       <header>
-        <h1 className="text-2xl font-semibold">部落格觀察管理</h1>
-        <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">管理來源收錄、人工說明與連結證據；所有異動保留操作紀錄。</p>
+        <h1 className="text-2xl font-semibold tracking-tight">{label}</h1>
+        <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">{intro}所有異動都留有稽核紀錄。</p>
       </header>
       {loading ? (
         <p role="status">確認管理員工作階段中…</p>
@@ -157,7 +154,7 @@ export default function AdminConsole() {
           <p role="alert">{authError}</p>
           <div className="flex flex-wrap gap-3">
             {loginNeeded ? (
-              <a className={primary} href="/auth/google?next=%2Fadmin%2F">
+              <a className={primary} href={`/auth/google?next=${encodeURIComponent(href)}`}>
                 登入管理員帳號
               </a>
             ) : null}
@@ -171,20 +168,6 @@ export default function AdminConsole() {
         </section>
       ) : csrf ? (
         <>
-          <nav aria-label="管理功能" className="flex flex-wrap gap-2">
-            {sections.map(([key, label]) => (
-              <button
-                key={key}
-                type="button"
-                aria-pressed={key === section}
-                className={`${button} ${key === section ? 'border-brand-600 bg-brand-50 text-brand-800 dark:bg-brand-950 dark:text-brand-300' : ''}`}
-                disabled={busy}
-                onClick={() => setSection(key)}
-              >
-                {label}
-              </button>
-            ))}
-          </nav>
           {message ? (
             <div
               className={`rounded-lg border p-3 text-sm ${failed ? 'border-red-300 text-red-700 dark:border-red-800 dark:text-red-400' : 'border-zinc-300 dark:border-zinc-700'}`}
@@ -196,9 +179,13 @@ export default function AdminConsole() {
             </div>
           ) : null}
           <fieldset disabled={busy} className="min-w-0 space-y-5">
-            <legend className="sr-only">{sections.find(([key]) => key === section)?.[1]}</legend>
+            <legend className="sr-only">{label}</legend>
             {section === 'discovery' ? (
               <Candidates run={run} busy={busy} />
+            ) : section === 'blogs' ? (
+              <Blogs />
+            ) : section === 'accounts' ? (
+              <Accounts />
             ) : section === 'overrides' ? (
               <Overrides run={run} busy={busy} />
             ) : section === 'relations' ? (

@@ -9,6 +9,8 @@ import { robotsFor, robotsStatuses } from '../crawl/robots-observations.ts';
 import { createTagSimilarSitesClient, normalizeSimilarDomain } from '../crawl/similarweb-client.ts';
 import { cooldownUntil, mysqlSimilarwebStore } from '../crawl/similarweb-sync.ts';
 import { invalidateRelationCache } from '../relations/routes.ts';
+import { adminAccounts } from './accounts.ts';
+import { adminBlogs } from './blogs.ts';
 import { type AdminOptions, csrfToken, installAdminGuard } from './guard.ts';
 import { type AdminActor, isAdmin, requireAdminTransaction, writeAudit } from './identity.ts';
 import { beginIntent, digest, executeIntentWork, finishIntent, recordExternalOutcome } from './intent.ts';
@@ -373,6 +375,15 @@ export function registerAdminRoutes(app: FastifyInstance, config: AdminOptions) 
       },
       true,
     );
+  });
+  // Whole tables for /admin/accounts/ and /admin/blogs/; both are small, so the browser sorts and filters.
+  app.get('/api/admin/accounts', async (req) => {
+    await actor(req);
+    return adminAccounts(config.pool, config.adminEmails);
+  });
+  app.get('/api/admin/blogs', async (req) => {
+    await actor(req);
+    return adminBlogs(config.pool);
   });
   app.get('/api/admin/audits', async (req) => {
     const q = object(req.query),

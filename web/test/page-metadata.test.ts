@@ -20,7 +20,18 @@ function pages(dir = APP): string[] {
 const routeOf = (file: string) => `/${relative(APP, file).replace(/page\.tsx$/, '')}`;
 const source = (file: string) => readFileSync(file, 'utf8');
 
-const PRIVATE_ROUTES = ['/my/', '/login/', '/admin/', '/observe/opt-out/'];
+const PRIVATE_ROUTES = [
+  '/my/',
+  '/login/',
+  '/admin/',
+  '/admin/blogs/',
+  '/admin/overrides/',
+  '/admin/relations/',
+  '/admin/similarweb/',
+  '/admin/accounts/',
+  '/admin/audits/',
+  '/observe/opt-out/',
+];
 // Retired pages kept only as permanent redirects (/authors/ → /blogs/).
 const REDIRECT_ROUTES = ['/admin/discovery/', '/authors/'];
 const DYNAMIC_PUBLIC = ['/blogs/[slug]/', '/topics/[id]/'];
