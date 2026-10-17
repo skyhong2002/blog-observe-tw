@@ -16,7 +16,7 @@ Measurement ID：`G-VKWGDHDESV`（property 558498886、stream 16112932212）。I
 
 沿用新文易數 SiteAnalytics／analytics-consent 的 MIT 實作模式，由 Opus 移植前端，Codex 審查與部署。只有 production、blog.observe.tw、hydration 後才可載入；webdriver／bot、DNT、GPC、opt-out、無法讀取偏好、空 ID 均不載入。
 
-私人、登入、管理、搜尋、退出統計頁與帶 query 的 URL 不計入。退出統計頁 `/observe/opt-out/` 設 noindex。已知公開路徑有無結尾斜線皆可計入（`skipTrailingSlashRedirect` 兩者都服務），`page_location` 一律為帶結尾斜線的 canonical。`/blogs/<slug>/` 只接受小寫 ASCII slug（長度上限同 `isSlug`），`/topics/<id>/` 解碼後只接受 `tag:<64 hex>`／`rss:<數字>`（同 `isTopicId`）；其他片段（例如 `/blogs/alice%40example.com/`、`/topics/private-email/`）一律不送。程式只檢查片段形狀，**不判斷該頁是否 404**；落地文件若帶 robots noindex 另外不計，但這只是額外防護，client 切頁時無法讀到新頁 metadata。
+私人、登入、管理、搜尋、退出統計頁與帶 query 的 URL 不計入。（搜尋次數另由 gateway 以每日總數記在 `search_usage_daily`，不含字詞或識別資料，見 docs/historical-fulltext.md。）退出統計頁 `/observe/opt-out/` 設 noindex。已知公開路徑有無結尾斜線皆可計入（`skipTrailingSlashRedirect` 兩者都服務），`page_location` 一律為帶結尾斜線的 canonical。`/blogs/<slug>/` 只接受小寫 ASCII slug（長度上限同 `isSlug`），`/topics/<id>/` 解碼後只接受 `tag:<64 hex>`／`rss:<數字>`（同 `isTopicId`）；其他片段（例如 `/blogs/alice%40example.com/`、`/topics/private-email/`）一律不送。程式只檢查片段形狀，**不判斷該頁是否 404**；落地文件若帶 robots noindex 另外不計，但這只是額外防護，client 切頁時無法讀到新頁 metadata。
 
 本站設定的頁面欄位只含允許的 canonical 路徑、固定站名及 referrer origin（Google 的公開歷史切頁可能另帶上一個公開頁路徑，詳見下節），透過全域 `gtag('set')` 設定，`config` 不帶任何 page_* 參數，避免 config 範圍的舊值覆蓋後續切頁（事件 > config > set）。不送原文標題、搜尋字詞、私人路徑或完整外連網址。pushState／replaceState 包裝與 popstate capture 在 gtag.js 載入前安裝，切頁之前就更新 `ga-disable-<ID>`；Google 其後包在外層的 history wrapper 讀到的已是新狀態。gtag.js 載入前的自訂事件只暫存在本地，遇到退出統計、私人頁、query 頁或文件已受污染即丟棄，不會在之後補送。仍必須以真實 Google collect 請求驗收瀏覽器記錄事件，單元測試不能取代外部 tag 行為。
 

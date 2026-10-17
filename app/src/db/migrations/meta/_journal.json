@@ -232,6 +232,13 @@
       "when": 1792242392190,
       "tag": "0032_robots_observations",
       "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "5",
+      "when": 1792266418048,
+      "tag": "0033_search_usage_daily",
+      "breakpoints": true
     }
   ]
 }

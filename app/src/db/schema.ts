@@ -605,3 +605,19 @@ export const robotsObservations = mysqlTable('robots_observations', {
   /** Last time the file was read at all (any outcome but unreachable). */
   readableAt: datetime('readable_at'),
 });
+
+/** Daily /api/search counts (app/src/search-usage.ts), Taiwan calendar days. No query text, results or client details. */
+export const searchUsageDaily = mysqlTable('search_usage_daily', {
+  day: char('day', { length: 10 }).primaryKey(),
+  /** First result pages requested by the site's own search page (Sec-Fetch-Site: same-origin). */
+  siteSearches: int('site_searches').notNull().default(0),
+  siteLaterPages: int('site_later_pages').notNull().default(0),
+  /** Of siteSearches: any match, any match found only in an article body, every match only in bodies. */
+  withResults: int('with_results').notNull().default(0),
+  bodyMatches: int('body_matches').notNull().default(0),
+  bodyOnly: int('body_only').notNull().default(0),
+  siteFailures: int('site_failures').notNull().default(0),
+  /** Valid requests from anything but the site's pages (scripts, other sites, API users). */
+  apiRequests: int('api_requests').notNull().default(0),
+  updatedAt: datetime('updated_at').notNull(),
+});

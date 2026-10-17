@@ -26,6 +26,7 @@ import { createApiKeyService } from './reader/api-keys.ts';
 import { registerApiKeyRoutes } from './reader/key-routes.ts';
 import { registerRelationRoutes } from './relations/routes.ts';
 import { registerSearchRoutes } from './search.ts';
+import { createSearchUsage } from './search-usage.ts';
 import { registerPageApi } from './seo/page-api.ts';
 import { registerPageLinks } from './seo/page-links.ts';
 import { createPublicPageRedirect } from './seo/redirects.ts';
@@ -99,7 +100,13 @@ export async function buildApp(config, { logger = false, store = null } = {}) {
   registerRelationRoutes(app, pool);
   registerAiRoutes(app, pool);
   registerTopicRoutes(app, pool);
-  registerSearchRoutes(app, pool);
+  registerSearchRoutes(
+    app,
+    pool,
+    store
+      ? undefined
+      : createSearchUsage(pool, { onError: (error) => app.log.warn({ err: error, operation: 'search.usage' }, 'search usage not saved') }),
+  );
   registerSeoRoutes(app, pool);
   registerContentRoutes(app, pool);
   registerTechRoutes(app, pool, { enabled: config.techPublicEnabled === true, publicOrigin: config.publicOrigin });

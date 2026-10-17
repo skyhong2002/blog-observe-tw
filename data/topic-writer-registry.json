@@ -829,6 +829,13 @@
       "occurrences": 1
     },
     {
+      "path": "app/src/search-usage.ts",
+      "digest": "82f88aa667e1cd7ad6afeebee38793e6764de399300be051150e1751e67a2211",
+      "tables": [],
+      "dynamic": true,
+      "occurrences": 1
+    },
+    {
       "path": "app/src/search.ts",
       "digest": "2491f12edc17563608e4162a9908a43eabbd11d1871efaf5eb0ccbf7f332bc69",
       "tables": [],

@@ -11,7 +11,8 @@ import {
   SEARCH_MATCH_VERSION,
   SEARCH_STATEMENT_MS,
 } from './search-bounds.ts';
-import { loadFulltextSearch } from './search-fulltext.ts';
+import { loadFulltextSearch, matchedCounts } from './search-fulltext.ts';
+import { fromSitePage, type SearchUsage } from './search-usage.ts';
 
 export const SEARCH_SCOPE_LIMIT = 1000;
 // Opt-in, partial local prefix index. No global historical body LIKE scan.
@@ -56,6 +57,7 @@ export async function loadSearch(
       items: hits.slice((page - 1) * limit, page * limit),
       pagination: { page, pageSize: limit, hasMore: hits.length > page * limit },
       coverage,
+      matched: matchedCounts(hits),
     };
   }
   const parameters: unknown[] = [];
@@ -107,19 +109,25 @@ export async function loadSearch(
     items: merged.slice(start, start + limit),
     pagination: { page, pageSize: limit, hasMore: merged.length > start + limit },
     coverage,
+    // Without the body index, metadata rows are this page's only (SQL pagination).
+    matched: matchedCounts(merged),
   };
 }
-export function registerSearchRoutes(app: FastifyInstance, pool: Pool) {
+/** `usage` (search-usage.ts) is given only by the production app; tests' query counts stay exact. */
+export function registerSearchRoutes(app: FastifyInstance, pool: Pool, usage?: SearchUsage) {
   let active = 0;
+  if (usage) app.addHook('onClose', () => usage.close());
   app.get<{ Querystring: Record<string, unknown> }>('/api/search', async (req, reply) => {
     const filters = searchFilters(req.query);
     if (!filters) return reply.code(400).send({ error: 'invalid_search', limits: { queryCharacters: 80, page: 50, pageSize: 20 } });
     reply.header('cache-control', 'no-store');
+    const site = fromSitePage(req.headers);
     try {
       if (active >= 2) throw Object.assign(Error('search_busy'), { statusCode: 503 });
       active++;
       try {
-        const result = await loadSearch(pool, filters);
+        const { matched, ...result } = await loadSearch(pool, filters);
+        usage?.record({ site, page: filters.page, matched });
         const items = await withPostTags(pool, result.items as Record<string, unknown>[], {
           id: (item) => item.articleId,
           onFailure: () => req.log.warn({ operation: 'search.postTags' }, 'post tags unavailable'),
@@ -129,6 +137,7 @@ export function registerSearchRoutes(app: FastifyInstance, pool: Pool) {
         active--;
       }
     } catch (error) {
+      usage?.record({ site, page: filters.page, matched: null });
       return reply
         .header('cache-control', 'no-store')
         .code(503)

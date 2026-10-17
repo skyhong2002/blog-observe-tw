@@ -114,6 +114,12 @@ export async function runFulltextBatch(pool: Pool, options: { after?: number; li
   return { next: rows.length ? Number(rows.at(-1)!.id) : 0, done: !rows.length, items };
 }
 
+/** Validated matches and how many matched only in a body, for search_usage_daily (search-usage.ts); not public. */
+export const matchedCounts = (items: { matchSource?: unknown }[]) => ({
+  total: items.length,
+  body: items.filter((item) => item.matchSource === 'body').length,
+});
+
 export async function loadFulltextSearch(pool: Pool, filters: { q: string; page: number; limit: number; blog: string }) {
   const q = normalizeFulltext(filters.q),
     tokens = fulltextTokens(q);
@@ -144,6 +150,7 @@ export async function loadFulltextSearch(pool: Pool, filters: { q: string; page:
       items: [],
       pagination: { page: filters.page, pageSize: filters.limit, hasMore: false },
       coverage: { ...coverage, historicalBody: { ...coverage.historicalBody, status: 'short-query' } },
+      matched: { total: 0, body: 0 },
     };
   const selectedTokens =
     tokens.length <= 16 ? tokens : Array.from({ length: 16 }, (_, n) => tokens[Math.floor((n * (tokens.length - 1)) / 15)]);
@@ -199,6 +206,7 @@ export async function loadFulltextSearch(pool: Pool, filters: { q: string; page:
     items: items.slice(start, start + filters.limit),
     pagination: { page: filters.page, pageSize: filters.limit, hasMore: items.length > start + filters.limit },
     coverage,
+    matched: matchedCounts(items),
   };
 }
 

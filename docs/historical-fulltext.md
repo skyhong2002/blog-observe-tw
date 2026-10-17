@@ -72,3 +72,17 @@ UTC20:49:04.958Z以同一份前端產物切到green/gen19/46c074c，homepage五�
 ### 回填續跑記錄
 
 原先一篇／60秒的20批均通過，cursor24438；首頁各批200，最慢4.342秒。接著保持單一writer、Nice19／IO idle／pool1，設定五篇／60秒，單次最多2000批，非200／>6.17秒立即取消，沒有失敗自動重試。worker仍af0，不啟用新的whole-body producer。CLI日誌與cursor：`/home/deck/.cache/blog-home-cloud-b3-20261014/.reviews/f3-fulltext/backfill-five-per-minute.log`；回填未完成，不把「已能搜到歷史文章」當成全站歷史coverage已完成。
+
+### 搜尋使用量（search_usage_daily）
+
+GA 不計帶 query 的網址，所以 `/articles/?q=` 搜尋本來量不到（docs/analytics.md）。為了判斷回填值不值得，gateway 以台灣日期每天累加 `search_usage_daily`（migration `0033_search_usage_daily`，`app/src/search-usage.ts`）：
+
+- `site_searches`：網站搜尋頁發出的第一頁搜尋（`Sec-Fetch-Site: same-origin`）；換頁另記 `site_later_pages`，503 記 `site_failures`。
+- `with_results`／`body_matches`／`body_only`：上述第一頁搜尋中，有任何結果、至少一筆只在正文命中、全部結果都只在正文命中（沒有正文索引就是零結果）。以所有驗證過的候選計算，不只當頁。
+- `api_requests`：其他來源（腳本、外站、API 使用者）的有效請求。
+
+不存搜尋字詞、結果、IP、User-Agent 或任何識別資料；只在記憶體累加，每分鐘與 gateway 關閉時各寫一筆 upsert（1 秒 statement 上限，失敗時留到下次）。讀取：
+
+```sql
+SET STATEMENT max_statement_time=1 FOR SELECT * FROM search_usage_daily ORDER BY day DESC LIMIT 30;
+```
