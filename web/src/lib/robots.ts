@@ -1,6 +1,7 @@
 import { taipei } from './api';
 
-/** The gateway's latest robots.txt read for a host (app/src/crawl/robots-observations.ts). */
+/** The gateway's latest robots.txt read for a host (app/src/crawl/robots-observations.ts). Shown only: the crawl
+ * reads robots.txt but does not stop at it (crawl/feed.ts obeyRobots). */
 export type RobotsStatus = {
   outcome: 'allowed' | 'missing' | 'partial' | 'blocked' | 'unreachable';
   httpStatus: number | null;
@@ -46,7 +47,7 @@ export function robotsLabel(robots: RobotsStatus | null | undefined): {
       return {
         label: `讀不到（${why}）`,
         tone: 'warn',
-        title: `robots.txt 伺服器錯誤或連不上時視為禁止，暫停抓取 · ${last} · ${read}`,
+        title: `robots.txt 讀不到 · ${last} · ${read}`,
       };
     }
   }

@@ -278,7 +278,7 @@ export default function BlogCatalogView({
                   <Th col="latest" label="最新文章" />
                   <Th col="crawl" label="抓取成功" />
                   <th scope="col" className={table.cell}>
-                    <abbr title="這個網站的 robots.txt 對本站爬蟲的規則，滑過可看細節" className="no-underline">
+                    <abbr title="這個網站的 robots.txt 對本站爬蟲寫了什麼（只公開顯示，不影響抓取），滑過可看細節" className="no-underline">
                       robots.txt
                     </abbr>
                   </th>

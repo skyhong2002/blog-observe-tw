@@ -82,6 +82,14 @@ async function applyWithRetry(pool: Pool, check: Parameters<typeof recordCandida
   throw Error('retry exhausted');
 }
 /** Review a bounded, resumable batch. Keep declined/operator-reviewed candidates out of automatic work. */
+/** When a candidate held by robots.txt is reviewed again: at once while the crawl does not obey robots.txt
+ * (crawl/feed.ts obeyRobots), otherwise when a later read of its host's robots.txt is open. */
+function robotsReopened() {
+  if (process.env.BLOG_CRAWL_OBEY_ROBOTS !== 'true') return 'TRUE';
+  return `EXISTS(SELECT 1 FROM robots_observations r WHERE r.host=LOWER(SUBSTRING_INDEX(SUBSTRING_INDEX(d.url,'/',3),'/',-1))
+       AND r.outcome IN ('allowed','missing','partial')
+       AND DATE_FORMAT(r.checked_at,'%Y-%m-%dT%H:%i:%s')>LEFT(JSON_UNQUOTE(JSON_EXTRACT(source_evidence,'$.automaticReview.checkedAt')),19))`;
+}
 export async function runCandidateReviewBatch(
   pool: Pool,
   options: FeedCrawlerOptions & {
@@ -114,14 +122,12 @@ export async function runCandidateReviewBatch(
        : `(COALESCE(JSON_UNQUOTE(JSON_EXTRACT(source_evidence,'$.automaticReview.policy')),'')<>? OR COALESCE(JSON_UNQUOTE(JSON_EXTRACT(source_evidence,'$.automaticReview.checkedAt')),'') < ?
    OR (JSON_UNQUOTE(JSON_EXTRACT(source_evidence,'$.automaticReview.reason')) IN ('candidate_host_budget_exhausted','daily_admission_budget_exhausted') AND JSON_UNQUOTE(JSON_EXTRACT(source_evidence,'$.automaticReview.checkedAt')) < ?) OR EXISTS(SELECT 1 FROM ai_results ai WHERE ai.entity_type='candidate' AND ai.entity_id=d.id AND ai.task='classification' AND ai.status<>'ok' AND ai.attempts<3 AND ai.next_attempt_at<=UTC_TIMESTAMP())
    OR (JSON_UNQUOTE(JSON_EXTRACT(source_evidence,'$.automaticReview.reason')) IN ('robots_disallowed','robots_unreachable')
-     AND EXISTS(SELECT 1 FROM robots_observations r WHERE r.host=LOWER(SUBSTRING_INDEX(SUBSTRING_INDEX(d.url,'/',3),'/',-1))
-       AND r.outcome IN ('allowed','missing','partial')
-       AND DATE_FORMAT(r.checked_at,'%Y-%m-%dT%H:%i:%s')>LEFT(JSON_UNQUOTE(JSON_EXTRACT(source_evidence,'$.automaticReview.checkedAt')),19))))`
+     AND ${robotsReopened()}))`
    }
    ORDER BY JSON_EXTRACT(source_evidence,'$.directoryListing') IS NULL AND JSON_EXTRACT(source_evidence,'$.indiewebListing') IS NULL,
      COALESCE(JSON_UNQUOTE(JSON_EXTRACT(source_evidence,'$.automaticReview.checkedAt')),''),id LIMIT ?`,
       // A spent per-host or admission budget is retried once it resets (the next UTC day), not after the weekly recheck;
-      // a candidate held by robots.txt is retried as soon as a later read of its host's robots.txt is open.
+      // a candidate held by robots.txt is retried as soon as robots.txt no longer holds it (robotsReopened).
       ids.length
         ? [ids, limit]
         : [

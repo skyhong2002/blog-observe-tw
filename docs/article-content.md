@@ -24,7 +24,8 @@ RSS `content:encoded`, Atom `content`, and already fetched public WordPress
 HTTP request. A missing or partial body can be supplemented by a publisher-owned
 public platform endpoint or the article's HTML. WordPress endpoints are learned
 from publisher markup and checked against the article owner. No private APIs,
-authenticated content, robots blocks or access restrictions are bypassed.
+authenticated content or access restrictions are bypassed. robots.txt is read and published
+but not obeyed (since 2026-10-17; `BLOG_CRAWL_OBEY_ROBOTS=true` restores it).
 
 Owner-path platforms remain deliberately conservative. An opaque Matters `/a/`
 or Vocus `/article/` URL does not by itself prove the author of a profile feed.
@@ -57,7 +58,7 @@ caches to avoid repeated aggregation under concurrent page visits.
 it is disabled by default. `npm run content:once` runs a bounded batch. The job
 shares the relationship lease, per-origin and global HTTP budgets and page budget,
 not a second independent allowance. Each actual request follows the existing
-robots, identifiable User-Agent, delay, DNS-pinned public-address validation,
+robots.txt read (not obeyed), identifiable User-Agent, delay, DNS-pinned public-address validation,
 redirect validation, timeout and response-size rules. A batch handles at most
 five articles with a two-minute wall-clock bound and resumes remaining work later.
 Budget exhaustion is a deferral, not evidence that a blog failed.

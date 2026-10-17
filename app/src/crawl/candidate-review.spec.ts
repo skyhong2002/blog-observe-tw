@@ -104,6 +104,16 @@ describe('resumable candidate review batch', () => {
     // A robots-held candidate comes back as soon as a later read of its host's robots.txt is open.
     expect(sql).toMatch(/IN \('robots_disallowed','robots_unreachable'\)\s+AND EXISTS\(SELECT 1 FROM robots_observations r/);
     expect(sql).toContain("r.outcome IN ('allowed','missing','partial')");
+    // A crawl that does not obey robots.txt takes every robots-held candidate back at once.
+    vi.stubEnv('BLOG_CRAWL_OBEY_ROBOTS', 'false');
+    try {
+      const off = harness();
+      await runCandidateReviewBatch(off.pool);
+      const [offSql] = (off.c.query.mock.calls as unknown as [string, unknown[]][]).find(([q]) => q.includes('FROM discovery_candidates'))!;
+      expect(offSql).toMatch(/IN \('robots_disallowed','robots_unreachable'\)\s+AND TRUE\)/);
+    } finally {
+      vi.unstubAllEnvs();
+    }
     // BlogBlog.Club- and IndieWeb-listed homes are reviewed first: the directory is the collection's priority.
     expect(sql).toMatch(
       /ORDER BY JSON_EXTRACT\(source_evidence,'\$\.directoryListing'\) IS NULL AND JSON_EXTRACT\(source_evidence,'\$\.indiewebListing'\) IS NULL,\s*COALESCE/,

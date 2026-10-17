@@ -29,7 +29,7 @@ node --env-file-if-exists=.env tools/crawl-history.ts --blogs 5 --duration-ms 60
 metadata 工作完成代表所有子工作已持久化，並不代表文章已寫完。每個 transaction 同時提交 post／作者／標籤、子工作與工作游標；任何 SQL 失敗皆 rollback，原工作保持 pending。重新抓取可重放，來源 ownership 與 verified blog URL 每次交易重新鎖定檢查。正常 crawler 共用相同 writer 與 blog row lock。
 
 - `partial`：本批預算用完，仍有 pending 工作。
-- `blocked`：robots、401/403/429、其他抓取或 SQL 錯誤。停止本站本批，保存待辦並至少冷卻六小時；遵守較長 Retry-After（最多七日）。不換 UA、不繞過 robots。403/429/robots 不自動略過；其他錯誤逐任務累計 attempts，第三次失敗改為 `failed`、保留 last_error 與警告，才繼續其他工作。來源已移除也可記錄終態，不寫入失去歸屬的文章。可選來源回 200 HTML 軟404／無效 XML 直接記錄不可用後結束該探測。
+- `blocked`：robots（只在 `BLOG_CRAWL_OBEY_ROBOTS=true` 時發生）、401/403/429、其他抓取或 SQL 錯誤。停止本站本批，保存待辦並至少冷卻六小時；遵守較長 Retry-After（最多七日）。不換 UA、不繞過 robots。403/429/robots 不自動略過；其他錯誤逐任務累計 attempts，第三次失敗改為 `failed`、保留 last_error 與警告，才繼續其他工作。來源已移除也可記錄終態，不寫入失去歸屬的文章。可選來源回 200 HTML 軟404／無效 XML 直接記錄不可用後結束該探測。
 - `limited`：總工作／文章／請求或巢狀深度達上限，保留待辦等待明確提高上限。分頁本身不累加 sitemap 巢狀深度。
 - `exhausted`：公開可發現工作已走完，但僅有最新 feed 視窗，或有任何 warning（例如來源遺失、跨站排除、文章未解析、循環或失敗任務）。目前保守地要求零 warning 才可完成，即使另有 sitemap，也不會掩蓋 feed 視窗的限制。非文章／缺乏文章機器可讀證據的頁面會留下 `article-unparsed`，不當作已取得文章。
 - `complete`：所有已發現的公開 archive 工作均已完成，且未遇上述缺口。僅此時寫入 `blogs.history_imported_at`；不是保證刪文或非公開文章也已取得。之後新增來源會重新開啟 queue 並清除完成時間。
@@ -38,7 +38,7 @@ metadata 工作完成代表所有子工作已持久化，並不代表文章已�
 
 ## 安全與姊妹站隔離
 
-所有網路請求使用原有 DNS 公開 IP 驗證與連線釘選、每跳 redirect 安全驗證、robots、可識別 UA、每 host 原子預約限速、回應大小與 timeout。它不呼叫 Similarweb、不共用 tag 資料庫或 Redis。單一 `blog_observe:history-import` MariaDB named lock 使用專用 connection，工作另用一條，pool size 2 足夠；lease 丟失即停止，不在交易裡做 HTTP。worker 排程由 blog 自己的佇列負責，與正常抓取共用每 host 限速 map。
+所有網路請求使用原有 DNS 公開 IP 驗證與連線釘選、每跳 redirect 安全驗證、robots.txt 讀取（預設不遵守）、可識別 UA、每 host 原子預約限速、回應大小與 timeout。它不呼叫 Similarweb、不共用 tag 資料庫或 Redis。單一 `blog_observe:history-import` MariaDB named lock 使用專用 connection，工作另用一條，pool size 2 足夠；lease 丟失即停止，不在交易裡做 HTTP。worker 排程由 blog 自己的佇列負責，與正常抓取共用每 host 限速 map。
 
 測試涵蓋全 sitemap 分片與千筆 URL、Atom/Blogger/WordPress 分頁、平台作者隔離、comments exclusion、partial 續跑、403/429/robots 冷卻、SQL 失敗 rollback 不前移游標、總量上限與來源／GUID／日期保護。
 

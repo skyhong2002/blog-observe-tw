@@ -20,6 +20,9 @@ export default function AboutPage() {
           文章內文依序從 RSS 全文、Atom 內容、平台 API 或文章頁 HTML
           取得，只用於關鍵字、文章關係與站內搜尋；本站公開只顯示摘要、搜尋片段與原文連結。各部落格頁的「內文來源」會說明取得方式與狀態。
         </p>
+        <p className="text-sm leading-7 text-zinc-600 dark:text-zinc-400">
+          爬蟲以可識別的 User-Agent（blog.observe.tw）抓取，會讀取各站的 robots.txt 並在部落格目錄公開其內容，但不依它停止抓取。站主若希望停止抓取或移除，請透過下方 GitHub 或 b@blog.observe.tw 聯絡。
+        </p>
       </section>
       <section className="space-y-2">
         <h2 className="text-lg font-semibold">更新與排行</h2>

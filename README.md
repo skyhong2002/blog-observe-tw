@@ -15,7 +15,7 @@ Created in [T3 Code](https://t3.codes).
 - 獨立 MariaDB `blog_observe` schema、Drizzle schema 與持久化 session；seed 匯入器保留原始列、來源 SHA-256、分類與未換算的流量原值。
 - 登入後可追蹤部落格，透過 `/me/feed.xml` 匯出個人 RSS，並以 `/me/opml` 匯出、`POST /api/me/opml` 匯入 OPML；未知 OPML 網址只進候選清單，不會自動公開收錄。
 - 專案骨架跟隨 tag.observe.tw 固定 commit `afe0a653fa8aae7e25a04a1d9fe87bf0400a2a39`：Fastify、Drizzle、BullMQ、Next 16、React 19、Tailwind 4、Biome、Vitest；`NOTICE` 保留移植來源與 MIT 聲明。
-- RSS/Atom/sitemap 抓取遵守 robots、識別 User-Agent、每站延遲和 ETag/Last-Modified；blogblog.club discovery 每週執行，Similarweb 已接通 tag 的唯一供應商工作，正式旗標已啟用，本地持久化限制每日 30 次提交與至少六小時輪詢；舊 direct provider 與 mkdir 鎖已移除。
+- RSS/Atom/sitemap 抓取讀取但不依 robots.txt 停止（2026-10-17 起，狀態公開於 `/blogs/`，`BLOG_CRAWL_OBEY_ROBOTS=true` 可恢復遵守）、識別 User-Agent、每站延遲和 ETag/Last-Modified；blogblog.club discovery 每週執行，Similarweb 已接通 tag 的唯一供應商工作，正式旗標已啟用，本地持久化限制每日 30 次提交與至少六小時輪詢；舊 direct provider 與 mkdir 鎖已移除。
 - 作者身份以部落格範圍分開保存，爬蟲標籤與社群／人工標籤有 provenance，不會覆蓋人工修訂；部落格另外保存最後抓取成功、最後發文、預期更新頻率與歷史匯入時間，低頻站不因沒有近期文章被判 stale。
 - 高信心且首頁／RSS 身份一致的候選會自動收錄；未通過者保留原因，管理員仍可在 `/admin/discovery/` 查看來源、路徑與稽核；設定檔以 `BLOG_ADMIN_EMAILS`（逗號分隔）指定帳號，所有決定寫入 audit。
 

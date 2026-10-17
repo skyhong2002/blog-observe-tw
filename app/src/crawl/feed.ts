@@ -87,6 +87,9 @@ export type FeedCrawlerOptions = BodyIndexOptions & {
   resolveHost?: HostResolver;
   fetcher?: FeedFetcher;
   historyImport?: boolean;
+  /** Stop at robots.txt rules. Off unless BLOG_CRAWL_OBEY_ROBOTS=true (the owner's choice, 2026-10-17): robots.txt is
+   * still read for every host and its status published, but no fetch waits on it. */
+  obeyRobots?: boolean;
 };
 
 const DEFAULT_USER_AGENT = 'blog.observe.tw/1.0 (+https://blog.observe.tw/about; mailto:b@blog.observe.tw)';
@@ -100,7 +103,8 @@ const parser = new XMLParser({
   parseTagValue: false,
 });
 const hostNextAt = new Map<string, number>();
-const robotsCache = new Map<string, { expiresAt: number; disallow: string[] }>();
+/** An unreadable robots.txt is kept ten minutes, so a crawl that does not obey it still reads it once, not per page. */
+const robotsCache = new Map<string, { expiresAt: number; disallow: string[] | 'unreachable' }>();
 /** What one read of a host's robots.txt said about our agent. `missing` (a 4xx other than 429: no rules) and
  * `allowed` admit everything, `partial` blocks some paths, `blocked` blocks `/`; `unreachable` (5xx, 429, a timeout
  * or a network error) is held as a disallow, so an outage is not mistaken for permission. */
@@ -453,7 +457,8 @@ async function robotsAllows(
   const parsed = new URL(url);
   const origin = parsed.origin;
   const cached = robotsCache.get(origin);
-  let disallow = cached && cached.expiresAt > Date.now() ? cached.disallow : null;
+  if (cached && cached.expiresAt > Date.now() && cached.disallow === 'unreachable') return 'unreachable';
+  let disallow = cached && cached.expiresAt > Date.now() && cached.disallow !== 'unreachable' ? cached.disallow : null;
   if (!disallow) {
     try {
       let robotsUrl = `${origin}/robots.txt`;
@@ -476,6 +481,7 @@ async function robotsAllows(
       } else if (!response.ok) {
         await response.body?.cancel().catch(() => {});
         observeRobots(parsed.host, { outcome: 'unreachable', httpStatus: response.status, error: null, disallow: [] });
+        robotsCache.set(origin, { expiresAt: Date.now() + 600_000, disallow: 'unreachable' });
         return 'unreachable';
       } else disallow = robotsRules(await response.text(), userAgent);
       robotsCache.set(origin, { expiresAt: Date.now() + 3_600_000, disallow });
@@ -500,6 +506,7 @@ async function robotsAllows(
             : 'network',
         disallow: [],
       });
+      robotsCache.set(origin, { expiresAt: Date.now() + 600_000, disallow: 'unreachable' });
       return 'unreachable';
     }
   }
@@ -520,7 +527,7 @@ export async function readRobots(value: string, options: FeedCrawlerOptions = {}
   );
 }
 
-/** Every request goes through this gate: one host delay and one robots check. */
+/** Every request goes through this gate: one host delay and one robots.txt read (enforced only with obeyRobots). */
 export async function politeFetch(
   value: string,
   headers: Record<string, string> = {},
@@ -533,6 +540,7 @@ export async function politeFetch(
   // Agent and fetch must use the same undici version; Node's bundled fetch
   // can use an older dispatcher handler protocol than the installed package.
   const fetcher = options.fetcher ?? (undiciFetch as FeedFetcher);
+  const obeyRobots = options.obeyRobots ?? process.env.BLOG_CRAWL_OBEY_ROBOTS === 'true';
   let url = new URL(value);
   try {
     for (let hop = 0; hop <= 5; hop += 1) {
@@ -547,8 +555,8 @@ export async function politeFetch(
       const wait = scheduled - Date.now();
       if (wait > 0) await new Promise((resolve) => setTimeout(resolve, wait));
       const allowed = await robotsAllows(url.toString(), userAgent, timeoutMs, resolveHost, fetcher);
-      if (allowed === 'unreachable') throw new Error(`robots disallow (${ROBOTS_UNREACHABLE}) ${url}`);
-      if (!allowed) throw new Error(`robots disallow ${url}`);
+      if (obeyRobots && allowed === 'unreachable') throw new Error(`robots disallow (${ROBOTS_UNREACHABLE}) ${url}`);
+      if (obeyRobots && !allowed) throw new Error(`robots disallow ${url}`);
       const response = await pinnedFetch(
         target,
         {

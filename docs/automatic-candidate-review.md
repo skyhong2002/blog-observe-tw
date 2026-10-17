@@ -8,8 +8,9 @@
 - 首頁可正常讀取，來源名稱的完整規格化文字與首頁 title／site name／author 一致，RSS 名稱亦一致。共用單字或部分姓名不夠；不因短文、少文或多年未更新而判 stale。
 - RSS／Atom XML 有實際文章，channel／alternate link 與首頁身份相符，所有文章網址均在該 publication 範圍。排除留言 feed、空 feed、混合作者／跨站轉載 feed；僅有 sitemap 尚不符合此階段的自動核准門檻。
 - 保留平台作者的子網域／路徑。網站搬家須有同一次安全抓取的 redirect 與完整名稱證據；寫入原網址別名，不把平台總站或同筆名作者跨站合併。
-- 所有網路請求沿用 robots、公開 DNS 釘選、每跳 URL/IP 檢查、識別 UA、每站延遲、大小與 timeout 限制；403／robots 不繞過。
-- robots.txt 依 RFC 9309：429 以外的 4xx 視為沒有規則（2026-10-17 使用者同意；先前只有 404／410）；5xx、429、逾時或連線失敗都當成禁止（避免把站方故障當成許可），記為 `robots_unreachable`，跟真的被規則擋下的 `robots_disallowed` 分開。候選若因 robots 保留，之後只要同 host 的 robots.txt 讀到開放（允許／無規則／部分路徑），下一輪審查就會重審，不必等 7 天。`tools/robots-refresh.ts` 一次讀遍所有已收錄部落格與候選的 robots.txt（每 host 一次請求）。每次實際讀取 robots.txt 的結果依 host 存在 `robots_observations`（`crawl/robots-observations.ts`：允許／無檔案／部分路徑限制／禁止／讀不到，附 HTTP 狀態、被擋路徑、上次讀到時間），顯示在 `/blogs/` 的「robots.txt」欄與管理頁候選清單。
+- 所有網路請求沿用公開 DNS 釘選、每跳 URL/IP 檢查、識別 UA、每站延遲、大小與 timeout 限制；403 不繞過。
+- **robots.txt 只讀不遵守**（2026-10-17 站主決定）：`politeFetch` 仍為每個 host 讀 robots.txt（成功讀到快取 1 小時、讀不到 10 分鐘）並記錄狀態，但不因它停止任何抓取。設 `BLOG_CRAWL_OBEY_ROBOTS=true` 恢復遵守（測試套件以此模式執行）。/about 寫明此政策並提供聯絡方式；站主要求停止時以人工處理。
+- 遵守模式下 robots.txt 依 RFC 9309：429 以外的 4xx 視為沒有規則；5xx、429、逾時或連線失敗都當成禁止，記為 `robots_unreachable`，跟真的被規則擋下的 `robots_disallowed` 分開。過去因 robots 保留的候選：不遵守時下一輪審查就全部重審；遵守時要等同 host 的 robots.txt 讀到開放（允許／無規則／部分路徑）才重審。`tools/robots-refresh.ts` 一次讀遍所有已收錄部落格與候選的 robots.txt（每 host 一次請求）。每次實際讀取 robots.txt 的結果依 host 存在 `robots_observations`（`crawl/robots-observations.ts`：允許／無檔案／部分路徑限制／禁止／讀不到，附 HTTP 狀態、被擋路徑、上次讀到時間），顯示在 `/blogs/` 的「robots.txt」欄與管理頁候選清單。
 
 ## 交易與續跑
 

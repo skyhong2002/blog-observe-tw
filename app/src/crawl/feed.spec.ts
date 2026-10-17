@@ -233,6 +233,29 @@ describe('crawl request safety', () => {
     expect(unreachable).toMatch(/^robots disallow \(robots\.txt unreachable\) /);
   });
 
+  it('without obeyRobots, reads robots.txt for its status but fetches a disallowed or unreadable site anyway', async () => {
+    const seen: RobotsObservation[] = [];
+    onRobotsObservation((o) => seen.push(o));
+    try {
+      for (const robots of [new Response('User-agent: *\nDisallow: /\n'), new Response('', { status: 503 })]) {
+        const host = `ignore-robots-${seen.length}-${Date.now()}.test`;
+        const calls: string[] = [];
+        const fetcher = async (input: string | Request | URL) => {
+          calls.push(String(input));
+          return String(input).endsWith('/robots.txt') ? robots.clone() : new Response('<rss/>');
+        };
+        const options = { delayMs: 250, fetcher, resolveHost: async () => ['93.184.216.34'], obeyRobots: false };
+        expect((await politeFetch(`https://${host}/feed`, {}, options)).status).toBe(200);
+        // An unreadable robots.txt is remembered for a while, not read again before every page.
+        expect((await politeFetch(`https://${host}/post`, {}, options)).status).toBe(200);
+        expect(calls).toEqual([`https://${host}/robots.txt`, `https://${host}/feed`, `https://${host}/post`]);
+      }
+    } finally {
+      onRobotsObservation(null);
+    }
+    expect(seen.map((o) => o.outcome)).toEqual(['blocked', 'unreachable']);
+  });
+
   it('honors a matching robots disallow rule before requesting the feed', async () => {
     const host = `robots-${Date.now()}.test`;
     const calls: string[] = [];
