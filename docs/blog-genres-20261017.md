@@ -34,6 +34,55 @@ New blogs added after the run can remain unclassified and are always retained by
 genre filters. All labels are provisional; "high" means stronger sampled evidence,
 not independent confirmation.
 
+## 2026-10-17 split of paired genres
+
+The user asked for every paired label to become two genres. The vocabulary now has 20
+genres; each old key kept the half it names, and the other half got a new key. A shared
+link with the retired `creative` key now excludes `design`.
+
+| Old | New |
+| --- | --- |
+| `gadgets` 3C／軟體介紹 | `gadgets` 3C (hardware) · `software` 軟體介紹 (apps, tools, downloads) |
+| `programming` 程式／技術 | `programming` 程式 (writing code) · `tech` 技術 (ops, networking, self-hosting, security, tech analysis) |
+| `life` 生活／日記 | `life` 生活 (everyday lifestyle, health) · `diary` 日記 (personal journal and reflection) |
+| `news` 新聞／媒體 | `news` 新聞 · `media` 媒體 (run as a media outlet, or about media) |
+| `anime` 動漫／遊戲 | `anime` 動漫 · `games` 遊戲 |
+| `culture` 閱讀／藝文 | `reading` 閱讀 (books) · `culture` 藝文 (film, music, literature, arts) |
+| `creative` 攝影／設計 | `photography` 攝影 · `design` 設計 (visual, UI, illustration, architecture) |
+| `other` 其他／綜合 | `other` 其他 · `general` 綜合 (deliberately mixed subjects) |
+
+The AI re-decided every paired label of the earlier seed into one or both halves, from a fresh
+evidence export (473 verified blogs) and the earlier reason, kept the unpaired labels unless the
+evidence contradicted them, and labelled the 18 blogs added since from scratch. A blog may now
+have 1–4 genres. `data/blog-genre-seed.json` holds 473 blogs and 915 assignments (260 high, 180
+medium, 33 low confidence; among the low ones are shop sites with no collected posts,
+labelled `other`):
+
+| ID | Reader label | Blogs |
+| --- | --- | ---: |
+| `food` | 美食 | 66 |
+| `travel` | 旅遊 | 91 |
+| `gadgets` | 3C | 24 |
+| `software` | 軟體介紹 | 40 |
+| `programming` | 程式 | 90 |
+| `tech` | 技術 | 67 |
+| `life` | 生活 | 37 |
+| `diary` | 日記 | 190 |
+| `parenting` | 親子 | 15 |
+| `news` | 新聞 | 15 |
+| `media` | 媒體 | 2 |
+| `finance` | 財經 | 26 |
+| `anime` | 動漫 | 38 |
+| `games` | 遊戲 | 25 |
+| `reading` | 閱讀 | 31 |
+| `culture` | 藝文 | 88 |
+| `photography` | 攝影 | 8 |
+| `design` | 設計 | 42 |
+| `other` | 其他 | 20 |
+| `general` | 綜合 | 0 |
+
+The sections below describe the first labelling (12 paired genres) and are kept for history.
+
 ## Vocabulary and coverage
 
 Assignments overlap, so counts do not sum to 455. There are no unclassified blogs

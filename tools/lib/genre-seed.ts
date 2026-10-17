@@ -20,7 +20,7 @@ export function validateGenreSeed(raw: unknown): { version: 2; totalBlogs: numbe
       !['high', 'medium', 'low'].includes(entry.confidence) ||
       !Array.isArray(entry.genres) ||
       entry.genres.length < 1 ||
-      entry.genres.length > 3 ||
+      entry.genres.length > 4 ||
       new Set(entry.genres.map((g) => g.genre)).size !== entry.genres.length ||
       entry.genres.some((g) => !isBlogGenre(g.genre) || typeof g.reason !== 'string' || !g.reason.trim())
     )

@@ -12,6 +12,8 @@ test('filter URL validates caps and genres, deduplicates repeated values and rou
   for (const max of ['-1', '999', '2junk', '2.5', '', 'Infinity', '01'])
     assert.equal(articleFiltersOf(new URLSearchParams({ maxPerBlog: max })).maxPerBlog, 0);
   assert.deepEqual(articleFiltersOf(new URLSearchParams('exclude=__proto__&exclude=constructor')), NO_ARTICLE_FILTERS);
+  // creative (攝影／設計) was retired by the 2026-10-17 split; its shared links now exclude 設計.
+  assert.deepEqual(articleFiltersOf(new URLSearchParams('exclude=creative&exclude=design')).exclude, ['design']);
   assert.equal(articleFiltersHref(NO_ARTICLE_FILTERS), '/articles/');
 });
 

@@ -69,9 +69,20 @@ describe('resolved blog genres', () => {
   });
   it('validates complete, unique AI labels and rejects malformed seeds', async () => {
     const seed = validateGenreSeed(JSON.parse(await readFile(new URL('../../../data/blog-genre-seed.json', import.meta.url), 'utf8')));
-    expect(seed.entries).toHaveLength(455);
+    expect(seed.entries).toHaveLength(473);
     expect(seed.entries.find((b) => b.slug === 'saydigi')?.genres.map((g) => g.genre)).toContain('gadgets');
+    // The 2026-10-17 split: software-introduction sites are 軟體介紹, no longer 3C.
+    expect(seed.entries.find((b) => b.slug === 'azo-307')?.genres.map((g) => g.genre)).toEqual(['software']);
     expect(() => validateGenreSeed({ ...seed, entries: [seed.entries[0], seed.entries[0]], totalBlogs: 2 })).toThrow();
     expect(() => validateGenreSeed({ ...seed, entries: [{ ...seed.entries[0], genres: [] }], totalBlogs: 1 })).toThrow();
+    const five = ['food', 'travel', 'life', 'diary', 'culture'].map((genre) => ({ genre, reason: 'fixture' }));
+    expect(() => validateGenreSeed({ ...seed, entries: [{ ...seed.entries[0], genres: five }], totalBlogs: 1 })).toThrow();
+    expect(() =>
+      validateGenreSeed({
+        ...seed,
+        entries: [{ ...seed.entries[0], genres: [{ genre: 'creative', reason: 'retired key' }] }],
+        totalBlogs: 1,
+      }),
+    ).toThrow();
   });
 });

@@ -39,8 +39,8 @@ type Blog = {
   lastEdit: { at: string; by: string | null; action: string } | null;
 };
 type Data = { partial: boolean; blogs: Blog[] };
-type SortKey = 'name' | 'category' | 'crawl' | 'posts' | 'posts7d' | 'lastPublishedAt' | 'lastCrawlSuccessAt' | 'edits' | 'lastEdit';
-type Filters = { crawl: string | null; genre: string | null; category: string | null };
+type SortKey = 'name' | 'crawl' | 'posts' | 'posts7d' | 'lastPublishedAt' | 'lastCrawlSuccessAt' | 'edits' | 'lastEdit';
+type Filters = { crawl: string | null; label: string | null };
 
 const CRAWL: Record<Crawl, { label: string; tone: string; title: string }> = {
   ok: { label: '正常', tone: 'text-zinc-700 dark:text-zinc-300', title: '抓取成功，90 天內有新文章' },
@@ -50,7 +50,15 @@ const CRAWL: Record<Crawl, { label: string; tone: string; title: string }> = {
   off: { label: '不收錄', tone: 'text-zinc-500', title: '待核對、已搬家或已移除，不再抓取' },
 };
 const crawlOrder: Crawl[] = ['failing', 'never', 'quiet', 'ok', 'off'];
-const NO_GENRE = '__none';
+const NO_LABEL = '__none';
+/** The legacy seed `category` ("科技, 遊戲", "電商 (服裝)", 待分類) read as labels beside the genres: split on commas,
+ * qualifiers in brackets dropped, 待分類 is no label. */
+const categoryLabels = (category: string) =>
+  category
+    .split(/[,，、]/u)
+    .map((part) => part.replace(/[(（].*?[)）]/gu, '').trim())
+    .filter((part) => part && part !== '待分類');
+const genreOrder = Object.values(BLOG_GENRES) as string[];
 const fold = (text: string) => text.normalize('NFKC').toLowerCase();
 const editLabel = (action: string) =>
   action.startsWith('genre.')
@@ -103,9 +111,9 @@ export default function Blogs() {
   const [data, setData] = useState<Data | null>(null);
   const [error, setError] = useState('');
   const [q, setQ] = useState('');
-  const [filters, setFilters] = useState<Filters>({ crawl: null, genre: null, category: null });
-  const [sort, setSort] = useState<SortKey>('name');
-  const [descending, setDescending] = useState(false);
+  const [filters, setFilters] = useState<Filters>({ crawl: null, label: null });
+  const [sort, setSort] = useState<SortKey>('posts7d');
+  const [descending, setDescending] = useState(true);
   const load = () => {
     setError('');
     adminGet<Data>('/api/admin/blogs')
@@ -127,24 +135,28 @@ export default function Blogs() {
   if (!data) return <p role="status">載入部落格中…</p>;
 
   const words = fold(q).split(/\s+/u).filter(Boolean);
-  const genresOf = (b: Blog): string[] => b.genres.filter((g) => g.visible).map((g) => g.genre);
+  // One label set per blog: the genres readers see plus the legacy category, merged by name (旅遊, 財經, 遊戲 …).
+  const labelsOf = (b: Blog) => [
+    ...new Set([...b.genres.filter((g) => g.visible).map((g) => BLOG_GENRES[g.genre] as string), ...categoryLabels(b.category)]),
+  ];
   const matches = (b: Blog, skip?: keyof Filters) =>
     words.every((w) => fold(`${b.name} ${b.url ?? ''} ${b.slug} ${b.manualTags.join(' ')}`).includes(w)) &&
     (skip === 'crawl' || !filters.crawl || b.crawl === filters.crawl) &&
-    (skip === 'category' || !filters.category || b.category === filters.category) &&
-    (skip === 'genre' || !filters.genre || (filters.genre === NO_GENRE ? !genresOf(b).length : genresOf(b).includes(filters.genre)));
+    (skip === 'label' || !filters.label || (filters.label === NO_LABEL ? !labelsOf(b).length : labelsOf(b).includes(filters.label)));
   const tally = (skip: keyof Filters, keys: (b: Blog) => string[]) => {
     const out = new Map<string, number>();
     for (const b of data.blogs) if (matches(b, skip)) for (const k of keys(b)) out.set(k, (out.get(k) ?? 0) + 1);
     return out;
   };
   const crawlCounts = tally('crawl', (b) => [b.crawl]);
-  const genreCounts = tally('genre', (b) => (genresOf(b).length ? genresOf(b) : [NO_GENRE]));
-  const categoryCounts = tally('category', (b) => [b.category]);
+  const labelCounts = tally('label', (b) => (labelsOf(b).length ? labelsOf(b) : [NO_LABEL]));
+  // Genres in vocabulary order, then labels found only in the legacy category, most used first.
+  const extraLabels = [...new Set(data.blogs.flatMap((b) => categoryLabels(b.category)))]
+    .filter((label) => !genreOrder.includes(label))
+    .sort((a, b) => (labelCounts.get(b) ?? 0) - (labelCounts.get(a) ?? 0) || a.localeCompare(b, 'zh-TW'));
   const rows = data.blogs.filter((b) => matches(b));
   const value = (b: Blog): number | string => {
     if (sort === 'name') return fold(b.name);
-    if (sort === 'category') return b.category;
     if (sort === 'crawl') return crawlOrder.indexOf(b.crawl);
     if (sort === 'lastEdit') return b.lastEdit ? Date.parse(b.lastEdit.at) : 0;
     if (sort === 'lastPublishedAt' || sort === 'lastCrawlSuccessAt') return b[sort] ? Date.parse(b[sort] as string) : 0;
@@ -160,7 +172,7 @@ export default function Blogs() {
     if (sort === key) setDescending((d) => !d);
     else {
       setSort(key);
-      setDescending(!['name', 'category', 'crawl'].includes(key));
+      setDescending(!['name', 'crawl'].includes(key));
     }
   };
   const th = (col: SortKey, label: string, className: string = table.cell, title?: string) => (
@@ -194,25 +206,13 @@ export default function Blogs() {
         <Chips
           label="類型"
           all="全部類型"
-          value={filters.genre}
-          onChange={(genre) => setFilters((f) => ({ ...f, genre }))}
-          options={[
-            ...(Object.entries(BLOG_GENRES) as [BlogGenre, string][]).map(([g, label]) => ({
-              value: g,
-              label,
-              count: genreCounts.get(g) ?? 0,
-            })),
-            { value: NO_GENRE, label: '無類型', count: genreCounts.get(NO_GENRE) ?? 0 },
-          ]}
-        />
-        <Chips
-          label="分類"
-          all="全部分類"
-          value={filters.category}
-          onChange={(category) => setFilters((f) => ({ ...f, category }))}
-          options={[...new Set(data.blogs.map((b) => b.category))]
-            .map((c) => ({ value: c, label: c, count: categoryCounts.get(c) ?? 0 }))
-            .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label, 'zh-TW'))}
+          value={filters.label}
+          onChange={(label) => setFilters((f) => ({ ...f, label }))}
+          options={[...genreOrder, ...extraLabels, NO_LABEL].map((label) => ({
+            value: label,
+            label: label === NO_LABEL ? '無類型' : label,
+            count: labelCounts.get(label) ?? 0,
+          }))}
         />
       </div>
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -237,8 +237,11 @@ export default function Blogs() {
           <thead className="bg-(--table-head-bg) text-left text-xs text-zinc-600 dark:text-zinc-400">
             <tr>
               {th('name', '部落格', table.leadHead)}
-              {th('category', '分類')}
-              <th scope="col" className={table.cell} title="讀者看到的類型；✎ 是管理員設定的，刪除線是管理員隱藏的">
+              <th
+                scope="col"
+                className={table.cell}
+                title="讀者看到的類型加上舊分類；✎ 是管理員設定的，刪除線是管理員隱藏的，虛線框來自舊分類"
+              >
                 類型
               </th>
               <th scope="col" className={table.cell}>
@@ -261,6 +264,8 @@ export default function Blogs() {
               const robots = robotsLabel(b.robots);
               const crawl = CRAWL[b.crawl];
               const shown = b.genres.filter((g) => g.visible || g.source === 'admin');
+              // Legacy category labels a visible genre does not already show.
+              const legacy = categoryLabels(b.category).filter((label) => !shown.some((g) => g.visible && BLOG_GENRES[g.genre] === label));
               return (
                 <tr key={b.id} className={`${table.row} [&>td]:align-baseline`}>
                   <td className={table.lead}>
@@ -286,13 +291,8 @@ export default function Blogs() {
                       ) : null}
                     </div>
                   </td>
-                  <td className={table.cell}>
-                    <span className="block max-w-32 truncate" title={b.category}>
-                      {b.category}
-                    </span>
-                  </td>
                   <td className={`${table.cell} text-xs`}>
-                    {shown.length ? (
+                    {shown.length || legacy.length ? (
                       <span className="flex gap-1">
                         {shown.map((g) => (
                           <span
@@ -304,6 +304,15 @@ export default function Blogs() {
                           >
                             {BLOG_GENRES[g.genre] ?? g.genre}
                             {g.source === 'admin' ? ' ✎' : ''}
+                          </span>
+                        ))}
+                        {legacy.map((label) => (
+                          <span
+                            key={label}
+                            className="rounded border border-dashed border-zinc-300 px-1.5 py-px dark:border-zinc-700"
+                            title={`舊分類：${b.category}`}
+                          >
+                            {label}
                           </span>
                         ))}
                       </span>
@@ -353,8 +362,9 @@ export default function Blogs() {
         </table>
       </TableScroller>
       <p className="text-xs text-zinc-500 dark:text-zinc-400">
-        收錄狀態：抓取失敗是每個 RSS 都連續失敗 3 次以上、也沒有產生的爬蟲；久未更新是 90 天內沒有新文章；不收錄包括待核對、已搬家和已移除。
-        游標移到收錄狀態上可看 RSS 數與失敗次數。點部落格名稱可設定簡介與標籤；類型要到部落格公開頁的類型區調整。
+        類型是讀者看到的類型加上早期名單的舊分類（虛線框），同名的併成一個。收錄狀態：抓取失敗是每個 RSS 都連續失敗 3
+        次以上、也沒有產生的爬蟲；久未更新是 90 天內沒有新文章；不收錄包括待核對、已搬家和已移除。 游標移到收錄狀態上可看 RSS
+        數與失敗次數。點部落格名稱可設定簡介與標籤；類型要到部落格公開頁的類型區調整。
       </p>
     </section>
   );

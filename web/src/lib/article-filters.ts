@@ -5,12 +5,22 @@ export type ArticleFilters = { maxPerBlog: number; exclude: BlogGenre[] };
 export const NO_ARTICLE_FILTERS: ArticleFilters = { maxPerBlog: 0, exclude: [] };
 export const BLOG_CAPS = [0, 1, 2, 3] as const;
 
+/** Retired genre keys a shared URL may still carry (creative was 攝影／設計 before the 2026-10-17 split). */
+const RETIRED: Record<string, BlogGenre> = { creative: 'design' };
+
 /** Only supported caps and known genres survive a shared URL; repeated genres are harmless. */
 export function articleFiltersOf(params: { get(key: string): string | null; getAll(key: string): string[] }): ArticleFilters {
   const raw = params.get('maxPerBlog');
   return {
     maxPerBlog: BLOG_CAPS.find((cap) => String(cap) === raw) ?? 0,
-    exclude: [...new Set(params.getAll('exclude').filter(isBlogGenre))].sort(),
+    exclude: [
+      ...new Set(
+        params
+          .getAll('exclude')
+          .map((genre) => (Object.hasOwn(RETIRED, genre) ? RETIRED[genre] : genre))
+          .filter(isBlogGenre),
+      ),
+    ].sort(),
   };
 }
 export function articleFiltersHref(filters: ArticleFilters): string {

@@ -17,10 +17,10 @@ export async function loadBlogGenres(pool: Pick<Pool, 'query'>, slugs: string[])
        (SELECT COUNT(*) FROM blog_genre_votes v WHERE v.blog_id=b.id AND v.genre=a.genre AND v.vote=-1) disagrees
      FROM blogs b JOIN blog_genre_assignments a ON a.blog_id=b.id
      WHERE b.status='verified' AND b.slug IN (?)
-     GROUP BY b.id,b.slug,a.genre LIMIT 2401`,
+     GROUP BY b.id,b.slug,a.genre LIMIT 4001`,
     [keys],
   );
-  if (rows.length > 2400) throw Error('genre-read-bound');
+  if (rows.length > 4000) throw Error('genre-read-bound');
   for (const row of rows) {
     if (!isBlogGenre(row.genre)) continue;
     result.get(row.slug)?.items.push(
