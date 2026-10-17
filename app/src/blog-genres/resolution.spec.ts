@@ -9,7 +9,9 @@ describe('resolved blog genres', () => {
   it('retains AI ties and hides only when disagreements outnumber agreements', () => {
     expect(resolveGenre(input).visible).toBe(true);
     expect(resolveGenre({ ...input, agrees: 2, disagrees: 2 }).visible).toBe(true);
-    expect(resolveGenre({ ...input, agrees: 2, disagrees: 3 }).visible).toBe(false);
+    expect(resolveGenre({ ...input, agrees: 2, disagrees: 3 }).visible).toBe(true);
+    expect(resolveGenre({ ...input, disagrees: 1 }).visible).toBe(true);
+    expect(resolveGenre({ ...input, agrees: 2, disagrees: 4 }).visible).toBe(false);
   });
   it('requires two net community agreements, and votes remain effective after releasing overrides', () => {
     expect(resolveGenre({ ...input, ai: false, agrees: 2, disagrees: 1 }).visible).toBe(false);

@@ -2,7 +2,7 @@
 export const BLOG_GENRES = {
   food: '美食',
   travel: '旅遊',
-  gadgets: '3C／科技產品',
+  gadgets: '3C／軟體介紹',
   programming: '程式／技術',
   life: '生活／日記',
   parenting: '親子',

@@ -55,19 +55,19 @@ exist for 265 blogs; they are evidence, not curated blog identities.
 ## Initial classification
 
 `data/blog-genre-review.json` holds multi-label assignments and their evidence.
-The vocabulary is 美食, 旅遊, 3C／科技產品, 程式／技術, 生活／日記, 親子,
+The vocabulary is 美食, 旅遊, 3C／軟體介紹, 程式／技術, 生活／日記, 親子,
 新聞／媒體, 財經. The initial assignments are heuristic, not author-confirmed.
 
 The proposal used names, descriptions, existing categories and up to 60 distinct
 active public feed-category labels per blog (ordered by tag id, not recency).
 Identity signals can establish a genre. Otherwise a genre needs at least three
 matching distinct labels and 25% of sampled labels, or six matching labels.
-Broad 科技 alone never establishes 3C／科技產品. Classification is deliberately
+Broad 科技 alone never establishes 3C／軟體介紹. Classification is deliberately
 incomplete; a tag sample is not a statistical estimate of a blog's article mix.
 Evidence and assignments can be corrected in the review file before deployment.
 
 105 / 455 blogs (23.1%) receive at least one genre; 350 remain unclassified.
-Genre assignments overlap: 美食 45, 旅遊 80, 3C／科技產品 6, 程式／技術 2,
+Genre assignments overlap: 美食 45, 旅遊 80, 3C／軟體介紹 6, 程式／技術 2,
 生活／日記 8, 親子 2, 新聞／媒體 0, 財經 13. In the sampled latest list,
 38 / 67 sources and 131 / 200 articles have a classified source. This coverage
 is not a claim of complete food or gadget detection. New and unknown slugs

@@ -10,6 +10,8 @@ export type GenreItem = {
 };
 export type GenreState = { status: 'ready' | 'unavailable'; items: GenreItem[] };
 export const COMMUNITY_GENRE_THRESHOLD = 2;
+/** An AI label hides only at this net disagreement, so one reader cannot remove it alone. */
+export const AI_GENRE_HIDE_THRESHOLD = 2;
 
 /** Admin overrides preserve the underlying AI baseline and every reader vote. */
 export function resolveGenre(input: {
@@ -23,7 +25,7 @@ export function resolveGenre(input: {
   return {
     genre,
     source: admin ? 'admin' : ai ? 'ai' : 'community',
-    visible: admin ? admin === 'set' : ai ? agrees >= disagrees : agrees - disagrees >= COMMUNITY_GENRE_THRESHOLD,
+    visible: admin ? admin === 'set' : ai ? disagrees - agrees < AI_GENRE_HIDE_THRESHOLD : agrees - disagrees >= COMMUNITY_GENRE_THRESHOLD,
     agrees,
     disagrees,
     adminOverride: admin,

@@ -4,7 +4,7 @@
 
 This follow-up supersedes the initial heuristic classification in
 [Article reader filters](article-filters-20261017.md). All 455 verified blogs in
-the 2026-10-17 export receive 1–3 AI labels, with 848 assignments in total.
+the 2026-10-17 export receive 1–3 AI labels, with 842 assignments in total after the 2026-10-17 review below.
 These are provisional judgments, not author declarations or a measure of quality.
 The homepage is unchanged; `/articles/` still defaults to unlimited per blog.
 
@@ -43,8 +43,8 @@ in this export; 11 receive `other`, and 16 blogs have low-confidence judgments.
 | --- | --- | ---: |
 | `food` | 美食 | 66 |
 | `travel` | 旅遊 | 85 |
-| `gadgets` | 3C／科技產品 | 33 |
-| `programming` | 程式／技術 | 168 |
+| `gadgets` | 3C／軟體介紹 | 40 |
+| `programming` | 程式／技術 | 155 |
 | `life` | 生活／日記 | 203 |
 | `parenting` | 親子 | 15 |
 | `news` | 新聞／媒體 | 15 |
@@ -76,15 +76,15 @@ all source titles, categories, confidence and per-assignment reasons.
 
 | Blog | AI labels | Reason |
 | --- | --- | --- |
-| 電腦王阿達 (`kocpc`) | 3C／科技產品, 新聞／媒體 | Hardware reviews, consumer electronics launches and technology news dominate recent posts. |
+| 電腦王阿達 (`kocpc`) | 3C／軟體介紹, 新聞／媒體 | Hardware reviews, consumer electronics launches and technology news dominate recent posts. |
 | 波比 (BobbyFun) (`bobbyfun-248`) | 旅遊, 美食 | Accommodation and destination guides alongside repeated market and restaurant food guides. |
-| 阿榮福利味azo (`azo-307`) | 程式／技術 | Software downloads, utilities and operating-system tools rather than hardware reviews. |
+| 阿榮福利味azo (`azo-307`) | 3C／軟體介紹 | Software downloads, utilities and operating-system tools rather than hardware reviews. |
 | Nash.tw 神之領域 (`nash-tw-312`) | 美食 | Restaurant and street-food reviews; all fifteen sampled posts use food-review categories. |
-| 電腦玩物 (`seed-390`) | 程式／技術 | AI productivity workflows, software applications and digital tools. |
+| 電腦玩物 (`seed-390`) | 3C／軟體介紹 | AI productivity workflows, software applications and digital tools. |
 | dietician江欣樺 營養師 (`dietician-396`) | 其他／綜合 | Dietitian-branded commercial site, with no collected articles or feed categories to establish a narrower genre. |
 | upssmile.com/ (`upssmile-com-492`) | 美食, 旅遊 | Recent posts are cafe and restaurant visits; broad repeated design categories do not establish a design-focused blog. |
-| 哇哇 ez3c (`ez3c-657`) | 程式／技術 | Windows utilities, AI coding software and digital-asset downloads; the 3C name alone overstates hardware coverage. |
-| 點子生活 saydigi (`saydigi`) | 3C／科技產品, 旅遊, 程式／技術 | Recurring wearables and appliance coverage, travel guides and AI software; the sparse category heuristic missed this mixed technology publisher. |
+| 哇哇 ez3c (`ez3c-657`) | 3C／軟體介紹 | Windows utilities, AI coding software and digital-asset downloads; the 3C name alone overstates hardware coverage. |
+| 點子生活 saydigi (`saydigi`) | 3C／軟體介紹, 旅遊 | Recurring wearables and appliance coverage, travel guides and AI software; the sparse category heuristic missed this mixed technology publisher. |
 | 好和弦 - NiceChord.com (`discovered-fa86bb6d78428551e7fc`) | 閱讀／藝文 | The sampled posts overwhelmingly teach music theory and performance; one pitch tool does not establish a software genre. |
 | Shuyu Pixelart (`discovered-e8ba63c638ea166a97cc`) | 攝影／設計, 生活／日記 | Pixel-art creation and monthly personal retrospectives. |
 | Huli's blog (`discovered-3565128083e8a6200b10`) | 程式／技術, 生活／日記, 財經 | Programming teaching and a JavaScript book, personal reflections, and a sustained retirement and investment series. |
@@ -143,8 +143,8 @@ production migration applications or writes in this work.
 Each genre resolves independently:
 
 1. Admin `active` forces display; admin `hidden` forces hidden. Counts still update.
-2. Without an admin override, an AI `active` label displays when agrees >= disagrees
-   (including zero/zero). More disagreements hide it.
+2. Without an admin override, an AI `active` label displays until disagreements exceed
+   agreements by 2 (net -2), so a single reader cannot remove it alone.
 3. Without an AI baseline, a community candidate displays at net agrees >= 2.
 4. Releasing the admin override deletes only the admin row, immediately restoring
    the baseline/vote result. It never deletes opinions. Admin actions also preserve
@@ -264,3 +264,14 @@ of 程式／技術, and the names of the two combined arts genres. Defaults stay
 and the homepage remains unchanged. Human review should start with the low-
 confidence queue and mixed-topic sources; complete seed coverage is not proof
 that every genre is correct.
+
+## Review on 2026-10-17
+
+Readers who exclude 3C expect software and app introduction sites to go too, so
+`gadgets` is now 3C／軟體介紹 and "programming" means writing software. Moved to
+3C／軟體介紹: 阿榮福利味, 電腦玩物, 重灌狂人, 就是教不落, 哇哇 ez3c, IT路人甲, 梅問題.
+Programming dropped where 3C already covered the site: 硬是要學, 瓦特兄弟, Ted, 雲爸,
+點子生活, CHCOOBOO. An AI label now hides only at net −2 (disagrees − agrees ≥ 2),
+so one reader cannot remove it alone; admins can still hide it directly. The seed
+keeps labels and reasons only; per-blog evidence is regenerated by
+tools/export-blog-genre-evidence.ts when needed.
