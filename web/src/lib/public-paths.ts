@@ -18,6 +18,7 @@ const SEGMENT = '[^/?#\\\\]{1,765}';
 export const PUBLIC_KINDS = [
   'overview',
   'catalog',
+  'collectionCount',
   'authors',
   'search',
   'topics',
@@ -49,6 +50,7 @@ const RULES: readonly Rule[] = [
   // view=home: the homepage's bounded projections (app/src/app.js, overview.js; topics/routes.ts).
   { kind: 'overview', path: /^\/api\/overview$/, query: [], views: { home: 'homeOverview' } },
   { kind: 'catalog', path: /^\/api\/catalog$/, query: ['q', 'category', 'status', 'sort', 'dir', 'page', 'limit'] },
+  { kind: 'collectionCount', path: /^\/api\/collection-count$/, query: [] },
   { kind: 'authors', path: /^\/api\/catalog\/authors$/, query: ['author', 'page', 'limit'] },
   { kind: 'search', path: /^\/api\/search$/, query: ['q', 'page', 'limit', 'blog'] },
   { kind: 'topics', path: /^\/api\/topics$/, query: ['days'], views: { home: 'homeTopics' } },

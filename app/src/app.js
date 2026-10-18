@@ -11,6 +11,7 @@ import { readBlogGenres } from './blog-genres/store.ts';
 import { installPrivateCachePolicy } from './cache-policy.ts';
 import { loadCatalog } from './catalog.js';
 import { loadAuthorCatalog } from './catalog-authors.js';
+import { registerCollectionCount } from './collection-count.ts';
 import { registerContentRoutes } from './content/routes.ts';
 import { recordRobotsObservations } from './crawl/robots-observations.ts';
 import { createDb } from './db/client.ts';
@@ -130,6 +131,8 @@ export async function buildApp(config, { logger = false, store = null } = {}) {
     version: '0.3.0',
     uptimeSeconds: Math.floor((Date.now() - startedAt) / 1000),
   }));
+
+  registerCollectionCount(app, pool);
 
   app.get('/api/catalog/authors', async (request, reply) => {
     reply.header('cache-control', 'no-store');

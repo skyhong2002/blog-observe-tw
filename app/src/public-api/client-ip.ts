@@ -34,7 +34,7 @@ export function internalRenderRead(request: FastifyRequest): boolean {
   )
     return false;
   const path = request.url.split('?')[0];
-  return /^\/api\/(?:overview|catalog(?:\/authors)?|search|icons|traffic|relations|content\/coverage|pages\/(?:blogs|topics)\/[^/]+|blogs\/[^/]+(?:\/(?:topics|relations|content))?|topics(?:\/[^/]+)?)$/.test(
+  return /^\/api\/(?:overview|collection-count|catalog(?:\/authors)?|search|icons|traffic|relations|content\/coverage|pages\/(?:blogs|topics)\/[^/]+|blogs\/[^/]+(?:\/(?:topics|relations|content))?|topics(?:\/[^/]+)?)$/.test(
     path,
   );
 }
