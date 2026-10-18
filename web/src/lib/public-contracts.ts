@@ -367,6 +367,7 @@ export const PUBLIC_CONTRACTS: Record<PublicKind, (raw: unknown) => boolean> = {
   overview: (raw) => shape(raw, overviewShape),
   homeOverview,
   homeTopics,
+  collectionCount: (raw) => shape(raw, { blogs: count }),
   catalog: (raw) =>
     shape(raw, {
       blogs: (value) => rows(value, { slug: text, name: text }),

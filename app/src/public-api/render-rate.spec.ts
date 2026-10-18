@@ -1,6 +1,6 @@
+import rateLimit from '@fastify/rate-limit';
 import type { FastifyRequest } from 'fastify';
 import Fastify from 'fastify';
-import rateLimit from '@fastify/rate-limit';
 import { describe, expect, it } from 'vitest';
 import { registerFavicons } from '../v1/favicon-routes.ts';
 import { gatewayRateKey, gatewayRateMax, internalRenderRead } from './client-ip.ts';
@@ -67,5 +67,59 @@ describe('server render rate bucket isolation', () => {
     expect(internalRenderRead(request('/api/overview?q=example', {}, '127.0.0.1', 'HEAD'))).toBe(true);
     expect(internalRenderRead(request('/api/%6fverview'))).toBe(false);
     expect(internalRenderRead(request('/api/topics/x%2f..%2fadmin'))).toBe(true); // A topic parameter, never an admin route.
+  });
+});
+
+describe('footer count rate compatibility', () => {
+  it.each(['GET', 'HEAD'])('keeps the catalog bucket for %s across every direct loopback form', (method) => {
+    for (const socket of ['127.0.0.1', '::1', '::ffff:127.0.0.1']) {
+      const old = request('/api/catalog?limit=1', {}, socket, method);
+      const count = request('/api/collection-count', {}, socket, method);
+      expect(internalRenderRead(count)).toBe(true);
+      expect(gatewayRateKey(count)).toBe(gatewayRateKey(old));
+      expect(gatewayRateMax(count)).toBe(gatewayRateMax(old));
+      expect(gatewayRateKey(count)).toBe('internal-render-read');
+      expect(gatewayRateMax(count)).toBe(2000);
+    }
+  });
+
+  it.each([
+    'cf-connecting-ip',
+    'x-real-ip',
+    'true-client-ip',
+    'x-forwarded-port',
+    'x-forwarded-for',
+    'x-forwarded-host',
+    'x-forwarded-proto',
+    'forwarded',
+    'cookie',
+    'authorization',
+    'x-api-key',
+    'x-service-token',
+  ])('retains the forwarding/credential guard for count with %s', (header) => {
+    for (const method of ['GET', 'HEAD']) {
+      const count = request('/api/collection-count', { [header]: '203.0.113.5' }, '127.0.0.1', method);
+      expect(internalRenderRead(count)).toBe(false);
+      expect(gatewayRateMax(count)).toBe(240);
+      expect(gatewayRateKey(count)).not.toBe('internal-render-read');
+    }
+  });
+
+  it('excludes external sockets, writes and near-match paths', () => {
+    for (const socket of ['203.0.113.7', '127.0.0.2', '::2'])
+      expect(internalRenderRead(request('/api/collection-count', {}, socket))).toBe(false);
+    for (const method of ['POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'])
+      expect(internalRenderRead(request('/api/collection-count', {}, '127.0.0.1', method))).toBe(false);
+    for (const path of [
+      '/api/collection-count/',
+      '/api/collection-count-extra',
+      '/api/collection-count/x',
+      '/api/%63ollection-count',
+      '//api/collection-count',
+      '/api/v1/collection-count',
+      '/api/me/collection-count',
+      '/api/admin/collection-count',
+    ])
+      expect(internalRenderRead(request(path))).toBe(false);
   });
 });

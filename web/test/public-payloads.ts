@@ -48,6 +48,7 @@ export const notObservedBlog = {
 
 /** Valid answers with no rows. One per public kind. */
 export const EMPTY: Record<PublicKind, unknown> = {
+  collectionCount: { blogs: 0 },
   overview: { posts: [], tags: [], authors: [], blogs: [], recentBlogs: [], totals: { blogs: 0, posts: 0 }, updatedAt: null },
   catalog: {
     blogs: [],
@@ -181,6 +182,7 @@ export const EMPTY: Record<PublicKind, unknown> = {
 
 /** A path answering each kind. */
 export const PATHS: Record<PublicKind, string> = {
+  collectionCount: '/api/collection-count',
   overview: '/api/overview',
   catalog: '/api/catalog?sort=latest',
   authors: '/api/catalog/authors?author=7',

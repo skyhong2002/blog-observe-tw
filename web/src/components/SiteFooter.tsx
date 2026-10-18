@@ -1,5 +1,5 @@
 import { Suspense } from 'react';
-import { catalog } from '@/lib/public-api';
+import { collectionCount } from '@/lib/public-api';
 import { METHOD_HREF } from '@/lib/site-nav';
 import BackToTop from './BackToTop';
 import FooterMethod from './FooterMethod';
@@ -69,12 +69,10 @@ const ICONS = {
   install: 'M12 4v11m0 0-4-4m4 4 4-4M5 20h14',
 };
 
-/** Collection totals use only the blog gateway's public catalog. Best effort:
+/** Collection totals use only the blog gateway's public verified-blog count. Best effort:
  *  the footer is on every page, private ones included, and never fails one. */
 async function FooterStats() {
-  const totals = await catalog({ limit: '1' })
-    .then((data) => data.totals as { blogs?: number } | undefined)
-    .catch(() => undefined);
+  const totals = await collectionCount().catch(() => undefined);
   if (!totals?.blogs) return null;
   return (
     <Link href="/blogs/" className="group inline-flex items-center gap-2 text-[13px] text-zinc-600 dark:text-zinc-400">
