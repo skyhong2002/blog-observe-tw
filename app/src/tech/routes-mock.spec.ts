@@ -90,6 +90,11 @@ describe('optional technology HTTP routes with offline storage adapter', () => {
       });
       expect(first.json().items).toHaveLength(2);
       expect(first.json().pagination.nextCursor).toBe('2');
+      // /tech/ shows not-observed under 未辨識: status=unknown lists both, status=not-observed only its own.
+      const unknown = (await app.inject('/api/tech?status=unknown')).json();
+      expect(unknown.items.map((i: { status: string }) => i.status)).toEqual(['unknown', 'not-observed']);
+      expect(unknown.pagination.total).toBe(2);
+      expect((await app.inject('/api/tech?status=not-observed')).json().pagination.total).toBe(1);
       const failed = (await app.inject('/api/tech?status=failed')).json();
       expect(failed.items).toHaveLength(1);
       expect(failed.items[0]).toMatchObject({
@@ -106,7 +111,7 @@ describe('optional technology HTTP routes with offline storage adapter', () => {
       expect(next.coverage.notObserved).toBe(1);
       expect(next.technologies).toEqual([]);
       expect(next.items[0].detections).toEqual([]);
-      expect(query).toHaveBeenCalledTimes(6);
+      expect(query).toHaveBeenCalledTimes(10);
     } finally {
       await app.close();
     }

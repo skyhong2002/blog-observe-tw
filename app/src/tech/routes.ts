@@ -186,7 +186,8 @@ export function registerTechRoutes(app: FastifyInstance, pool: Pool, options: { 
         ({ row, scan }) =>
           (!filters.q ||
             `${row.name} ${row.slug} ${publicTechBlogUrl(row.url) ?? ''}`.toLocaleLowerCase().includes(filters.q.toLocaleLowerCase())) &&
-          (!filters.status || scan.status === filters.status) &&
+          // The public page shows not-observed under 未辨識, so status=unknown lists both.
+          (!filters.status || scan.status === filters.status || (filters.status === 'unknown' && scan.status === 'not-observed')) &&
           (!filters.technology || scan.detections.some((d) => d.id === filters.technology)),
       );
       const remaining = matching.filter(({ row }) => Number(row.id) > filters.cursor);

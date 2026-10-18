@@ -19,7 +19,7 @@ import { table } from '@/lib/table-styles';
 import {
   canonicalBlogPath,
   categoryText,
-  coverageKey,
+  chipCount,
   errorLabel,
   explicitVersions,
   hostOf,
@@ -29,12 +29,12 @@ import {
   isTechStatus,
   LOW_DATA_BLOGS,
   observedBlogs,
+  STATUS_CHIPS,
   share,
   shownVersion,
   sourceTypeText,
   statusText,
   statusTone,
-  TECH_STATUSES,
   type TechBlog,
   type TechDetection,
   type TechStats,
@@ -177,7 +177,7 @@ export function TechMethodNotes({ data }: { data: TechStats }) {
       <p>版本只取自明確的版本宣告（例如 generator 標記）且附有證據；沒有證據時顯示「未知」，不從檔名、網址參數或標頭推測。</p>
       <p>主機與 CDN 只來自回應標頭等基礎設施線索，信心低，只代表網站可能經由哪裡提供，不會當成 CMS 或框架。</p>
       <p>
-        「未辨識」是已觀測但沒看到已知線索；「觀測失敗」「來源阻擋」是最近一次沒能觀測，不算未辨識；「未觀測」是還沒有紀錄。失敗或被阻擋時保留的結果是上次成功的歷史觀測，不代表目前仍確認。
+        「未辨識」是沒有看到任何已知線索，包含兩種情況：已觀測但回應裡沒有已知線索，以及還沒有可供辨識的公開回應（尚未有觀測紀錄）；各部落格的狀態說明會寫是哪一種。「觀測失敗」「來源阻擋」是最近一次沒能觀測，不算未辨識。失敗或被阻擋時保留的結果是上次成功的歷史觀測，不代表目前仍確認。
       </p>
       <p>
         技術排行與技術篩選都依各部落格目前保留的觀測證據計算，包含最近一次觀測失敗或被阻擋、但仍保留的上次成功結果；這些部落格的「狀態」顯示最近一次嘗試的結果，所以排行的站數不一定等於「有辨識」的數量。
@@ -225,6 +225,8 @@ export default function TechStatsView({
   const scanned = coverage.scannedBlogs;
   const activeTech = technologies.find((t) => t.id === filters.technology);
   const activeStatus = isTechStatus(filters.status) ? filters.status : null;
+  // An old ?status=not-observed link lights the 未辨識 chip it now belongs to.
+  const activeChip = activeStatus === 'not-observed' ? 'unknown' : activeStatus;
   const chip = 'inline-flex min-h-11 items-center gap-1 whitespace-nowrap rounded-full bg-brand-700 px-3 text-white hover:bg-brand-800';
   return (
     <div className="space-y-5 pb-8">
@@ -253,12 +255,12 @@ export default function TechStatsView({
         label="辨識狀態"
         items={[
           { href: techHref({ q: filters.q, technology: filters.technology }), label: '全部狀態', current: !activeStatus },
-          ...TECH_STATUSES.map((state) => {
-            const value = coverage[coverageKey[state]];
+          ...STATUS_CHIPS.map((state) => {
+            const value = chipCount(coverage, state);
             return {
-              href: techHref({ q: filters.q, technology: filters.technology, status: activeStatus === state ? undefined : state }),
+              href: techHref({ q: filters.q, technology: filters.technology, status: activeChip === state ? undefined : state }),
               label: `${statusText[state]} ${n(value)}（${share(value, scanned)}）`,
-              current: activeStatus === state,
+              current: activeChip === state,
               title: `佔已讀取 ${share(value, scanned)}`,
             };
           }),
@@ -271,7 +273,7 @@ export default function TechStatsView({
         {technologies.length ? (
           <RankTable technologies={technologies} scanned={scanned} filters={filters} />
         ) : (
-          <p className={`py-4 text-sm ${muted}`}>目前沒有辨識到網站軟體。可能是尚未觀測或線索不足，不代表部落格沒有使用。</p>
+          <p className={`py-4 text-sm ${muted}`}>目前沒有辨識到網站軟體。可能是尚未取得可辨識的回應或線索不足，不代表部落格沒有使用。</p>
         )}
       </section>
 
@@ -424,7 +426,7 @@ export default function TechStatsView({
               <p className={`py-8 ${muted}`}>
                 沒有符合條件的部落格。
                 {filters.technology &&
-                  ' 技術篩選只列出目前保留的觀測證據中有該技術的部落格（包含最近一次觀測失敗或被阻擋、但仍保留上次成功結果的部落格）；未辨識、未觀測或沒有保留結果的部落格不會出現在這裡。'}
+                  ' 技術篩選只列出目前保留的觀測證據中有該技術的部落格（包含最近一次觀測失敗或被阻擋、但仍保留上次成功結果的部落格）；未辨識或沒有保留結果的部落格不會出現在這裡。'}
               </p>
             )}
             <nav aria-label="部落格分頁" className="flex justify-between gap-2 text-sm">

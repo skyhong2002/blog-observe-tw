@@ -253,7 +253,7 @@ const baselineFilters = { q: '', technology: '', status: '' };
 /* /tech/ ------------------------------------------------------------------- */
 
 describe('/tech/ baseline', () => {
-  test('denominators, five state chips, partial scan and the ranking table above the blog table', () => {
+  test('denominators, four state chips (未辨識 includes not-observed), partial scan and the ranking table above the blog table', () => {
     const $ = render(<TechStatsView data={stats()} filters={baselineFilters} status="ready" />);
     expect($('h1').text()).toBe('部落格使用的技術');
     expect(card($, '公開部落格').text()).toContain('2,400');
@@ -261,10 +261,9 @@ describe('/tech/ baseline', () => {
     expect(card($, '本次讀取').text()).toContain('部分截斷');
     for (const [label, count, status, pct] of [
       ['有辨識', '30', 'detected', '1.5%'],
-      ['未辨識', '20', 'unknown', '1%'],
+      ['未辨識', '1,955', 'unknown', '97.8%'],
       ['觀測失敗', '10', 'failed', '0.5%'],
       ['來源阻擋', '5', 'blocked', '0.3%'],
-      ['未觀測', '1,935', 'not-observed', '96.8%'],
     ]) {
       const state = statusChip($, label);
       expect(state.length, label).toBe(1);
@@ -272,6 +271,7 @@ describe('/tech/ baseline', () => {
       expect(state.text()).toBe(`${label} ${count}（${pct}）`);
       expect(state.attr('title')).toBe(`佔已讀取 ${pct}`);
     }
+    expect($('body').text()).not.toContain('未觀測');
     // The partial scan is said in the method block, not above the ranking.
     expect(outsideText($)).not.toContain('其餘 400 個');
     expect(methodBlocks($).text()).toContain('其餘 400 個不計入任何狀態、排行或篩選');
@@ -361,7 +361,7 @@ describe('/tech/ baseline', () => {
 
     const unregistered = rowOf($, '測試站戊');
     expect(unregistered.find('td').first().find('a').length).toBe(0);
-    expect(unregistered.find('td').eq(1).text()).toBe('未觀測');
+    expect(unregistered.find('td').eq(1).text()).toBe('未辨識');
     expect(unregistered.find('td').eq(6).text()).toBe('尚未嘗試');
 
     const main = $('main').text();
@@ -631,7 +631,7 @@ describe('profile 使用的技術 (optional)', () => {
   for (const [name, row, expected] of [
     ['unknown', unknownBlog, '已觀測，但既有回應中沒有可辨識的線索'],
     ['blocked without a success', blockedBlog, '最近一次觀測被來源拒絕'],
-    ['not-observed', unregisteredBlog, '尚未有這個部落格的技術觀測紀錄'],
+    ['not-observed', unregisteredBlog, '還沒有可供辨識的公開回應'],
   ] as const) {
     test(`${name}: its own sentence, no detections listed`, async () => {
       gateway.answer = () => Promise.resolve(payload(row));

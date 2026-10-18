@@ -157,9 +157,11 @@ test('views: internal links go through NoPrefetchLink; nothing is kept between r
 
 /* Pure helpers ------------------------------------------------------------- */
 
-test('statuses: five states, none of which claims a technology is absent', () => {
+test('statuses: five states read as four labels, none of which claims a technology is absent', () => {
   assert.deepEqual(TECH_STATUSES, ['detected', 'unknown', 'failed', 'blocked', 'not-observed']);
-  assert.equal(new Set(TECH_STATUSES.map((s) => statusText[s])).size, 5);
+  assert.equal(new Set(TECH_STATUSES.map((s) => statusText[s])).size, 4);
+  assert.equal(statusText['not-observed'], statusText.unknown);
+  assert.notEqual(statusNote['not-observed'], statusNote.unknown);
   for (const state of TECH_STATUSES) assert.doesNotMatch(statusNote[state], /沒有使用(?!任何技術)|未使用(?!」)/, state);
 });
 

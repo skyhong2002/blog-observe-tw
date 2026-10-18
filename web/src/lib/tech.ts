@@ -91,15 +91,18 @@ export const statusText: Record<TechStatus, string> = {
   unknown: '未辨識',
   failed: '觀測失敗',
   blocked: '來源阻擋',
-  'not-observed': '未觀測',
+  // Same label as unknown: either way no known clue was seen. statusNote keeps the reason.
+  'not-observed': '未辨識',
 };
+/** The /tech/ status chips. 未辨識 covers not-observed too (see unknownCount); the gateway's status=unknown matches both. */
+export const STATUS_CHIPS: TechStatus[] = ['detected', 'unknown', 'failed', 'blocked'];
 /** One sentence per status; none of them claims a technology is absent. */
 export const statusNote: Record<TechStatus, string> = {
   detected: '在既有公開回應中辨識到下列技術線索。',
   unknown: '已觀測，但既有回應中沒有可辨識的線索；這不代表網站沒有使用任何技術。',
   failed: '最近一次觀測沒有成功（例如逾時或連線失敗），所以目前無法確認。',
   blocked: '最近一次觀測被來源拒絕（例如 robots.txt 或網站防護），本站不會繞過限制。',
-  'not-observed': '尚未有這個部落格的技術觀測紀錄，不能當成「未使用」。',
+  'not-observed': '還沒有可供辨識的公開回應（尚未有觀測紀錄），不能當成「未使用」。',
 };
 export const statusTone: Record<TechStatus, string> = {
   detected: 'text-brand-700 dark:text-brand-400',
@@ -115,6 +118,9 @@ export const coverageKey: Record<TechStatus, Exclude<keyof TechCoverage, 'totalB
   blocked: 'blocked',
   'not-observed': 'notObserved',
 };
+/** A chip's count: 未辨識 adds the blogs with no observation yet. */
+export const chipCount = (coverage: TechCoverage, state: TechStatus) =>
+  state === 'unknown' ? coverage.unknown + coverage.notObserved : coverage[coverageKey[state]];
 export const isTechStatus = (value: string): value is TechStatus => (TECH_STATUSES as string[]).includes(value);
 
 export const errorText: Record<string, string> = {
