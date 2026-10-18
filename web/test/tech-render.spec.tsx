@@ -117,7 +117,15 @@ const card = ($: CheerioAPI, label: string) =>
   $('main a, main div')
     .filter((_, el) => $(el).children('div').first().text() === label)
     .first();
-const rowOf = ($: CheerioAPI, name: string) => $('tbody tr').filter((_, el) => $(el).find('td').first().text().includes(name));
+/** The blog list's rows and table; the ranking above is a table of its own. */
+const blogRows = ($: CheerioAPI) => $('section[aria-labelledby="tech-blogs"] tbody tr');
+const blogTable = ($: CheerioAPI) => $('section[aria-labelledby="tech-blogs"] table');
+const rowOf = ($: CheerioAPI, name: string) => blogRows($).filter((_, el) => $(el).find('td').first().text().includes(name));
+/** A status filter chip (FilterChips), found by its label. */
+const statusChip = ($: CheerioAPI, label: string) =>
+  $('nav[aria-label="辨識狀態"] a').filter((_, el) => $(el).text().startsWith(`${label} `));
+const rankRow = ($: CheerioAPI, name: string) =>
+  $('section[aria-labelledby="tech-ranking"] tbody tr').filter((_, el) => $(el).find('td').first().text() === name);
 
 /* Synthetic fixtures ------------------------------------------------------- */
 
@@ -245,7 +253,7 @@ const baselineFilters = { q: '', technology: '', status: '' };
 /* /tech/ ------------------------------------------------------------------- */
 
 describe('/tech/ baseline', () => {
-  test('denominators, five states, partial scan and grouped ranking above the table', () => {
+  test('denominators, five state chips, partial scan and the ranking table above the blog table', () => {
     const $ = render(<TechStatsView data={stats()} filters={baselineFilters} status="ready" />);
     expect($('h1').text()).toBe('部落格使用的技術');
     expect(card($, '公開部落格').text()).toContain('2,400');
@@ -258,28 +266,38 @@ describe('/tech/ baseline', () => {
       ['來源阻擋', '5', 'blocked', '0.3%'],
       ['未觀測', '1,935', 'not-observed', '96.8%'],
     ]) {
-      const state = card($, label);
-      expect(state.is('a'), label).toBe(true);
+      const state = statusChip($, label);
+      expect(state.length, label).toBe(1);
       expect(state.attr('href')).toBe(`/tech/?status=${status}`);
-      expect(state.text()).toContain(count);
-      expect(state.text()).toContain(`佔已讀取 ${pct}`);
+      expect(state.text()).toBe(`${label} ${count}（${pct}）`);
+      expect(state.attr('title')).toBe(`佔已讀取 ${pct}`);
     }
     // The partial scan is said in the method block, not above the ranking.
     expect(outsideText($)).not.toContain('其餘 400 個');
     expect(methodBlocks($).text()).toContain('其餘 400 個不計入任何狀態、排行或篩選');
 
-    // CMS and other software in the ranking; hosting / CDN apart, marked low confidence.
+    // One ranking table: site software first, then hosting / CDN marked low confidence.
     const ranking = $('section[aria-labelledby="tech-ranking"]');
-    const wordpress = ranking.find('a[href="/tech/?technology=wordpress"]');
-    expect(wordpress.text()).toBe('WordPress');
-    expect(wordpress.closest('section').find('h3').text()).toBe('CMS／平台');
-    expect(ranking.text()).toContain('明確版本 6.4（1）');
+    expect(
+      ranking
+        .find('thead th')
+        .map((_, el) => $(el).text())
+        .get(),
+    ).toEqual(['技術', '類別', '部落格', '佔已讀取', '明確版本']);
+    const wordpress = rankRow($, 'WordPress');
+    expect(wordpress.find('a').attr('href')).toBe('/tech/?technology=wordpress');
+    expect(wordpress.find('td').eq(1).text()).toBe('CMS／平台');
+    expect(wordpress.find('td').eq(4).text()).toContain('6.4（1）');
     expect(ranking.text()).not.toContain('unknown');
-    expect(ranking.find('a[href="/tech/?technology=wp-plugin%3Aelementor"]').text()).toBe('Elementor');
-    const infra = ranking.find('h3').filter((_, el) => $(el).text() === '主機與 CDN（低信心）');
-    expect(infra.length).toBe(1);
-    expect(infra.parent().find('a[href="/tech/?technology=cloudflare"]').length).toBe(1);
-    expect(ranking.find('div.grid').first().find('a[href="/tech/?technology=cloudflare"]').length).toBe(0);
+    expect(rankRow($, 'Elementor').find('a').attr('href')).toBe('/tech/?technology=wp-plugin%3Aelementor');
+    const cloudflare = rankRow($, 'Cloudflare');
+    expect(cloudflare.find('a').attr('href')).toBe('/tech/?technology=cloudflare');
+    expect(cloudflare.find('td').eq(1).text()).toContain('（低信心）');
+    const names = ranking
+      .find('tbody tr td:first-child')
+      .map((_, el) => $(el).text())
+      .get();
+    expect(names.indexOf('Cloudflare')).toBe(names.length - 1);
     expectNoPrefetch($);
   });
 
@@ -378,9 +396,9 @@ describe('/tech/ baseline', () => {
   test('empty: zero public blogs is data with "—" shares and an empty table, never an error', () => {
     const $ = render(<TechStatsView data={EMPTY_STATS} filters={baselineFilters} status="ready" />);
     expect(methodBlocks($).text()).toContain('目前沒有可統計的公開部落格。');
-    expect(card($, '有辨識').text()).toContain('佔已讀取 —');
+    expect(statusChip($, '有辨識').text()).toBe('有辨識 0（—）');
     expect(card($, '本次讀取').text()).toContain('已全部讀取');
-    expect($('tbody tr').length).toBe(0);
+    expect(blogRows($).length).toBe(0);
     expect($('main').text()).toContain('沒有符合條件的部落格。');
     expect($('span[role="status"]').text()).toBe('共 0 個部落格符合');
     expect($('[role="alert"]').length).toBe(0);
@@ -410,7 +428,7 @@ describe('/tech/ query views', () => {
   test('no query: the baseline renders and nothing is read in the browser', () => {
     const $ = render(<TechStatsFromUrl baseline={stats()} />);
     expect(publicJson.paths.filter(Boolean)).toEqual([]);
-    expect($('tbody tr').length).toBe(5);
+    expect(blogRows($).length).toBe(5);
   });
 
   test('a query the gateway would refuse is dropped and said, not sent', () => {
@@ -425,8 +443,8 @@ describe('/tech/ query views', () => {
     const $ = render(<TechStatsFromUrl baseline={stats()} />);
     expect(publicJson.paths).toContain('/api/tech?status=failed');
     expect($('p[aria-busy="true"]').text()).toBe('正在載入符合條件的部落格…');
-    expect($('table').length).toBe(0);
-    expect(card($, '觀測失敗').attr('aria-current')).toBe('true');
+    expect(blogTable($).length).toBe(0);
+    expect(statusChip($, '觀測失敗').attr('aria-current')).toBe('page');
     expectOneBlock($);
   });
 
@@ -439,7 +457,7 @@ describe('/tech/ query views', () => {
       expect(alert.text()).toContain('技術統計暫時無法載入');
       expect(alert.text()).toContain('不代表數量為 0');
       expect(alert.find('button').text()).toBe('重新載入');
-      expect($('table').length).toBe(0);
+      expect(blogTable($).length).toBe(0);
       expect($('main p').filter((_, element) => $(element).text() === '沒有符合條件的部落格。').length).toBe(0);
       expectOneBlock($);
     });
@@ -458,7 +476,7 @@ describe('/tech/ query views', () => {
     expect(publicJson.paths).toContain('/api/tech?technology=wordpress&cursor=3');
     expect($('#tech-blogs').text()).toBe('保留證據中有「WordPress」的部落格');
     expect($('main').text()).toContain('列出不代表目前仍確認使用');
-    expect($('tbody tr').length).toBe(1);
+    expect(blogRows($).length).toBe(1);
     expect(
       $('a')
         .filter((_, el) => $(el).text().startsWith('技術：WordPress'))
@@ -483,7 +501,7 @@ describe('/tech/ server page and its switches', () => {
     const $ = render(await TechPage());
     expect(gateway.paths).toEqual(['/api/tech']);
     expect($('[role="alert"]').text()).toContain('技術觀測資料目前沒有開放讀取');
-    expect($('table').length).toBe(0);
+    expect(blogTable($).length).toBe(0);
     expect($('main').text()).not.toMatch(/\d/);
     expectOneBlock($);
   });
@@ -494,7 +512,7 @@ describe('/tech/ server page and its switches', () => {
     for (const page of [<ErrorPage key="error" error={new Error('boom')} reset={() => undefined} />, <NotFound key="404" />]) {
       const $ = render(page);
       expectOneBlock($);
-      expect($('table').length).toBe(0);
+      expect(blogTable($).length).toBe(0);
     }
   });
 
@@ -502,7 +520,7 @@ describe('/tech/ server page and its switches', () => {
     gateway.answer = () => Promise.resolve(stats());
     const $ = render(await TechPage());
     expect(gateway.paths).toEqual(['/api/tech']);
-    expect($('tbody tr').length).toBe(5);
+    expect(blogRows($).length).toBe(5);
     expectOneBlock($);
   });
 });

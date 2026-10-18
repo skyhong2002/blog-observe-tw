@@ -1,12 +1,13 @@
 'use client';
 
-// Cards, filters and table follow BlogCatalog (tag.observe.tw /media/ at afe0a65). One view for
+// Tiles, filter chips and tables follow BlogCatalog (tag.observe.tw /media/ at afe0a65). One view for
 // both the server-rendered first page (no query) and the browser's own query; see app/tech/page.tsx.
 // How the numbers are made sits in this page's 資料來源與計算方式 (TechMethodNotes), closed until
 // asked for, like the topic pages; the layout's footer leaves its copy out on /tech/ (FooterMethod).
 
 import { useSearchParams } from 'next/navigation';
 import BlogIcon from '@/components/BlogIcon';
+import FilterChips from '@/components/FilterChips';
 import FooterMethod from '@/components/FooterMethod';
 import MethodLink from '@/components/MethodLink';
 import Link from '@/components/NoPrefetchLink';
@@ -22,14 +23,12 @@ import {
   errorLabel,
   explicitVersions,
   hostOf,
-  INFRA_CATEGORIES,
   isHistorical,
   isInfra,
   isTechBaseline,
   isTechStatus,
   LOW_DATA_BLOGS,
   observedBlogs,
-  SOFTWARE_CATEGORIES,
   share,
   shownVersion,
   sourceTypeText,
@@ -37,7 +36,6 @@ import {
   statusTone,
   TECH_STATUSES,
   type TechBlog,
-  type TechCategory,
   type TechDetection,
   type TechStats,
   type TechTechnology,
@@ -57,55 +55,71 @@ const link = 'text-brand-700 hover:underline dark:text-brand-400';
 const methodHeading = 'font-medium text-zinc-900 dark:text-zinc-100';
 const n = (value: number) => value.toLocaleString('zh-TW');
 
-function RankCard({
-  category,
-  technologies,
-  scanned,
-  filters,
-}: {
-  category: TechCategory;
-  technologies: TechTechnology[];
-  scanned: number;
-  filters: Filters;
-}) {
+/** Every recognised technology in one table, like /ranking/: site software first, then low-confidence hosting / CDN. */
+function RankTable({ technologies, scanned, filters }: { technologies: TechTechnology[]; scanned: number; filters: Filters }) {
+  const order = (list: TechTechnology[]) => [...list].sort((a, b) => b.blogs - a.blogs || a.name.localeCompare(b.name));
+  const rows = [...order(technologies.filter((t) => !isInfra(t.category))), ...order(technologies.filter((t) => isInfra(t.category)))];
   return (
-    <section className="rounded-xl border border-zinc-300 bg-white p-3 text-sm dark:border-zinc-800 dark:bg-zinc-900">
-      <h3 className="mb-2 text-xs font-semibold text-zinc-600 dark:text-zinc-400">{categoryText[category]}</h3>
-      <ol className="space-y-1.5">
-        {[...technologies]
-          .sort((a, b) => b.blogs - a.blogs || a.name.localeCompare(b.name))
-          .map((tech) => {
+    <TableScroller card label="技術排行表格，可左右捲動">
+      <table className="w-full whitespace-nowrap text-sm">
+        <thead className="bg-zinc-50 text-left text-xs text-zinc-600 dark:bg-zinc-950 dark:text-zinc-400">
+          <tr>
+            <th scope="col" className={table.leadHead}>
+              技術
+            </th>
+            <th scope="col" className={table.cell}>
+              類別
+            </th>
+            <th scope="col" className={table.num}>
+              部落格
+            </th>
+            <th scope="col" className={table.num}>
+              佔已讀取
+            </th>
+            <th scope="col" className={table.cell}>
+              明確版本
+            </th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
+          {rows.map((tech) => {
             const current = tech.id === filters.technology;
-            const versions = explicitVersions(tech);
+            const infra = isInfra(tech.category);
+            const versions = explicitVersions(tech)
+              .map((v) => `${v.version}（${v.blogs}）`)
+              .join('、');
             return (
-              <li key={tech.id}>
-                <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
-                  <Link
-                    href={techHref({ q: filters.q, status: filters.status, technology: current ? undefined : tech.id })}
-                    scroll={false}
-                    aria-current={current ? 'true' : undefined}
-                    className={`-mx-1 flex min-h-11 min-w-0 items-center rounded px-1 ${current ? 'bg-brand-50 font-semibold text-brand-800 dark:bg-brand-950 dark:text-brand-300' : link}`}
-                    title={current ? `取消篩選 ${tech.name}` : `看保留證據中有 ${tech.name} 的部落格`}
-                  >
-                    <span className="truncate">{tech.name}</span>
-                  </Link>
-                  <span className="whitespace-nowrap text-right text-xs tabular-nums text-zinc-600 dark:text-zinc-400">
-                    {n(tech.blogs)} 站<span className={`ml-1.5 ${muted}`}>{share(tech.blogs, scanned)}</span>
+              <tr key={tech.id} className={`${table.row} ${current ? 'bg-brand-50 dark:bg-brand-950' : ''}`}>
+                <td className={table.lead}>
+                  <div className={table.leadBox}>
+                    <Link
+                      href={techHref({ q: filters.q, status: filters.status, technology: current ? undefined : tech.id })}
+                      scroll={false}
+                      aria-current={current ? 'true' : undefined}
+                      title={current ? `取消篩選 ${tech.name}` : `看保留證據中有 ${tech.name} 的部落格`}
+                      className={`${table.leadText} sm:max-w-60 ${current ? 'font-semibold text-brand-800 dark:text-brand-300' : infra ? 'text-zinc-600 hover:underline dark:text-zinc-400' : link}`}
+                    >
+                      {tech.name}
+                    </Link>
+                  </div>
+                </td>
+                <td className={`${table.cell} text-xs ${muted}`}>
+                  {categoryText[tech.category]}
+                  {infra ? '（低信心）' : ''}
+                </td>
+                <td className={table.num}>{n(tech.blogs)}</td>
+                <td className={`${table.num} ${muted}`}>{share(tech.blogs, scanned)}</td>
+                <td className={`${table.cell} text-xs tabular-nums ${muted}`}>
+                  <span className="block max-w-72 truncate" title={versions || undefined}>
+                    {versions || '—'}
                   </span>
-                </div>
-                {versions.length > 0 && (
-                  <p
-                    className={`mt-0.5 truncate text-[11px] tabular-nums ${muted}`}
-                    title={`明確版本 ${versions.map((v) => `${v.version}（${v.blogs}）`).join('、')}`}
-                  >
-                    明確版本 {versions.map((v) => `${v.version}（${v.blogs}）`).join('、')}
-                  </p>
-                )}
-              </li>
+                </td>
+              </tr>
             );
           })}
-      </ol>
-    </section>
+        </tbody>
+      </table>
+    </TableScroller>
   );
 }
 
@@ -211,9 +225,6 @@ export default function TechStatsView({
   const scanned = coverage.scannedBlogs;
   const activeTech = technologies.find((t) => t.id === filters.technology);
   const activeStatus = isTechStatus(filters.status) ? filters.status : null;
-  const byCategory = (category: TechCategory) => technologies.filter((t) => t.category === category);
-  const software = SOFTWARE_CATEGORIES.filter((c) => byCategory(c).length);
-  const infra = INFRA_CATEGORIES.filter((c) => byCategory(c).length);
   const chip = 'inline-flex min-h-11 items-center gap-1 whitespace-nowrap rounded-full bg-brand-700 px-3 text-white hover:bg-brand-800';
   return (
     <div className="space-y-5 pb-8">
@@ -224,7 +235,7 @@ export default function TechStatsView({
         </p>
       </header>
 
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-7">
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
         <div className={card}>
           <div className="text-xs text-zinc-600 dark:text-zinc-400">公開部落格</div>
           <div className="mt-1 text-2xl font-semibold tabular-nums tracking-tight">{n(coverage.totalBlogs)}</div>
@@ -237,53 +248,30 @@ export default function TechStatsView({
             {coverage.truncated ? '部分截斷' : '已全部讀取'}
           </div>
         </div>
-        {TECH_STATUSES.map((state) => {
-          const value = coverage[coverageKey[state]];
-          const active = activeStatus === state;
-          return (
-            <Link
-              key={state}
-              href={techHref({ q: filters.q, technology: filters.technology, status: active ? undefined : state })}
-              scroll={false}
-              aria-current={active ? 'true' : undefined}
-              title={active ? `取消篩選「${statusText[state]}」` : `只看「${statusText[state]}」的部落格`}
-              className={`block rounded-xl border p-4 transition-colors ${
-                active
-                  ? 'border-brand-600 bg-brand-50 dark:border-brand-400 dark:bg-brand-950'
-                  : 'border-zinc-300 bg-white hover:border-brand-600 dark:border-zinc-800 dark:bg-zinc-900 dark:hover:border-brand-400'
-              }`}
-            >
-              <div className={`text-xs ${statusTone[state]}`}>{statusText[state]}</div>
-              <div className="mt-1 text-2xl font-semibold tabular-nums tracking-tight">{n(value)}</div>
-              <div className={`text-[11px] tabular-nums ${muted}`}>佔已讀取 {share(value, scanned)}</div>
-            </Link>
-          );
-        })}
       </div>
+      <FilterChips
+        label="辨識狀態"
+        items={[
+          { href: techHref({ q: filters.q, technology: filters.technology }), label: '全部狀態', current: !activeStatus },
+          ...TECH_STATUSES.map((state) => {
+            const value = coverage[coverageKey[state]];
+            return {
+              href: techHref({ q: filters.q, technology: filters.technology, status: activeStatus === state ? undefined : state }),
+              label: `${statusText[state]} ${n(value)}（${share(value, scanned)}）`,
+              current: activeStatus === state,
+              title: `佔已讀取 ${share(value, scanned)}`,
+            };
+          }),
+        ]}
+      />
       <section aria-labelledby="tech-ranking" className="space-y-3">
         <h2 id="tech-ranking" className="text-sm font-semibold">
           技術排行
         </h2>
-        {software.length ? (
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {software.map((category) => (
-              <RankCard key={category} category={category} technologies={byCategory(category)} scanned={scanned} filters={filters} />
-            ))}
-          </div>
+        {technologies.length ? (
+          <RankTable technologies={technologies} scanned={scanned} filters={filters} />
         ) : (
-          <p className={`rounded-xl border border-zinc-300 p-4 text-sm dark:border-zinc-800 ${muted}`}>
-            目前沒有辨識到網站軟體。可能是尚未觀測或線索不足，不代表部落格沒有使用。
-          </p>
-        )}
-        {infra.length > 0 && (
-          <div className="space-y-2">
-            <h3 className="text-xs font-semibold text-zinc-600 dark:text-zinc-400">主機與 CDN（低信心）</h3>
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {infra.map((category) => (
-                <RankCard key={category} category={category} technologies={byCategory(category)} scanned={scanned} filters={filters} />
-              ))}
-            </div>
-          </div>
+          <p className={`py-4 text-sm ${muted}`}>目前沒有辨識到網站軟體。可能是尚未觀測或線索不足，不代表部落格沒有使用。</p>
         )}
       </section>
 
