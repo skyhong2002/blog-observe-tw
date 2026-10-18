@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { candidateReasonText } from '@/lib/candidate-reasons';
 import { blogHref } from '@/lib/page-links';
 import { loginHref, useSession } from '@/lib/session';
 import Link from './NoPrefetchLink';
@@ -19,17 +20,9 @@ type State =
 /** Worth asking the gateway about: one word with a dot and a letter ending, with or without a scheme. */
 export const looksLikeAddress = (q: string) => /^(https?:\/\/)?[^\s/]+\.[a-z¡-￿-]{2,}(\/\S*)?$/i.test(q.trim());
 
-/** Why the last automatic check did not admit it, in the reader's words; budget waits are not failures. */
-const REASONS: Array<[RegExp, string]> = [
-  [/budget_exhausted/, ''],
-  [/^homepage_http_|homepage_personal_verification_failed/, '首頁暫時打不開'],
-  [/^robots_/, '網站的 robots.txt 暫時讀不到或不允許'],
-  [/rss|feed|sitemap/, '找不到可讀的 RSS／Atom 訂閱或文章 sitemap'],
-  [/personal|identity/, '還無法確認這是個人部落格'],
-  [/platform_root|not_a_blog_publication|needs_publication_home/, '這個網址不是部落格首頁'],
-];
-const reasonText = (reason: string | null) => (reason ? (REASONS.find(([pattern]) => pattern.test(reason))?.[1] ?? '未通過自動檢查') : '');
 const shown = (home: string) => home.replace(/^https?:\/\/(www\.)?/, '').replace(/\/$/, '');
+/** This site's row in the public 待查清單 (/queue/). */
+export const queueHref = (site: string) => `/queue/?q=${encodeURIComponent(site)}`;
 
 export function SuggestionNote({
   state,
@@ -56,12 +49,22 @@ export function SuggestionNote({
       </p>
     );
   if (state.state === 'unlisted') return <p>{site} 在本站資料中，但目前沒有公開。</p>;
-  if (state.state === 'rejected') return <p>{site} 先前已檢查過，沒有收錄。</p>;
-  if (state.state === 'queued') {
-    const why = reasonText(state.reason);
+  const queue = (
+    <Link className={link} href={queueHref(site)}>
+      待查清單
+    </Link>
+  );
+  if (state.state === 'rejected')
     return (
       <p>
-        {site} 已在待查清單，系統會自動檢查首頁與 RSS，通過後就會出現在部落格列表。
+        {site} 先前已檢查過，沒有收錄（見{queue}）。
+      </p>
+    );
+  if (state.state === 'queued') {
+    const why = candidateReasonText(state.reason);
+    return (
+      <p>
+        {site} 已在{queue}，系統會自動檢查首頁與 RSS，通過後就會出現在部落格列表。
         {why && `上次檢查尚未通過：${why}，之後會再試。`}
       </p>
     );

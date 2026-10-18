@@ -437,6 +437,25 @@ export const PUBLIC_CONTRACTS: Record<PublicKind, (raw: unknown) => boolean> = {
       topics: rows,
     }),
   blogContent: (raw) => shape(raw, { blog: object, sources: rows }),
+  // app/src/blog-suggestions.ts loadBlogQueue: the view reads every one of these keys.
+  blogQueue: (raw) =>
+    shape(raw, {
+      filters: (value) => shape(value, { q: text, state: text, source: text, page: positive }),
+      pagination: (value) => shape(value, { page: positive, pages: positive, total: count }),
+      states: object,
+      sources: object,
+      items: (value) =>
+        rows(value, {
+          url: text,
+          name: nullable(text),
+          source: text,
+          state: oneOf('waiting', 'failed', 'listed', 'rejected'),
+          addedAt: nullable(text),
+          checkedAt: nullable(text),
+          reason: nullable(text),
+          slug: nullable(text),
+        }),
+    }),
   tech: (raw) => {
     if (
       !shape(raw, {

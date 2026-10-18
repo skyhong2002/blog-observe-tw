@@ -85,6 +85,91 @@ export async function suggestionState(pool: Pool, input: unknown): Promise<Sugge
   return { state: 'new', home };
 }
 
+// The public 待查清單 (/queue/): every candidate still waiting, checked or decided, newest activity first.
+// Owner-excluded hosts and readers' private OPML imports are never listed.
+export const QUEUE_STATES = ['waiting', 'failed', 'listed', 'rejected'] as const;
+export type QueueState = (typeof QUEUE_STATES)[number];
+export const QUEUE_SOURCES = ['reader-suggestion', 'blogblog-club', 'indieweb-wiki', 'article-link', 'blogroll', 'seed-url-resolution'];
+const QUEUE_PAGE = 50;
+const review = (field: string) => `JSON_UNQUOTE(JSON_EXTRACT(d.source_evidence,'$.automaticReview.${field}'))`;
+const host = (column: string) => `LOWER(SUBSTRING_INDEX(SUBSTRING_INDEX(${column},'/',3),'/',-1))`;
+const queueState = `CASE WHEN d.status='approved' THEN 'listed' WHEN d.status='rejected' THEN 'rejected'
+  WHEN ${review('reason')} IS NULL OR ${review('reason')} LIKE '%budget_exhausted' THEN 'waiting' ELSE 'failed' END`;
+const checkedAt = `STR_TO_DATE(LEFT(${review('checkedAt')},19),'%Y-%m-%dT%H:%i:%s')`;
+
+export function queueFilters(query: Record<string, unknown> = {}) {
+  const text = (value: unknown) => (typeof value === 'string' ? value.normalize('NFKC').trim().toLowerCase() : '');
+  const q = text(query.q)
+    .replace(/^https?:\/\/(www\.)?/, '')
+    .replace(/\/$/, '')
+    .slice(0, 100);
+  const state = QUEUE_STATES.find((s) => s === query.state) ?? '';
+  const source = QUEUE_SOURCES.find((s) => s === query.source) ?? '';
+  const page = typeof query.page === 'string' && /^\d{1,6}$/.test(query.page) ? Math.max(1, Number(query.page)) : 1;
+  return { q, state, source, page };
+}
+
+export async function loadBlogQueue(pool: Pool, query: Record<string, unknown> = {}) {
+  const filters = queueFilters(query);
+  // A handful of hosts, read once: a correlated NOT EXISTS would rescan the table for every row.
+  const [excluded] = await pool.query<RowDataPacket[]>(
+    `SELECT DISTINCT ${host('url')} host FROM discovery_candidates WHERE source_type='owner-exclusion'`,
+  );
+  const where = [`d.source_type IN (?)`, `${host('d.url')} NOT IN (?)`];
+  const parameters: unknown[] = [QUEUE_SOURCES, excluded.length ? excluded.map((row) => String(row.host)) : ['']];
+  if (filters.q) {
+    where.push(`d.url LIKE ? ESCAPE '='`);
+    parameters.push(`%${filters.q.replace(/[=%_]/g, '=$&')}%`);
+  }
+  const base = `FROM discovery_candidates d WHERE ${where.join(' AND ')}`;
+  // Facets count the search, not the other chip: each row of chips shows what choosing it would list.
+  const [facets] = await pool.query<RowDataPacket[]>(
+    `SET STATEMENT max_statement_time=3 FOR SELECT ${queueState} state,d.source_type source,COUNT(*) n ${base} GROUP BY state,source`,
+    parameters,
+  );
+  const count = (match: (row: RowDataPacket) => boolean) => facets.filter(match).reduce((sum, row) => sum + Number(row.n), 0);
+  const states = Object.fromEntries(
+    QUEUE_STATES.map((s) => [s, count((r) => r.state === s && (!filters.source || r.source === filters.source))]),
+  );
+  const sources = Object.fromEntries(
+    QUEUE_SOURCES.map((s) => [s, count((r) => r.source === s && (!filters.state || r.state === filters.state))]),
+  );
+  const total = count((r) => (!filters.state || r.state === filters.state) && (!filters.source || r.source === filters.source));
+  const pages = Math.max(1, Math.ceil(total / QUEUE_PAGE));
+  const page = Math.min(filters.page, pages);
+  const narrowed = [...(filters.state ? [`${queueState}=?`] : []), ...(filters.source ? ['d.source_type=?'] : [])];
+  const [rows] = await pool.query<RowDataPacket[]>(
+    `SET STATEMENT max_statement_time=3 FOR SELECT d.id,d.url,d.name,d.source_type source,d.discovered_at addedAt,${checkedAt} checkedAt,
+       ${review('reason')} reason,${review('slug')} slug,${queueState} state
+     ${base}${narrowed.map((condition) => ` AND ${condition}`).join('')}
+     ORDER BY GREATEST(d.discovered_at,COALESCE(${checkedAt},d.discovered_at)) DESC,d.id DESC LIMIT ? OFFSET ?`,
+    [
+      ...parameters,
+      ...(filters.state ? [filters.state] : []),
+      ...(filters.source ? [filters.source] : []),
+      QUEUE_PAGE,
+      (page - 1) * QUEUE_PAGE,
+    ],
+  );
+  return {
+    filters: { ...filters, page },
+    pagination: { page, pages, total },
+    states,
+    sources,
+    items: rows.map((row) => ({
+      url: String(row.url),
+      name: row.name ? String(row.name) : null,
+      source: String(row.source),
+      state: row.state as QueueState,
+      addedAt: row.addedAt instanceof Date ? row.addedAt.toISOString() : null,
+      checkedAt: row.checkedAt instanceof Date ? row.checkedAt.toISOString() : null,
+      // Why the last check did not admit it; an admitted or decided row has no pending reason.
+      reason: row.state === 'failed' ? String(row.reason) : null,
+      slug: row.state === 'listed' && row.slug ? String(row.slug) : null,
+    })),
+  };
+}
+
 type Options = {
   pool: Pool;
   publicOrigin: string;
@@ -101,6 +186,14 @@ export function registerBlogSuggestionRoutes(app: FastifyInstance, options: Opti
       return await suggestionState(pool, (request.query as { url?: unknown })?.url);
     } catch {
       return reply.code(503).send({ error: 'suggestions unavailable' });
+    }
+  });
+  app.get('/api/blog-queue', async (request, reply) => {
+    reply.header('cache-control', 'no-store');
+    try {
+      return await loadBlogQueue(pool, (request.query as Record<string, unknown>) ?? {});
+    } catch {
+      return reply.code(503).send({ error: 'queue unavailable' });
     }
   });
   app.post('/api/me/blog-suggestions', { bodyLimit: 2048 }, async (request, reply) => {

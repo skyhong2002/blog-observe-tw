@@ -36,6 +36,11 @@ describe('automatic discovery verification', () => {
     ])
       expect(candidatePreflight({ ...candidate, url })).toBe('needs_publication_home');
     expect(candidatePreflight({ ...candidate, url: 'https://medium.com/@one' })).toBeNull();
+    // A language home the site redirects to (thelingwu.com → /zh) is the publication home.
+    for (const url of ['https://quill.test/zh', 'https://quill.test/zh-tw/', 'https://quill.test/zh_Hant/blog/', 'https://quill.test/blog'])
+      expect(candidatePreflight({ ...candidate, url })).toBeNull();
+    for (const url of ['https://quill.test/zh/writing', 'https://quill.test/2024', 'https://quill.test/zh/?lang=1'])
+      expect(candidatePreflight({ ...candidate, url })).toBe('needs_publication_home');
     expect(candidatePreflight({ ...candidate, status: 'rejected' })).toBe('decision_already_exists');
     expect(candidatePreflight({ ...candidate, url: 'http://127.0.0.1/' })).toBe('unsafe_or_invalid_url');
     expect(candidatePreflight({ ...candidate, url: 'https://m.facebook.com/' })).toBe('not_a_blog_publication');

@@ -1,7 +1,15 @@
 import Fastify from 'fastify';
 import type { Pool } from 'mysql2/promise';
 import { expect, it, vi } from 'vitest';
-import { DAILY_SUGGESTIONS, READER_SUGGESTION, registerBlogSuggestionRoutes, suggestionHome } from './blog-suggestions.ts';
+import {
+  DAILY_SUGGESTIONS,
+  loadBlogQueue,
+  QUEUE_SOURCES,
+  queueFilters,
+  READER_SUGGESTION,
+  registerBlogSuggestionRoutes,
+  suggestionHome,
+} from './blog-suggestions.ts';
 
 it('reads a bare domain or address as its publication home', () => {
   expect(suggestionHome('thelingwu.com')).toEqual({ home: 'https://thelingwu.com/' });
@@ -89,4 +97,61 @@ it('adds nothing for a known blog, another origin, a signed-out reader or a spen
   const spent = fakePool({ used: DAILY_SUGGESTIONS });
   expect((await post(await app(spent.pool), 'thelingwu.com')).statusCode).toBe(429);
   for (const pool of [known, fresh, spent]) expect(pool.execute).not.toHaveBeenCalled();
+});
+
+it('reads queue filters strictly: known states and sources only, an address without its scheme', () => {
+  expect(queueFilters({ q: ' HTTPS://www.TheLingWu.com/ ', state: 'failed', source: 'reader-suggestion', page: '3' })).toEqual({
+    q: 'thelingwu.com',
+    state: 'failed',
+    source: 'reader-suggestion',
+    page: 3,
+  });
+  expect(queueFilters({ state: 'x', source: 'owner-exclusion', page: '-1' })).toEqual({ q: '', state: '', source: '', page: 1 });
+  expect(queueFilters({ source: 'opml-import' }).source).toBe('');
+});
+
+it('lists the queue without owner-excluded hosts or private OPML imports, counting each chip row by the other', async () => {
+  const query = vi.fn(async (sql: string, _parameters?: unknown[]) => {
+    if (sql.includes("source_type='owner-exclusion'")) return [[{ host: 'excluded.test' }]];
+    if (sql.includes('GROUP BY state,source'))
+      return [
+        [
+          { state: 'failed', source: 'reader-suggestion', n: 1 },
+          { state: 'listed', source: 'blogblog-club', n: 4 },
+          { state: 'waiting', source: 'blogblog-club', n: 2 },
+        ],
+      ];
+    return [
+      [
+        {
+          url: 'https://thelingwu.com/',
+          name: null,
+          source: 'reader-suggestion',
+          state: 'failed',
+          addedAt: new Date('2026-10-18T21:06:46Z'),
+          checkedAt: new Date('2026-10-18T21:08:42Z'),
+          reason: 'personal_identity_uncertain',
+          slug: null,
+        },
+      ],
+    ];
+  });
+  const queue = await loadBlogQueue({ query } as unknown as Pool, { source: 'blogblog-club' });
+  expect(queue.states).toEqual({ waiting: 2, failed: 0, listed: 4, rejected: 0 });
+  expect(queue.sources).toMatchObject({ 'reader-suggestion': 1, 'blogblog-club': 6, 'indieweb-wiki': 0 });
+  expect(queue.pagination).toEqual({ page: 1, pages: 1, total: 6 });
+  expect(queue.items[0]).toEqual({
+    url: 'https://thelingwu.com/',
+    name: null,
+    source: 'reader-suggestion',
+    state: 'failed',
+    addedAt: '2026-10-18T21:06:46.000Z',
+    checkedAt: '2026-10-18T21:08:42.000Z',
+    reason: 'personal_identity_uncertain',
+    slug: null,
+  });
+  const [, parameters] = query.mock.calls.at(-1)!;
+  expect(parameters).toEqual([QUEUE_SOURCES, ['excluded.test'], 'blogblog-club', 50, 0]);
+  expect(QUEUE_SOURCES).not.toContain('owner-exclusion');
+  expect(QUEUE_SOURCES).not.toContain('opml-import');
 });

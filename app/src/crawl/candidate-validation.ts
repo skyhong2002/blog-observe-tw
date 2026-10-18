@@ -77,6 +77,8 @@ const nonPublications = [
   'ko-fi.com',
   'buymeacoffee.com',
 ];
+/** `/`, `/blog`, or a language home a site redirects to (thelingwu.com → /zh, /zh-tw/, /en/blog). */
+const LANGUAGE_OR_BLOG_HOME = /^\/(?:[a-z]{2}(?:[-_][a-z]{2,4})?\/?)?(?:blogs?\/?)?$/i;
 export function candidatePreflight(candidate: DiscoveryCandidate): string | null {
   if (candidate.status !== 'candidate') return 'decision_already_exists';
   if (!isAllowedCrawlUrl(candidate.url) || candidate.url.length > 1024) return 'unsafe_or_invalid_url';
@@ -101,7 +103,7 @@ export function candidatePreflight(candidate: DiscoveryCandidate): string | null
       u.search !== home.search
     )
       return 'needs_publication_home';
-  } else if (!/^\/(?:blog\/?|blogs\/?)?$/.test(u.pathname) || u.search) return 'needs_publication_home';
+  } else if (!LANGUAGE_OR_BLOG_HOME.test(u.pathname) || u.search) return 'needs_publication_home';
   if (!candidate.name?.trim()) return 'missing_identity_name';
   return null;
 }
