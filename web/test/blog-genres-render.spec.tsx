@@ -2,6 +2,7 @@ import { load } from 'cheerio';
 import { renderToString } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import { BlogGenresView } from '@/components/BlogGenres';
+import { BLOG_GENRES } from '../../app/src/blog-genre-vocabulary.ts';
 import type { GenreState } from '../../app/src/blog-genres/resolve.ts';
 
 const state: GenreState = {
@@ -20,7 +21,7 @@ describe('blog genre SSR block', () => {
     const $ = load(renderToString(<BlogGenresView state={state} signedIn votes={{ food: -1 }} loginUrl="/auth/google" />));
     expect($('a').length).toBe(0);
     expect($('button[aria-pressed=true]').text()).toContain('已不同意（收回）');
-    expect($('select[name=genre] option').length).toBe(12);
+    expect($('select[name=genre] option').length).toBe(Object.keys(BLOG_GENRES).length);
     expect($('form').text()).toContain('提議並同意');
     expect($('section').text()).not.toContain('解除管理員覆寫');
   });

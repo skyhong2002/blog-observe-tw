@@ -37,7 +37,7 @@ beforeEach(() => {
 });
 
 describe('latest article preferences: server rendering', () => {
-  test('shows active preferences, partitioned counts, checked inputs and a reset link', () => {
+  test('shows active preferences, partitioned counts, current chips and a reset link', () => {
     const $ = load(
       renderToString(
         <ArticlesView genreStatus="ready" asked={NO_SEARCH} latest={posts} search={null} filters={{ maxPerBlog: 1, exclude: ['food'] }} />,
@@ -48,17 +48,23 @@ describe('latest article preferences: server rendering', () => {
         .map((_, el) => $(el).text())
         .get(),
     ).toEqual(['Other latest', 'Gadget latest']);
-    expect($('[role="status"]').text()).toContain('4 篇中顯示 2 篇');
-    expect($('[role="status"]').text()).toContain('類型排除 1 篇、每站篇數限制隱藏 1 篇');
-    expect($('input[name="exclude"][value="food"]').is(':checked')).toBe(true);
-    expect($('option[selected]').attr('value')).toBe('1');
+    expect($('[role="status"]').text()).toContain('最近收錄 4 篇，顯示 2 篇');
+    expect($('[role="status"]').text()).toContain('類型隱藏 1、每站上限隱藏 1');
+    const current = $('[aria-label="最新文章篩選"] a[aria-current="page"]');
+    expect(current.map((_, el) => $(el).text()).get()).toEqual(['1 篇', '✕ 美食']);
+    // Clicking a hidden genre shows it again; other choices are kept.
+    expect(current.eq(1).attr('href')).toBe('/articles/?maxPerBlog=1');
+    expect(
+      $('nav a')
+        .filter((_, el) => $(el).text() === '3C')
+        .attr('href'),
+    ).toBe('/articles/?maxPerBlog=1&exclude=food&exclude=gadgets');
     expect(
       $('a')
         .filter((_, el) => $(el).text() === '清除篩選')
         .attr('href'),
     ).toBe('/articles/');
-    expect($.text()).toContain('尚未分類或目前沒有顯示類型的部落格一律保留');
-    expect($.text()).toContain('不會補入更早文章');
+    expect($.text()).toContain('目前沒有顯示類型的文章 2 篇，一律保留');
   });
   test('the force-dynamic page fallback reads URL preferences on the server', async () => {
     state.suspend = true;
@@ -69,8 +75,8 @@ describe('latest article preferences: server rendering', () => {
         .map((_, el) => $(el).text())
         .get(),
     ).toEqual(['Other latest']);
-    expect($('input:checked')).toHaveLength(2);
-    expect($('[role="status"]').text()).toContain('4 篇中顯示 1 篇');
+    expect($('[aria-label="最新文章篩選"] a[aria-current="page"]')).toHaveLength(3);
+    expect($('[role="status"]').text()).toContain('最近收錄 4 篇，顯示 1 篇');
   });
   test('client URL navigation reuses the same parser and leaves older-gateway posts visible', () => {
     state.query = 'maxPerBlog=1&exclude=food&exclude=gadgets';
@@ -105,9 +111,15 @@ describe('latest article preferences: server rendering', () => {
         .map((_, el) => $(el).text())
         .get(),
     ).toEqual(['Food latest', 'Other latest', 'Gadget latest']);
-    expect($('fieldset').is('[disabled]')).toBe(true);
+    expect($('nav[aria-label="隱藏類型"]')).toHaveLength(0);
     expect($.text()).toContain('本次未套用類型排除');
-    expect($.text()).toContain('每站篇數限制隱藏 1 篇');
+    expect($.text()).toContain('每站上限隱藏 1');
+    // The cap chips keep the genre choice in the URL for when genres come back.
+    expect(
+      $('nav[aria-label="每站最多"] a')
+        .filter((_, el) => $(el).text() === '2 篇')
+        .attr('href'),
+    ).toBe('/articles/?maxPerBlog=2&exclude=food');
   });
   test('search mode explicitly states its scope and does not show latest-only controls', () => {
     const $ = load(
@@ -120,7 +132,7 @@ describe('latest article preferences: server rendering', () => {
         />,
       ),
     );
-    expect($('form[aria-label="最新文章篩選"]')).toHaveLength(0);
+    expect($('[aria-label="最新文章篩選"]')).toHaveLength(0);
     expect($.text()).toContain('搜尋結果不套用每站篇數與類型排除');
     expect($.text()).toContain('正在搜尋');
   });

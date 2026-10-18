@@ -8,6 +8,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import BlogIcon from '@/components/BlogIcon';
 import BlogTrafficTrend from '@/components/BlogTrafficTrend';
+import { filterChipClass, filterRowClass } from '@/components/FilterChips';
 import Link from '@/components/NoPrefetchLink';
 import SortIndicator from '@/components/SortIndicator';
 import TableScroller from '@/components/TableScroller';
@@ -166,8 +167,7 @@ export default function BlogTrafficComparison({ data, initial }: { data: Traffic
     { key: 'status', label: '資料狀態', sub: '抓取狀態 · 最近取得日期（台北時間）', align: 'left' },
     { key: 'compare', label: '比較', sub: `加入下方趨勢圖，最多 ${COMPARE_LIMIT} 個；需有兩個月以上的估計`, align: 'left' },
   ];
-  const chip = (active: boolean) =>
-    `min-h-8 whitespace-nowrap rounded-full px-3 text-xs ${active ? 'bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900' : 'bg-zinc-100 text-zinc-700 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700'}`;
+  const chip = (active: boolean) => filterChipClass(active);
 
   return (
     <section aria-label="部落格流量與排名清單" className="space-y-4">
@@ -210,7 +210,7 @@ export default function BlogTrafficComparison({ data, initial }: { data: Traffic
         )}
       </section>
 
-      <fieldset className="flex min-w-0 flex-wrap items-center gap-1.5">
+      <fieldset className={`min-w-0 ${filterRowClass}`}>
         <legend className="sr-only">依資料狀態篩選</legend>
         <button
           type="button"
@@ -257,7 +257,7 @@ export default function BlogTrafficComparison({ data, initial }: { data: Traffic
         />
         <fieldset className="flex items-center gap-2 text-xs text-zinc-500 dark:text-zinc-400">
           <legend className="sr-only">流量顯示方式</legend>
-          <span className="inline-flex overflow-hidden rounded-md border border-zinc-300 dark:border-zinc-700">
+          <span className="flex gap-1.5 text-sm">
             {(
               [
                 ['value', '數值'],
@@ -269,7 +269,7 @@ export default function BlogTrafficComparison({ data, initial }: { data: Traffic
                 type="button"
                 aria-pressed={view === value}
                 onClick={() => setView(value)}
-                className={`min-h-9 px-3 text-sm ${view === value ? 'bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900' : ''}`}
+                className={chip(view === value)}
               >
                 {label}
               </button>

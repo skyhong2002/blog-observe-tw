@@ -208,8 +208,7 @@ export default function TechStatsView({
   const byCategory = (category: TechCategory) => technologies.filter((t) => t.category === category);
   const software = SOFTWARE_CATEGORIES.filter((c) => byCategory(c).length);
   const infra = INFRA_CATEGORIES.filter((c) => byCategory(c).length);
-  const chip =
-    'inline-flex min-h-11 items-center gap-1 whitespace-nowrap rounded-full bg-zinc-900 px-3 text-white dark:bg-zinc-100 dark:text-zinc-900';
+  const chip = 'inline-flex min-h-11 items-center gap-1 whitespace-nowrap rounded-full bg-brand-700 px-3 text-white hover:bg-brand-800';
   return (
     <div className="space-y-5 pb-8">
       <header>
@@ -333,10 +332,7 @@ export default function TechStatsView({
             />
             {filters.technology && <input type="hidden" name="technology" value={filters.technology} />}
             {activeStatus && <input type="hidden" name="status" value={activeStatus} />}
-            <button
-              type="submit"
-              className="min-h-11 rounded-lg bg-brand-700 px-4 text-sm text-white hover:bg-brand-800"
-            >
+            <button type="submit" className="min-h-11 rounded-lg bg-brand-700 px-4 text-sm text-white hover:bg-brand-800">
               搜尋
             </button>
             {filters.technology && (

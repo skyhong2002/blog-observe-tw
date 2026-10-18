@@ -7,6 +7,7 @@
 import { useSearchParams } from 'next/navigation';
 import { type ReactNode, useEffect, useRef, useState } from 'react';
 import BlogIcon from '@/components/BlogIcon';
+import FilterChips from '@/components/FilterChips';
 import MediaTabs from '@/components/MediaTabs';
 import Link from '@/components/NoPrefetchLink';
 import ReloadButton from '@/components/public/ReloadButton';
@@ -205,8 +206,6 @@ export default function BlogCatalogView({
       </Link>
     </th>
   );
-  const chip = (active: boolean) =>
-    `whitespace-nowrap rounded-full px-3 py-1 ${active ? 'bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900' : 'bg-zinc-100 text-zinc-700 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-300'}`;
   return (
     <div className="space-y-5 pb-8">
       <MediaTabs current="media" />
@@ -232,24 +231,29 @@ export default function BlogCatalogView({
           </div>
         ))}
       </div>
-      <div className="flex flex-wrap items-center gap-1.5 text-sm">
-        <Link href={href({ status: null })} scroll={false} className={chip(!query.status)}>
-          全部狀態
-        </Link>
-        {statuses.map(({ value: status, count }) => (
-          <Link key={status} href={href({ status })} scroll={false} className={chip(query.status === status)}>
-            {status} {count}
-          </Link>
-        ))}
-        <span className="mx-1 h-5 w-px bg-zinc-200 dark:bg-zinc-700" aria-hidden />
-        <Link href={href({ category: null })} scroll={false} className={chip(!query.category)}>
-          全部分類
-        </Link>
-        {categories.map(({ value: category, count }) => (
-          <Link key={category} href={href({ category })} scroll={false} className={chip(query.category === category)}>
-            {category} {count}
-          </Link>
-        ))}
+      <div className="space-y-2">
+        <FilterChips
+          label="收錄狀態"
+          items={[
+            { href: href({ status: null }), label: '全部狀態', current: !query.status },
+            ...statuses.map(({ value, count }) => ({
+              href: href({ status: value }),
+              label: `${value} ${count}`,
+              current: query.status === value,
+            })),
+          ]}
+        />
+        <FilterChips
+          label="分類"
+          items={[
+            { href: href({ category: null }), label: '全部分類', current: !query.category },
+            ...categories.map(({ value, count }) => ({
+              href: href({ category: value }),
+              label: `${value} ${count}`,
+              current: query.category === value,
+            })),
+          ]}
+        />
       </div>
       <div className="flex flex-wrap items-center justify-between gap-2">
         <SearchBox q={q} />
