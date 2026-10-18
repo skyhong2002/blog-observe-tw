@@ -34,6 +34,8 @@ const SOURCES: Record<string, string> = {
   blogroll: '部落格友站連結',
   'seed-url-resolution': '種子名單',
   'owner-exclusion': '站主要求排除',
+  'reader-suggestion': '讀者新增',
+  'opml-import': '讀者匯入 OPML',
 };
 const host = (url: string | null) => {
   try {

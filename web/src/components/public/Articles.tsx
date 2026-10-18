@@ -4,6 +4,7 @@
 
 import { useSearchParams } from 'next/navigation';
 import ArticleListItem from '@/components/ArticleListItem';
+import BlogSuggestion from '@/components/BlogSuggestion';
 import FilterChips from '@/components/FilterChips';
 import FooterMethod, { methodHeading } from '@/components/FooterMethod';
 import MethodLink from '@/components/MethodLink';
@@ -198,6 +199,7 @@ function SearchResults({ asked, search }: { asked: SearchParams; search: PublicL
       ) : (
         <div role="status" className="py-8 text-sm text-zinc-600 dark:text-zinc-400">
           <p>{result.page > 1 ? `「${asked.q}」沒有更多結果了。` : `在搜尋範圍內找不到「${asked.q}」。`}</p>
+          {result.page === 1 && <BlogSuggestion query={asked.q} />}
           {result.page > 1 && (
             <Link className="mt-3 inline-block text-brand-700 dark:text-brand-400" href={searchHref({ ...asked, page: 1 })}>
               ← 回到第 1 頁

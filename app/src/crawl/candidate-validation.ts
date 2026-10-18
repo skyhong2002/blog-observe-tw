@@ -168,8 +168,8 @@ export async function validateCandidate(candidate: DiscoveryCandidate, options: 
   };
   const listed = listingOf(candidate.source_type, candidate.source_evidence);
   if (listed) result.directoryListing = listed;
-  // Directory-listed homes are added without a name; like discovered links, they take the homepage's own.
-  const mayEnrich = ['article-link', 'blogroll'].includes(candidate.source_type) || Boolean(listed);
+  // Directory-listed homes and reader suggestions are added without a name; like discovered links, they take the homepage's own.
+  const mayEnrich = ['article-link', 'blogroll', 'reader-suggestion'].includes(candidate.source_type) || Boolean(listed);
   const personal = () => result.personalEvidence?.personal === true || Boolean(listed);
   const personalReason = (verified: string) => (result.personalEvidence?.personal === true ? verified : `${verified}_directory_listed`);
   if (result.reason !== 'unverified' && !(mayEnrich && result.reason === 'missing_identity_name')) return result;

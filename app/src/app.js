@@ -8,6 +8,7 @@ import { registerLogin } from './auth/google-login.ts';
 import { dbLoginStore } from './auth/store.ts';
 import { registerBlogGenreRoutes } from './blog-genres/routes.ts';
 import { readBlogGenres } from './blog-genres/store.ts';
+import { registerBlogSuggestionRoutes } from './blog-suggestions.ts';
 import { installPrivateCachePolicy } from './cache-policy.ts';
 import { loadCatalog } from './catalog.js';
 import { loadAuthorCatalog } from './catalog-authors.js';
@@ -280,6 +281,7 @@ export async function buildApp(config, { logger = false, store = null } = {}) {
     publicOrigin: config.publicOrigin,
     sessionSecret: config.login?.sessionSecret || '',
   });
+  registerBlogSuggestionRoutes(app, { pool, requireUser, publicOrigin: config.publicOrigin });
   app.get('/api/me/follows', async (request, reply) => {
     const user = await requireUser(request, reply);
     if (!user) return reply;

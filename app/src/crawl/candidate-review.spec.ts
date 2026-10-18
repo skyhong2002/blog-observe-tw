@@ -114,9 +114,10 @@ describe('resumable candidate review batch', () => {
     } finally {
       vi.unstubAllEnvs();
     }
-    // BlogBlog.Club- and IndieWeb-listed homes are reviewed first: the directory is the collection's priority.
+    // BlogBlog.Club- and IndieWeb-listed homes and readers' suggestions are reviewed first: the directory is the
+    // collection's priority, and a reader is waiting on a suggestion.
     expect(sql).toMatch(
-      /ORDER BY JSON_EXTRACT\(source_evidence,'\$\.directoryListing'\) IS NULL AND JSON_EXTRACT\(source_evidence,'\$\.indiewebListing'\) IS NULL,\s*COALESCE/,
+      /ORDER BY JSON_EXTRACT\(source_evidence,'\$\.directoryListing'\) IS NULL AND JSON_EXTRACT\(source_evidence,'\$\.indiewebListing'\) IS NULL\s+AND source_type<>'reader-suggestion',\s*COALESCE/,
     );
   });
   it('checks lease again after a slow network request, before any write', async () => {

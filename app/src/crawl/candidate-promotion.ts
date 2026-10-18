@@ -135,7 +135,9 @@ export async function recordCandidateCheck(
     // An IndieWeb listing counts only once validation found the home Chinese (it then carries the listing).
     const listed = listing && (candidate.source_type !== 'indieweb-wiki' || check.directoryListing === listing) ? listing : null;
     const effectiveName =
-      check.enrichedName && (['article-link', 'blogroll'].includes(candidate.source_type) || listed) ? check.enrichedName : candidate.name;
+      check.enrichedName && (['article-link', 'blogroll', 'reader-suggestion'].includes(candidate.source_type) || listed)
+        ? check.enrichedName
+        : candidate.name;
     if (check.eligible) {
       const personal = check.personalEvidence;
       let personalValid = personal ? deterministicPersonalProof(personal) : false;

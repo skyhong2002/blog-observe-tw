@@ -7,6 +7,7 @@
 import { useSearchParams } from 'next/navigation';
 import { type ReactNode, useEffect, useRef, useState } from 'react';
 import BlogIcon from '@/components/BlogIcon';
+import BlogSuggestion from '@/components/BlogSuggestion';
 import FilterChips from '@/components/FilterChips';
 import MediaTabs from '@/components/MediaTabs';
 import MethodLink from '@/components/MethodLink';
@@ -336,11 +337,14 @@ export default function BlogCatalogView({
             </table>
           </TableScroller>
           {!rows.length && (
-            <p className="py-8 text-zinc-500">
-              {q
-                ? `沒有符合「${q}」的部落格。可以試試網址的一部分、較短的關鍵字${category || blogStatus ? '，或清除分類與狀態篩選' : ''}。`
-                : '沒有符合條件的部落格。'}
-            </p>
+            <div className="py-8 text-zinc-500">
+              <p>
+                {q
+                  ? `沒有符合「${q}」的部落格。可以試試網址的一部分、較短的關鍵字${category || blogStatus ? '，或清除分類與狀態篩選' : ''}。`
+                  : '沒有符合條件的部落格。'}
+              </p>
+              {q && <BlogSuggestion query={q} />}
+            </div>
           )}
           <nav aria-label="部落格分頁" className="flex justify-between text-sm">
             {page > 1 ? (
