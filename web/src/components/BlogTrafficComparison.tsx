@@ -175,12 +175,10 @@ export default function BlogTrafficComparison({ data, initial }: { data: Traffic
         aria-labelledby="traffic-trend"
         className="rounded-xl border border-zinc-300 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900"
       >
-        <h2 id="traffic-trend" className="mb-1 text-sm font-semibold">
+        <h2 id="traffic-trend" className="mb-3 text-sm font-semibold">
           月造訪趨勢比較
         </h2>
-        <p className="mb-3 text-xs leading-5 text-zinc-500 dark:text-zinc-400">
-          只畫有兩個月以上估計的部落格；沒有資料的月份留白，不補零。在表格「比較」欄勾選加入，最多 {COMPARE_LIMIT} 個。
-        </p>
+
         {compared.length > 0 && (
           <ul aria-label="正在比較的部落格" className="mb-3 flex flex-wrap gap-1.5">
             {compared.map((blog) => (

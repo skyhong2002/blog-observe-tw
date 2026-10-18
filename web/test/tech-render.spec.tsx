@@ -264,8 +264,9 @@ describe('/tech/ baseline', () => {
       expect(state.text()).toContain(count);
       expect(state.text()).toContain(`佔已讀取 ${pct}`);
     }
-    const note = $('p[role="note"]').filter((_, el) => $(el).text().includes('本次統計只讀取前'));
-    expect(note.text()).toContain('其餘 400 個不在上面任何一格');
+    // The partial scan is said in the method block, not above the ranking.
+    expect(outsideText($)).not.toContain('其餘 400 個');
+    expect(methodBlocks($).text()).toContain('其餘 400 個不計入任何狀態、排行或篩選');
 
     // CMS and other software in the ranking; hosting / CDN apart, marked low confidence.
     const ranking = $('section[aria-labelledby="tech-ranking"]');
@@ -376,7 +377,7 @@ describe('/tech/ baseline', () => {
 
   test('empty: zero public blogs is data with "—" shares and an empty table, never an error', () => {
     const $ = render(<TechStatsView data={EMPTY_STATS} filters={baselineFilters} status="ready" />);
-    expect($('p[role="note"]').text()).toContain('目前沒有可統計的公開部落格。');
+    expect(methodBlocks($).text()).toContain('目前沒有可統計的公開部落格。');
     expect(card($, '有辨識').text()).toContain('佔已讀取 —');
     expect(card($, '本次讀取').text()).toContain('已全部讀取');
     expect($('tbody tr').length).toBe(0);
@@ -399,7 +400,7 @@ describe('/tech/ baseline', () => {
         status="ready"
       />,
     );
-    expect($('p[role="note"]').text()).toBe('目前只有 3 個部落格有觀測紀錄，排行與百分比的代表性有限。');
+    expect(methodBlocks($).text()).toContain('目前只有 3 個部落格有觀測紀錄，排行與百分比的代表性有限。');
     expect($('main').text()).not.toContain('本次統計只讀取前');
     expect(methodBlocks($).text()).toContain('（已全部讀取）');
   });

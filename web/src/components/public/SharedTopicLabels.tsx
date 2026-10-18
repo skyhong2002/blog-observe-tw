@@ -52,7 +52,6 @@ function Relations({ view }: { view: SnapshotView<SharedLabelRelations> }) {
       {list.groups.map((g) => (
         <div key={g.type} data-relation-group={g.type}>
           <h4 className="text-sm font-medium">{g.label}</h4>
-          {g.type === 'alias' ? <p className={`text-xs ${muted}`}>上游標示的同義寫法；本站話題不因此合併，也不共用頁面。</p> : null}
           {g.rows.length ? (
             <ul className="mt-1 grid gap-x-4 sm:grid-cols-2">
               {g.rows.map((r) => (
@@ -150,8 +149,7 @@ export default function SharedTopicLabels({ value, tag }: { value: unknown; tag:
       </h2>
       <p className={`text-xs ${muted}`}>
         來源：
-        <External href={view.tagHref}>tag.observe.tw 的「{tag}」</External>
-        ，為本站保存的快照，不是即時結果；與本站的話題比對分開。
+        <External href={view.tagHref}>tag.observe.tw 的「{tag}」</External>（本站保存的快照）
       </p>
       <div className="space-y-1">
         <h3 className="text-sm font-semibold">代表圖示</h3>

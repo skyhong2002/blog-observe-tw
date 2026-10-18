@@ -37,6 +37,8 @@ export default function TopicMethod({
   coverage,
   ranking = false,
   sharedLabels,
+  truncated,
+  history = false,
 }: {
   vocabulary: VocabularyStatus;
   matchingPolicy?: MatchingPolicy;
@@ -47,6 +49,10 @@ export default function TopicMethod({
   ranking?: boolean;
   /** The detail page's shared-label block, when it renders one (sharedLabelsView). */
   sharedLabels?: SharedLabelsView | null;
+  /** The list on the page was cut short; says how. */
+  truncated?: string;
+  /** The detail page fell back to past matches (TopicHistorySection). */
+  history?: boolean;
 }) {
   return (
     <>
@@ -78,6 +84,8 @@ export default function TopicMethod({
           篇。比對達上限 {coverage.cappedPosts} 篇保留未完整標記。日期未知 {coverage.unknownDatePosts} 篇不列入期間排行。
         </p>
       ) : null}
+      {truncated ? <p>{truncated}</p> : null}
+      {history ? <p>過去觀測到的文章只列原站標題與連結；標示「待重新確認」的文章不代表目前仍命中。</p> : null}
       <h3 className={methodHeading}>共同關鍵字詞庫</h3>
       <VocabularyMethod data={vocabulary} />
       {sharedLabels ? <SharedLabelMethod view={sharedLabels} /> : null}

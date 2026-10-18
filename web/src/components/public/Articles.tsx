@@ -5,6 +5,8 @@
 import { useSearchParams } from 'next/navigation';
 import ArticleListItem from '@/components/ArticleListItem';
 import FilterChips from '@/components/FilterChips';
+import FooterMethod, { methodHeading } from '@/components/FooterMethod';
+import MethodLink from '@/components/MethodLink';
 import Link from '@/components/NoPrefetchLink';
 import SectionTabs from '@/components/SectionTabs';
 import { type Post, taipei } from '@/lib/api';
@@ -107,7 +109,8 @@ function Coverage({ result }: { result: SearchResult }) {
   const wholeBody =
     body?.status === 'indexed' || body?.indexVersion === WHOLE_BODY_INDEX || result.coverage.type === HISTORICAL_COVERAGE_TYPE;
   return (
-    <div className="space-y-1 text-xs leading-5 text-zinc-500 dark:text-zinc-400" data-search-coverage="">
+    <div className="space-y-2.5" data-search-coverage="">
+      <h3 className={methodHeading}>這次搜尋的範圍</h3>
       <p>{metadataText(result.coverage)}</p>
       <p>{historicalBodyText(body, wholeBody)}</p>
       <p>
@@ -177,7 +180,6 @@ function SearchResults({ asked, search }: { asked: SearchParams; search: PublicL
   const result = search.data;
   return (
     <>
-      <Coverage result={result} />
       {result.items.length ? (
         <>
           <ul className="divide-y divide-zinc-200 dark:divide-zinc-800" aria-label={`「${asked.q}」的搜尋結果`}>
@@ -196,9 +198,6 @@ function SearchResults({ asked, search }: { asked: SearchParams; search: PublicL
       ) : (
         <div role="status" className="py-8 text-sm text-zinc-600 dark:text-zinc-400">
           <p>{result.page > 1 ? `「${asked.q}」沒有更多結果了。` : `在搜尋範圍內找不到「${asked.q}」。`}</p>
-          <p className="mt-2 text-xs text-zinc-500 dark:text-zinc-400">
-            只查了上方說明的範圍，找不到不代表其他文章沒有提到它；可以換個關鍵字，或到部落格頁面瀏覽。
-          </p>
           {result.page > 1 && (
             <Link className="mt-3 inline-block text-brand-700 dark:text-brand-400" href={searchHref({ ...asked, page: 1 })}>
               ← 回到第 1 頁
@@ -271,7 +270,9 @@ export default function ArticlesView({
     <div className="space-y-5 pb-8">
       <header>
         <h1 className="text-2xl font-semibold">{searching ? '搜尋文章' : '最新文章'}</h1>
-        <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">從各站公開訂閱來源收錄，按發文時間排列。完整文章請至作者原站閱讀。</p>
+        <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
+          <MethodLink />
+        </p>
       </header>
       <SectionTabs
         label="文章瀏覽"
@@ -312,10 +313,7 @@ export default function ArticlesView({
         </p>
       )}
       {search ? (
-        <>
-          <p className="text-xs text-zinc-500 dark:text-zinc-400">最新文章篩選只適用於最新清單，搜尋結果不套用每站篇數與類型排除。</p>
-          <SearchResults asked={asked} search={search} />
-        </>
+        <SearchResults asked={asked} search={search} />
       ) : (
         <>
           <LatestFilters filters={filters} genresReady={genresReady} />
@@ -335,8 +333,6 @@ export default function ArticlesView({
                 </Link>
               </>
             ) : null}
-            。類型由 AI 初判、讀者投票與管理員覆核，可能有誤；
-            {genresReady ? `目前沒有顯示類型的文章 ${filtered.unclassified} 篇，一律保留。` : '未分類的部落格一律保留。'}
           </p>
           {filtered.items.length ? (
             <ul className="divide-y divide-zinc-200 dark:divide-zinc-800">
@@ -351,6 +347,23 @@ export default function ArticlesView({
           )}
         </>
       )}
+      <FooterMethod
+        page
+        notes={
+          <>
+            <h3 className={methodHeading}>最新文章</h3>
+            <p>從各站公開訂閱來源收錄，按發文時間排列，只顯示標題、摘要與短片段；完整文章請至作者原站閱讀。</p>
+            <p>「每站最多」與「隱藏類型」只篩選最近收錄的 {latest.length} 篇，不會補入更早的文章；搜尋結果不套用這兩項篩選。</p>
+            <p>
+              部落格類型依 AI
+              初判、讀者投票與管理員覆核整理，可能有誤。一個部落格可以有多個類型，只要符合任一隱藏類型，整站文章就會隱藏；這不是單篇文章的標籤篩選。尚未分類或目前沒有顯示類型的部落格一律保留
+              {genresReady ? `（這批中有 ${filtered.unclassified} 篇）` : ''}。
+            </p>
+            {search?.status === 'ready' && <Coverage result={search.data} />}
+            {search && <p>搜尋只查上述範圍，找不到不代表其他文章沒有提到它；可以換個關鍵字，或到部落格頁面瀏覽。</p>}
+          </>
+        }
+      />
     </div>
   );
 }

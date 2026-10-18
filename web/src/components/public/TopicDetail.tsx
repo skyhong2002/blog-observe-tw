@@ -21,7 +21,6 @@ import {
   historyRows,
   historySummary,
   inactiveReasonLabel,
-  matchingReasonLabel,
   recorded,
   type TopicDetail,
   type TopicHistory,
@@ -170,7 +169,7 @@ function TopicHistorySection({ id, days, history }: { id: string; days: Period; 
     <section>
       <h2 className="font-semibold">過去觀測到的文章</h2>
       <p role="note" className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
-        近 {days} 天沒有新的相關文章。以下是過去曾比對到這個詞的文章，只列原站標題與連結；標示「待重新確認」的文章不代表目前仍命中。
+        近 {days} 天沒有新的相關文章，以下是過去曾比對到這個詞的文章。
       </p>
       {summary || history.lastObservedAt ? (
         <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
@@ -262,11 +261,6 @@ export default function TopicDetailView({
               」，以下為合併後的結果。
             </p>
           ) : null}
-          {data.topic.matchingReason ? (
-            <p role="note" className="text-sm text-zinc-600 dark:text-zinc-400">
-              {matchingReasonLabel(data.topic.matchingReason)}：排行與升溫倍率只計標題命中。
-            </p>
-          ) : null}
           <TopicBlogsJump count={data.blogs.length} />
           {topicArticleMode(data) === 'history' && data.history ? (
             <div className={data.blogs.length ? 'grid gap-5 lg:grid-cols-[1fr_2fr]' : undefined}>
@@ -292,7 +286,6 @@ export default function TopicDetailView({
               <TopicBlogs blogs={data.blogs} />
             </div>
           )}
-          {data.truncated ? <p className="text-xs text-zinc-500 dark:text-zinc-400">僅顯示部分來源與文章。</p> : null}
           <SharedTopicLabels value={data.sharedLabels} tag={data.topic.label} />
           <VocabularySummary data={data.vocabulary} />
         </>
@@ -318,6 +311,8 @@ export default function TopicDetailView({
               matchingPolicy={data.matchingPolicy}
               matchingReason={data.topic?.matchingReason}
               sharedLabels={shared}
+              truncated={data.truncated ? '頁面只顯示部分來源與文章。' : undefined}
+              history={Boolean(data.topic && topicArticleMode(data) === 'history' && data.history)}
             />
           ) : null
         }

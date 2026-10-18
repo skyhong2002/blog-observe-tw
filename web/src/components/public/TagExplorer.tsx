@@ -5,6 +5,7 @@
 import { useSearchParams } from 'next/navigation';
 import ArticleListItem from '@/components/ArticleListItem';
 import BlogIcon from '@/components/BlogIcon';
+import MethodLink from '@/components/MethodLink';
 import Link from '@/components/NoPrefetchLink';
 import SectionTabs from '@/components/SectionTabs';
 import type { Blog, Overview, Post, Tag } from '@/lib/api';
@@ -31,8 +32,8 @@ export default function TagExplorerView({
     <div className="space-y-5 pb-8">
       <header>
         <h1 className="text-2xl font-semibold">{title ? `${title} · 標籤` : '標籤與主題'}</h1>
-        <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
-          從部落格與文章標籤探索不同作者的書寫。人工與社群標籤保留來源，與爬蟲標籤分開記錄。
+        <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
+          <MethodLink />
         </p>
       </header>
       <SectionTabs

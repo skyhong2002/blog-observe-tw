@@ -39,8 +39,8 @@ export default async function BlogInference({ slug }: { slug: string }) {
         </details>
       ) : null}
       <p className="text-xs text-zinc-500">
-        {data.overridden ? '此簡介已由人工覆寫。' : '依已收錄的網站資訊與文章整理，可能不完整，請以作者原文為準。'}
-        {data.provenance?.updatedAt ? ` ${taipei(data.provenance.updatedAt)} 更新。` : ''}
+        {data.overridden ? '此簡介已由人工覆寫。' : ''}
+        {data.provenance?.updatedAt ? `${taipei(data.provenance.updatedAt)} 更新。` : ''}
       </p>
     </section>
   );

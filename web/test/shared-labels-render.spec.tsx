@@ -252,7 +252,8 @@ describe('ready', () => {
     expect(rows.eq(1).text()).toContain('繼承（第 2 層）');
     expect(rows.eq(1).text()).toContain('規則推導（closure）');
     expect(rows.eq(3).text()).toContain('使用者提交（form）');
-    expect(block.text()).toContain('本站話題不因此合併');
+    // Alias semantics are in the page's method block (TopicMethod's 共用標籤), not repeated in the list.
+    expect(block.text()).not.toContain('本站話題不因此合併');
     expect(block.text()).toContain('共 4 條');
     expect(block.text()).not.toContain('完整清單');
 

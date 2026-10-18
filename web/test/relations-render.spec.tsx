@@ -259,7 +259,7 @@ describe('profile 引用與交流', () => {
       $('h3')
         .map((_, el) => $(el).text())
         .get(),
-    ).toEqual(['正文直接引用', '非正文連結（Blogroll、側欄、留言）', '共同標籤（不是引用）', '文字相似（不是引用）']);
+    ).toEqual(['正文直接引用', '非正文連結（Blogroll、側欄、留言，不計入篇數）', '共同標籤（不是引用）', '文字相似（不是引用）']);
     const outside = outsideText($);
     for (const text of ['提到誰', '被誰提到', '測試站乙', '測試站丙', '已分析 12 篇', '未知目標連結 3 條'])
       expect(outside, text).toContain(text);
@@ -269,7 +269,7 @@ describe('profile 引用與交流', () => {
     expect($('body').text()).not.toContain('引用占比的分母');
     expect($('summary').text()).not.toContain('計算方式');
     expect($('#method').length).toBe(0);
-    expect($('a[href="#method"]').text()).toBe('計算方式見頁尾的方法說明 ↓');
+    expect($('a[href="#method"]').text()).toBe('資料來源與計算方式 ⓘ');
     expect($('body').text()).not.toContain('這些關係怎麼算');
     expect($('a[href="/relations/"]').text()).toBe('全站關係圖 →');
     expectNoPrefetch($);
@@ -284,13 +284,12 @@ describe('profile 引用與交流', () => {
     expect(toB.text()).toContain('1 篇');
     expect(toB.text()).not.toContain('2 篇');
     expect(body.find('summary').text()).toBe('核對正文連結（列出 4 筆連結）');
-    expect(body.find('details').text()).toContain('同一篇文章連到多個網址會列成多筆，篇數以上方統計為準');
     expect(body.find('details a[href="https://b.example/x"]').length).toBe(1);
     expect(body.find('details a[href="https://b.example/y"]').length).toBe(1);
     expect(body.text()).not.toContain('友站連結');
     expect(body.text()).not.toContain('丙的留言');
 
-    expect(nonBody.text()).toContain('不計入上方篇數');
+    expect(nonBody.text()).toContain('不計入篇數');
     expect(nonBody.text()).toContain('本站另記 Blogroll 5、側欄 1、留言 2 條');
     expect(nonBody.find('summary').text()).toBe('核對非正文連結（列出 2 筆連結）');
     expect(nonBody.text()).toContain('位置 Blogroll');
@@ -862,7 +861,7 @@ describe("F3's method lives in the footer's one 本頁的資料來源與計算�
       $('#method h3')
         .map((_, el) => $(el).text())
         .get(),
-    ).toEqual(['資料來源', '引用與交流']);
+    ).toEqual(['資料來源', '部落格頁', '引用與交流']);
     const method = $('#method').text();
     expect(method).toContain(shareExplanation);
     for (const text of [
@@ -870,27 +869,35 @@ describe("F3's method lives in the footer's one 本頁的資料來源與計算�
       '不代表同時互動',
       '非正文連結來自 Blogroll、側欄與留言，與正文分開保存',
       '共同標籤比的是發布者自己替文章加的原始標籤',
-      '文字相似目前沒有計算',
+      '尚未分析時不顯示任何百分比',
+      '同一篇文章連到多個網址會列成多筆，篇數以統計為準',
     ])
       expect(method, text).toContain(text);
   });
 
   test('the F3 paragraphs are on one profile and the site-wide map only', () => {
+    // /relations/ renders the block itself (OWN_METHOD), with this period's coverage.
     for (const pathname of ['/blogs/a/', '/blogs/b-blog', '/relations/', '/relations']) {
-      const $ = footerOnly(pathname);
+      const $ = footerOnly(pathname, pathname.startsWith('/relations'));
       expect(methodBlocks($).length, pathname).toBe(1);
       expect($('#method h3').last().text(), pathname).toBe('引用與交流');
       expect($('#method').text(), pathname).toContain(shareExplanation);
     }
-    for (const pathname of ['/blogs/', '/blogs', '/blogs/a/feed/', '/tags/x/', '/relations/extra/']) {
-      const $ = footerOnly(pathname);
+    for (const [pathname, own] of [
+      ['/blogs/', '部落格與文章數'],
+      ['/blogs', null],
+      ['/blogs/a/feed/', null],
+      ['/tags/x/', null],
+      ['/relations/extra/', null],
+    ] as const) {
+      const $ = footerOnly(pathname, pathname.startsWith('/relations'));
       expect(methodBlocks($).length, pathname).toBe(1);
       expect(
         $('#method h3')
           .map((_, el) => $(el).text())
           .get(),
         pathname,
-      ).toEqual(['資料來源']);
+      ).toEqual(own ? ['資料來源', own] : ['資料來源']);
       expect($('#method').text(), pathname).not.toContain('引用占比');
     }
     // The homepage carries its own citation-row method instead, still without the F3 share paragraphs.
@@ -905,7 +912,7 @@ describe("F3's method lives in the footer's one 本頁的資料來源與計算�
   });
 
   test('/tech/ and topic pages keep their own block: none from the footer, and no F3 paragraphs in theirs', () => {
-    for (const pathname of ['/tech/', '/topics/', '/topics/rss%3A1/']) {
+    for (const pathname of ['/tech/', '/topics/', '/topics/rss%3A1/', '/traffic/', '/articles/']) {
       expect(footerOnly(pathname)('details').length, pathname).toBe(0);
       const $ = footerOnly(pathname, true);
       expect(methodBlocks($).length, pathname).toBe(1);
@@ -947,7 +954,7 @@ describe('site-wide relation map', () => {
   test('missing coverage counts are 未提供, never 0', () => {
     const data = map({ coverage: { nonBodyLinks: {} } as unknown as Relations['coverage'] });
     const $ = load(renderToString(<RelationMapView days="90" load={{ status: 'ready', data }} />));
-    const footer = $('footer').text();
+    const footer = $('#method').text();
     expect(footer).toContain('未辨識正文 未提供 篇。另記 blogroll 未提供、側欄 未提供、留言 未提供 條');
     expect(footer).toContain('已分析 未提供／未提供 篇');
     expect(footer).not.toMatch(/(^|\D)0 (篇|條)/);

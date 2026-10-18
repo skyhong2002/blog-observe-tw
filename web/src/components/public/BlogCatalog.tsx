@@ -9,6 +9,7 @@ import { type ReactNode, useEffect, useRef, useState } from 'react';
 import BlogIcon from '@/components/BlogIcon';
 import FilterChips from '@/components/FilterChips';
 import MediaTabs from '@/components/MediaTabs';
+import MethodLink from '@/components/MethodLink';
 import Link from '@/components/NoPrefetchLink';
 import ReloadButton from '@/components/public/ReloadButton';
 import TableScroller from '@/components/TableScroller';
@@ -212,10 +213,7 @@ export default function BlogCatalogView({
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">部落格與文章數</h1>
         <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
-          {data.updatedAt ? `更新於 ${taipei(data.updatedAt)}` : '等待資料更新'} ·{' '}
-          <Link href="/about/" className="hover:text-brand-700 hover:underline dark:hover:text-brand-400">
-            資料來源與計算方式 ⓘ
-          </Link>
+          {data.updatedAt ? `更新於 ${taipei(data.updatedAt)}` : '等待資料更新'} · <MethodLink />
         </p>
       </div>
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
@@ -263,7 +261,7 @@ export default function BlogCatalogView({
             : ready
               ? q
                 ? `符合「${q}」的部落格 ${total} 個${sort === 'relevance' && total > 1 ? ' · 依相符程度排序' : ''}`
-                : `共 ${total} 個部落格 · 沒有近期文章不代表網站失效`
+                : `共 ${total} 個部落格`
               : status === 'pending'
                 ? '正在載入符合條件的部落格…'
                 : '部落格目錄暫時無法載入'}

@@ -31,9 +31,6 @@ export default async function BlogTopics({ slug }: { slug: string }) {
       ) : (
         <p className="text-sm text-zinc-500 dark:text-zinc-400">此期間尚無可列出的話題。</p>
       )}
-      {data && (data.items.length > 20 || data.truncated) ? (
-        <p className="text-xs text-zinc-500 dark:text-zinc-400">此處顯示前 20 個話題。</p>
-      ) : null}
     </section>
   );
 }

@@ -186,7 +186,10 @@ describe('search hit evidence', () => {
 describe('search coverage', () => {
   test('partial: metadata scope and the indexed body prefix are said apart, with the gateway caps; never whole-site', () => {
     const $ = render(answer(partial));
-    const text = outsideText($);
+    // The scope is explanation: it waits in the page's closed 本頁的資料來源與計算方式, not above the results.
+    expect($('#method [data-search-coverage]').length).toBe(1);
+    expect(outsideText($)).not.toContain('標題、摘要、部落格名稱與公開標籤');
+    const text = coverageText($);
     expect(text).toContain(
       '標題、摘要、部落格名稱與公開標籤：只查最近收錄的最多 1,000 篇（本次查找 1,000 篇），更早收錄的文章不在這部分的範圍內。',
     );
@@ -230,7 +233,8 @@ describe('search coverage', () => {
       expect(text).not.toContain('前 4,096 個字');
       expect($('[data-search-coverage] details').length).toBe(0);
       expect(text).not.toMatch(/候選 0|0 篇候選/);
-      expect($('[role="status"]').text()).toContain('找不到不代表其他文章沒有提到它');
+      expect($('[role="status"]').text()).toContain('找不到');
+      expect($('#method').text()).toContain('找不到不代表其他文章沒有提到它');
     });
 
   test('missing metadata counts are 未提供, never 1000 or 0', () => {
@@ -240,12 +244,11 @@ describe('search coverage', () => {
     expect(text).not.toMatch(/1,000|（本次查找 0 篇）/);
   });
 
-  test('links stay no-prefetch; result text uses the muted zinc with its dark variant', () => {
+  test('links stay no-prefetch; result evidence uses the muted zinc with its dark variant', () => {
     const $ = render(answer(partial));
     $('a[href^="/"]').each((_, el) => {
       expect($(el).attr('data-prefetch'), $(el).attr('href')).toBe('false');
     });
-    expect($('[data-search-coverage]').attr('class')).toContain('dark:text-zinc-400');
     expect($('[data-search-evidence]').first().attr('class')).toContain('dark:text-zinc-400');
   });
 });

@@ -250,11 +250,12 @@ describe('topic detail', () => {
     expect(which.attr('id')).toBe('topic-blogs');
     expect(position($, jump)).toBeLessThan(position($, articles));
 
-    // Above the fold: the short rule, the source sentence and the partial-snapshot warning only.
+    // Nothing explanatory above the fold: the rule, the source and the partial-snapshot warning are in the block.
     const outside = outsideText($);
-    expect(outside).toContain('高頻詞，只計標題命中：排行與升溫倍率只計標題命中。');
-    expect(outside).toContain('計算方式與詞庫細節見下方「本頁的資料來源與計算方式」');
-    expect($('p[role="note"]').text()).toContain('共同關鍵字僅涵蓋上游文章觀測窗口');
+    expect(outside).not.toContain('只計標題命中');
+    expect(outside).not.toContain('共同關鍵字僅涵蓋上游文章觀測窗口');
+    expect(block.text()).toContain('高頻詞，只計標題命中');
+    expect(block.text()).toContain('共同關鍵字僅涵蓋上游文章觀測窗口');
     expectLongNotesInsideOnly($, ['這個詞在長期文章中出現得很普遍', '門檻：基準期間命中文章占比超過 2%']);
     expect(block.find('ul[aria-label="暫未參與比對的原因"] li').length).toBe(2);
     expect(block.find('ul[aria-label="不參與比對的原因"] li').length).toBe(2);
@@ -395,9 +396,6 @@ describe('topic ranking', () => {
     expect(table.find('tbody a').attr('href')).toBe(PATH);
     expect(position($, table)).toBeLessThan(position($, block));
     expect(table.closest('details').length).toBe(0);
-    const capped = $('p[role="note"]').filter((_, el) => $(el).text().includes('比對達上限'));
-    expect(capped.text()).toBe('期間內有 3 篇比對達上限，保留未完整標記。');
-    expect(position($, capped)).toBeLessThan(position($, block));
     expectLongNotesInsideOnly($, [
       '同站對同一詞的貢獻逐篇遞減',
       '期間內 1200 篇；可辨識正文 900 篇',

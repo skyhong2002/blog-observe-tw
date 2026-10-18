@@ -157,26 +157,10 @@ const tagSite = (
  * an unfinished re-match, no sync yet). The full record is VocabularyMethod,
  * inside the page's 資料來源與計算方式.
  */
+/** In the page only while the vocabulary is missing; its sync time and caveats are in VocabularyMethod. */
 export function VocabularySummary({ data }: { data: VocabularyStatus }) {
-  if (data.status !== 'ready') {
-    return <p className="text-xs text-zinc-500">共同關鍵字尚未完成同步；話題排行會在同步完成後顯示，請稍後再查看。</p>;
-  }
-  const warnings = [
-    data.coverage === 'observed-article-window' ? '共同關鍵字僅涵蓋上游文章觀測窗口，屬部分快照，不代表完整詞庫。' : '',
-    baselinePending(data.frequencyBaseline) ? '長期基準尚未依目前版本完成比對，高頻詞命中篇數為已觀測到的下限。' : '',
-  ].filter(Boolean);
-  return (
-    <div className="min-w-0 space-y-1 text-xs text-zinc-500">
-      <p>
-        話題詞取自{tagSite}的共同關鍵字{data.syncedAt ? `，${taipei(data.syncedAt)} 同步` : ''}。計算方式與詞庫細節見下方「本頁的資料來源與計算方式」。
-      </p>
-      {warnings.length ? (
-        <p role="note" className="font-medium text-zinc-700 dark:text-zinc-300">
-          {warnings.join('')}
-        </p>
-      ) : null}
-    </div>
-  );
+  if (data.status === 'ready') return null;
+  return <p className="text-sm text-zinc-500">共同關鍵字尚未完成同步；話題排行會在同步完成後顯示，請稍後再查看。</p>;
 }
 
 /** The full vocabulary record (source, version, window, tag quality, capacity, baseline, backfill), for 資料來源與計算方式. */
@@ -196,6 +180,7 @@ export function VocabularyMethod({ data }: { data: VocabularyStatus }) {
               : '共同關鍵字涵蓋上游目前索引文章的標籤，不代表人工編輯詞庫。'}{' '}
             {data.syncedAt ? taipei(data.syncedAt) + ' 同步。' : ''}
           </p>
+          {baselinePending(data.frequencyBaseline) ? <p>長期基準尚未依目前版本完成比對，高頻詞命中篇數為已觀測到的下限。</p> : null}
           <p className="break-all">來源版本：{data.version}</p>
           {data.window ? (
             <p>

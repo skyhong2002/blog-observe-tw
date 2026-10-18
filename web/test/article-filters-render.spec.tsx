@@ -8,6 +8,7 @@ import { NO_SEARCH } from '@/lib/search';
 
 const state = vi.hoisted(() => ({ query: '', posts: [] as Post[], suspend: false }));
 vi.mock('next/navigation', () => ({
+  usePathname: () => '/articles/',
   useSearchParams: () => {
     if (state.suspend) throw new Promise(() => {});
     return new URLSearchParams(state.query);
@@ -44,7 +45,7 @@ describe('latest article preferences: server rendering', () => {
       ),
     );
     expect(
-      $('h3')
+      $('li h3')
         .map((_, el) => $(el).text())
         .get(),
     ).toEqual(['Other latest', 'Gadget latest']);
@@ -64,14 +65,14 @@ describe('latest article preferences: server rendering', () => {
         .filter((_, el) => $(el).text() === '清除篩選')
         .attr('href'),
     ).toBe('/articles/');
-    expect($.text()).toContain('目前沒有顯示類型的文章 2 篇，一律保留');
+    expect($('#method').text()).toContain('（這批中有 2 篇）');
   });
   test('the force-dynamic page fallback reads URL preferences on the server', async () => {
     state.suspend = true;
     const page = await ArticlesPage({ searchParams: Promise.resolve({ maxPerBlog: '1', exclude: ['food', 'gadgets'] }) });
     const $ = load(renderToString(page));
     expect(
-      $('h3')
+      $('li h3')
         .map((_, el) => $(el).text())
         .get(),
     ).toEqual(['Other latest']);
@@ -82,11 +83,11 @@ describe('latest article preferences: server rendering', () => {
     state.query = 'maxPerBlog=1&exclude=food&exclude=gadgets';
     const $ = load(renderToString(<ArticlesFromUrl latest={posts} genreStatus="ready" />));
     expect(
-      $('h3')
+      $('li h3')
         .map((_, el) => $(el).text())
         .get(),
     ).toEqual(['Other latest']);
-    expect($.text()).toContain('目前沒有顯示類型的文章 2 篇');
+    expect($('#method').text()).toContain('（這批中有 2 篇）');
   });
   test('distinguishes filtered empty results from an empty source list', () => {
     const filtered = renderToString(
@@ -107,7 +108,7 @@ describe('latest article preferences: server rendering', () => {
       renderToString(<ArticlesView asked={NO_SEARCH} latest={posts} search={null} filters={{ maxPerBlog: 1, exclude: ['food'] }} />),
     );
     expect(
-      $('h3')
+      $('li h3')
         .map((_, el) => $(el).text())
         .get(),
     ).toEqual(['Food latest', 'Other latest', 'Gadget latest']);
@@ -133,7 +134,7 @@ describe('latest article preferences: server rendering', () => {
       ),
     );
     expect($('[aria-label="最新文章篩選"]')).toHaveLength(0);
-    expect($.text()).toContain('搜尋結果不套用每站篇數與類型排除');
+    expect($('#method').text()).toContain('搜尋結果不套用這兩項篩選');
     expect($.text()).toContain('正在搜尋');
   });
 });

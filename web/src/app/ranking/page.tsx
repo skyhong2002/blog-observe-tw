@@ -1,3 +1,4 @@
+import MethodLink from '@/components/MethodLink';
 import Link from '@/components/NoPrefetchLink';
 import SectionTabs from '@/components/SectionTabs';
 import TableScroller from '@/components/TableScroller';
@@ -15,10 +16,9 @@ export default async function RankingPage() {
     <div className="space-y-5 pb-8">
       <header>
         <h1 className="text-2xl font-semibold">標籤收錄排行</h1>
-        <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
-          先依參與部落格數，再依已收錄文章數排列。這是收錄概況，不是品質評分、閱讀人次或升溫趨勢。
+        <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
+          {data.updatedAt ? `更新於 ${taipei(data.updatedAt)}` : '等待資料更新'} · <MethodLink />
         </p>
-        <p className="mt-2 text-xs text-zinc-500">{data.updatedAt ? `${taipei(data.updatedAt)} 更新` : '等待資料更新'}</p>
       </header>
       <SectionTabs
         label="標籤觀察"

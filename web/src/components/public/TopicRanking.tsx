@@ -4,6 +4,7 @@
 
 import { useSearchParams } from 'next/navigation';
 import FooterMethod from '@/components/FooterMethod';
+import MethodLink from '@/components/MethodLink';
 import Link from '@/components/NoPrefetchLink';
 import SectionTabs from '@/components/SectionTabs';
 import TableScroller from '@/components/TableScroller';
@@ -23,7 +24,9 @@ export default function TopicRankingView({ days, load }: { days: Period; load: P
     <div className="space-y-5 pb-8">
       <header>
         <h1 className="text-2xl font-semibold">大家正在寫什麼</h1>
-        <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">從不同部落格的文章，看持續被書寫的話題。</p>
+        <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
+          不同部落格持續在寫的話題 · <MethodLink />
+        </p>
       </header>
       <SectionTabs
         label="話題期間"
@@ -41,7 +44,15 @@ export default function TopicRankingView({ days, load }: { days: Period; load: P
       <FooterMethod
         page
         notes={
-          data ? <TopicMethod vocabulary={data.vocabulary} matchingPolicy={data.matchingPolicy} coverage={data.coverage} ranking /> : null
+          data ? (
+            <TopicMethod
+              vocabulary={data.vocabulary}
+              matchingPolicy={data.matchingPolicy}
+              coverage={data.coverage}
+              ranking
+              truncated={data.truncated ? `排行只顯示前 ${data.items.length} 項。` : undefined}
+            />
+          ) : null
         }
       />
     </div>
@@ -118,13 +129,6 @@ function TopicRows({ days, data }: { days: Period; data: Topics }) {
       {!data.items.length ? (
         <p className="py-8 text-zinc-500 dark:text-zinc-400">
           這段期間尚無跨至少 {data.minimumBlogs} 個部落格的共同話題；個別站的主題可在部落格頁查看。
-        </p>
-      ) : null}
-      {data.truncated ? <p className="text-xs text-zinc-500 dark:text-zinc-400">僅顯示前 {data.items.length} 項。</p> : null}
-      {/* Partial coverage stays in view; the full period counts are in TopicMethod. */}
-      {data.coverage && data.coverage.cappedPosts > 0 ? (
-        <p role="note" className="text-xs font-medium text-zinc-700 dark:text-zinc-300">
-          期間內有 {data.coverage.cappedPosts} 篇比對達上限，保留未完整標記。
         </p>
       ) : null}
       <VocabularySummary data={data.vocabulary} />

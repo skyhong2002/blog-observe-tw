@@ -103,11 +103,8 @@ export default function BlogTrafficProfile({ blog, limitations }: { blog: Traffi
           ))}
         </dl>
       )}
-      <p className="mt-3 text-[11px] leading-4 text-zinc-500 dark:text-zinc-400">
-        整個網域的估算值，比例以造訪次數計，非精確 page views，也不代表文章品質。
-        {limitations ? ` ${limitations}` : ''}
-      </p>
-      <p className="mt-1.5 flex flex-wrap justify-between gap-x-2 text-[11px] leading-4 text-zinc-500 dark:text-zinc-400">
+      {limitations ? <p className="mt-3 text-[11px] leading-4 text-zinc-500 dark:text-zinc-400">{limitations}</p> : null}
+      <p className="mt-3 flex flex-wrap justify-between gap-x-2 text-[11px] leading-4 text-zinc-500 dark:text-zinc-400">
         <span>取得：{fetched ?? '尚未取得'}</span>
         <Link href={`/traffic/?q=${encodeURIComponent(blog.name)}`} className="text-brand-700 hover:underline dark:text-brand-400">
           與其他部落格比較 →

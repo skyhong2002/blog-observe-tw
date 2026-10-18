@@ -37,7 +37,7 @@ export default function ProfilePostsView({ blog, posts: allPosts, query }: { blo
         </button>
       </form>
       <p className="text-xs text-zinc-500 dark:text-zinc-400">
-        本頁 {posts.length} 篇 · 搜尋最新收錄的 {allPosts.length} 篇文章的標題與摘要
+        本頁 {posts.length} 篇
         {query && (
           <>
             {' · '}

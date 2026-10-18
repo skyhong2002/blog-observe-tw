@@ -8,6 +8,7 @@
 import { useSearchParams } from 'next/navigation';
 import BlogIcon from '@/components/BlogIcon';
 import FooterMethod from '@/components/FooterMethod';
+import MethodLink from '@/components/MethodLink';
 import Link from '@/components/NoPrefetchLink';
 import ReloadButton from '@/components/public/ReloadButton';
 import TableScroller from '@/components/TableScroller';
@@ -170,6 +171,7 @@ export function TechMethodNotes({ data }: { data: TechStats }) {
       <p>
         「成功觀測」是最後一次取得可用回應的時間；「最後嘗試」是最近一次嘗試的時間，可能失敗。只檢查文章內文片段的觀測屬部分覆蓋，不代表已掃描全站。
       </p>
+      <p>技術排行依保留觀測證據中辨識到的部落格數排序，點選可列出這些部落格；列出不代表目前仍確認使用。</p>
       <h3 className={methodHeading}>本次統計範圍</h3>
       <p>
         公開部落格共 {n(coverage.totalBlogs)} 個；本次讀取 {n(coverage.scannedBlogs)} 個
@@ -178,6 +180,11 @@ export function TechMethodNotes({ data }: { data: TechStats }) {
           : '（已全部讀取）'}
         。各狀態的數量與所有百分比的分母都是本次讀取的 {n(coverage.scannedBlogs)} 個；統計於 {taipei(data.generatedAt)}。
       </p>
+      {coverage.totalBlogs === 0 ? (
+        <p>目前沒有可統計的公開部落格。</p>
+      ) : observedBlogs(coverage) < LOW_DATA_BLOGS ? (
+        <p>目前只有 {n(observedBlogs(coverage))} 個部落格有觀測紀錄，排行與百分比的代表性有限。</p>
+      ) : null}
       {method.description && <p>{method.description}</p>}
     </>
   );
@@ -202,7 +209,6 @@ export default function TechStatsView({
   const { coverage, technologies } = data;
   const ready = status === 'ready';
   const scanned = coverage.scannedBlogs;
-  const observed = observedBlogs(coverage);
   const activeTech = technologies.find((t) => t.id === filters.technology);
   const activeStatus = isTechStatus(filters.status) ? filters.status : null;
   const byCategory = (category: TechCategory) => technologies.filter((t) => t.category === category);
@@ -213,11 +219,8 @@ export default function TechStatsView({
     <div className="space-y-5 pb-8">
       <header>
         <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">部落格使用的技術</h1>
-        <p className="mt-2 text-sm leading-6 text-zinc-600 dark:text-zinc-400">
-          從收錄時已取得的公開回應被動辨識，不另外連線；只是部分證據，不是完整清單 · 統計於 {taipei(data.generatedAt)} ·{' '}
-          <Link href="#method" className="hover:text-brand-700 hover:underline dark:hover:text-brand-400">
-            計算方式見下方「本頁的資料來源與計算方式」 ⓘ
-          </Link>
+        <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
+          統計於 {taipei(data.generatedAt)} · <MethodLink />
         </p>
       </header>
 
@@ -257,34 +260,10 @@ export default function TechStatsView({
           );
         })}
       </div>
-      {coverage.truncated && (
-        <p
-          role="note"
-          className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-xs leading-5 text-amber-900 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-200"
-        >
-          本次統計只讀取前 {n(scanned)} 個部落格（公開部落格共 {n(coverage.totalBlogs)} 個）。其餘 {n(coverage.totalBlogs - scanned)}{' '}
-          個不在上面任何一格、技術排行與下表的篩選範圍內，它們不是「未辨識」也不是「未觀測」。
-        </p>
-      )}
-      {coverage.totalBlogs === 0 ? (
-        <p role="note" className={`text-xs leading-5 ${muted}`}>
-          目前沒有可統計的公開部落格。
-        </p>
-      ) : observed < LOW_DATA_BLOGS ? (
-        <p role="note" className="text-xs font-medium leading-5 text-zinc-700 dark:text-zinc-300">
-          目前只有 {n(observed)} 個部落格有觀測紀錄，排行與百分比的代表性有限。
-        </p>
-      ) : null}
-
       <section aria-labelledby="tech-ranking" className="space-y-3">
-        <div>
-          <h2 id="tech-ranking" className="text-sm font-semibold">
-            技術排行
-          </h2>
-          <p className={`mt-1 text-xs leading-5 ${muted}`}>
-            依保留觀測證據中辨識到的部落格數排序，點選可列出這些部落格；百分比的分母是本次讀取的 {n(scanned)} 個部落格。
-          </p>
-        </div>
+        <h2 id="tech-ranking" className="text-sm font-semibold">
+          技術排行
+        </h2>
         {software.length ? (
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {software.map((category) => (
@@ -299,9 +278,6 @@ export default function TechStatsView({
         {infra.length > 0 && (
           <div className="space-y-2">
             <h3 className="text-xs font-semibold text-zinc-600 dark:text-zinc-400">主機與 CDN（低信心）</h3>
-            <p className={`text-xs leading-5 ${muted}`}>
-              只來自回應標頭等基礎設施線索，代表網站可能經由哪裡提供，不代表用哪種 CMS 或框架寫成。
-            </p>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {infra.map((category) => (
                 <RankCard key={category} category={category} technologies={byCategory(category)} scanned={scanned} filters={filters} />
@@ -359,11 +335,6 @@ export default function TechStatsView({
           </span>
         </form>
         {ignored && <p className={`text-xs ${muted}`}>網址中有無法辨識的篩選條件，已略過。</p>}
-        {filters.technology && (
-          <p className={`text-xs leading-5 ${muted}`}>
-            技術篩選比對各部落格目前保留的觀測證據，包含最近一次觀測失敗或被阻擋時保留的上次成功結果；「狀態」欄另外顯示最近一次嘗試的結果。列出不代表目前仍確認使用。
-          </p>
-        )}
 
         {ready ? (
           <>

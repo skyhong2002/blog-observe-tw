@@ -25,6 +25,7 @@ import {
   type SimilaritySide,
   type TextSimilarity,
 } from '@/lib/relations';
+import MethodLink from './MethodLink';
 import Link from './NoPrefetchLink';
 import RelationLists from './RelationLists';
 
@@ -131,7 +132,6 @@ function EvidenceList({
       <summary className="cursor-pointer">
         {label}（列出 {rows.length} 筆連結{truncated ? '，僅最近 20 筆' : ''}）
       </summary>
-      <p className={`mt-2 text-xs ${muted}`}>每筆是一條連結：同一篇文章連到多個網址會列成多筆，篇數以上方統計為準。</p>
       <ul className="mt-3 space-y-3">
         {rows.map(([key, e]) => (
           <EvidenceItem key={key} e={e} blogId={blogId} name={name} />
@@ -179,6 +179,7 @@ function SharedTagsBlock({ value, days }: { value: SharedTags | undefined; days:
   const groups = hitsByTag(value.items);
   return (
     <div className="space-y-2 text-sm">
+      {/* The gateway's own reading of these tags (never "none found" for an off or failed read); kept beside them. */}
       <p className={`text-xs ${muted}`}>{value.interpretation}</p>
       {groups.length ? (
         <>
@@ -332,7 +333,6 @@ function TextSimilarityBlock({ value }: { value: TextSimilarity | undefined }) {
     case 'ready':
       return (
         <div className="space-y-2 text-sm">
-          <p className={`text-xs ${muted}`}>只比對本站文章與它在正文裡直接連到的文章。{NOT_PROOF}</p>
           {view.items.length ? (
             <ul aria-label="文字相似配對" className="space-y-3">
               {view.items.map((item) => (
@@ -397,13 +397,12 @@ export default async function BlogRelations({ slug }: { slug: string }) {
   const nonBody = data.coverage?.nonBodyLinks;
   return (
     <Section>
-      <p className={`text-sm ${muted}`}>近 {days} 天。下面三種關係分開列出：只有正文直接引用計入「篇」；共同標籤與文字相似都不是引用。</p>
+      <p className={`text-sm ${muted}`}>近 {days} 天</p>
 
       <section aria-labelledby="relations-body" className={block}>
         <h3 id="relations-body" className="font-semibold">
           正文直接引用
         </h3>
-        <p className={`text-xs ${muted}`}>文章正文裡連到其他已收錄部落格的連結；「篇」是提及方提到對方的文章數。</p>
         <div className="grid gap-4 lg:grid-cols-2">
           <RelationLists title="提到誰" edges={data.outgoing ?? []} nodes={data.nodes} />
           <RelationLists title="被誰提到" edges={data.incoming ?? []} nodes={data.nodes} incoming />
@@ -417,19 +416,17 @@ export default async function BlogRelations({ slug }: { slug: string }) {
           name={name}
         />
         <p className={`text-xs ${muted}`}>
-          已分析 {countText(data.coverage?.observedPosts)} 篇；未知目標連結 {countText(data.coverage?.unresolvedLinks)}{' '}
-          條。沒有資料不代表沒有交流。
+          已分析 {countText(data.coverage?.observedPosts)} 篇；未知目標連結 {countText(data.coverage?.unresolvedLinks)} 條。
           {data.profileTruncated ? ' 此處僅顯示前 1,000 條關係。' : ''}
         </p>
       </section>
 
       <section aria-labelledby="relations-non-body" className={block}>
         <h3 id="relations-non-body" className="font-semibold">
-          非正文連結（Blogroll、側欄、留言）
+          非正文連結（Blogroll、側欄、留言，不計入篇數）
         </h3>
         <p className={`text-xs ${muted}`}>
-          另列，不計入上方篇數。本站另記 Blogroll {countText(nonBody?.blogroll)}、側欄 {countText(nonBody?.sidebar)}、留言{' '}
-          {countText(nonBody?.comment)} 條。
+          本站另記 Blogroll {countText(nonBody?.blogroll)}、側欄 {countText(nonBody?.sidebar)}、留言 {countText(nonBody?.comment)} 條。
         </p>
         <EvidenceList
           label="核對非正文連結"
@@ -457,9 +454,7 @@ export default async function BlogRelations({ slug }: { slug: string }) {
 
       {/* The method is the page's one footer block (FooterMethod's 引用與交流), not a second copy here. */}
       <p className={`text-xs ${muted}`}>
-        <Link href="#method" className={link}>
-          計算方式見頁尾的方法說明 ↓
-        </Link>
+        <MethodLink />
       </p>
     </Section>
   );

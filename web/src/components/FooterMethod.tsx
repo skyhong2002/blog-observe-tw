@@ -1,12 +1,14 @@
 'use client';
 
 import { usePathname } from 'next/navigation';
+import { useEffect, useRef } from 'react';
 import { shareExplanation } from '@/lib/relations';
 import { METHOD_HREF } from '@/lib/site-nav';
 import Link from './NoPrefetchLink';
 
 const inlineLink = 'text-brand-700 underline underline-offset-2 dark:text-brand-400';
-const heading = 'font-medium text-zinc-900 dark:text-zinc-100';
+export const methodHeading = 'font-medium text-zinc-900 dark:text-zinc-100';
+const heading = methodHeading;
 
 // Pages that show relations: one blog's profile (BlogRelations links here) and the
 // site-wide map. Not the /blogs/ directory, nor anything under a profile.
@@ -48,6 +50,40 @@ function sectionsFor(pathname: string) {
           </p>
         </>
       ) : null}
+      {pathname === '/blogs/' ? (
+        <>
+          <h3 className={heading}>部落格與文章數</h3>
+          <p>
+            收錄狀態是本站確認來源的方式（名單自動收錄、RSS
+            自動驗證、已核對網站）；分類沿用收錄時的舊分類，讀者投票的部落格類型在各部落格頁。
+          </p>
+          <p>沒有近期文章不代表網站失效。robots 欄只公開顯示該站 robots.txt 對本站爬蟲寫了什麼，不影響抓取。</p>
+        </>
+      ) : null}
+      {pathname === '/ranking/' ? (
+        <>
+          <h3 className={heading}>標籤收錄排行</h3>
+          <p>先依參與部落格數，再依已收錄文章數排列。這是收錄概況，不是品質評分、閱讀人次或升溫趨勢。</p>
+        </>
+      ) : null}
+      {pathname === '/tags/' ? (
+        <>
+          <h3 className={heading}>標籤與主題</h3>
+          <p>從部落格與文章標籤探索不同作者的書寫。人工與社群標籤保留來源，與爬蟲標籤分開記錄。</p>
+        </>
+      ) : null}
+      {/^\/blogs\/[^/]+\/?$/.test(pathname) ? (
+        <>
+          <h3 className={heading}>部落格頁</h3>
+          <p>最新收錄依發文時間排列，本站只顯示標題與摘要，完整內容請至原站閱讀；頁內搜尋只查這個部落格最新收錄文章的標題與摘要。</p>
+          <p>近期話題只列前 20 個。閱讀線索由 AI 依已收錄的網站資訊與文章整理，可能不完整，請以作者原文為準；人工覆寫時會標示。</p>
+          <p>
+            部落格類型：AI 初判在不同意票比同意票多 2 票以上時才隱藏；讀者提議須淨同意達 2
+            票。管理員覆寫優先，解除後恢復依票數判定。類型描述整個部落格，可能有誤。
+          </p>
+          <p>網站流量是 Similarweb 對整個網域的估算值，比例以造訪次數計，非精確 page views，也不代表文章品質。</p>
+        </>
+      ) : null}
       {RELATIONS_METHOD.test(pathname) ? (
         <>
           <h3 className={heading}>引用與交流</h3>
@@ -56,29 +92,46 @@ function sectionsFor(pathname: string) {
           </p>
           <p>{shareExplanation}</p>
           <p>非正文連結來自 Blogroll、側欄與留言，與正文分開保存，不進入篇數、排行或全站關係圖。</p>
+          <p>
+            三種關係分開列出：只有正文直接引用計入「篇」（提及方提到對方的文章數）；非正文連結、共同標籤與文字相似都不是引用，也不加進篇數。核對清單的每筆是一條連結，同一篇文章連到多個網址會列成多筆，篇數以統計為準。沒有資料不代表沒有交流。
+          </p>
           <p>共同標籤比的是發布者自己替文章加的原始標籤，不是本站的標籤詞庫；標籤相同不代表引用、交流或內容相似。</p>
-          <p>文字相似目前沒有計算，因此不顯示任何百分比或相似文章。</p>
+          <p>
+            文字相似只比對本站文章與它在正文裡直接連到的文章，看的是正規化正文前段的字面重疊，不是引用、語意相似、抄襲或交流；尚未分析時不顯示任何百分比或相似文章。
+          </p>
         </>
       ) : null}
     </>
   );
 }
 
-// Topic pages and /tech/ render this block themselves, after their content, with the
-// payload's notes (components/public/TopicMethod.tsx, TechStats.tsx); the layout's
+// Pages whose explanations depend on their data (topics, /tech/, /traffic/, /articles/, /relations/)
+// render this block themselves, after their content, with those notes
+// (TopicMethod.tsx, TechStats.tsx, SimilarwebTraffic.tsx, Articles.tsx); the layout's
 // footer leaves it out there so a page never has two. When that page never
 // mounts (app/error.tsx, app/not-found.tsx), TopicMethodFallback renders it instead.
-export const OWN_METHOD = /^\/(topics|tech)(\/|$)/;
+// Every page keeps its explanatory small print here, not under the title.
+export const OWN_METHOD = /^\/(topics|tech|traffic|articles|relations)(\/|$)/;
 
 // The footer's collapsible 資料來源與計算方式: the blocks for this page, the page's
 // own notes, then a link to the full write-up. Hidden on that page itself.
 // `page` marks the copy a page renders itself (see OWN_METHOD).
 export default function FooterMethod({ notes, page = false }: { notes?: React.ReactNode; page?: boolean }) {
   const pathname = usePathname();
+  const block = useRef<HTMLDetailsElement>(null);
+  // The headers' 資料來源與計算方式 ⓘ (MethodLink) jumps to #method: open the block it points into.
+  useEffect(() => {
+    const open = () => {
+      if (window.location.hash === '#method' && block.current) block.current.open = true;
+    };
+    open();
+    window.addEventListener('hashchange', open);
+    return () => window.removeEventListener('hashchange', open);
+  }, []);
   if (pathname === METHOD_HREF || `${pathname}/` === METHOD_HREF) return null;
   if (!page && OWN_METHOD.test(pathname)) return null;
   return (
-    <details className="group border-t border-zinc-200 dark:border-zinc-800">
+    <details ref={block} className="group border-t border-zinc-200 dark:border-zinc-800">
       <summary className="flex cursor-pointer list-none items-center justify-between gap-4 py-4 text-sm font-medium text-zinc-900 dark:text-zinc-100 hover:text-brand-700 dark:hover:text-brand-400 [&::-webkit-details-marker]:hidden">
         <span>
           本頁的資料來源與計算方式

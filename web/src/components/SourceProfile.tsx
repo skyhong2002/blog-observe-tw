@@ -139,7 +139,6 @@ export default function SourceProfile({ blog, sidebar, cloud }: { blog: Blog; si
           {cloud}
           <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
             <h2 className="text-sm font-semibold">最新收錄</h2>
-            <p className="text-xs text-zinc-500">依發文時間排列 · 完整內容請至原站閱讀</p>
           </div>
           <Suspense fallback={<ProfilePostsView blog={owner} posts={allPosts} query="" />}>
             <ProfilePostsFromUrl blog={owner} posts={allPosts} />
