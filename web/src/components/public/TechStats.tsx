@@ -89,7 +89,7 @@ function RankTable({ technologies, scanned, filters }: { technologies: TechTechn
               .map((v) => `${v.version}（${v.blogs}）`)
               .join('、');
             return (
-              <tr key={tech.id} className={`${table.row} ${current ? 'bg-brand-50 dark:bg-brand-950' : ''}`}>
+              <tr key={tech.id} className={table.row}>
                 <td className={table.lead}>
                   <div className={table.leadBox}>
                     <Link
