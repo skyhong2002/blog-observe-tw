@@ -361,5 +361,5 @@ a.recentPost:hover { color: var(--accent); }
 .mentionChip { display: inline-flex; align-items: center; gap: 6px; height: 24px; padding: 0 10px 0 6px; border: 1px solid var(--line); border-radius: 999px; line-height: 1; color: var(--ink); }
 .mentionChip:hover { border-color: var(--accent); }
 .mentionQuote { margin: 4px 0 0 18px; font-size: 13px; line-height: 1.6; color: var(--muted); display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; overflow-wrap: anywhere; }
-.mentionQuote a { color: var(--accent); text-decoration: underline; text-underline-offset: 3px; }
-.mentionQuote a:hover { text-decoration-thickness: 2px; }
+.mentionQuote a { color: inherit; text-decoration: underline; text-decoration-color: color-mix(in srgb, currentColor 55%, transparent); text-decoration-thickness: 1px; text-underline-offset: 3px; }
+.mentionQuote a:hover, .mentionQuote a:focus-visible { color: var(--ink); text-decoration-color: currentColor; }
