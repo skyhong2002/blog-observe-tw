@@ -186,7 +186,8 @@ export default function BlogCatalogView({
       if (value === null) params.delete(key);
       else params.set(key, value);
     }
-    return `/blogs/?${params}`;
+    const search = params.toString();
+    return search ? `/blogs/?${search}` : '/blogs/';
   };
   const sortLink = (col: CatalogSort) =>
     href({ sort: col, dir: sort === col ? (dir === 'asc' ? 'desc' : 'asc') : ascendingFirst.has(col) ? 'asc' : 'desc' });
@@ -321,7 +322,7 @@ export default function BlogCatalogView({
                       </div>
                     </td>
                     <td className={`${table.cell} text-xs`}>
-                      <span className="flex max-w-56 flex-wrap gap-x-2 gap-y-0.5 whitespace-normal">
+                      <span className="flex gap-x-2">
                         {(blog.genres ?? []).slice(0, 3).map((g) => (
                           <Link
                             key={g.value}
