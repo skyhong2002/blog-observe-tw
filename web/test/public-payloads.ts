@@ -120,7 +120,7 @@ export const EMPTY: Record<PublicKind, unknown> = {
   blogTech: { generatedAt: '2026-10-12T00:00:00.000Z', method: techMethod, blog: notObservedBlog },
   // app/src/blog-suggestions.ts loadBlogQueue: an empty queue is a valid answer.
   blogQueue: {
-    filters: { q: '', state: '', source: '', page: 1 },
+    filters: { q: '', state: '', source: '', page: 1, sort: 'added', dir: 'desc' },
     pagination: { page: 1, pages: 1, total: 0 },
     states: { waiting: 0, failed: 0, listed: 0, rejected: 0 },
     sources: {},
@@ -211,7 +211,7 @@ export const PATHS: Record<PublicKind, string> = {
   topicPage: '/api/pages/topics/%E6%97%85%E8%A1%8C',
   homeOverview: '/api/overview?view=home',
   homeTopics: '/api/topics?days=30&view=home',
-  blogQueue: '/api/blog-queue?q=thelingwu.com&state=failed&source=reader-suggestion&page=2',
+  blogQueue: '/api/blog-queue?q=thelingwu.com&state=failed&source=reader-suggestion&page=2&sort=checked&dir=asc',
 };
 
 export const json = (status: number, body: unknown = { ok: true }) =>

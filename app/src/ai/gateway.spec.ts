@@ -180,3 +180,22 @@ it('checks complete trusted regions for organization/multiple-author signals bef
   expect(authors.reason).toBe('multiple_author_identities');
   expect(authors.personal).toBe(false);
 });
+it('accepts the homepage’s only first-person bio block as personal, never a plural, author or team one', () => {
+  const bio = '我因為對美的熱愛投身設計。畢業後我在軟體業做行銷，我擅長體驗設計，寫作是我的興趣。';
+  const home = (block: string) => personalHomepage(`<title>霖吳</title><main><section>${block}</section></main>`).evidence;
+  const css = home(`<div class="Home_intro__v3SiC"><p>工作、心智、生活。</p><div class="Home_bio__5_jqc">${bio}</div></div>`);
+  expect(css.reason).toBe('first_person_site_introduction');
+  expect(css.identitySnippet).toBe(`工作、心智、生活。${bio}`.normalize('NFKC'));
+  expect(deterministicPersonalProof(css)).toBe(true);
+  expect(home(`<div id="about">I write about design. My work is in services, and I live in London now.</div>`).personal).toBe(true);
+  for (const block of [
+    `<div class="bio">${bio.replace('寫作是我的興趣', '我們的團隊')}</div>`,
+    `<div class="author-bio">${bio}</div>`,
+    `<div class="team"><div class="bio">${bio}</div></div>`,
+    `<div class="bio">${bio}</div><div class="bio">我是另一位作者，住在台南，我寫我的旅行，也寫我在出版社的工作與閱讀。</div>`,
+    `<div class="bio">我喜歡寫作，也喜歡攝影。</div>`,
+    `<div class="post-list">${bio}</div>`,
+    `<article><div class="bio">${bio}</div></article>`,
+  ])
+    expect(home(block).personal, block).toBe(false);
+});

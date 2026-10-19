@@ -105,8 +105,19 @@ it('reads queue filters strictly: known states and sources only, an address with
     state: 'failed',
     source: 'reader-suggestion',
     page: 3,
+    sort: 'added',
+    dir: 'desc',
   });
-  expect(queueFilters({ state: 'x', source: 'owner-exclusion', page: '-1' })).toEqual({ q: '', state: '', source: '', page: 1 });
+  expect(queueFilters({ state: 'x', source: 'owner-exclusion', page: '-1', sort: 'id;--', dir: 'up' })).toEqual({
+    q: '',
+    state: '',
+    source: '',
+    page: 1,
+    sort: 'added',
+    dir: 'desc',
+  });
+  expect(queueFilters({ sort: 'site' })).toMatchObject({ sort: 'site', dir: 'asc' });
+  expect(queueFilters({ sort: 'checked', dir: 'asc' })).toMatchObject({ sort: 'checked', dir: 'asc' });
   expect(queueFilters({ source: 'opml-import' }).source).toBe('');
 });
 
@@ -150,8 +161,11 @@ it('lists the queue without owner-excluded hosts or private OPML imports, counti
     reason: 'personal_identity_uncertain',
     slug: null,
   });
-  const [, parameters] = query.mock.calls.at(-1)!;
+  const [sql, parameters] = query.mock.calls.at(-1)!;
   expect(parameters).toEqual([QUEUE_SOURCES, ['excluded.test'], 'blogblog-club', 50, 0]);
+  expect(sql).toMatch(/ORDER BY d\.discovered_at DESC,d\.id DESC LIMIT/);
+  await loadBlogQueue({ query } as unknown as Pool, { sort: 'checked', dir: 'asc' });
+  expect(query.mock.calls.at(-1)![0]).toMatch(/ORDER BY STR_TO_DATE\([\s\S]+\) IS NULL,STR_TO_DATE\([\s\S]+\) ASC,d\.id ASC LIMIT/);
   expect(QUEUE_SOURCES).not.toContain('owner-exclusion');
   expect(QUEUE_SOURCES).not.toContain('opml-import');
 });

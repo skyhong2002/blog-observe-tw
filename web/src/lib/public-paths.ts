@@ -71,7 +71,7 @@ const RULES: readonly Rule[] = [
   { kind: 'blogPage', path: new RegExp(`^/api/pages/blogs/${SEGMENT}$`), query: [] },
   { kind: 'topicPage', path: new RegExp(`^/api/pages/topics/${SEGMENT}$`), query: [] },
   // The public 待查清單 (app/src/blog-suggestions.ts loadBlogQueue).
-  { kind: 'blogQueue', path: /^\/api\/blog-queue$/, query: ['q', 'state', 'source', 'page'] },
+  { kind: 'blogQueue', path: /^\/api\/blog-queue$/, query: ['q', 'state', 'source', 'page', 'sort', 'dir'] },
 ];
 
 /** Never public, whatever a rule above might match. */

@@ -11,6 +11,17 @@ export function selfDescription(text: string) {
   const explicitAbout = /關於我(?!們)|\babout me\b/i.test(text);
   return personal && (chineseIdentity || englishIdentity || explicitAbout) && !organizationEvidence(text);
 }
+/**
+ * A site introduction written by one person about themself: three or more first-person-singular
+ * words (「我」, I/my/me) and no plural voice (「我們」, we/our/us) or organization wording.
+ */
+export function firstPersonIntroduction(text: string) {
+  if (text.length < 30 || organizationEvidence(text) || /我們|我们|\b(?:we|our|us)\b/i.test(text)) return false;
+  const chinese = text.match(/我(?!們|们)/g)?.length ?? 0;
+  const english = text.match(/\b(?:I|I'm|I've|[Mm]y|me)\b/g)?.length ?? 0;
+  return chinese >= 3 || english >= 3;
+}
+export const ownerIntroduction = (text: string) => selfDescription(text) || firstPersonIntroduction(text);
 /** Canonical JSON array of website strings: no generated prompt labels can qualify as quotations. */
 export function ownershipInput(segments: string[]): string {
   const bounded: string[] = [];

@@ -440,7 +440,7 @@ export const PUBLIC_CONTRACTS: Record<PublicKind, (raw: unknown) => boolean> = {
   // app/src/blog-suggestions.ts loadBlogQueue: the view reads every one of these keys.
   blogQueue: (raw) =>
     shape(raw, {
-      filters: (value) => shape(value, { q: text, state: text, source: text, page: positive }),
+      filters: (value) => shape(value, { q: text, state: text, source: text, page: positive, sort: text, dir: text }),
       pagination: (value) => shape(value, { page: positive, pages: positive, total: count }),
       states: object,
       sources: object,

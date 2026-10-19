@@ -1,8 +1,10 @@
 import * as cheerio from 'cheerio';
 import { normalizeInput } from './contracts.ts';
 import {
+  firstPersonIntroduction,
   OWNERSHIP_VERSION,
   organizationEvidence,
+  ownerIntroduction,
   ownershipInput,
   ownershipQuotes,
   ownershipSegments,
@@ -53,7 +55,31 @@ export function personalHomepage(html: string) {
   const regions = $('.site-description,.site-tagline,#about-me,.about-me,.author-bio,[data-site-introduction]')
     .toArray()
     .filter(trustedPosition);
-  const identityRegions = [description, ...regions.map((el) => $(el).text())];
+  // A homepage's own bio/intro block (`.bio`, `#about`, CSS-module names like `Home_bio__x1`) counts only
+  // when it is written in the first person, is not about an author/user/member, and is the page's only one.
+  const introToken = /(?:^|[-_])(?:bio|intro|about|profile)(?:[-_]|$)/i;
+  const peopleToken = /author|user|member|byline|comment|team|staff/i;
+  const tokens = (el: Parameters<typeof $>[0]) => [$(el).attr('id') || '', ...($(el).attr('class') || '').split(/\s+/)];
+  const introBlocks = $('[id],[class]')
+    .toArray()
+    .filter((el) => !['html', 'body'].includes(el.tagName) && tokens(el).some((t) => introToken.test(t)))
+    .filter((el) => ![el, ...$(el).parents().toArray()].some((node) => tokens(node).some((t) => peopleToken.test(t))));
+  const introTexts = [
+    ...new Set(
+      introBlocks
+        // The outermost block of a nested intro/bio pair holds all of it.
+        .filter(
+          (el) =>
+            !$(el)
+              .parents()
+              .toArray()
+              .some((parent) => introBlocks.includes(parent)),
+        )
+        .map((el) => $(el).text().replace(/\s+/g, ' ').trim())
+        .filter(firstPersonIntroduction),
+    ),
+  ];
+  const identityRegions = [description, ...regions.map((el) => $(el).text()), ...(introTexts.length === 1 ? introTexts : [])];
   // Exclusions inspect every complete trusted region BEFORE byte/segment bounds, so
   // a late editorial/team notice cannot disappear behind a truncated personal bio.
   const excluded = [siteName, ...identityRegions].some(organizationEvidence);
@@ -69,7 +95,7 @@ export function personalHomepage(html: string) {
   const input = ownershipInput(
     excluded || ambiguousAuthors ? [] : identityRegions.map((s) => normalizeInput(s.replace(/\s+/g, ' ').trim())),
   );
-  const identitySnippet = ownershipSegments(input)!.find(selfDescription);
+  const identitySnippet = ownershipSegments(input)!.find(ownerIntroduction);
   const personal = Boolean(identitySnippet);
   return {
     siteName: siteName.trim().slice(0, 255),
@@ -84,7 +110,9 @@ export function personalHomepage(html: string) {
         : ambiguousAuthors
           ? 'multiple_author_identities'
           : personal
-            ? 'explicit_personal_self_description'
+            ? selfDescription(identitySnippet!)
+              ? 'explicit_personal_self_description'
+              : 'first_person_site_introduction'
             : 'personal_identity_uncertain',
     } as PersonalEvidence,
   };
@@ -97,7 +125,7 @@ export function deterministicPersonalProof(e: PersonalEvidence) {
     e.identitySnippet.length <= 1000 &&
     validOwnershipEvidence(e) &&
     ownershipSegments(e.input)!.some((segment) => segment === e.identitySnippet) &&
-    selfDescription(e.identitySnippet) &&
+    ownerIntroduction(e.identitySnippet) &&
     !organizationEvidence(e.input)
   );
 }

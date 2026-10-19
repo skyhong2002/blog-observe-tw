@@ -85,11 +85,16 @@ export async function suggestionState(pool: Pool, input: unknown): Promise<Sugge
   return { state: 'new', home };
 }
 
-// The public 待查清單 (/queue/): every candidate still waiting, checked or decided, newest activity first.
+// The public 待查清單 (/queue/): every candidate still waiting, checked or decided, newest added first
+// unless the reader sorts by another column.
 // Owner-excluded hosts and readers' private OPML imports are never listed.
 export const QUEUE_STATES = ['waiting', 'failed', 'listed', 'rejected'] as const;
 export type QueueState = (typeof QUEUE_STATES)[number];
 export const QUEUE_SOURCES = ['reader-suggestion', 'blogblog-club', 'indieweb-wiki', 'article-link', 'blogroll', 'seed-url-resolution'];
+export const QUEUE_SORTS = ['added', 'checked', 'site', 'state', 'source'] as const;
+export type QueueSort = (typeof QUEUE_SORTS)[number];
+/** Dates start newest first; text and state columns start from the top of their order. */
+export const QUEUE_ASCENDING_FIRST: readonly QueueSort[] = ['site', 'state', 'source'];
 const QUEUE_PAGE = 50;
 const review = (field: string) => `JSON_UNQUOTE(JSON_EXTRACT(d.source_evidence,'$.automaticReview.${field}'))`;
 const host = (column: string) => `LOWER(SUBSTRING_INDEX(SUBSTRING_INDEX(${column},'/',3),'/',-1))`;
@@ -106,7 +111,9 @@ export function queueFilters(query: Record<string, unknown> = {}) {
   const state = QUEUE_STATES.find((s) => s === query.state) ?? '';
   const source = QUEUE_SOURCES.find((s) => s === query.source) ?? '';
   const page = typeof query.page === 'string' && /^\d{1,6}$/.test(query.page) ? Math.max(1, Number(query.page)) : 1;
-  return { q, state, source, page };
+  const sort: QueueSort = QUEUE_SORTS.find((s) => s === query.sort) ?? 'added';
+  const dir = query.dir === 'asc' || query.dir === 'desc' ? query.dir : QUEUE_ASCENDING_FIRST.includes(sort) ? 'asc' : 'desc';
+  return { q, state, source, page, sort, dir };
 }
 
 export async function loadBlogQueue(pool: Pool, query: Record<string, unknown> = {}) {
@@ -137,12 +144,21 @@ export async function loadBlogQueue(pool: Pool, query: Record<string, unknown> =
   const total = count((r) => (!filters.state || r.state === filters.state) && (!filters.source || r.source === filters.source));
   const pages = Math.max(1, Math.ceil(total / QUEUE_PAGE));
   const page = Math.min(filters.page, pages);
+  const direction = filters.dir === 'asc' ? 'ASC' : 'DESC';
+  const sortKey: Record<QueueSort, string> = {
+    added: 'd.discovered_at',
+    // Never checked sorts after every checked row, whichever way.
+    checked: `${checkedAt} IS NULL,${checkedAt}`,
+    site: `REGEXP_REPLACE(LOWER(d.url),'^https?://(www[.])?','')`,
+    state: `FIELD(${queueState},${QUEUE_STATES.map((s) => `'${s}'`).join(',')})`,
+    source: `FIELD(d.source_type,${QUEUE_SOURCES.map((s) => `'${s}'`).join(',')})`,
+  };
   const narrowed = [...(filters.state ? [`${queueState}=?`] : []), ...(filters.source ? ['d.source_type=?'] : [])];
   const [rows] = await pool.query<RowDataPacket[]>(
     `SET STATEMENT max_statement_time=3 FOR SELECT d.id,d.url,d.name,d.source_type source,d.discovered_at addedAt,${checkedAt} checkedAt,
        ${review('reason')} reason,${review('slug')} slug,${queueState} state
      ${base}${narrowed.map((condition) => ` AND ${condition}`).join('')}
-     ORDER BY GREATEST(d.discovered_at,COALESCE(${checkedAt},d.discovered_at)) DESC,d.id DESC LIMIT ? OFFSET ?`,
+     ORDER BY ${sortKey[filters.sort]} ${direction},d.id ${direction} LIMIT ? OFFSET ?`,
     [
       ...parameters,
       ...(filters.state ? [filters.state] : []),

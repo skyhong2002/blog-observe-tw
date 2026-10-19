@@ -26,8 +26,9 @@ export type QueueItem = {
   reason: string | null;
   slug: string | null;
 };
+export type QueueSort = 'added' | 'checked' | 'site' | 'state' | 'source';
 export type Queue = {
-  filters: { q: string; state: string; source: string; page: number };
+  filters: { q: string; state: string; source: string; page: number; sort: QueueSort; dir: 'asc' | 'desc' };
   pagination: { page: number; pages: number; total: number };
   states: Record<QueueState, number>;
   sources: Record<string, number>;
@@ -40,6 +41,8 @@ export const QUEUE_STATE_LABELS: Record<QueueState, string> = {
   listed: '已收錄',
   rejected: '未收錄',
 };
+/** Dates start newest first; the other columns start from the top of their order (app/src/blog-suggestions.ts). */
+const ASCENDING_FIRST = new Set<QueueSort>(['site', 'state', 'source']);
 const site = (url: string) => url.replace(/^https?:\/\/(www\.)?/, '').replace(/\/$/, '');
 const tone: Record<QueueState, string> = {
   waiting: 'text-zinc-600 dark:text-zinc-400',
@@ -85,17 +88,53 @@ export function BlogQueueView({
   status: 'ready' | 'pending' | 'error';
   onSearch?: (q: string) => void;
 }) {
-  const filters = queue?.filters ?? { q: '', state: '', source: '', page: 1 };
+  const filters = queue?.filters ?? { q: '', state: '', source: '', page: 1, sort: 'added', dir: 'desc' };
   const href = (patch: Record<string, string | null>) => {
+    // The default order (newest added first) stays out of the link.
+    const sorted = filters.sort !== 'added' || filters.dir !== 'desc';
     const params = new URLSearchParams(
-      Object.entries({ q: filters.q, state: filters.state, source: filters.source }).filter(([, value]) => value),
+      Object.entries({
+        q: filters.q,
+        state: filters.state,
+        source: filters.source,
+        ...(sorted ? { sort: filters.sort, dir: filters.dir } : {}),
+      }).filter(([, value]) => value),
     );
     for (const [key, value] of Object.entries(patch)) {
       if (value) params.set(key, value);
       else params.delete(key);
     }
+    if (params.get('sort') === 'added' && params.get('dir') === 'desc') {
+      params.delete('sort');
+      params.delete('dir');
+    }
     const search = params.toString();
     return search ? `/queue/?${search}` : '/queue/';
+  };
+  const Th = ({ col, label, lead = false }: { col?: QueueSort; label: string; lead?: boolean }) => {
+    const className = lead ? table.leadHead : table.cell;
+    if (!col)
+      return (
+        <th scope="col" className={className}>
+          {label}
+        </th>
+      );
+    const current = filters.sort === col;
+    const dir = current ? (filters.dir === 'asc' ? 'desc' : 'asc') : ASCENDING_FIRST.has(col) ? 'asc' : 'desc';
+    return (
+      <th scope="col" className={className} aria-sort={current ? (filters.dir === 'asc' ? 'ascending' : 'descending') : undefined}>
+        <Link
+          href={href({ sort: col, dir, page: null })}
+          scroll={false}
+          className={`inline-flex items-center gap-0.5 whitespace-nowrap hover:text-brand-700 dark:hover:text-brand-400 ${current ? 'text-zinc-900 dark:text-zinc-100' : ''}`}
+        >
+          {label}
+          <span aria-hidden="true" className={current ? '' : 'text-zinc-400 dark:text-zinc-600'}>
+            {current ? (filters.dir === 'desc' ? '▼' : '▲') : '↕'}
+          </span>
+        </Link>
+      </th>
+    );
   };
   return (
     <div className="space-y-5 pb-8">
@@ -150,24 +189,12 @@ export function BlogQueueView({
             <table aria-busy={status === 'pending'} className={`w-full min-w-[52rem] text-sm ${status === 'pending' ? 'opacity-60' : ''}`}>
               <thead className="bg-zinc-50 text-left text-xs text-zinc-600 dark:bg-zinc-950 dark:text-zinc-400">
                 <tr>
-                  <th scope="col" className={table.leadHead}>
-                    網站
-                  </th>
-                  <th scope="col" className={table.cell}>
-                    狀態
-                  </th>
-                  <th scope="col" className={table.cell}>
-                    說明
-                  </th>
-                  <th scope="col" className={table.cell}>
-                    來源
-                  </th>
-                  <th scope="col" className={table.cell}>
-                    最近檢查
-                  </th>
-                  <th scope="col" className={table.cell}>
-                    加入
-                  </th>
+                  <Th col="site" label="網站" lead />
+                  <Th col="state" label="狀態" />
+                  <Th label="說明" />
+                  <Th col="source" label="來源" />
+                  <Th col="checked" label="最近檢查" />
+                  <Th col="added" label="加入" />
                 </tr>
               </thead>
               <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
@@ -250,12 +277,12 @@ export function BlogQueueView({
   );
 }
 
-/** Reads ?q=&state=&source=&page= and answers it from /api/blog-queue, keeping the last answer on screen while the next loads. */
+/** Reads ?q=&state=&source=&page=&sort=&dir= and answers it from /api/blog-queue, keeping the last answer on screen while the next loads. */
 export default function BlogQueueFromUrl() {
   const params = useSearchParams();
   const router = useRouter();
   const query = new URLSearchParams(
-    ['q', 'state', 'source', 'page'].flatMap((key) => {
+    ['q', 'state', 'source', 'page', 'sort', 'dir'].flatMap((key) => {
       const value = params.get(key);
       return value ? [[key, value] as [string, string]] : [];
     }),

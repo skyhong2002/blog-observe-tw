@@ -48,7 +48,7 @@ test('the 待查清單 shows each site, its state, the reason in words and links
     <BlogQueueView
       status="ready"
       queue={{
-        filters: { q: '', state: '', source: '', page: 1 },
+        filters: { q: '', state: '', source: '', page: 1, sort: 'added', dir: 'desc' },
         pagination: { page: 1, pages: 1, total: 2 },
         states: { waiting: 0, failed: 1, listed: 1, rejected: 0 },
         sources: { 'reader-suggestion': 1, 'blogblog-club': 1 },
@@ -83,4 +83,9 @@ test('the 待查清單 shows each site, its state, the reason in words and links
   expect(html).toContain('未通過 1');
   expect(html).toContain('href="/blogs/wiwi/"');
   expect(html).not.toContain('personal_identity_uncertain');
+  // Newest added first by default; its header flips it, the others start from their own default and keep the default out of links.
+  expect(html).toMatch(/aria-sort="descending"[\s\S]*?href="\/queue\/\?sort=added&amp;dir=asc"[\s\S]*?加入/);
+  expect(html).toContain('href="/queue/?sort=site&amp;dir=asc"');
+  expect(html).toContain('href="/queue/?sort=checked&amp;dir=desc"');
+  expect(html).not.toMatch(/sort=added&amp;dir=desc/);
 });
