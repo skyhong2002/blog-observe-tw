@@ -72,11 +72,9 @@ export default function ArticleListItem({
             <p data-search-evidence="" className="mt-0.5 text-[11px] leading-5 text-zinc-500 dark:text-zinc-400">
               {evidence.articleId === null ? `文章 ID ${MISSING}` : `文章 #${evidence.articleId}`} · 比對版本{' '}
               {evidence.matchVersion ?? MISSING} · 片段來源 {contextSourceText(evidence.contextSource)}
-              {evidence.snippetNormalization === 'NFKC-then-lowercase'
-                ? ' · 片段經 NFKC 與小寫正規化，大小寫可能與原文不同'
-                : evidence.snippetNormalization
-                  ? ` · 片段正規化 ${evidence.snippetNormalization}`
-                  : ''}
+              {evidence.snippetNormalization && evidence.snippetNormalization !== 'NFKC-then-lowercase'
+                ? ` · 片段正規化 ${evidence.snippetNormalization}`
+                : ''}
             </p>
           )}
           {!snippet && article.description && (

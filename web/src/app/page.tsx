@@ -60,7 +60,7 @@ export default async function HomePage() {
                 {data.totals.blogs}
                 <span>個部落格</span>
               </div>
-              <p className={styles.briefSub}>已收錄 {data.totals.posts} 篇文章，逐步核對來源與訂閱資訊。</p>
+              <p className={styles.briefSub}>已收錄 {data.totals.posts} 篇文章</p>
               <Link href="/blogs/" className={styles.textLink}>
                 探索部落格 <span>→</span>
               </Link>

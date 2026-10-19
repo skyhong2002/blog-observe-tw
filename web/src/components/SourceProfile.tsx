@@ -8,6 +8,7 @@ import { type Blog, taipei } from '@/lib/api';
 import { blogHref } from '@/lib/page-links';
 import FollowButton from './follow-button';
 import MediaSidebar from './MediaSidebar';
+import MethodLink from './MethodLink';
 import SectionTabs from './SectionTabs';
 
 /**
@@ -16,8 +17,7 @@ import SectionTabs from './SectionTabs';
  */
 /** The median gap between its latest posts, in words: 約每天, 約每 3 天, 約每 2 週. */
 function postingText(hours: number | null | undefined) {
-  if (hours === undefined) return '未提供';
-  if (hours === null) return '文章太少，尚無法估計';
+  if (hours == null) return null;
   if (hours < 18) return '一天數篇';
   const days = Math.round(hours / 24);
   if (days <= 1) return '約每天';
@@ -26,8 +26,22 @@ function postingText(hours: number | null | undefined) {
   return `約每 ${Math.round(days / 30)} 個月`;
 }
 
+/** One 部落格資料 row, left out when there is nothing to say. */
+function Row({ term, children }: { term: string; children: ReactNode }) {
+  if (children === null || children === undefined || children === '') return null;
+  return (
+    <>
+      <dt className="text-zinc-500 dark:text-zinc-400">{term}</dt>
+      <dd>{children}</dd>
+    </>
+  );
+}
+const recorded = (value?: string | null) => (value ? taipei(value) : null);
+
 export default function SourceProfile({ blog, sidebar, cloud }: { blog: Blog; sidebar?: ReactNode; cloud?: ReactNode }) {
   const allPosts = blog.posts ?? [];
+  const authors = blog.authors ?? [];
+  const tags = blog.tags ?? [];
   const owner = { slug: blog.slug, name: blog.name, canonicalPath: blog.canonicalPath };
   return (
     <div className="pb-4">
@@ -51,6 +65,8 @@ export default function SourceProfile({ blog, sidebar, cloud }: { blog: Blog; si
             <span>{blog.category ?? '未分類'}</span>
             <span>·</span>
             <span>{blog.statusLabel ?? '待核對'}</span>
+            <span>·</span>
+            <MethodLink />
           </p>
         </div>
         <dl className="flex gap-5 text-right sm:gap-7">
@@ -69,7 +85,7 @@ export default function SourceProfile({ blog, sidebar, cloud }: { blog: Blog; si
         label="部落格資料"
         tabs={[
           { href: blogHref(blog.slug, blog.canonicalPath), label: '收錄文章', current: true },
-          { href: '#authors', label: '相關作者' },
+          ...(authors.length ? [{ href: '#authors', label: '相關作者' }] : []),
           { href: '#source', label: '來源資料' },
         ]}
       />
@@ -78,62 +94,48 @@ export default function SourceProfile({ blog, sidebar, cloud }: { blog: Blog; si
           <section id="source" className="rounded-lg border border-zinc-200 p-3 text-xs dark:border-zinc-800">
             <h2 className="mb-3 flex items-baseline justify-between gap-2 text-sm font-semibold">部落格資料</h2>
             <dl className="grid grid-cols-[5rem_minmax(0,1fr)] gap-y-2.5 leading-5">
-              <dt className="text-zinc-500 dark:text-zinc-400">名稱</dt>
-              <dd>{blog.name}</dd>
-              <dt className="text-zinc-500 dark:text-zinc-400">收錄說明</dt>
-              <dd>{blog.description || '由公開來源名單與訂閱來源整理。'}</dd>
-              <dt className="text-zinc-500 dark:text-zinc-400">原站</dt>
-              <dd className="break-all">
+              <Row term="名稱">{blog.name}</Row>
+              <Row term="收錄說明">{blog.description || null}</Row>
+              <Row term="原站">
                 {blog.url ? (
-                  <a className="text-brand-700 hover:underline dark:text-brand-400" href={blog.url} rel="noopener noreferrer">
+                  <a className="break-all text-brand-700 hover:underline dark:text-brand-400" href={blog.url} rel="noopener noreferrer">
                     {blog.url} ↗
                   </a>
-                ) : (
-                  '網址待核對'
-                )}
-              </dd>
-              <dt className="text-zinc-500 dark:text-zinc-400">最後發文</dt>
-              <dd>{taipei(blog.lastPublishedAt)}</dd>
-              <dt className="text-zinc-500 dark:text-zinc-400">抓取成功</dt>
-              <dd>{taipei(blog.lastCrawlSuccessAt)}</dd>
-              <dt className="text-zinc-500 dark:text-zinc-400">發文頻率</dt>
-              <dd>{postingText(blog.postingIntervalHours)}</dd>
-              <dt className="text-zinc-500 dark:text-zinc-400">檢查頻率</dt>
-              <dd>{blog.crawlIntervalHours ? `每 ${blog.crawlIntervalHours} 小時檢查 RSS` : '未提供'}</dd>
+                ) : null}
+              </Row>
+              <Row term="最後發文">{recorded(blog.lastPublishedAt)}</Row>
+              <Row term="抓取成功">{recorded(blog.lastCrawlSuccessAt)}</Row>
+              <Row term="發文頻率">{postingText(blog.postingIntervalHours)}</Row>
+              <Row term="檢查頻率">{blog.crawlIntervalHours ? `每 ${blog.crawlIntervalHours} 小時檢查 RSS` : null}</Row>
             </dl>
-            <p className="mt-3 border-t border-zinc-200 pt-3 leading-5 text-zinc-500 dark:border-zinc-800">
-              沒有近期文章不代表網站失效，抓取成功與發文時間分開記錄。
-            </p>
           </section>
           {sidebar}
-          <section id="authors" className="rounded-lg border border-zinc-200 p-3 text-xs dark:border-zinc-800">
-            <h2 className="mb-3 text-sm font-semibold">相關作者</h2>
-            {blog.authors?.length ? (
+          {authors.length > 0 && (
+            <section id="authors" className="rounded-lg border border-zinc-200 p-3 text-xs dark:border-zinc-800">
+              <h2 className="mb-3 text-sm font-semibold">相關作者</h2>
               <ul className="space-y-2">
-                {blog.authors.map((author) => (
+                {authors.map((author) => (
                   <li key={author.id}>{author.displayName}</li>
                 ))}
               </ul>
-            ) : (
-              <p className="text-zinc-500">作者資料待核對。</p>
-            )}
-            <p className="mt-3 leading-5 text-zinc-500">署名依各站記錄，不憑相同筆名合併跨站作者。</p>
-          </section>
-          <section className="rounded-lg border border-zinc-200 p-3 text-xs dark:border-zinc-800">
-            <h2 className="mb-3 text-sm font-semibold">部落格標籤</h2>
-            <div className="flex flex-wrap gap-2">
-              {blog.tags?.map((tag) => (
-                <Link
-                  key={tag.slug}
-                  className="rounded bg-zinc-100 px-2 py-1 text-brand-700 dark:bg-zinc-900 dark:text-brand-400"
-                  href={`/tags/?tag=${encodeURIComponent(tag.slug)}`}
-                >
-                  {tag.label}
-                </Link>
-              ))}
-            </div>
-            {!blog.tags?.length && <p className="text-zinc-500">尚無標籤。</p>}
-          </section>
+            </section>
+          )}
+          {tags.length > 0 && (
+            <section className="rounded-lg border border-zinc-200 p-3 text-xs dark:border-zinc-800">
+              <h2 className="mb-3 text-sm font-semibold">部落格標籤</h2>
+              <div className="flex flex-wrap gap-2">
+                {tags.map((tag) => (
+                  <Link
+                    key={tag.slug}
+                    className="rounded bg-zinc-100 px-2 py-1 text-brand-700 dark:bg-zinc-900 dark:text-brand-400"
+                    href={`/tags/?tag=${encodeURIComponent(tag.slug)}`}
+                  >
+                    {tag.label}
+                  </Link>
+                ))}
+              </div>
+            </section>
+          )}
         </MediaSidebar>
         <section className="min-w-0 space-y-4 lg:col-start-1 lg:row-start-1">
           {cloud}

@@ -43,7 +43,7 @@ function Bars({ rows }: { rows: Array<{ label: string; share: number; strong?: b
 }
 
 /** One blog's newest Similarweb month: visits, recent trend, source countries and ranks. Rendered in /blogs/[slug]/'s sidebar. */
-export default function BlogTrafficProfile({ blog, limitations }: { blog: TrafficBlog; limitations?: string }) {
+export default function BlogTrafficProfile({ blog }: { blog: TrafficBlog }) {
   const state = stateOf(blog);
   const profile = blog.traffic;
   const latest = latestPoint(blog);
@@ -58,6 +58,8 @@ export default function BlogTrafficProfile({ blog, limitations }: { blog: Traffi
     profile?.category && ['網站類別', categoryName(profile.category), 'Similarweb 網站類別'],
   ].filter(Boolean) as Array<[string, string, string]>;
   const fetched = dateText(blog.fetchedAt);
+  // No estimate yet (or ever): the section is left out; how Similarweb is read is in the footer's 部落格頁 block.
+  if (!latest && !profile?.topCountries.length && !ranks.length) return null;
   return (
     <section id="traffic" aria-label="網站流量" className="rounded-lg border border-zinc-200 p-3 text-xs dark:border-zinc-800">
       <h2 className="mb-3 flex items-baseline justify-between gap-2 text-sm font-semibold">
@@ -72,11 +74,6 @@ export default function BlogTrafficProfile({ blog, limitations }: { blog: Traffi
           {stateText[state]}
         </span>
       </p>
-      {state !== 'ready' && (
-        <p role="status" className="mb-3 leading-5 text-zinc-600 dark:text-zinc-400">
-          {stateHint[state]}。
-        </p>
-      )}
       {latest && (
         <div className="mb-3 flex items-end justify-between gap-3">
           <p className="leading-5">
@@ -103,9 +100,8 @@ export default function BlogTrafficProfile({ blog, limitations }: { blog: Traffi
           ))}
         </dl>
       )}
-      {limitations ? <p className="mt-3 text-[11px] leading-4 text-zinc-500 dark:text-zinc-400">{limitations}</p> : null}
       <p className="mt-3 flex flex-wrap justify-between gap-x-2 text-[11px] leading-4 text-zinc-500 dark:text-zinc-400">
-        <span>取得：{fetched ?? '尚未取得'}</span>
+        <span>{fetched ? `取得：${fetched}` : ''}</span>
         <Link href={`/traffic/?q=${encodeURIComponent(blog.name)}`} className="text-brand-700 hover:underline dark:text-brand-400">
           與其他部落格比較 →
         </Link>

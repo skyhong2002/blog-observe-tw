@@ -393,7 +393,7 @@ describe('/tech/ baseline', () => {
     expect(tablePosition).toBeLessThan(($('*').toArray() as unknown[]).indexOf(block.get(0)));
   });
 
-  test('empty: zero public blogs is data with "—" shares and an empty table, never an error', () => {
+  test('empty: zero public blogs is data with "—" shares and an empty table, never an error; no ranking is drawn', () => {
     const $ = render(<TechStatsView data={EMPTY_STATS} filters={baselineFilters} status="ready" />);
     expect(methodBlocks($).text()).toContain('目前沒有可統計的公開部落格。');
     expect(statusChip($, '有辨識').text()).toBe('有辨識 0（—）');
@@ -402,7 +402,10 @@ describe('/tech/ baseline', () => {
     expect($('main').text()).toContain('沒有符合條件的部落格。');
     expect($('span[role="status"]').text()).toBe('共 0 個部落格符合');
     expect($('[role="alert"]').length).toBe(0);
-    expect($('main').text()).toContain('目前沒有辨識到網站軟體');
+    // No technologies: the ranking table is left out, with no "nothing recognized" sentence.
+    expect($('section[aria-labelledby="tech-ranking"] table').length).toBe(0);
+    expect($('main').text()).not.toContain('目前沒有辨識到網站軟體');
+    expect(outsideText($)).not.toContain('不代表');
     expectOneBlock($);
   });
 
@@ -454,8 +457,9 @@ describe('/tech/ query views', () => {
       publicJson.load = state;
       const $ = render(<TechStatsFromUrl baseline={stats()} />);
       const alert = $('[role="alert"]');
-      expect(alert.text()).toContain('技術統計暫時無法載入');
-      expect(alert.text()).toContain('不代表數量為 0');
+      expect(alert.text()).toBe('技術統計暫時無法載入，請稍後再試。重新載入');
+      // "Not a zero" is said once, in the method block, not in the alert.
+      expect(methodBlocks($).text()).toContain('留白或載入失敗都不表示沒有收錄、沒有符合的結果或數量為 0');
       expect(alert.find('button').text()).toBe('重新載入');
       expect(blogTable($).length).toBe(0);
       expect($('main p').filter((_, element) => $(element).text() === '沒有符合條件的部落格。').length).toBe(0);
@@ -500,9 +504,10 @@ describe('/tech/ server page and its switches', () => {
     gateway.answer = () => Promise.resolve(null);
     const $ = render(await TechPage());
     expect(gateway.paths).toEqual(['/api/tech']);
-    expect($('[role="alert"]').text()).toContain('技術觀測資料目前沒有開放讀取');
+    expect($('[role="alert"]').text()).toBe('技術觀測資料目前沒有開放讀取。');
     expect(blogTable($).length).toBe(0);
-    expect($('main').text()).not.toMatch(/\d/);
+    // No counts outside the method block (whose general note mentions 0 as what a blank does not mean).
+    expect(outsideText($)).not.toMatch(/\d/);
     expectOneBlock($);
   });
 
@@ -548,16 +553,18 @@ describe('profile 使用的技術 (optional)', () => {
     await expect(BlogTech({ slug: 'synthetic-1' })).rejects.toThrow('bug');
   });
 
-  test("the gateway's 404 and a key it cannot have are said as no observation offered", async () => {
+  test("the gateway's 404 and a key it cannot have render nothing, not a claim of no technology", async () => {
     let $ = await renderSection();
-    expect($('[role="status"]').text()).toBe('目前沒有提供這個部落格的技術觀測。這不代表網站沒有使用任何技術。');
+    expect($('section').length).toBe(0);
+    expect($('body').text()).toBe('');
     gateway.paths = [];
     $ = await renderSection('../x');
     expect(gateway.paths).toEqual([]);
-    expect($('[role="status"]').length).toBe(1);
+    expect($('section').length).toBe(0);
+    expect($('body').text()).toBe('');
   });
 
-  test('detected: software then low-confidence CDN, versions only with evidence, evidence and both times', async () => {
+  test('detected: software then low-confidence CDN, versions only with evidence, evidence and the success time', async () => {
     gateway.answer = () => Promise.resolve(payload(detectedBlog));
     const $ = await renderSection();
     expect(gateway.paths).toEqual(['/api/blogs/synthetic-1/tech']);
@@ -566,32 +573,60 @@ describe('profile 使用的技術 (optional)', () => {
       .get();
     expect(headings).toEqual(['辨識到的網站軟體', '主機與 CDN（低信心）']);
     const item = (name: string) => $('li').filter((_, el) => $(el).find('a').first().text() === name);
+    const terms = (name: string) =>
+      item(name)
+        .find('dt')
+        .map((_, el) => $(el).text())
+        .get();
     expect(item('WordPress').find('dd').first().text()).toBe('6.4');
-    expect(item('Elementor').find('dd').first().text()).toBe('未知（沒有明確的版本證據）');
-    expect(item('Cloudflare').text()).toContain('低· 只代表基礎設施，不是 CMS');
+    // No version evidence: the 版本 row is left out, never 未知 or the gateway's 'unknown'.
+    expect(terms('Elementor')).not.toContain('版本');
+    expect(terms('Cloudflare')).not.toContain('版本');
+    expect(item('Elementor').text()).not.toContain('未知');
+    // The infrastructure caveat lives in the footer's 部落格頁 block, not on the row.
+    expect(item('Cloudflare').text()).toContain('低');
+    expect(item('Cloudflare').text()).not.toContain('不是 CMS');
     expect(item('Cloudflare').find('code').text()).toBe('cf-ray');
     expect(item('Elementor').find('a').attr('href')).toBe('/tech/?technology=wp-plugin%3Aelementor');
     expect($('body').text()).toContain(`成功觀測${taipei(OBSERVED)}`);
-    expect($('body').text()).toContain(`最後嘗試${taipei(OBSERVED)}`);
-    expect($('a[href="/tech/#method"]').text()).toBe('資料來源與計算方式');
+    // A detected blog says no 最近一次 failure row and no 最後嘗試 row.
+    expect($('body').text()).not.toContain('最近一次');
+    expect($('body').text()).not.toContain('最後嘗試');
+    // Method text is not in the section: no partial-evidence sentence, no method link.
+    expect($('body').text()).not.toContain('不是完整的技術清單');
+    expect($('a[href="/tech/#method"]').length).toBe(0);
     expect($('details').length).toBe(0);
     expect($('body').text()).not.toContain('unknown');
     expectNoPrefetch($);
   });
 
-  test('failed with a kept success: marked as history with its date; an unproven version is 未知', async () => {
+  test("the profile footer's 部落格頁 block carries the technology caveats the section no longer prints", () => {
+    nav.pathname = '/blogs/s1.example/';
+    const $ = load(renderToString(<FooterMethod />));
+    expect(methodBlocks($).length).toBe(1);
+    const text = $('#method').text();
+    for (const caveat of [
+      '是部分證據，不是完整的技術清單',
+      '版本只在有明確證據時顯示',
+      '不代表用哪種 CMS 寫成',
+      '列出的是上次成功觀測的結果',
+      '沒有辨識到技術不代表沒有使用',
+    ])
+      expect(text, caveat).toContain(caveat);
+  });
+
+  test('failed with a kept success: marked as history with its date and the failure; an unproven version is left out', async () => {
     gateway.answer = () => Promise.resolve(payload(failedBlog));
     const $ = await renderSection();
-    expect($('h2').text()).toContain('觀測失敗');
-    expect($('body').text()).toContain('連線逾時');
-    expect(
-      $('p')
-        .filter((_, el) => $(el).text().startsWith('最近一次觀測沒有成功'))
-        .text(),
-    ).toContain(`${taipei(OLD_SUCCESS)} 上次成功觀測的歷史結果，不代表目前仍確認`);
+    expect($('h2').text()).toBe('使用的技術');
+    expect($('body').text()).toContain('最近一次觀測失敗 · 連線逾時');
+    expect($('body').text()).toContain(`成功觀測${taipei(OLD_SUCCESS)}`);
     expect($('h3').first().text()).toBe('上次成功辨識到的網站軟體');
+    const row = $('li').filter((_, el) => $(el).find('a').first().text() === 'WordPress');
+    expect(row.find('dt').first().text()).not.toBe('版本');
     expect($('body').text()).not.toContain('6.5');
-    expect($('body').text()).toContain(`最後嘗試${taipei(LAST_ATTEMPT)}`);
+    expect($('body').text()).not.toContain('未知');
+    expect(row.text()).toContain(`觀測於${taipei(OLD_SUCCESS)}`);
   });
 
   test('evidence keys are kind and value, not position: the same under any order, identical pairs listed once', async () => {
@@ -628,16 +663,16 @@ describe('profile 使用的技術 (optional)', () => {
     }
   });
 
-  for (const [name, row, expected] of [
-    ['unknown', unknownBlog, '已觀測，但既有回應中沒有可辨識的線索'],
-    ['blocked without a success', blockedBlog, '最近一次觀測被來源拒絕'],
-    ['not-observed', unregisteredBlog, '還沒有可供辨識的公開回應'],
+  for (const [name, row] of [
+    ['unknown', unknownBlog],
+    ['blocked without a success', blockedBlog],
+    ['not-observed', unregisteredBlog],
   ] as const) {
-    test(`${name}: its own sentence, no detections listed`, async () => {
+    test(`${name}: no detections, so BlogTech renders null (no status sentence, no "none")`, async () => {
       gateway.answer = () => Promise.resolve(payload(row));
       const $ = await renderSection();
-      expect($('body').text()).toContain(expected);
-      expect($('h3').length).toBe(0);
+      expect($('section').length).toBe(0);
+      expect($('body').text()).toBe('');
       expect($('[role="alert"]').length).toBe(0);
     });
   }

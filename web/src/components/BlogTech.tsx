@@ -1,6 +1,7 @@
 // Sidebar section in the SourceProfile 部落格資料 style (tag /media/[media]/ sidebar, afe0a65), beside
 // BlogContentSources. Rendered only while BLOG_TECH_PUBLIC_ENABLED is on: app/blogs/[slug]/page.tsx decides.
-// The full method lives once, in /tech/'s 資料來源與計算方式; this section links there instead of repeating it.
+// Only what was recognized is shown; with nothing recognized the section is left out. How it is observed lives in
+// the footer's 部落格頁 block and /tech/'s 資料來源與計算方式, not here.
 import Link from '@/components/NoPrefetchLink';
 import ReloadButton from '@/components/public/ReloadButton';
 import { taipei } from '@/lib/api';
@@ -12,17 +13,13 @@ import {
   blogTechApiPath,
   categoryText,
   confidenceLabel,
-  coverageNote,
   errorLabel,
   evidenceKindText,
   externalHref,
   isHistorical,
   isInfra,
   shownVersion,
-  statusNote,
   statusText,
-  statusTone,
-  TECH_METHOD_HREF,
   type TechDetection,
   type TechEvidence,
   techHref,
@@ -31,7 +28,6 @@ import {
 const box = 'rounded-lg border border-zinc-200 p-3 text-xs dark:border-zinc-800';
 const muted = 'text-zinc-600 dark:text-zinc-400';
 const link = 'text-brand-700 hover:underline dark:text-brand-400';
-const recorded = (value: string | null) => (value ? taipei(value) : '尚未記錄');
 
 /** Evidence carries no id; its kind and value are all it says, so they are its key, whatever the order sent. */
 export const techEvidenceKey = (evidence: TechEvidence) => JSON.stringify([evidence.kind, evidence.value]);
@@ -55,13 +51,14 @@ function Detection({ detection }: { detection: TechDetection }) {
         <span className={`shrink-0 text-[11px] ${muted}`}>{categoryText[detection.category] ?? detection.category}</span>
       </div>
       <dl className="mt-1 grid grid-cols-[4rem_minmax(0,1fr)] gap-y-1 leading-5">
-        <dt className={muted}>版本</dt>
-        <dd className="tabular-nums">{version ?? <span className={muted}>未知（沒有明確的版本證據）</span>}</dd>
+        {version && (
+          <>
+            <dt className={muted}>版本</dt>
+            <dd className="tabular-nums">{version}</dd>
+          </>
+        )}
         <dt className={muted}>信心</dt>
-        <dd>
-          {confidenceLabel(detection.confidence)}
-          {isInfra(detection.category) && <span className={`ml-1.5 ${muted}`}>· 只代表基礎設施，不是 CMS</span>}
-        </dd>
+        <dd>{confidenceLabel(detection.confidence)}</dd>
         <dt className={muted}>規則</dt>
         <dd className="break-all font-mono text-[11px]">{detection.ruleId}</dd>
         {detection.evidence.length > 0 && (
@@ -79,8 +76,12 @@ function Detection({ detection }: { detection: TechDetection }) {
             </dd>
           </>
         )}
-        <dt className={muted}>觀測於</dt>
-        <dd className="tabular-nums">{recorded(detection.observedAt)}</dd>
+        {detection.observedAt && (
+          <>
+            <dt className={muted}>觀測於</dt>
+            <dd className="tabular-nums">{taipei(detection.observedAt)}</dd>
+          </>
+        )}
       </dl>
     </li>
   );
@@ -129,19 +130,12 @@ export default async function BlogTech({ slug }: { slug: string }) {
     return (
       <Section>
         <div role="alert" className={`leading-5 ${muted}`}>
-          <p>技術資料暫時無法讀取，請稍後再試。這不是觀測結果，也不代表網站沒有使用任何技術。</p>
+          <p>技術資料暫時無法讀取，請稍後再試。</p>
           <ReloadButton />
         </div>
       </Section>
     );
-  if (!data)
-    return (
-      <Section>
-        <p role="status" className={`leading-5 ${muted}`}>
-          目前沒有提供這個部落格的技術觀測。這不代表網站沒有使用任何技術。
-        </p>
-      </Section>
-    );
+  if (!data?.blog.detections.length) return null;
   const { blog } = data;
   const historical = isHistorical(blog);
   const failed = blog.status === 'failed' || blog.status === 'blocked';
@@ -149,22 +143,20 @@ export default async function BlogTech({ slug }: { slug: string }) {
   const infra = blog.detections.filter((d) => isInfra(d.category));
   const evidenceSource = externalHref(blog.evidenceSourceUrl);
   return (
-    <Section state={<span className={`text-[11px] font-normal ${statusTone[blog.status]}`}>{statusText[blog.status]}</span>}>
+    <Section>
       <dl className="mt-1 grid grid-cols-[5rem_minmax(0,1fr)] gap-y-2.5 leading-5">
-        <dt className={muted}>狀態</dt>
-        <dd>
-          {statusText[blog.status]}
-          {failed && <span className={`ml-1.5 ${muted}`}>· {errorLabel(blog.errorCode)}</span>}
-          <p className={`mt-0.5 ${muted}`}>{statusNote[blog.status]}</p>
-        </dd>
-        <dt className={muted}>成功觀測</dt>
-        <dd className="tabular-nums">{blog.observedAt ? taipei(blog.observedAt) : '尚無成功觀測'}</dd>
-        <dt className={muted}>最後嘗試</dt>
-        <dd className="tabular-nums">{blog.lastAttemptAt ? taipei(blog.lastAttemptAt) : '尚未嘗試'}</dd>
-        {blog.coverage && (
+        {failed && (
           <>
-            <dt className={muted}>觀測範圍</dt>
-            <dd>{coverageNote(blog.coverage)}</dd>
+            <dt className={muted}>最近一次</dt>
+            <dd>
+              {statusText[blog.status]} · {errorLabel(blog.errorCode)}
+            </dd>
+          </>
+        )}
+        {blog.observedAt && (
+          <>
+            <dt className={muted}>成功觀測</dt>
+            <dd className="tabular-nums">{taipei(blog.observedAt)}</dd>
           </>
         )}
         {evidenceSource && (
@@ -178,12 +170,6 @@ export default async function BlogTech({ slug }: { slug: string }) {
           </>
         )}
       </dl>
-      {historical && (
-        <p className="mt-3 rounded border border-amber-300 bg-amber-50 p-2 leading-5 text-amber-900 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-200">
-          最近一次觀測{blog.status === 'blocked' ? '被來源阻擋' : '沒有成功'}。下列是 {recorded(blog.observedAt)}{' '}
-          上次成功觀測的歷史結果，不代表目前仍確認。
-        </p>
-      )}
       {software.length > 0 && (
         <>
           <h3 className={`mt-3 mb-1.5 border-t border-zinc-200 pt-3 dark:border-zinc-800 ${muted}`}>
@@ -201,7 +187,6 @@ export default async function BlogTech({ slug }: { slug: string }) {
           <h3 className={`mt-3 mb-1 border-t border-zinc-200 pt-3 dark:border-zinc-800 ${muted}`}>
             {historical ? '上次成功辨識到的主機與 CDN（低信心）' : '主機與 CDN（低信心）'}
           </h3>
-          <p className={`mb-1.5 leading-5 ${muted}`}>只來自回應標頭等線索，代表網站可能經由哪裡提供，不代表用哪種 CMS 寫成。</p>
           <ul className="space-y-2">
             {infra.map((detection) => (
               <Detection key={detection.id} detection={detection} />
@@ -209,12 +194,6 @@ export default async function BlogTech({ slug }: { slug: string }) {
           </ul>
         </>
       )}
-      <p className={`mt-3 border-t border-zinc-200 pt-3 leading-5 dark:border-zinc-800 ${muted}`}>
-        只重用收錄時已取得的公開回應被動辨識，不另外連線；是部分證據，不是完整的技術清單。{' '}
-        <Link href={TECH_METHOD_HREF} className={link}>
-          資料來源與計算方式
-        </Link>
-      </p>
     </Section>
   );
 }

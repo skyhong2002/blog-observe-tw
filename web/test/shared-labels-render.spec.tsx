@@ -322,48 +322,33 @@ describe('ready', () => {
     $ = page(enabled(undefined, snap(visualData({ image: null, large: null }))));
     expect(outsideImages($).length).toBe(0);
     expect(shared($).find('[role="img"]').length).toBe(0);
-    expect(shared($).text()).toContain('上游未提供圖片。');
+    expect(shared($).text()).not.toContain('上游未提供圖片');
     $ = page(enabled(undefined, snap(visualData(null))));
     expect(outsideImages($).length).toBe(0);
     expect(shared($).find('img, [role="img"]').length).toBe(0);
-    expect(shared($).find('[data-visual-empty]').text()).toBe('尚未收錄代表圖示');
-    expect(shared($).text()).not.toContain('上游回覆此標籤沒有代表圖示');
+    expect(shared($).text()).not.toMatch(/尚未收錄代表圖示|上游回覆此標籤沒有代表圖示/);
   });
 });
 
 describe('states', () => {
-  test('missing is not fetched yet, unavailable is unavailable, ready-empty is the upstream empty answer', () => {
-    let text = page(enabled(snap(undefined, { status: 'missing', fetchedAt: null }), snap(undefined, { status: 'missing' })))(
-      'main',
-    ).text();
-    expect(text).toContain('尚未取得標籤關係；這不代表沒有關係。');
-    expect(text).toContain('尚未取得代表圖示。');
-    text = page(enabled(snap(undefined, { status: 'unavailable' }), snap(undefined, { status: 'unavailable' })))('main').text();
+  test('missing and ready-empty leave their parts blank, unavailable is unavailable', () => {
+    // The method block below may explain these states; the section itself says nothing about them.
+    expect(
+      shared(page(enabled(snap(undefined, { status: 'missing', fetchedAt: null }), snap(undefined, { status: 'missing' })))).text(),
+    ).not.toMatch(/尚未取得標籤關係|尚未取得代表圖示|不代表沒有關係/);
+    const text = page(enabled(snap(undefined, { status: 'unavailable' }), snap(undefined, { status: 'unavailable' })))('main').text();
     expect(text).toContain('標籤關係暫時無法使用。');
     expect(text).toContain('代表圖示暫時無法使用。');
-    // Ready and empty: every kind is shown and each says 尚未收錄 (not hidden, not "not fetched").
+    // Ready and empty: no kind is listed and nothing is said about it.
     let $ = page(enabled(snap(relationsData([]))));
-    const groups = shared($).find('[data-relation-group]');
-    expect(groups.map((_, el) => $(el).attr('data-relation-group')).get()).toEqual(['is-a', 'related', 'alias']);
-    expect(
-      groups
-        .find('h4')
-        .map((_, el) => $(el).text())
-        .get(),
-    ).toEqual(['上位分類', '相關詞', '別名']);
-    expect(
-      groups
-        .find('[data-relation-empty]')
-        .map((_, el) => $(el).text())
-        .get(),
-    ).toEqual(['尚未收錄', '尚未收錄', '尚未收錄']);
+    expect(shared($).find('[data-relation-group]').length).toBe(0);
     expect(shared($).find('li').length).toBe(0);
-    expect(shared($).text()).not.toContain('尚未取得標籤關係');
-    // One kind present: the others still appear as 尚未收錄, with the present row's inherited/source/depth kept.
+    expect(shared($).text()).not.toMatch(/尚未收錄|尚未取得標籤關係/);
+    // One kind present: only it is listed, with the row's inherited/source/depth kept.
     $ = page(enabled(snap(relationsData([relation('r1', 'related', '露營車', { inherited: true, depth: 2 })]))));
     const byType = (type: string) => shared($).find(`[data-relation-group="${type}"]`);
-    expect(byType('is-a').find('[data-relation-empty]').text()).toBe('尚未收錄');
-    expect(byType('alias').find('[data-relation-empty]').text()).toBe('尚未收錄');
+    expect(byType('is-a').length).toBe(0);
+    expect(byType('alias').length).toBe(0);
     expect(byType('related').find('li').length).toBe(1);
     expect(byType('related').find('li').text()).toContain('繼承（第 2 層）');
     // Missing and unavailable stay their own states, never 尚未收錄.
@@ -374,17 +359,18 @@ describe('states', () => {
     expect(shared($).find('[data-relation-group]').length).toBe(0);
   });
 
-  test('a truncated or partly shown list does not call an empty kind 尚未收錄', () => {
+  test('a truncated or partly shown list leaves out an empty kind and never calls it 尚未收錄', () => {
     const rows = Array.from({ length: 30 }, (_, i) => relation(`r${i}`, 'related', `詞${i}`));
     const $ = page(enabled(snap(relationsData(rows, { truncated: true }))));
-    expect(shared($).find('[data-relation-group="is-a"] [data-relation-empty]').text()).toBe('本頁顯示的關係中沒有這一類。');
+    expect(shared($).find('[data-relation-group="is-a"]').length).toBe(0);
+    expect(shared($).text()).not.toContain('尚未收錄');
   });
 
   test('more than 24 relations: 24 rows, one per id, with the total and the truncation kept', () => {
     const rows = Array.from({ length: 30 }, (_, i) => relation(`r${i % 29}`, ['is-a', 'related', 'alias'][i % 3], `詞${i}`));
     const $ = page(enabled(snap(relationsData(rows, { truncated: true }))));
     expect(shared($).find('li').length).toBe(24);
-    expect(shared($).text()).toContain('本頁收到 29 條，只顯示前 24 條；上游回應已截斷，這不是完整清單');
+    expect(shared($).text()).toContain('本頁收到 29 條，只顯示前 24 條；清單不完整');
   });
 
   test('bad values never crash the topic page and never put an outside image on it', () => {

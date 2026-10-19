@@ -251,7 +251,7 @@ test('at most 24 distinct relations are shown, grouped is-a / related / alias, t
   );
   const ids = list.groups.flatMap((g) => g.rows.map((r) => r.id));
   assert.equal(new Set(ids).size, ids.length);
-  assert.equal(relationCountText(list), '本頁收到 29 條，只顯示前 24 條；上游回應已截斷，這不是完整清單');
+  assert.equal(relationCountText(list), '本頁收到 29 條，只顯示前 24 條；清單不完整');
   assert.equal(relationCountText({ shown: 2, total: 2, truncated: false }), '共 2 條');
 });
 

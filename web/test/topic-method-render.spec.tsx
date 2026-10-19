@@ -281,7 +281,7 @@ describe('topic detail', () => {
     expect(position($, which)).toBeLessThan(position($, block));
     expect(past.closest('details').length).toBe(0);
 
-    expect(past.find('p[role="note"]').text()).toContain('近 7 天沒有新的相關文章');
+    expect(past.find('p[role="note"]').text()).toContain('近 7 天沒有新文章');
     expect(past.text()).toContain(`共 2 篇（已確認 1 · 待重新確認 1） · 最近觀測：${taipei(history.lastObservedAt)}`);
     const rows = past.find('li');
     expect(rows.length).toBe(2);
@@ -297,11 +297,12 @@ describe('topic detail', () => {
     expectLongNotesInsideOnly($);
   });
 
-  test('an empty period without history still renders one block after the empty state', () => {
+  test('an empty period without history leaves the article list blank and still renders one block after it', () => {
     const $ = render(<TopicDetailView id={ID} path={PATH} days="30" load={ready(detail({ articles: [], blogs: [] }))} />, PATH);
     const block = expectOnePageBlock($);
-    const empty = $('p').filter((_, el) => $(el).text() === '此期間尚無已比對文章。');
-    expect(position($, empty)).toBeLessThan(position($, block));
+    const list = $('h2').filter((_, el) => $(el).text() === '相關文章');
+    expect(list.parent().find('li, p').length).toBe(0);
+    expect(position($, list)).toBeLessThan(position($, block));
     expectLongNotesInsideOnly($);
   });
 
@@ -404,11 +405,12 @@ describe('topic ranking', () => {
     ]);
   });
 
-  test('an empty ranking keeps its empty state ahead of one block', () => {
+  test('an empty ranking leaves the table empty, says no reason inline, and keeps one block after it', () => {
     const $ = render(<TopicRankingView days="30" load={ready({ ...ranking, items: [], coverage: undefined })} />, '/topics/');
     const block = expectOnePageBlock($);
-    const empty = $('p').filter((_, el) => $(el).text().includes('這段期間尚無跨至少 2 個部落格的共同話題'));
-    expect(position($, empty)).toBeLessThan(position($, block));
+    expect($('tbody tr').length).toBe(0);
+    expect($.text()).not.toContain('這段期間尚無跨至少');
+    expect(position($, $('table'))).toBeLessThan(position($, block));
     expectLongNotesInsideOnly($);
   });
 

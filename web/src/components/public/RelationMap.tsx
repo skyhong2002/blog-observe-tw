@@ -77,13 +77,11 @@ function RelationDetails({ data }: { data: Relations }) {
   };
   return (
     <>
-      <section className="rounded-xl border border-zinc-300 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">
-        {data.edges.length ? (
+      {data.edges.length > 0 && (
+        <section className="rounded-xl border border-zinc-300 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">
           <BlogRelationGraph nodes={data.nodes} edges={data.edges} />
-        ) : (
-          <p className="py-16 text-center text-zinc-500">目前期間尚無可確認的正文提及。文章會依每日預算逐批分析。</p>
-        )}
-      </section>
+        </section>
+      )}
       {/* min-w-0: a grid item is otherwise as wide as its widest row, and two long chips pushed the page sideways. */}
       <div className="grid gap-5 lg:grid-cols-2">
         <section className="min-w-0 rounded-xl border border-zinc-300 p-4 dark:border-zinc-800">
@@ -98,7 +96,6 @@ function RelationDetails({ data }: { data: Relations }) {
               </li>
             ))}
           </ol>
-          {!data.mostMentioned.length ? <p className="py-6 text-sm text-zinc-500">尚無足夠資料。</p> : null}
         </section>
         <section className="min-w-0 rounded-xl border border-zinc-300 p-4 dark:border-zinc-800">
           <h2 className="font-semibold">互相提及</h2>
@@ -121,7 +118,6 @@ function RelationDetails({ data }: { data: Relations }) {
               </li>
             ))}
           </ol>
-          {!data.mutual.length ? <p className="py-6 text-sm text-zinc-500">這段期間尚未觀察到雙向提及。</p> : null}
         </section>
       </div>
       <details className="rounded-xl border border-zinc-300 p-4 dark:border-zinc-800">
@@ -152,6 +148,7 @@ function RelationNotes({ data }: { data: Relations }) {
         {data.coverage.graphTruncated ? '圖中只顯示部分節點與連結。' : ''}
       </p>
       <p>連結明細的「篇」是提及方提到目標站的文章數。</p>
+      <p>文章依每日預算逐批分析；這段期間沒有可確認的提及時，關係圖、最常被提及與互相提及留白，不代表各站之間沒有連結。</p>
       {data.coverage.aggregationTruncated ? <p>關係統計超過 10,000 條上限，排行僅呈現目前可載入的部分。</p> : null}
       {/* countText: a count the gateway did not send is 未提供, never 0. */}
       <p>

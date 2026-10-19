@@ -92,19 +92,17 @@ export default function HomeMentionsSection({ mentions }: { mentions: HomeMentio
         <Link href="/relations/">關係圖 →</Link>
       </div>
       {mentions.status === 'unavailable' ? (
-        <p className={styles.notice}>正文引用暫時無法載入；其他首頁資料仍可使用。</p>
+        <p className={styles.notice}>正文引用暫時無法載入。</p>
       ) : cards.length ? (
         <div className={styles.storyList}>
           {cards.map((card) => (
             <MentionCardView key={card.key} card={card} />
           ))}
           <Link href="/relations/" className={styles.more}>
-            {mentions.truncated ? `只列最近 ${mentions.limit} 筆連結 · ` : ''}看全站關係圖 <span aria-hidden="true">→</span>
+            看全站關係圖 <span aria-hidden="true">→</span>
           </Link>
         </div>
-      ) : (
-        <p className={styles.notice}>近 {mentions.days} 天沒有可列出的正文直接引用；這不代表各站之間沒有連結。</p>
-      )}
+      ) : null}
     </section>
   );
 }

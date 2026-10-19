@@ -84,10 +84,10 @@ describe('homepage topic list (view=home)', () => {
     });
   });
 
-  test('an empty ranking says there are not enough shared topics; nothing is counted', async () => {
+  test('an empty ranking leaves the list blank; nothing is counted', async () => {
     answer(home([]));
     const $ = await render();
-    expect($('p.notice').text()).toBe('最近 30 天尚無足夠的共同話題。');
+    expect($('p.notice').length).toBe(0);
     expect($('ol').length).toBe(0);
     expect($('body').text()).not.toMatch(/\d+ (篇|個部落格)/);
   });

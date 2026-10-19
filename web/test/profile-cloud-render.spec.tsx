@@ -101,21 +101,29 @@ describe('profile topic cloud', () => {
     // The list itself is unchanged: it still shows every ranked row with its source label.
     expect(list('a[href="/topics/%E8%A9%B1%E9%A1%8C1/?days=90"]').text()).toContain('話題1 · 2 篇');
     expect(list('body').text()).toContain('RSS分類詞');
-    expect(list('p').first().text()).toContain('近 90 天');
+    // What counts as a topic is said once, in the footer's method block, not above the list.
+    expect(list('body').text()).not.toContain('不是作者身分分類');
+    expect(list('p').length).toBe(0);
   });
 
-  test('empty, not offered (404) and failure stay distinct; nothing falls back to raw tags', async () => {
+  test('empty and not offered (404) leave the cloud out, a failure still throws; nothing falls back to raw tags', async () => {
     answer(topics([]));
     let $ = load(renderToString(await BlogTopicCloud({ slug: 'a' })));
-    expect($('[data-cloud-state="empty"]').text()).toContain('近 90 天尚無足夠的共同話題');
-    // Only unapproved provenance: still an empty cloud, not a fallback to those rows.
+    expect($('section').length).toBe(0);
+    expect($('body').text()).toBe('');
+    // The list is left out too when the period has no topics: no 尚無 sentence.
+    const list = load(renderToString(await BlogTopics({ slug: 'a' })));
+    expect(list('section').length).toBe(0);
+    expect(list('body').text()).toBe('');
+    // Only unapproved provenance: still no cloud, not a fallback to those rows.
     answer(topics([topic(5, { id: 'rss:5', source: 'rss-category' })]));
     $ = load(renderToString(await BlogTopicCloud({ slug: 'a' })));
-    expect($('[data-cloud-state="empty"]').length).toBe(1);
+    expect($('section').length).toBe(0);
     expect($('a').length).toBe(0);
     gateway.bodies.clear();
     $ = load(renderToString(await BlogTopicCloud({ slug: 'a' })));
-    expect($('[data-cloud-state="missing"]').text()).toBe('目前沒有提供這個部落格的話題資料，文章仍可正常瀏覽。');
+    expect($('section').length).toBe(0);
+    expect($('body').text()).toBe('');
     answer({ error: 'busy' }, 503);
     await expect(BlogTopicCloud({ slug: 'a' })).rejects.toBeInstanceOf(PublicGatewayError);
     const pending = load(renderToString(<MediaWordCloudPending />));

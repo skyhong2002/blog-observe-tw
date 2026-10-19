@@ -299,13 +299,14 @@ describe('homepage centre: body citations', () => {
     expect($('body').text()).toContain('每一種生活，各自怎麼寫');
   });
 
-  test('truncated says only the latest 8; a true empty 90-day window is said as such, not as no links at all', async () => {
+  test('the more link only leads to the map; an empty 90-day window leaves the section blank, its meaning in the method block', async () => {
     answer(OVERVIEW, overview({ mentions: mentions([mention()], { truncated: true }) }));
-    expect((await renderHome())('section[aria-label="最近的正文引用"] a.more').text()).toContain('只列最近 8 筆連結 · 看全站關係圖');
+    expect((await renderHome())('section[aria-label="最近的正文引用"] a.more').text()).toBe('看全站關係圖 →');
     answer(OVERVIEW, overview());
     const $ = await renderHome();
     expect($('[data-mention]').length).toBe(0);
-    expect($('section[aria-label="最近的正文引用"] p.notice').text()).toBe('近 90 天沒有可列出的正文直接引用；這不代表各站之間沒有連結。');
+    expect($('section[aria-label="最近的正文引用"] p').length).toBe(0);
+    expect($('section[aria-label="最近的正文引用"] h2').text()).toBe('最近的正文引用');
   });
 
   const failures: Array<[string, () => void]> = [
@@ -550,12 +551,10 @@ describe('masthead cloud: the local 30-day topic ranking only', () => {
     }
   });
 
-  test('an empty ranking is said as empty (no words, no fallback); a failed read throws like the ranking', async () => {
+  test('an empty ranking draws nothing (no words, no fallback); a failed read throws like the ranking', async () => {
     stubs.cloud = false;
     answer(TOPICS, topics([]));
-    const $ = load(renderToString(await HomeTopicCloud()));
-    expect($('[data-cloud-state="empty"]').text()).toBe('近 30 天尚無足夠的共同話題可以畫成文字雲。');
-    expect($('a, svg').length).toBe(0);
+    expect(await HomeTopicCloud()).toBeNull();
     answer(TOPICS, { error: 'busy' }, 503);
     await expect(HomeTopicCloud()).rejects.toBeInstanceOf(PublicGatewayError);
     answer(TOPICS, EMPTY.topics);

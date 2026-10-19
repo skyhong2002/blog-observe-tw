@@ -64,8 +64,7 @@ export function SuggestionNote({
     const why = candidateReasonText(state.reason);
     return (
       <p>
-        {site} 已在{queue}，系統會自動檢查首頁與 RSS，通過後就會出現在部落格列表。
-        {why && `上次檢查尚未通過：${why}，之後會再試。`}
+        {site} 已在{queue}。{why && `上次檢查未通過：${why}。`}
       </p>
     );
   }

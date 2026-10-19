@@ -30,9 +30,9 @@ test('says what a reader can do for each state', () => {
   expect(html({ state: 'new', home })).toContain('新增這個部落格');
   expect(html({ state: 'new', home }, '/auth/google?next=%2F')).toContain('登入後新增這個部落格');
   expect(html({ state: 'listed', home, slug: 'ling', name: '凌' })).toContain('thelingwu.com 已收錄');
-  expect(html({ state: 'queued', home, checkedAt: null, reason: null })).toContain('待查清單</a>，系統會自動檢查');
+  expect(html({ state: 'queued', home, checkedAt: null, reason: null })).toContain('待查清單</a>。</p>');
   expect(html({ state: 'queued', home, checkedAt: null, reason: 'rss_or_article_sitemap_required' })).toContain('找不到可讀的 RSS');
-  expect(html({ state: 'queued', home, checkedAt: null, reason: 'daily_admission_budget_exhausted' })).not.toContain('尚未通過');
+  expect(html({ state: 'queued', home, checkedAt: null, reason: 'daily_admission_budget_exhausted' })).not.toContain('未通過');
   expect(html({ state: 'invalid' })).toBe('');
 });
 

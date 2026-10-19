@@ -40,19 +40,18 @@ function Fetched({ at }: { at: string | null }) {
 }
 
 function Relations({ view }: { view: SnapshotView<SharedLabelRelations> }) {
-  if (view.state === 'missing') return <p className={`text-sm ${muted}`}>尚未取得標籤關係；這不代表沒有關係。</p>;
+  if (view.state === 'missing') return null;
   if (view.state === 'unavailable') return <p className={`text-sm ${muted}`}>標籤關係暫時無法使用。</p>;
   const list = relationGroups(view.data);
-  // A ready snapshot says for each kind what the upstream recorded. When only part of the list is shown (or the
-  // upstream cut it), an empty kind may still have rows further on, so it is not called 尚未收錄 there.
-  const partial = list.shown < list.total || list.truncated;
+  // A kind with no rows here is left out (it may still have rows past the shown part, so it is never called empty).
   return (
     <>
       {list.total ? <p className={`text-xs ${muted}`}>{relationCountText(list)}</p> : null}
-      {list.groups.map((g) => (
-        <div key={g.type} data-relation-group={g.type}>
-          <h4 className="text-sm font-medium">{g.label}</h4>
-          {g.rows.length ? (
+      {list.groups
+        .filter((g) => g.rows.length)
+        .map((g) => (
+          <div key={g.type} data-relation-group={g.type}>
+            <h4 className="text-sm font-medium">{g.label}</h4>
             <ul className="mt-1 grid gap-x-4 sm:grid-cols-2">
               {g.rows.map((r) => (
                 <li key={r.id} className="min-w-0 break-words py-1.5 text-sm">
@@ -67,13 +66,8 @@ function Relations({ view }: { view: SnapshotView<SharedLabelRelations> }) {
                 </li>
               ))}
             </ul>
-          ) : (
-            <p className={`mt-1 text-sm ${muted}`} data-relation-empty="">
-              {partial ? '本頁顯示的關係中沒有這一類。' : '尚未收錄'}
-            </p>
-          )}
-        </div>
-      ))}
+          </div>
+        ))}
       <Fetched at={view.fetchedAt} />
     </>
   );
@@ -93,19 +87,11 @@ function Credit({ source }: { source: NonNullable<SharedLabelVisual['visual']>['
 }
 
 function Visual({ view, tag }: { view: SnapshotView<SharedLabelVisual>; tag: string }) {
-  if (view.state === 'missing') return <p className={`text-sm ${muted}`}>尚未取得代表圖示。</p>;
+  if (view.state === 'missing') return null;
   if (view.state === 'unavailable') return <p className={`text-sm ${muted}`}>代表圖示暫時無法使用。</p>;
   const visual = view.data.visual;
   // Ready with no visual: the upstream's own answer. No picture and no placeholder; the fetch time stays.
-  if (!visual)
-    return (
-      <>
-        <p className={`text-sm ${muted}`} data-visual-empty="">
-          尚未收錄代表圖示
-        </p>
-        <Fetched at={view.fetchedAt} />
-      </>
-    );
+  if (!visual) return null;
   const src = visualImage(visual);
   const name = visual.label ?? tag;
   return (
@@ -132,7 +118,7 @@ function Visual({ view, tag }: { view: SnapshotView<SharedLabelVisual>; tag: str
           {visual.label ? `：${visual.label}` : ''}
           {visual.wikidataId ? <span className={`ml-1 text-xs ${muted}`}>Wikidata {visual.wikidataId}</span> : null}
         </p>
-        {src ? <Credit source={visual.source} /> : visual.emoji ? null : <p className={`text-xs ${muted}`}>上游未提供圖片。</p>}
+        {src ? <Credit source={visual.source} /> : null}
         <Fetched at={view.fetchedAt} />
       </div>
     </div>

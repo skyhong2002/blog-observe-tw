@@ -276,10 +276,7 @@ export function relationGroups(data: SharedLabelRelations) {
 /** "共 N 條，顯示前 24 條；上游清單已截斷", saying only what is known. */
 export function relationCountText({ shown, total, truncated }: { shown: number; total: number; truncated: boolean }) {
   const fmt = (n: number) => n.toLocaleString('zh-TW');
-  return [
-    shown < total ? `本頁收到 ${fmt(total)} 條，只顯示前 ${fmt(shown)} 條` : `共 ${fmt(total)} 條`,
-    truncated ? '上游回應已截斷，這不是完整清單' : '',
-  ]
+  return [shown < total ? `本頁收到 ${fmt(total)} 條，只顯示前 ${fmt(shown)} 條` : `共 ${fmt(total)} 條`, truncated ? '清單不完整' : '']
     .filter(Boolean)
     .join('；');
 }

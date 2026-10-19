@@ -126,11 +126,6 @@ function TopicRows({ days, data }: { days: Period; data: Topics }) {
           </tbody>
         </table>
       </TableScroller>
-      {!data.items.length ? (
-        <p className="py-8 text-zinc-500 dark:text-zinc-400">
-          這段期間尚無跨至少 {data.minimumBlogs} 個部落格的共同話題；個別站的主題可在部落格頁查看。
-        </p>
-      ) : null}
       <VocabularySummary data={data.vocabulary} />
     </>
   );

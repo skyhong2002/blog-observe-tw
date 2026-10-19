@@ -160,7 +160,7 @@ const tagSite = (
 /** In the page only while the vocabulary is missing; its sync time and caveats are in VocabularyMethod. */
 export function VocabularySummary({ data }: { data: VocabularyStatus }) {
   if (data.status === 'ready') return null;
-  return <p className="text-sm text-zinc-500">共同關鍵字尚未完成同步；話題排行會在同步完成後顯示，請稍後再查看。</p>;
+  return <p className="text-sm text-zinc-500">共同關鍵字尚未完成同步。</p>;
 }
 
 /** The full vocabulary record (source, version, window, tag quality, capacity, baseline, backfill), for 資料來源與計算方式. */

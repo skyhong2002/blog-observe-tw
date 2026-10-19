@@ -66,9 +66,7 @@ export default function ProfilePostsView({ blog, posts: allPosts, query }: { blo
           ))}
         </ul>
       ) : (
-        <p className="py-8 text-zinc-600 dark:text-zinc-400">
-          {query ? '沒有符合搜尋條件的文章。' : '尚未收錄文章，會依禮貌頻率重新檢查訂閱來源。'}
-        </p>
+        <p className="py-8 text-zinc-600 dark:text-zinc-400">{query ? '沒有符合搜尋條件的文章。' : '尚未收錄文章。'}</p>
       )}
     </>
   );

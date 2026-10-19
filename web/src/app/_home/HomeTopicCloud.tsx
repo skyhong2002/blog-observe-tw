@@ -16,11 +16,5 @@ export default async function HomeTopicCloud() {
   // cloudItems: the same ranked pool, up to 60 candidates for 30 words, in this one response; older gateways send
   // only the left list's items.
   const words = topicCloudWords(topics.cloudItems ?? topics.items, '30', 30, visuals);
-  return words.length ? (
-    <MastheadWords words={words} />
-  ) : (
-    <p role="status" className="sr-only" data-cloud-state="empty">
-      近 30 天尚無足夠的共同話題可以畫成文字雲。
-    </p>
-  );
+  return words.length ? <MastheadWords words={words} /> : null;
 }

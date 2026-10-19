@@ -11,8 +11,7 @@ import {
 import { publicJsonOrNull } from '@/lib/public-api';
 
 const box = 'rounded-lg border border-zinc-200 p-3 text-xs dark:border-zinc-800';
-const note = '取得的內文只用於關鍵字、文章關係與站內搜尋；本站公開只顯示摘要與原文連結，全文請至原站閱讀。';
-const recorded = (value: string | null) => (value ? taipei(value) : '尚未記錄');
+// What the text is used for is in the footer's 部落格頁 block (FooterMethod.tsx), not repeated here.
 
 /** The content route's own slug rule (app/src/content/routes.ts); it answers 400 to anything else. */
 const contentSlug = /^[a-z0-9][a-z0-9-]{0,199}$/;
@@ -26,39 +25,39 @@ export default async function BlogContentSources({ slug }: { slug: string }) {
       <section id="content-source" className={box}>
         <h2 className="mb-2 text-sm font-semibold">內文來源</h2>
         <p role="status" className="leading-5 text-zinc-500 dark:text-zinc-400">
-          內文來源狀態暫時無法讀取。
+          暫時無法讀取。
         </p>
-        <p className="mt-3 border-t border-zinc-200 pt-3 leading-5 text-zinc-500 dark:border-zinc-800 dark:text-zinc-400">{note}</p>
       </section>
     );
   const { blog, sources } = data;
   const platform = platformLabel(blog.platform);
+  // Never tried and nothing recorded: the section is left out.
+  if (!blog.status && !blog.lastMethod && !blog.lastAttemptAt && !sources.length) return null;
+  const row = (term: string, value: React.ReactNode, className = '') =>
+    value ? (
+      <>
+        <dt className="text-zinc-500 dark:text-zinc-400">{term}</dt>
+        <dd className={className}>{value}</dd>
+      </>
+    ) : null;
   return (
     <section id="content-source" className={box}>
-      <h2 className="mb-3 flex items-baseline justify-between gap-2 text-sm font-semibold">
-        內文來源
-        {blog.status && (
-          <span className={`text-[11px] font-normal ${contentStatusTone[blog.status]}`}>{contentStatusText[blog.status]}</span>
-        )}
-      </h2>
+      <h2 className="mb-3 text-sm font-semibold">內文來源</h2>
       <dl className="grid grid-cols-[5rem_minmax(0,1fr)] gap-y-2.5 leading-5">
-        <dt className="text-zinc-500 dark:text-zinc-400">狀態</dt>
-        <dd>
-          {blog.status ? contentStatusText[blog.status] : '尚未記錄'}
-          {blog.reason && <span className="ml-1.5 text-zinc-500 dark:text-zinc-400">· {blog.reason}</span>}
-        </dd>
-        <dt className="text-zinc-500 dark:text-zinc-400">取得方式</dt>
-        <dd>{blog.lastMethod ? sourceText[blog.lastMethod] : '尚未記錄'}</dd>
-        {platform && (
-          <>
-            <dt className="text-zinc-500 dark:text-zinc-400">平台</dt>
-            <dd>{platform}</dd>
-          </>
+        {row(
+          '狀態',
+          blog.status && (
+            <>
+              <span className={contentStatusTone[blog.status]}>{contentStatusText[blog.status]}</span>
+              {blog.reason && <span className="ml-1.5 text-zinc-500 dark:text-zinc-400">· {blog.reason}</span>}
+            </>
+          ),
         )}
-        <dt className="text-zinc-500 dark:text-zinc-400">最近嘗試</dt>
-        <dd className="tabular-nums">{recorded(blog.lastAttemptAt)}</dd>
-        <dt className="text-zinc-500 dark:text-zinc-400">最近成功</dt>
-        <dd className="tabular-nums">{recorded(blog.lastSuccessAt)}</dd>
+        {row('取得方式', blog.lastMethod && sourceText[blog.lastMethod])}
+        {row('平台', platform)}
+        {row('最近成功', blog.lastSuccessAt && taipei(blog.lastSuccessAt), 'tabular-nums')}
+        {/* An attempt is shown only when it did not succeed (a later failure, or never a success). */}
+        {row('最近嘗試', blog.lastAttemptAt !== blog.lastSuccessAt && blog.lastAttemptAt && taipei(blog.lastAttemptAt), 'tabular-nums')}
       </dl>
       {sources.length > 0 && (
         <>
@@ -77,7 +76,7 @@ export default async function BlogContentSources({ slug }: { slug: string }) {
                       {complete && <span className="text-zinc-500 dark:text-zinc-400"> · {complete}</span>}
                     </span>
                     <span className="text-right tabular-nums text-zinc-600 dark:text-zinc-400">
-                      {source.count === null ? '未記錄' : `${source.count.toLocaleString('zh-TW')} 篇`}
+                      {source.count === null ? '' : `${source.count.toLocaleString('zh-TW')} 篇`}
                     </span>
                   </li>
                 );
@@ -85,7 +84,6 @@ export default async function BlogContentSources({ slug }: { slug: string }) {
           </ul>
         </>
       )}
-      <p className="mt-3 border-t border-zinc-200 pt-3 leading-5 text-zinc-500 dark:border-zinc-800 dark:text-zinc-400">{note}</p>
     </section>
   );
 }

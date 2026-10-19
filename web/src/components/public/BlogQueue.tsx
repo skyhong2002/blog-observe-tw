@@ -264,11 +264,9 @@ export function BlogQueueView({
           {filters.q && (
             <>
               {' '}
-              可以到
               <Link className="text-brand-700 hover:underline dark:text-brand-400" href={`/blogs/?q=${encodeURIComponent(filters.q)}`}>
-                部落格目錄
+                到部落格目錄搜尋或新增 →
               </Link>
-              搜尋，找不到時可以新增。
             </>
           )}
         </p>

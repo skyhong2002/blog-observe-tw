@@ -338,11 +338,7 @@ export default function BlogCatalogView({
           </TableScroller>
           {!rows.length && (
             <div className="py-8 text-zinc-500">
-              <p>
-                {q
-                  ? `沒有符合「${q}」的部落格。可以試試網址的一部分、較短的關鍵字${category || blogStatus ? '，或清除分類與狀態篩選' : ''}。`
-                  : '沒有符合條件的部落格。'}
-              </p>
+              <p>{q ? `沒有符合「${q}」的部落格。` : '沒有符合條件的部落格。'}</p>
               {q && <BlogSuggestion query={q} />}
             </div>
           )}
@@ -372,7 +368,7 @@ export default function BlogCatalogView({
         </p>
       ) : (
         <div className="rounded-xl border border-zinc-300 p-6 text-sm text-zinc-600 dark:border-zinc-800 dark:text-zinc-400">
-          <p>部落格目錄暫時無法載入，請稍後再試。這不表示沒有符合條件的部落格。</p>
+          <p>部落格目錄暫時無法載入，請稍後再試。</p>
           <ReloadButton />
         </div>
       )}

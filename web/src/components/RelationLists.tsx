@@ -14,11 +14,13 @@ export default function RelationLists({
   nodes: RelationNode[];
   incoming?: boolean;
 }) {
+  // Nothing in this direction: the list is left out, not explained (the footer's 引用與交流 says how it is read).
+  if (!edges.length) return null;
   const index = new Map(nodes.map((n) => [n.id, n]));
   return (
     <section className="min-w-0 rounded-xl border border-zinc-300 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">
       <h4 className="font-semibold">{title}</h4>
-      {edges.length ? (
+      {
         <ul className="mt-3 divide-y divide-zinc-200 dark:divide-zinc-800">
           {edges.map((e) => {
             const n = index.get(incoming ? e.sourceBlogId : e.targetBlogId);
@@ -59,9 +61,7 @@ export default function RelationLists({
             );
           })}
         </ul>
-      ) : (
-        <p className="py-6 text-sm text-zinc-500">這段期間尚未觀察到可確認的正文提及。</p>
-      )}
+      }
     </section>
   );
 }

@@ -21,7 +21,7 @@ export default async function SimilarwebTraffic({ slug, compact = false }: { slu
     const blog = data.blogs.find((b) => b.slug === slug);
     // Not listed: unverified, or a shared platform whose domain-wide figures are not one writer's.
     if (!blog) return null;
-    return <BlogTrafficProfile blog={blog} limitations={data.limitations} />;
+    return <BlogTrafficProfile blog={blog} />;
   }
   const notes = (
     <>

@@ -42,9 +42,7 @@ export default async function HomeTopicRanking() {
         </li>
       ))}
     </ol>
-  ) : (
-    <p className={styles.notice}>最近 30 天尚無足夠的共同話題。</p>
-  );
+  ) : null;
 }
 
 // One stable key per placeholder row (the ranking's eight); the rows carry no data.

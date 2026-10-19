@@ -4,11 +4,17 @@ import test from 'node:test';
 
 const profile = readFileSync(new URL('../src/components/SourceProfile.tsx', import.meta.url), 'utf8');
 
-test('a blog page shows how often it posts and how often its RSS is checked, never a fixed default', () => {
+test('a blog page shows how often it posts and how often its RSS is checked, never a fixed default; unknown rows are left out', () => {
   assert.doesNotMatch(profile, /預期更新|expectedIntervalHours/);
-  assert.match(profile, /發文頻率<\/dt>\s*<dd>\{postingText\(blog\.postingIntervalHours\)\}<\/dd>/);
-  assert.match(profile, /`每 \$\{blog\.crawlIntervalHours\} 小時檢查 RSS`/);
-  assert.match(profile, /if \(hours === null\) return '文章太少，尚無法估計';/);
+  assert.match(profile, /<Row term="發文頻率">\{postingText\(blog\.postingIntervalHours\)\}<\/Row>/);
+  assert.match(
+    profile,
+    /<Row term="檢查頻率">\{blog\.crawlIntervalHours \? `每 \$\{blog\.crawlIntervalHours\} 小時檢查 RSS` : null\}<\/Row>/,
+  );
+  // Too few posts (null) or an older payload (undefined): no row, never 未提供 or an estimate sentence.
+  assert.match(profile, /if \(hours == null\) return null;/);
+  assert.match(profile, /if \(children === null \|\| children === undefined \|\| children === ''\) return null;/);
+  assert.doesNotMatch(profile, /文章太少，尚無法估計|'未提供'/);
   assert.match(profile, /if \(days <= 1\) return '約每天';/);
 });
 

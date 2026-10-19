@@ -171,7 +171,7 @@ function SearchResults({ asked, search }: { asked: SearchParams; search: PublicL
   if (search.status !== 'ready')
     return (
       <div role="status" className="rounded-xl border border-zinc-300 p-6 text-sm text-zinc-600 dark:border-zinc-800 dark:text-zinc-400">
-        <p>搜尋暫時無法使用，請稍後再試。這不表示沒有符合的文章。</p>
+        <p>搜尋暫時無法使用，請稍後再試。</p>
         {/* A full load: the same URL would not refetch through the client router. */}
         <a href={searchHref(asked)} className="mt-3 inline-block text-brand-700 hover:underline dark:text-brand-400">
           重新搜尋
@@ -321,7 +321,7 @@ export default function ArticlesView({
           <LatestFilters filters={filters} genresReady={genresReady} />
           {!genresReady && (
             <p role="status" className="text-sm">
-              類型篩選暫時無法使用，本次未套用類型排除；每站篇數限制仍有效。
+              類型篩選暫時無法使用，本次未套用。
             </p>
           )}
           <p role="status" className="text-xs leading-5 text-zinc-500 dark:text-zinc-400">
@@ -363,6 +363,7 @@ export default function ArticlesView({
             </p>
             {search?.status === 'ready' && <Coverage result={search.data} />}
             {search && <p>搜尋只查上述範圍，找不到不代表其他文章沒有提到它；可以換個關鍵字，或到部落格頁面瀏覽。</p>}
+            {search && <p>搜尋結果下方的片段經 NFKC 與小寫正規化，大小寫可能與原文不同。</p>}
           </>
         }
       />

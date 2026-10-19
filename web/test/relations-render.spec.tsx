@@ -252,25 +252,26 @@ const profile = (patch: Partial<Relations> = {}): Relations => ({
 /* Profile -------------------------------------------------------------------- */
 
 describe('profile 引用與交流', () => {
-  test('four parts in order, read from the no-store profile path; the summaries are readable before opening anything', async () => {
+  test('parts with data in order, read from the no-store profile path; off or not-analysed parts are absent', async () => {
     const $ = await renderProfile(profile());
     expect(gateway.paths).toEqual(['/api/blogs/a/relations?days=90']);
+    // Shared tags are not enabled and text similarity is not analysed in this fixture: their blocks are left out.
     expect(
       $('h3')
         .map((_, el) => $(el).text())
         .get(),
-    ).toEqual(['正文直接引用', '非正文連結（Blogroll、側欄、留言，不計入篇數）', '共同標籤（不是引用）', '文字相似（不是引用）']);
+    ).toEqual(['正文直接引用', '非正文連結']);
+    expect($('section#relations h2').text()).toBe('引用與交流近 90 天');
     const outside = outsideText($);
-    for (const text of ['提到誰', '被誰提到', '測試站乙', '測試站丙', '已分析 12 篇', '未知目標連結 3 條'])
-      expect(outside, text).toContain(text);
-    // Evidence waits behind closed <details>; the method is not in the section at all, only linked (FooterMethod).
+    for (const text of ['提到誰', '被誰提到', '測試站乙', '測試站丙']) expect(outside, text).toContain(text);
+    // Evidence waits behind closed <details>; the method is not in the section at all (FooterMethod).
     expect($('details[open]').length).toBe(0);
     expect(outside).not.toContain('這裡提到乙的文章 X');
     expect($('body').text()).not.toContain('引用占比的分母');
     expect($('summary').text()).not.toContain('計算方式');
     expect($('#method').length).toBe(0);
-    expect($('a[href="#method"]').text()).toBe('資料來源與計算方式 ⓘ');
     expect($('body').text()).not.toContain('這些關係怎麼算');
+    for (const caveat of ['不代表', '不是引用', '不計入篇數', '未提供', '尚未']) expect($('body').text(), caveat).not.toContain(caveat);
     expect($('a[href="/relations/"]').text()).toBe('全站關係圖 →');
     expectNoPrefetch($);
   });
@@ -289,12 +290,14 @@ describe('profile 引用與交流', () => {
     expect(body.text()).not.toContain('友站連結');
     expect(body.text()).not.toContain('丙的留言');
 
-    expect(nonBody.text()).toContain('不計入篇數');
-    expect(nonBody.text()).toContain('本站另記 Blogroll 5、側欄 1、留言 2 條');
+    expect(nonBody.text()).toContain('Blogroll 5 條、側欄 1 條、留言 2 條');
+    expect(nonBody.text()).not.toMatch(/\d+ 篇/);
     expect(nonBody.find('summary').text()).toBe('核對非正文連結（列出 2 筆連結）');
     expect(nonBody.text()).toContain('位置 Blogroll');
     expect(nonBody.text()).toContain('位置 留言');
-    expect(nonBody.text()).toContain('上下文摘要未提供');
+    // A row without a context summary just has no summary line.
+    expect(nonBody.text()).not.toContain('上下文摘要');
+    expect(nonBody.find('details li').eq(1).text()).not.toContain('「');
     expect(nonBody.find('a[href="https://b.example/x"]').length).toBe(0);
   });
 
@@ -331,15 +334,36 @@ describe('profile 引用與交流', () => {
     expect(part($, 'relations-non-body').find('summary').text()).toContain('僅最近 20 筆');
   });
 
-  test('empty lists are said as empty for this period', async () => {
-    const $ = await renderProfile(profile({ outgoing: [], incoming: [], evidence: [], nonBodyEvidence: [] }));
-    expect(part($, 'relations-body').text()).toContain('這段期間尚未觀察到可確認的正文提及。');
-    expect(part($, 'relations-body').text()).toContain('這段期間沒有可列出的正文連結。');
-    expect(part($, 'relations-non-body').text()).toContain('這段期間沒有可列出的非正文連結。');
+  test('empty lists leave their parts out; with nothing in any part the whole section is absent', async () => {
+    // Body links empty, non-body counts still sent: only the non-body part, with its counts.
+    let $ = await renderProfile(profile({ outgoing: [], incoming: [], evidence: [], nonBodyEvidence: [] }));
+    expect(part($, 'relations-body').length).toBe(0);
+    expect(part($, 'relations-non-body').text()).toContain('Blogroll 5 條');
     expect($('details').length).toBe(0);
+    for (const sentence of ['尚未觀察到', '沒有可列出', '這段期間']) expect($('body').text(), sentence).not.toContain(sentence);
+    // One direction empty: that list is left out, the other stays.
+    $ = await renderProfile(profile({ incoming: [] }));
+    expect(
+      part($, 'relations-body')
+        .find('h4')
+        .map((_, el) => $(el).text())
+        .get(),
+    ).toEqual(['提到誰']);
+    // Nothing anywhere (zero non-body counts too): no section, no heading, no "none".
+    $ = await renderProfile(
+      profile({
+        outgoing: [],
+        incoming: [],
+        evidence: [],
+        nonBodyEvidence: [],
+        coverage: { ...coverage, nonBodyLinks: { sidebar: 0, blogroll: 0, comment: 0 } },
+      }),
+    );
+    expect($('section#relations').length).toBe(0);
+    expect($('body').text()).toBe('');
   });
 
-  test('an older payload: every missing key or count is 未提供, never 0 or an empty success', async () => {
+  test('an older payload with missing keys: nothing renders 未提供 and no 0; missing blocks are absent', async () => {
     const old = profile({ coverage: { nonBodyLinks: {} } as unknown as Relations['coverage'] }) as Partial<Relations>;
     for (const key of [
       'evidence',
@@ -352,13 +376,15 @@ describe('profile 引用與交流', () => {
       delete old[key];
     const $ = await renderProfile(old);
     const text = $('body').text();
-    expect(text).toContain('核對正文連結：資料未提供。');
-    expect(text).toContain('核對非正文連結：資料未提供。');
-    expect(text).toContain('已分析 未提供 篇；未知目標連結 未提供 條');
-    expect(text).toContain('本站另記 Blogroll 未提供、側欄 未提供、留言 未提供 條');
-    expect(part($, 'relations-tags').text()).toBe('共同標籤（不是引用）共同標籤資料未提供。');
-    expect(part($, 'relations-text').text()).toBe('文字相似（不是引用）文字相似資料未提供。');
-    expect(text).not.toMatch(/已分析 0|未知目標連結 0|Blogroll 0|側欄 0|留言 0/);
+    // The body edges are still there; the missing evidence lists, counts, tags and similarity are simply absent.
+    expect(part($, 'relations-body').find('h4').length).toBe(2);
+    expect(part($, 'relations-body').find('details').length).toBe(0);
+    expect(part($, 'relations-non-body').length).toBe(0);
+    expect(part($, 'relations-tags').length).toBe(0);
+    expect(part($, 'relations-text').length).toBe(0);
+    expect(text).not.toContain('未提供');
+    expect(text).not.toMatch(/已分析|未知目標連結|Blogroll|側欄|留言/);
+    expect(text).not.toMatch(/(^|\D)0 (篇|條)/);
 
     // Rows from a gateway that sent only the five original keys (no postId), through the real readPublic and
     // contract: a null anchor and date are accepted and said, not rejected.
@@ -369,8 +395,9 @@ describe('profile 引用與交流', () => {
       const row = part($old, id).find('details li').text();
       expect(row, id).toContain('舊文');
       expect(row, id).toContain('原始連結');
-      expect(row, id).toContain('上下文摘要未提供');
-      expect(row, id).toContain('文章 ID 未提供 · 發表 日期未知 · 位置 未提供 · 比對版本 未提供 · 觀測 未提供');
+      expect(row, id).not.toContain('上下文摘要');
+      // The detail line keeps only what was sent: nothing here, so no 未提供, no 日期未知 and no 0.
+      expect(row, id).not.toMatch(/未提供|日期未知|比對版本|觀測/);
       expect(row, id).not.toContain('#');
       expect(row, id).not.toContain('null');
     }
@@ -433,7 +460,7 @@ describe('profile 引用與交流', () => {
 });
 
 describe('shared tags (not citation)', () => {
-  test('ready: the tag in brand green, both original articles linked out, ids/sources/version to check', async () => {
+  test('ready: the tag in brand green, both original articles linked out, ids/sources/version to check, no caveat in the block', async () => {
     const items = [
       hit(),
       hit({
@@ -448,7 +475,10 @@ describe('shared tags (not citation)', () => {
     ];
     const $ = await renderProfile(profile({ sharedTags: sharedReady(items) }));
     const tags = part($, 'relations-tags');
-    expect(tags.text()).toContain(INTERPRETATION);
+    expect(tags.find('h3').text()).toBe('共同標籤');
+    // The gateway's interpretation is a caveat: the footer's 引用與交流 says it once, not the block.
+    expect(tags.text()).not.toContain(INTERPRETATION);
+    expect(tags.text()).not.toContain('不代表');
     const chips = tags.find('ul[aria-label="共同標籤"] > li');
     expect(chips.map((_, el) => $(el).text()).get()).toEqual(['#旅行2 組文章', '#咖啡1 組文章']);
     expect(chips.first().find('span').first().hasClass('text-brand-700')).toBe(true);
@@ -474,48 +504,51 @@ describe('shared tags (not citation)', () => {
   test('ready with truncation says which limit was reached', async () => {
     const $ = await renderProfile(profile({ sharedTags: sharedReady([hit()], { truncated: true, sourceTagsTruncated: true }) }));
     const text = part($, 'relations-tags').text();
-    expect(text).toContain('只比對其中一部分');
-    expect(text).toContain('只列出部分文章組合');
+    expect(text).toContain('只比對了本站部分近期標籤。');
+    expect(text).toContain('只列出部分文章組合。');
   });
 
-  test('ready and empty: no shared tags in the period, with the interpretation', async () => {
+  test('ready and empty: the shared-tags block is absent, never "none found"', async () => {
     const $ = await renderProfile(profile({ sharedTags: sharedReady([]) }));
-    const tags = part($, 'relations-tags');
-    expect(tags.text()).toContain('近 90 天沒有找到與其他部落格相同的原始文章標籤。');
-    expect(tags.text()).toContain(INTERPRETATION);
-    expect(tags.find('details').length).toBe(0);
+    expect(part($, 'relations-tags').length).toBe(0);
+    expect($('body').text()).not.toContain('沒有找到');
+    expect($('body').text()).not.toContain(INTERPRETATION);
+    // The rest of the section is untouched.
+    expect(part($, 'relations-body').length).toBe(1);
   });
 
-  test('unavailable: said with its version, never "none"', async () => {
+  test('unavailable: the shared-tags block is absent, never "none"', async () => {
     const $ = await renderProfile(profile({ sharedTags: { status: 'unavailable', matchVersion: 'native-post-tags-v1' } }));
-    const tags = part($, 'relations-tags');
-    expect(tags.find('[role="status"]').text()).toBe('共同標籤暫時無法讀取（比對版本 native-post-tags-v1）；不代表沒有共同標籤。');
-    expect(tags.text()).not.toContain('沒有找到');
+    expect(part($, 'relations-tags').length).toBe(0);
+    expect($('body').text()).not.toContain('共同標籤');
+    expect($('body').text()).not.toContain('沒有找到');
+    expect($('[role="status"]').length).toBe(0);
   });
 
-  test('not enabled (the default): no result, and not a claim that there are none', async () => {
+  test('not enabled (the default): the shared-tags block is absent, not a claim that there are none', async () => {
     const $ = await renderProfile(profile());
-    const tags = part($, 'relations-tags');
-    expect(tags.text()).toContain('共同標籤比對目前未開啟，這裡沒有結果；不代表沒有共同標籤。');
-    expect(tags.text()).not.toContain('沒有找到');
-    expect(tags.find('li').length).toBe(0);
+    expect(part($, 'relations-tags').length).toBe(0);
+    expect($('body').text()).not.toContain('共同標籤');
+    expect($('body').text()).not.toContain('沒有找到');
+    expect($('ul[aria-label="共同標籤"]').length).toBe(0);
   });
 });
 
 describe('text similarity', () => {
-  test('not analysed: said so, no percentage and no articles', async () => {
+  test('not analysed: the text-similarity block is absent, no percentage and no articles', async () => {
     const $ = await renderProfile(profile());
-    const text = part($, 'relations-text');
-    expect(text.text()).toBe('文字相似（不是引用）尚未分析：目前沒有文字相似的計算結果，這裡不列任何相似文章。');
-    expect(text.find('a, li').length).toBe(0);
-    expect(text.text()).not.toMatch(/\d/);
+    expect(part($, 'relations-text').length).toBe(0);
+    expect($('body').text()).not.toContain('文字相似');
+    expect($('body').text()).not.toContain('尚未分析');
+    expect($('body').text()).not.toContain('字面重疊');
   });
 
-  test('a status this page does not know is not shown as analysed', async () => {
+  test('a status this page does not know is not shown as analysed: the block is absent', async () => {
     for (const value of [{ status: 'ready' }, { status: 'complete', items: [] }, { status: 'ready', items: {} }]) {
       const $ = await renderProfile(profile({ textSimilarity: value }));
-      expect(part($, 'relations-text').text(), JSON.stringify(value)).toContain('文字相似資料未提供。');
-      expect(part($, 'relations-text').text()).not.toContain('%');
+      expect(part($, 'relations-text').length, JSON.stringify(value)).toBe(0);
+      expect($('body').text()).not.toContain('字面重疊');
+      expect($('body').text()).not.toContain('未提供');
     }
   });
 
@@ -573,28 +606,33 @@ describe('text similarity', () => {
     return { $, block: part($, 'relations-text') };
   };
 
-  test('not enabled (the default flag): no result, and not a claim that nothing is similar', async () => {
-    const { block } = await renderText({ status: 'not-enabled' });
-    expect(block.text()).toBe('文字相似（不是引用）文字相似比對目前未開啟，這裡沒有結果；不代表沒有文字相近的文章。');
-    expect(block.find('li, a, details').length).toBe(0);
+  test('not enabled (the default flag): the text-similarity block is absent, not a claim that nothing is similar', async () => {
+    const { $, block } = await renderText({ status: 'not-enabled' });
+    expect(block.length).toBe(0);
+    expect($('body').text()).not.toContain('文字相似');
+    expect($('ul[aria-label="文字相似配對"], [data-method="text-similarity"]').length).toBe(0);
   });
 
-  test('no selected pairs: not "no similar articles"; the selection is disclosed after the content', async () => {
-    const { block } = await renderText({ status: 'no-selected-pairs', ...SELECTION, selectedPairs: 0, selectionTruncated: false });
-    expect(block.find('p').first().text()).toContain('這不代表沒有文字相近的文章');
-    expect(block.text()).not.toContain('%');
-    const method = block.find('details[data-method="text-similarity"]');
-    expect(method.length).toBe(1);
-    expect(method.attr('open')).toBeUndefined();
-    expect(method.text()).toContain('本次選了 0 組（上限 3 組）。這不是全面比對');
-    expect(method.text()).not.toContain('還有符合條件的連結沒有選入');
+  test('no selected pairs: the block is absent, not "no similar articles", and no selection count is shown', async () => {
+    const { $, block } = await renderText({ status: 'no-selected-pairs', ...SELECTION, selectedPairs: 0, selectionTruncated: false });
+    expect(block.length).toBe(0);
+    expect($('[data-method="text-similarity"]').length).toBe(0);
+    expect($('body').text()).not.toContain('字面重疊');
+    expect($('body').text()).not.toContain('沒有');
   });
 
-  test('unavailable: a status, no score, no preview, no 0%', async () => {
-    const { block } = await renderText({ status: 'unavailable', ...SELECTION });
-    expect(block.find('[role="status"]').text()).toBe('文字相似暫時無法讀取；不代表沒有文字相近的文章。');
-    expect(block.text()).not.toMatch(/0%|0\.0%|摘要：/);
-    expect(block.find('li').length).toBe(0);
+  test('ready with no rows: the block is absent, never an empty success', async () => {
+    const { $, block } = await renderText(ready([]));
+    expect(block.length).toBe(0);
+    expect($('body').text()).not.toContain('沒有可列出的配對');
+  });
+
+  test('unavailable: the block is absent; no score, no preview, no 0%', async () => {
+    const { $, block } = await renderText({ status: 'unavailable', ...SELECTION });
+    expect(block.length).toBe(0);
+    expect($('[role="status"]').length).toBe(0);
+    expect($('body').text()).not.toMatch(/字面重疊|摘要：/);
+    expect($('body').text()).not.toContain('文字相似');
   });
 
   test('ready: both public articles linked out with both dates, ids, version, the summary preview and a bounded score', async () => {
@@ -616,16 +654,22 @@ describe('text similarity', () => {
     expect(text).toContain(`發表 ${dayText(OLD)}`);
     expect(text).toContain('摘要：「甲的公開摘要。」');
     expect(text).toContain('字面重疊 12.3%');
-    expect(text).toContain('不是引用、語意相似、抄襲或交流');
-    expect(text).toContain(`文章 #101／#202 · 觀測 ${dayText(SEEN)}／${dayText(SEEN)} · 比對字數 4,096／4,096（正文較長，只比前段）`);
+    // What the score does not prove is in the footer's 引用與交流, not on the row.
+    expect(text).not.toContain('不是引用');
+    expect(text).not.toContain('預覽取自公開摘要');
+    expect(text).toContain(`文章 #101／#202 · 觀測 ${dayText(SEEN)}／${dayText(SEEN)} · 比對字數 4,096／4,096（只比前段）`);
     expect(text).toContain('比對版本 body-prefix-dice-trigram-v1');
     expect(
       row
-        .find('span')
+        .find('p')
         .filter((_, el) => $(el).text().startsWith('字面重疊'))
         .hasClass('text-brand-700'),
     ).toBe(true);
-    expect(block.find('details[data-method="text-similarity"]').text()).toContain('本次選了 2 組（上限 3 組），還有符合條件的連結沒有選入');
+    // The selection count stays under the results, as visible text, without the method sentence.
+    const selection = block.find('[data-method="text-similarity"]');
+    expect(selection.is('details')).toBe(false);
+    expect(selection.text()).toBe('選了 2 組（上限 3 組），還有符合條件的連結沒有選入');
+    expect(selection.text()).not.toContain('全面比對');
     // Text similarity is its own kind: nothing joins the body citations or shared tags.
     expect(part($, 'relations-body').text()).not.toContain('字面重疊');
     expect(part($, 'relations-tags').text()).not.toContain('字面重疊');
@@ -647,9 +691,10 @@ describe('text similarity', () => {
     );
     const rows = block.find('ul[aria-label="文字相似配對"] > li');
     expect(rows.length).toBe(3);
-    expect(rows.eq(1).text()).toContain('正文前段太短，無法比對，不顯示分數。');
+    expect(rows.eq(1).text()).toContain('正文前段太短，無法比對。');
     expect(rows.eq(1).text()).not.toContain('%');
-    expect(rows.eq(2).text()).toBe('文章 #101／#204：目前無法比對（文章已變更或不再公開）；不顯示分數或預覽，也不代表兩篇不相近。');
+    expect(rows.eq(2).text()).toBe('文章 #101／#204：無法比對（文章已變更或不再公開）');
+    expect(rows.eq(2).text()).not.toContain('%');
     expect(rows.eq(2).find('a').length).toBe(0);
   });
 
@@ -672,11 +717,21 @@ describe('text similarity', () => {
     const rows = block.find('ul[aria-label="文字相似配對"] > li');
     expect(rows.length).toBe(3);
     expect(rows.eq(0).find('a[href^="javascript"]').length).toBe(0);
-    expect(rows.eq(0).text()).toContain('公開摘要未提供');
+    // An excerpt that is not text is left out: only the target's 摘要 line, no markup, no 未提供.
+    expect(
+      rows
+        .eq(0)
+        .text()
+        .match(/摘要：/g),
+    ).toHaveLength(1);
+    expect(rows.eq(0).text()).toContain('摘要：「乙的公開摘要。」');
+    expect(rows.eq(0).text()).not.toContain('甲的公開摘要');
+    expect(rows.eq(0).text()).not.toContain('未提供');
+    expect(rows.eq(0).find('b').length).toBe(0);
     expect(rows.eq(0).text()).toContain('字面重疊 12.3%');
     // Out of range score and a side that is not the asked article: unavailable, never a number.
     for (const index of [1, 2]) {
-      expect(rows.eq(index).text()).toContain('目前無法比對；不顯示分數或預覽');
+      expect(rows.eq(index).text()).toContain('無法比對');
       expect(rows.eq(index).text()).not.toMatch(/%/);
     }
     expect(block.text()).not.toContain('#101／#208');
@@ -724,9 +779,11 @@ describe('text similarity', () => {
       expect(html, secret).not.toContain(secret);
   });
 
-  test('an older gateway ready answer without selection keys says 未提供, never a count', async () => {
+  test('an older gateway ready answer without selection keys never shows a made-up count', async () => {
     const { block } = await renderText({ status: 'ready', items: [readyItem()] });
-    expect(block.find('details[data-method="text-similarity"]').text()).toContain('選取來源未提供。本次選了 未提供 組（上限 未提供 組）');
+    // No counts sent: the selection line is left out rather than saying 未提供 or a number.
+    expect(block.find('[data-method="text-similarity"]').length).toBe(0);
+    expect(block.text()).not.toContain('未提供');
   });
 });
 
@@ -736,8 +793,8 @@ describe('optional section', () => {
     gateway.response = () => new Response('busy', { status: 503 });
     const $ = load(renderToString(await BlogRelations({ slug: 'a' })));
     expect($('section#relations h2').text()).toBe('引用與交流');
-    expect($('[role="alert"]').text()).toContain('關係資料暫時無法讀取');
-    expect($('[role="alert"]').text()).toContain('不代表沒有引用或交流');
+    expect($('[role="alert"]').text()).toBe('關係資料暫時無法讀取，請稍後再試。重新載入');
+    expect($('[role="alert"]').text()).not.toContain('不代表');
     expect($('button').text()).toBe('重新載入');
     expect($('h3').length).toBe(0);
     expect($('body').text()).not.toMatch(/\d+ 篇/);
@@ -748,10 +805,10 @@ describe('optional section', () => {
     await expect(BlogRelations({ slug: 'a' })).rejects.toThrow('bug');
   });
 
-  test("the gateway's 404 is no data offered, not an empty relation list", async () => {
+  test("the gateway's 404: the section renders nothing, not an empty relation list", async () => {
     const $ = await renderProfile(null);
-    expect($('[role="status"]').text()).toBe('目前沒有提供這個部落格的關係資料。');
-    expect($('h3').length).toBe(0);
+    expect($('section#relations').length).toBe(0);
+    expect($('body').text()).toBe('');
   });
 });
 
@@ -792,7 +849,7 @@ describe('a malformed 200 (real readPublic and public-contracts.ts)', () => {
     expect(() => renderToString(element)).toThrow(/not valid as a React child/);
   });
 
-  test('older rows and hits without the newer keys pass the contract and say 未提供', async () => {
+  test('older rows and hits without the newer keys pass the contract and leave those parts out', async () => {
     const oldHit = hit() as Partial<SharedTagHit>;
     for (const key of [
       'targetBlogSlug',
@@ -807,8 +864,8 @@ describe('a malformed 200 (real readPublic and public-contracts.ts)', () => {
     const $ = await renderProfile(profile({ sharedTags: sharedReady([oldHit as SharedTagHit]) }));
     expect($('[role="alert"]').length).toBe(0);
     const text = part($, 'relations-tags').find('details li li').text();
-    expect(text).toContain('標籤 #9（未提供，確認於 未提供）');
-    expect(text).toContain('標籤來源 未提供／未提供 · 最後看到 未提供／未提供');
+    expect(text).toContain('文章 #11／#22 · 標籤 #9 · 比對版本 native-post-tags-v1');
+    expect(text).not.toMatch(/未提供|標籤來源|最後看到/);
   });
 });
 
@@ -840,7 +897,7 @@ describe("F3's method lives in the footer's one 本頁的資料來源與計算�
     return load(renderToString(<FooterMethod page={page} />));
   };
 
-  test('a profile has exactly one method block, closed, after the content; the section only links to it', async () => {
+  test('a profile has exactly one method block, closed, after the content; the caveats the section dropped are in it', async () => {
     const $ = await renderPage(profile());
     expect(methodBlocks($).length).toBe(1);
     expect($('summary').filter((_, el) => $(el).text().includes('計算方式')).length).toBe(1);
@@ -853,7 +910,7 @@ describe("F3's method lives in the footer's one 本頁的資料來源與計算�
     expect(main.find('section#relations h3').first().text()).toBe('正文直接引用');
     expect(main.text()).not.toContain('引用占比的分母');
     expect(main.text()).not.toContain('非正文連結來自 Blogroll、側欄與留言');
-    expect(main.find('a[href="#method"]').length).toBe(1);
+    expect(main.text()).not.toContain('不代表');
     const html = $.html();
     expect(html.indexOf('id="relations"')).toBeLessThan(html.indexOf('id="method"'));
     // The F3 paragraphs are in the footer block, under their own heading, after 資料來源.
@@ -869,8 +926,13 @@ describe("F3's method lives in the footer's one 本頁的資料來源與計算�
       '不代表同時互動',
       '非正文連結來自 Blogroll、側欄與留言，與正文分開保存',
       '共同標籤比的是發布者自己替文章加的原始標籤',
-      '尚未分析時不顯示任何百分比',
+      '標籤相同不代表引用、交流或內容相似',
+      '不是引用、語意相似、抄襲或交流',
+      '不是全面比對，沒有列出的文章不代表不相近',
+      '預覽取自公開摘要，比對用的正文不公開',
+      '共同標籤與文字相似在比對未開啟、尚未分析、暫時無法讀取或沒有結果時都不顯示',
       '同一篇文章連到多個網址會列成多筆，篇數以統計為準',
+      '沒有列出引用不代表沒有交流',
     ])
       expect(method, text).toContain(text);
   });

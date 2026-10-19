@@ -169,7 +169,7 @@ function TopicHistorySection({ id, days, history }: { id: string; days: Period; 
     <section>
       <h2 className="font-semibold">過去觀測到的文章</h2>
       <p role="note" className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
-        近 {days} 天沒有新的相關文章，以下是過去曾比對到這個詞的文章。
+        近 {days} 天沒有新文章。
       </p>
       {summary || history.lastObservedAt ? (
         <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
@@ -229,10 +229,7 @@ export default function TopicDetailView({
         <>
           <section role="status" className="rounded-xl border border-zinc-300 p-4 text-sm dark:border-zinc-800">
             <h2 className="font-semibold">此詞不參與話題比對</h2>
-            <p className="mt-2 text-zinc-600 dark:text-zinc-400">
-              原因：{exclusionReasonLabel(data.topic.excludedReason)}
-              。這個詞仍保留在來源資料中，但不會用來比對文章，所以這裡沒有部落格與文章。
-            </p>
+            <p className="mt-2 text-zinc-600 dark:text-zinc-400">原因：{exclusionReasonLabel(data.topic.excludedReason)}。</p>
           </section>
           <VocabularySummary data={data.vocabulary} />
         </>
@@ -240,10 +237,7 @@ export default function TopicDetailView({
         <>
           <section role="status" className="rounded-xl border border-zinc-300 p-4 text-sm dark:border-zinc-800">
             <h2 className="font-semibold">此詞暫未參與比對</h2>
-            <p className="mt-2 text-zinc-600 dark:text-zinc-400">
-              原因：{inactiveReasonLabel(data.topic.inactiveReason)}
-              。這不代表它是雜訊：完整的詞仍保留在詞庫中可查，只是本次比對未納入，所以這裡沒有部落格與文章。
-            </p>
+            <p className="mt-2 text-zinc-600 dark:text-zinc-400">原因：{inactiveReasonLabel(data.topic.inactiveReason)}。</p>
             {sourceActivity(data.topic) ? (
               <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">{sourceActivity(data.topic)}</p>
             ) : null}
@@ -281,7 +275,6 @@ export default function TopicDetailView({
                     </li>
                   ))}
                 </ul>
-                {!data.articles.length ? <p className="py-6 text-zinc-500 dark:text-zinc-400">此期間尚無已比對文章。</p> : null}
               </section>
               <TopicBlogs blogs={data.blogs} />
             </div>
@@ -299,7 +292,7 @@ export default function TopicDetailView({
         </p>
       ) : (
         <p role="alert" className="text-sm text-zinc-700 dark:text-zinc-300">
-          目前無法讀取此話題，可能尚未完成同步或不在目前詞庫版本。
+          目前無法讀取此話題。
         </p>
       )}
       <FooterMethod

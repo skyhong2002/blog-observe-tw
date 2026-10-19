@@ -201,11 +201,11 @@ export default function BlogTrafficComparison({ data, initial }: { data: Traffic
         )}
         {compared.length > 0 ? (
           <BlogTrafficTrend months={chartMonths} series={series} />
-        ) : (
+        ) : anyChartable ? (
           <p role="status" className="py-6 text-center text-sm text-zinc-500 dark:text-zinc-400">
-            {anyChartable ? '尚未選擇要比較的部落格。' : '目前沒有部落格累積兩個月以上的估計，暫不繪製趨勢。'}
+            尚未選擇要比較的部落格。
           </p>
-        )}
+        ) : null}
       </section>
 
       <fieldset className={`min-w-0 ${filterRowClass}`}>

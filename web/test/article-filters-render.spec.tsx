@@ -113,7 +113,7 @@ describe('latest article preferences: server rendering', () => {
         .get(),
     ).toEqual(['Food latest', 'Other latest', 'Gadget latest']);
     expect($('nav[aria-label="隱藏類型"]')).toHaveLength(0);
-    expect($.text()).toContain('本次未套用類型排除');
+    expect($.text()).toContain('類型篩選暫時無法使用，本次未套用。');
     expect($.text()).toContain('每站上限隱藏 1');
     // The cap chips keep the genre choice in the URL for when genres come back.
     expect(

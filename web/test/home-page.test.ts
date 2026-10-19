@@ -41,7 +41,9 @@ test('home: the topic list reads view=home itself, lets failures throw, and keep
   assert.doesNotMatch(list, /new Map|unstable_cache|\bcache\(|revalidate|data-analytics|sendEvent|gtag/);
   assert.match(list, /^import Link from '@\/components\/NoPrefetchLink';$/m);
   assert.match(list, /<Link \{\.\.\.topicLink\(tag\.id, tag\.canonicalPath, '30'\)\}>/);
-  assert.match(list, /最近 30 天尚無足夠的共同話題。/);
+  // An empty ranking leaves the list blank; FooterMethod's / block says what that means.
+  assert.match(list, /\) : null;/);
+  assert.doesNotMatch(list, /尚無足夠的共同話題/);
   // public-api.ts: the reads are React's per-request cache over no-store reads, the full overview unchanged.
   const api = source('lib/public-api.ts');
   assert.match(api, /const read = cache\(\(path: string\) => readPublic\(gatewayOrigin\(\), path\)\);/);

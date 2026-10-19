@@ -266,16 +266,14 @@ export default function TechStatsView({
           }),
         ]}
       />
-      <section aria-labelledby="tech-ranking" className="space-y-3">
-        <h2 id="tech-ranking" className="text-sm font-semibold">
-          技術排行
-        </h2>
-        {technologies.length ? (
+      {technologies.length > 0 && (
+        <section aria-labelledby="tech-ranking" className="space-y-3">
+          <h2 id="tech-ranking" className="text-sm font-semibold">
+            技術排行
+          </h2>
           <RankTable technologies={technologies} scanned={scanned} filters={filters} />
-        ) : (
-          <p className={`py-4 text-sm ${muted}`}>目前沒有辨識到網站軟體。可能是尚未取得可辨識的回應或線索不足，不代表部落格沒有使用。</p>
-        )}
-      </section>
+        </section>
+      )}
 
       <section aria-labelledby="tech-blogs" className="space-y-3">
         <h2 id="tech-blogs" className="text-sm font-semibold">
@@ -422,13 +420,7 @@ export default function TechStatsView({
                 </tbody>
               </table>
             </TableScroller>
-            {!data.items.length && (
-              <p className={`py-8 ${muted}`}>
-                沒有符合條件的部落格。
-                {filters.technology &&
-                  ' 技術篩選只列出目前保留的觀測證據中有該技術的部落格（包含最近一次觀測失敗或被阻擋、但仍保留上次成功結果的部落格）；未辨識或沒有保留結果的部落格不會出現在這裡。'}
-              </p>
-            )}
+            {!data.items.length && <p className={`py-8 ${muted}`}>沒有符合條件的部落格。</p>}
             <nav aria-label="部落格分頁" className="flex justify-between gap-2 text-sm">
               {filters.cursor ? (
                 <Link
@@ -469,7 +461,7 @@ export default function TechStatsView({
           </p>
         ) : (
           <div role="alert" className="rounded-xl border border-zinc-300 p-6 text-sm text-zinc-600 dark:border-zinc-800 dark:text-zinc-400">
-            <p>技術統計暫時無法載入，請稍後再試。這不表示沒有符合條件的部落格，也不代表數量為 0。</p>
+            <p>技術統計暫時無法載入，請稍後再試。</p>
             <ReloadButton />
           </div>
         )}
@@ -491,7 +483,7 @@ export function TechUnavailable() {
         role="alert"
         className="rounded-xl border border-zinc-300 p-6 text-sm leading-6 text-zinc-600 dark:border-zinc-800 dark:text-zinc-400"
       >
-        技術觀測資料目前沒有開放讀取，所以這裡沒有任何統計。這不是觀測結果，也不代表部落格沒有使用任何技術。
+        技術觀測資料目前沒有開放讀取。
       </p>
       <FooterMethod page />
     </div>
