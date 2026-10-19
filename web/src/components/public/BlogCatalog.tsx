@@ -258,7 +258,12 @@ export default function BlogCatalogView({
         />
       </div>
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <SearchBox q={q} />
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+          <SearchBox q={q} />
+          <Link href="/queue/#add" className="text-sm text-brand-700 hover:underline dark:text-brand-400">
+            新增部落格 →
+          </Link>
+        </div>
         <span role="status" className="text-xs text-zinc-500">
           {busy
             ? '正在搜尋…'

@@ -137,3 +137,62 @@ export default function BlogSuggestion({ query }: { query: string }) {
     </div>
   );
 }
+
+/**
+ * The 待查清單's own way in (/queue/#add): type a blog's address, see whether it is collected or queued, and add it
+ * when signed in. The same check and note as under an empty address search, so the rules stay in one place.
+ */
+export function BlogSubmitForm() {
+  const [text, setText] = useState('');
+  const [asked, setAsked] = useState('');
+  const invalid = asked !== '' && !looksLikeAddress(asked);
+  return (
+    <section
+      id="add"
+      aria-labelledby="add-blog"
+      className="scroll-mt-24 rounded-lg border border-zinc-200 p-3 text-sm dark:border-zinc-800"
+    >
+      <h2 id="add-blog" className="mb-2 text-sm font-semibold">
+        新增部落格
+      </h2>
+      <form
+        className="flex gap-2"
+        onSubmit={(event) => {
+          event.preventDefault();
+          setAsked(text.trim());
+        }}
+      >
+        <label htmlFor="add-blog-url" className="sr-only">
+          部落格網址
+        </label>
+        <input
+          id="add-blog-url"
+          type="text"
+          inputMode="url"
+          value={text}
+          autoComplete="off"
+          enterKeyHint="go"
+          placeholder="部落格網址，例如 example.com"
+          onChange={(event) => setText(event.target.value)}
+          className="min-h-9 w-full rounded-lg border border-zinc-300 bg-white px-3 py-1.5 text-base sm:max-w-96 sm:text-sm dark:border-zinc-700 dark:bg-zinc-900"
+        />
+        <button
+          type="submit"
+          disabled={!text.trim()}
+          className="min-h-9 shrink-0 rounded-lg bg-brand-700 px-3 text-sm text-white hover:bg-brand-800 disabled:opacity-60"
+        >
+          檢查
+        </button>
+      </form>
+      {invalid ? (
+        <p role="status" className="mt-2 text-zinc-600 dark:text-zinc-400">
+          請輸入網址，例如 example.com。
+        </p>
+      ) : asked ? (
+        <div className="text-zinc-700 dark:text-zinc-300">
+          <BlogSuggestion key={asked} query={asked} />
+        </div>
+      ) : null}
+    </section>
+  );
+}

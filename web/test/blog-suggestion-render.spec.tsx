@@ -1,6 +1,6 @@
 import { renderToString } from 'react-dom/server';
 import { expect, test, vi } from 'vitest';
-import { looksLikeAddress, SuggestionNote } from '@/components/BlogSuggestion';
+import { BlogSubmitForm, looksLikeAddress, SuggestionNote } from '@/components/BlogSuggestion';
 import { BlogQueueView } from '@/components/public/BlogQueue';
 
 vi.mock('next/navigation', () => ({
@@ -88,4 +88,12 @@ test('the 待查清單 shows each site, its state, the reason in words and links
   expect(html).toContain('href="/queue/?sort=site&amp;dir=asc"');
   expect(html).toContain('href="/queue/?sort=checked&amp;dir=desc"');
   expect(html).not.toMatch(/sort=added&amp;dir=desc/);
+});
+
+test('the 待查清單 has its own 新增部落格 box, reachable as /queue/#add', () => {
+  const html = renderToString(<BlogSubmitForm />);
+  expect(html).toContain('id="add"');
+  expect(html).toContain('新增部落格');
+  expect(html).toContain('placeholder="部落格網址，例如 example.com"');
+  expect(html).toMatch(/<button type="submit" disabled=""[^>]*>檢查<\/button>/);
 });

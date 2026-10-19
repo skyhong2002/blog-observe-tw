@@ -2,6 +2,7 @@
 
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
+import { BlogSubmitForm } from '@/components/BlogSuggestion';
 import FilterChips from '@/components/FilterChips';
 import MediaTabs from '@/components/MediaTabs';
 import MethodLink from '@/components/MethodLink';
@@ -83,10 +84,13 @@ export function BlogQueueView({
   queue,
   status,
   onSearch = () => {},
+  submit,
 }: {
   queue: Queue | null;
   status: 'ready' | 'pending' | 'error';
   onSearch?: (q: string) => void;
+  /** The 新增部落格 form (BlogSubmitForm), above the filters; left out where nobody can add (render tests). */
+  submit?: React.ReactNode;
 }) {
   const filters = queue?.filters ?? { q: '', state: '', source: '', page: 1, sort: 'added', dir: 'desc' };
   const href = (patch: Record<string, string | null>) => {
@@ -146,6 +150,7 @@ export function BlogQueueView({
           <MethodLink />
         </p>
       </header>
+      {submit}
       {queue && (
         <div className="space-y-2">
           <FilterChips
@@ -300,5 +305,5 @@ export default function BlogQueueFromUrl() {
   };
   const current = load?.status === 'ready' ? load.data : shown;
   const status = load?.status === 'ready' ? 'ready' : load?.status === 'pending' ? 'pending' : 'error';
-  return <BlogQueueView queue={status === 'error' ? null : current} status={status} onSearch={onSearch} />;
+  return <BlogQueueView queue={status === 'error' ? null : current} status={status} onSearch={onSearch} submit={<BlogSubmitForm />} />;
 }
