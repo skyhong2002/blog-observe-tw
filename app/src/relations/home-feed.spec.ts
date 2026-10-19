@@ -17,6 +17,7 @@ const row = {
   targetBlogSlug: 'b',
   targetBlogName: 'B 個人專欄',
   targetHomeUrl: 'https://medium.com/@b',
+  targetUrl: 'https://medium.com/@b/an-article#quote',
   anchor: 'B',
   context: '文章中的上下文',
   observedAt: '2026-10-14T02:00:00Z',
@@ -35,6 +36,7 @@ describe('homepage uses public article→blog body citations', () => {
       postTitle: row.postTitle,
       targetDomain: 'medium.com',
       targetHomeUrl: 'https://medium.com/@b',
+      targetUrl: row.targetUrl,
       targetBlogName: 'B 個人專欄',
       sourceIconUrl: '/favicons/a.png',
       evidenceType: 'direct-link',
@@ -45,6 +47,7 @@ describe('homepage uses public article→blog body citations', () => {
       observedAt: '2026-10-14T02:00:00.000Z',
     });
     expect(query).toHaveBeenCalledTimes(1);
+    expect(HOME_MENTIONS_SQL).toContain('l.target_url targetUrl');
   });
   it('deduplicates article→target before LIMIT, excludes all revoked/future/nonbody ownership paths in SQL', () => {
     expect(HOME_MENTIONS_SQL).toContain(PUBLIC_RELATION);
@@ -78,12 +81,14 @@ describe('homepage uses public article→blog body citations', () => {
       context: 'X'.repeat(1000),
       postUrl: i ? row.postUrl : 'javascript:alert(1)',
       targetHomeUrl: i ? row.targetHomeUrl : 'https://secret@evil.example/',
+      targetUrl: i ? row.targetUrl : 'javascript:alert(1)',
     }));
     const data = await loadHomeMentions({ query: async () => [rows] } as unknown as Pool);
     expect(data.items).toHaveLength(8);
     expect(data.truncated).toBe(true);
     expect(data.items[0].postUrl).toBeNull();
     expect(data.items[0].targetHomeUrl).toBeNull();
+    expect(data.items[0].targetUrl).toBeNull();
     expect(data.items[0].context).toHaveLength(240);
     expect(rows[0].context).toHaveLength(1000);
     expect(mentionPublicUrl('//evil.example')).toBeNull();

@@ -323,6 +323,11 @@ test('contracts: the home overview requires its body citations; empty is valid, 
   // Readable page paths from the gateway's enrichment are optional text.
   const paths = { ...HOME_MENTION, sourceBlogCanonicalPath: '/blogs/a.example/', targetBlogCanonicalPath: '/blogs/b.example/' };
   assert.equal(validPublicPayload('homeOverview', with_('homeOverview', 'mentions', { ...MENTIONS, items: [paths] })), true);
+  for (const targetUrl of ['https://b.example/cited#paragraph', null])
+    assert.equal(
+      validPublicPayload('homeOverview', with_('homeOverview', 'mentions', { ...MENTIONS, items: [{ ...HOME_MENTION, targetUrl }] })),
+      true,
+    );
   const bad: unknown[] = [
     undefined,
     null,
@@ -346,6 +351,7 @@ test('contracts: the home overview requires its body citations; empty is valid, 
       { sourceBlogSlug: undefined },
       { targetBlogName: undefined },
       { targetDomain: {} },
+      { targetUrl: 123 },
       { anchor: undefined },
       { context: 'x'.repeat(241) },
       { context: null },

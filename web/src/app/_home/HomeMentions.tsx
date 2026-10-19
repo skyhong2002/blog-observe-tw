@@ -34,6 +34,32 @@ export function mentionCards(items: readonly HomeMention[]): MentionCard[] {
 /** The gateway's sentence around the link (「…」 marks omitted text); older answers fall back to the raw context. */
 const mentionQuote = (m: HomeMention) => (m.quote ?? m.context).trim() || m.anchor.trim();
 
+/** Preserve the excerpt as text and restore only this citation's original linked words and destination. */
+function MentionQuote({ mention }: { mention: HomeMention }) {
+  const quote = mentionQuote(mention);
+  if (!quote) return null;
+  const anchor = mention.anchor.trim();
+  const at = anchor ? quote.indexOf(anchor) : -1;
+  const href = externalHref(mention.targetUrl);
+  return (
+    <p className={styles.mentionQuote}>
+      「
+      {href && at >= 0 ? (
+        <>
+          {quote.slice(0, at)}
+          <a href={href} rel="noopener noreferrer">
+            {anchor}
+          </a>
+          {quote.slice(at + anchor.length)}
+        </>
+      ) : (
+        quote
+      )}
+      」
+    </p>
+  );
+}
+
 function MentionCardView({ card }: { card: MentionCard }) {
   const m = card.article;
   const original = externalHref(m.postUrl);
@@ -60,21 +86,18 @@ function MentionCardView({ card }: { card: MentionCard }) {
         </h3>
         <PostTags tags={m.postTags} total={m.postTagCount} max={3} className={styles.postTags} />
         <ul className={styles.mentionTargets} aria-label="這篇文章在正文連到的部落格">
-          {card.targets.map((t) => {
-            const quote = mentionQuote(t);
-            return (
-              <li key={t.targetBlogId} data-mention={`${t.postId}:${t.targetBlogId}`}>
-                <p className={styles.mentionTo}>
-                  <span aria-hidden="true">→</span>
-                  <Link {...blogLink(t.targetBlogSlug, t.targetBlogCanonicalPath)} className={styles.mentionChip}>
-                    <BlogIcon media={t.targetBlogSlug} iconUrl={t.targetIconUrl} title={t.targetBlogName} />
-                    {t.targetBlogName}
-                  </Link>
-                </p>
-                {quote ? <p className={styles.mentionQuote}>「{quote}」</p> : null}
-              </li>
-            );
-          })}
+          {card.targets.map((t) => (
+            <li key={t.targetBlogId} data-mention={`${t.postId}:${t.targetBlogId}`}>
+              <p className={styles.mentionTo}>
+                <span aria-hidden="true">→</span>
+                <Link {...blogLink(t.targetBlogSlug, t.targetBlogCanonicalPath)} className={styles.mentionChip}>
+                  <BlogIcon media={t.targetBlogSlug} iconUrl={t.targetIconUrl} title={t.targetBlogName} />
+                  {t.targetBlogName}
+                </Link>
+              </p>
+              <MentionQuote mention={t} />
+            </li>
+          ))}
         </ul>
       </div>
       {/* The source article's own image (feed/og), only when it loads; never a placeholder. */}
@@ -86,13 +109,13 @@ function MentionCardView({ card }: { card: MentionCard }) {
 export default function HomeMentionsSection({ mentions }: { mentions: HomeMentions }) {
   const cards = mentionCards(mentions.items);
   return (
-    <section className={styles.center} aria-label="最近的正文引用">
+    <section className={styles.center} aria-label="最近的部落格引用">
       <div className={styles.sectionHeading}>
-        <h2>最近的正文引用</h2>
+        <h2>最近的部落格引用</h2>
         <Link href="/relations/">關係圖 →</Link>
       </div>
       {mentions.status === 'unavailable' ? (
-        <p className={styles.notice}>正文引用暫時無法載入。</p>
+        <p className={styles.notice}>部落格引用暫時無法載入。</p>
       ) : cards.length ? (
         <div className={styles.storyList}>
           {cards.map((card) => (

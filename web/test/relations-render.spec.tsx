@@ -969,7 +969,7 @@ describe("F3's method lives in the footer's one 本頁的資料來源與計算�
       $('#method h3')
         .map((_, el) => $(el).text())
         .get(),
-    ).toEqual(['資料來源', '首頁的正文引用與話題']);
+    ).toEqual(['資料來源', '首頁的部落格引用與話題']);
     expect($('#method').text()).not.toContain('引用占比');
   });
 

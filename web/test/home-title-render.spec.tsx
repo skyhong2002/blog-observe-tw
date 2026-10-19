@@ -127,6 +127,32 @@ beforeEach(() => {
 });
 
 describe('homepage centre: body citations', () => {
+  test('the quoted linked words open the actual cited page, preserving surrounding text and escaping markup', async () => {
+    const anchor = '乙的文章 <b>x</b>';
+    const quote = `…讀了${anchor}，覺得很有趣。`;
+    const targetUrl = 'https://b.example/posts/cited?from=a&ref=blog#paragraph';
+    answer(OVERVIEW, overview({ mentions: mentions([mention({ anchor, quote, targetUrl })]) }));
+    const $ = await renderHome();
+    const excerpt = $('[class~="mentionQuote"]');
+    expect(excerpt.text()).toBe(`「${quote}」`);
+    expect(excerpt.find('a').text()).toBe(anchor);
+    expect(excerpt.find('a').attr('href')).toBe(targetUrl);
+    expect(excerpt.find('a').attr('rel')).toBe('noopener noreferrer');
+    expect(excerpt.find('b, script').length).toBe(0);
+    expect($('a[href="/blogs/b/"]').text()).toBe('乙');
+  });
+
+  test.each([undefined, null, 'javascript:alert(1)', '/relative'])(
+    'a missing or unsafe citation URL (%s) leaves the quote as text',
+    async (targetUrl) => {
+      answer(OVERVIEW, overview({ mentions: mentions([mention({ anchor: '乙', context: '看了乙，很有趣。', targetUrl })]) }));
+      const $ = await renderHome();
+      const excerpt = $('[class~="mentionQuote"]');
+      expect(excerpt.text()).toBe('「看了乙，很有趣。」');
+      expect(excerpt.find('a').length).toBe(0);
+    },
+  );
+
   test('an article linking to three blogs is one card listing all three, with the article image when sent', async () => {
     const target = (id: number, slug: string, name: string) =>
       mention({
@@ -224,7 +250,7 @@ describe('homepage centre: body citations', () => {
     expect(cards.eq(2).text()).toContain('發文日期不明');
 
     // The rows come first: the long method text lives in the page's method disclosure (FooterMethod, tested below).
-    const centre = $('section[aria-label="最近的正文引用"]');
+    const centre = $('section[aria-label="最近的部落格引用"]');
     expect(centre.children().eq(1).hasClass('storyList')).toBe(true);
     expect(centre.text()).not.toMatch(/交流|互惠|抄襲|側欄、Blogroll/);
     expect(centre.text()).not.toContain('只列最近');
@@ -237,12 +263,19 @@ describe('homepage centre: body citations', () => {
       OVERVIEW,
       overview({
         mentions: mentions([
-          mention({ anchor: '乙', context: '提到乙。', observedAt: '2026-10-13T06:00:00.000Z', matchVersion: 'relations-v3' }),
+          mention({
+            anchor: '乙',
+            context: '提到乙。',
+            targetUrl: 'https://b.example/post/',
+            observedAt: '2026-10-13T06:00:00.000Z',
+            matchVersion: 'relations-v3',
+          }),
           mention({
             targetBlogId: 3,
             targetBlogSlug: 'c',
             targetBlogName: '丙',
             targetHomeUrl: 'https://c.example/',
+            targetUrl: 'https://c.example/entry/#cited',
             targetDomain: 'c.example',
             targetBlogCanonicalPath: '/blogs/c.example/',
             targetIconUrl: '/favicons/c.png',
@@ -271,6 +304,8 @@ describe('homepage centre: body citations', () => {
     // Each target row carries its own quote: the context, else the anchor text.
     expect(targets.eq(0).find('[class~="mentionQuote"]').text()).toBe('「提到乙。」');
     expect(targets.eq(1).find('[class~="mentionQuote"]').text()).toBe('「也提到丙。」');
+    expect(targets.eq(0).find('[class~="mentionQuote"] a').attr('href')).toBe('https://b.example/post/');
+    expect(targets.eq(1).find('[class~="mentionQuote"] a').attr('href')).toBe('https://c.example/entry/#cited');
     expect(card.find('details').length).toBe(0);
     expect(card.text()).not.toContain('重複的乙');
     expect(cards.eq(1).find('h3 a').attr('href')).toBe('https://a.example/p/2');
@@ -284,7 +319,7 @@ describe('homepage centre: body citations', () => {
     for (const gone of ['最新文章', '我的閱讀', '沿著連結，認識新部落格']) expect(h2, gone).not.toContain(gone);
     expect($('body').text()).not.toContain('最近發文');
     expect($('[class~="hero"], [class~="band"]').length).toBe(0);
-    expect(h2).toEqual(expect.arrayContaining(['最近共同話題', '最近的正文引用', '部落格觀察', '最新更新的部落格']));
+    expect(h2).toEqual(expect.arrayContaining(['最近共同話題', '最近的部落格引用', '部落格觀察', '最新更新的部落格']));
     // The author list page was retired (authors are counted per blog on /blogs/), so is its homepage block.
     expect(h2).not.toContain('作者動態');
     // The ranking rule moved to the closed method block at the page foot; the list carries no inline note.
@@ -301,12 +336,12 @@ describe('homepage centre: body citations', () => {
 
   test('the more link only leads to the map; an empty 90-day window leaves the section blank, its meaning in the method block', async () => {
     answer(OVERVIEW, overview({ mentions: mentions([mention()], { truncated: true }) }));
-    expect((await renderHome())('section[aria-label="最近的正文引用"] a.more').text()).toBe('看全站關係圖 →');
+    expect((await renderHome())('section[aria-label="最近的部落格引用"] a.more').text()).toBe('看全站關係圖 →');
     answer(OVERVIEW, overview());
     const $ = await renderHome();
     expect($('[data-mention]').length).toBe(0);
-    expect($('section[aria-label="最近的正文引用"] p').length).toBe(0);
-    expect($('section[aria-label="最近的正文引用"] h2').text()).toBe('最近的正文引用');
+    expect($('section[aria-label="最近的部落格引用"] p').length).toBe(0);
+    expect($('section[aria-label="最近的部落格引用"] h2').text()).toBe('最近的部落格引用');
   });
 
   const failures: Array<[string, () => void]> = [

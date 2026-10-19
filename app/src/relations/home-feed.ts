@@ -65,7 +65,7 @@ export const HOME_MENTIONS_SQL = `SET STATEMENT max_statement_time=1 FOR WITH re
  SELECT p.id postId,p.title postTitle,p.url postUrl,p.image_url postImageUrl,p.published_at publishedAt,
  a.id sourceBlogId,a.slug sourceBlogSlug,a.name sourceBlogName,
  b.id targetBlogId,b.slug targetBlogSlug,b.name targetBlogName,b.url targetHomeUrl,
- l.anchor_text anchor,l.context,l.observed_at observedAt,o.parser_version matchVersion
+ l.target_url targetUrl,l.anchor_text anchor,l.context,l.observed_at observedAt,o.parser_version matchVersion
  FROM picked k
  STRAIGHT_JOIN posts p ON p.id=k.postId AND p.blog_id=k.sourceBlogId
  STRAIGHT_JOIN relation_links l ON l.source_post_id=k.postId AND l.source_blog_id=k.sourceBlogId AND l.ordinal=k.ordinal
@@ -139,6 +139,7 @@ export async function loadHomeMentions(pool: Pool, now = new Date()) {
         targetBlogSlug: r.targetBlogSlug,
         targetBlogName: r.targetBlogName,
         targetHomeUrl,
+        targetUrl: mentionPublicUrl(r.targetUrl),
         targetDomain: targetHomeUrl ? new URL(targetHomeUrl).hostname : null,
         targetIconUrl: iconUrl(r.targetBlogSlug, icons),
         evidenceType: 'direct-link' as const,

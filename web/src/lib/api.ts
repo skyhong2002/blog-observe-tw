@@ -92,7 +92,7 @@ export type Overview = {
 /**
  * One row of the homepage's body citations (app/src/relations/home-feed.ts loadHomeMentions): an article that
  * links, in its body, to another collected blog. Only direct body links; never shared tags or text similarity.
- * The target is a blog (and its domain), not a guessed target article. anchor/context are plain text.
+ * The target identifies the blog and the actual linked URL. anchor/context are plain text.
  */
 export type HomeMention = {
   postId: number;
@@ -112,6 +112,8 @@ export type HomeMention = {
   targetBlogName: string;
   targetBlogCanonicalPath?: string;
   targetHomeUrl: string | null;
+  /** The actual URL linked by the article, including its path/fragment; absent on older gateways. */
+  targetUrl?: string | null;
   targetDomain: string | null;
   targetIconUrl: string | null;
   evidenceType: 'direct-link';

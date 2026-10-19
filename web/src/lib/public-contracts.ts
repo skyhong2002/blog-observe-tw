@@ -186,6 +186,7 @@ const homeMention = {
   targetBlogName: text,
   targetBlogCanonicalPath: optional(text),
   targetHomeUrl: nullable(text),
+  targetUrl: optional(nullable(text)),
   targetDomain: nullable(text),
   targetIconUrl: nullable(text),
   evidenceType: (v: unknown) => v === 'direct-link',
