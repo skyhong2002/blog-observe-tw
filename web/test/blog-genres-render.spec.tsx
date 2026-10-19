@@ -21,22 +21,38 @@ describe('blog genre SSR block', () => {
     const $ = load(renderToString(<BlogGenresView state={state} signedIn votes={{ food: -1 }} loginUrl="/auth/google" />));
     expect($('a').length).toBe(0);
     expect($('button[aria-pressed=true]').text()).toContain('已不同意（收回）');
+    // The picker offers only genres not already listed, after its placeholder; no admin controls for readers.
     expect($('select[name=genre] option').length).toBe(Object.keys(BLOG_GENRES).length);
-    expect($('form').text()).toContain('提議並同意');
-    expect($('section').text()).not.toContain('解除管理員覆寫');
+    expect($('select[name=genre] option[value=food]').length).toBe(0);
+    expect($('button').text()).toContain('提議');
+    expect($('section').text()).not.toContain('管理員覆寫');
   });
-  it('shows admin set/hide/release while keeping hidden candidates and their counts visible', () => {
+  it('keeps admin set/hide/release apart, in its own collapsed block, while hidden candidates and their counts stay visible', () => {
     const hidden: GenreState = { status: 'ready', items: [{ ...state.items[0], source: 'admin', visible: false, adminOverride: 'hide' }] };
     const $ = load(renderToString(<BlogGenresView state={hidden} signedIn admin loginUrl="/auth/google" />));
-    expect($('section').text()).toContain('管理員覆寫');
-    expect($('section').text()).toContain('未顯示');
-    expect($('select[name=action] option').length).toBe(3);
-    expect($('button').text()).toContain('解除管理員覆寫');
+    expect($('li').text()).toContain('未顯示（管理員覆寫）');
+    const block = $('details');
+    expect(block.find('summary').text()).toBe('管理員覆寫');
+    expect(block.find('select[name=genre] option').length).toBe(Object.keys(BLOG_GENRES).length + 1);
+    expect(
+      block
+        .find('button')
+        .map((_, el) => $(el).text())
+        .get(),
+    ).toEqual(['指定顯示', '隱藏', '解除覆寫']);
+  });
+  it('an empty classification says nothing: signed out it offers sign-in, signed in the picker', () => {
+    const empty: GenreState = { status: 'ready', items: [] };
+    const out = load(renderToString(<BlogGenresView state={empty} signedIn={false} loginUrl="/auth/google" />));
+    expect(out('section').text()).toBe('部落格類型登入後投票或提議類型 →');
+    const signed = load(renderToString(<BlogGenresView state={empty} signedIn loginUrl="/auth/google" />));
+    expect(signed('section').text()).not.toContain('尚未分類');
+    expect(signed('select[name=genre]').length).toBe(1);
   });
   it('distinguishes an unavailable read from a successfully empty classification', () => {
     const html = renderToString(<BlogGenresView state={{ status: 'unavailable', items: [] }} signedIn loginUrl="/auth/google" />);
     expect(html).toContain('類型資料暫時無法使用');
     expect(html).not.toContain('尚未分類');
-    expect(html).not.toContain('<form');
+    expect(html).not.toContain('<select');
   });
 });
