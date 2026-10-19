@@ -1,13 +1,13 @@
 import { load } from 'cheerio';
 import { renderToString } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
-import { BlogGenresView } from '@/components/BlogGenres';
+import { BlogGenresView, typedGenres } from '@/components/BlogGenres';
 import { BLOG_GENRES } from '../../app/src/blog-genre-vocabulary.ts';
 import type { GenreState } from '../../app/src/blog-genres/resolve.ts';
 
 const state: GenreState = {
   status: 'ready',
-  items: [{ genre: 'food', source: 'ai', visible: true, agrees: 4, disagrees: 2, adminOverride: null }],
+  items: [{ genre: 'food', label: '美食', source: 'ai', visible: true, agrees: 4, disagrees: 2, adminOverride: null }],
 };
 describe('blog genre SSR block', () => {
   it('shows provenance and public totals with a login prompt to logged-out readers', () => {
@@ -15,16 +15,19 @@ describe('blog genre SSR block', () => {
     expect($('section').text()).toContain('AI 初判');
     expect($('section').text()).toContain('同意 4 · 不同意 2');
     expect($('a').text()).toContain('登入後');
-    expect($('button,select').length).toBe(0);
+    expect($('button,input').length).toBe(0);
+    // Each genre links to the directory filtered by it.
+    expect($('a[href="/blogs/?genre=food"]').text()).toBe('美食');
   });
-  it('allows logged-in readers to vote, withdraw and propose from the fixed vocabulary', () => {
+  it('allows logged-in readers to vote, withdraw and add any genre', () => {
     const $ = load(renderToString(<BlogGenresView state={state} signedIn votes={{ food: -1 }} loginUrl="/auth/google" />));
-    expect($('a').length).toBe(0);
+    expect($('a[href^="/auth"]').length).toBe(0);
     expect($('button[aria-pressed=true]').text()).toContain('已不同意（收回）');
-    // The picker offers only genres not already listed, after its placeholder; no admin controls for readers.
-    expect($('select[name=genre] option').length).toBe(Object.keys(BLOG_GENRES).length);
-    expect($('select[name=genre] option[value=food]').length).toBe(0);
-    expect($('button').text()).toContain('提議');
+    // A free-text box; its suggestions are the starting genres not already listed. No admin controls for readers.
+    expect($('input[name=genre]').attr('placeholder')).toBe('新增類型，例如：咖啡');
+    expect($('#genre-add-suggestions option').length).toBe(Object.keys(BLOG_GENRES).length - 1);
+    expect($('#genre-add-suggestions option[value=美食]').length).toBe(0);
+    expect($('button[type=submit]').text()).toBe('新增');
     expect($('section').text()).not.toContain('管理員覆寫');
   });
   it('keeps admin set/hide/release apart, in its own collapsed block, while hidden candidates and their counts stay visible', () => {
@@ -33,7 +36,7 @@ describe('blog genre SSR block', () => {
     expect($('li').text()).toContain('未顯示（管理員覆寫）');
     const block = $('details');
     expect(block.find('summary').text()).toBe('管理員覆寫');
-    expect(block.find('select[name=genre] option').length).toBe(Object.keys(BLOG_GENRES).length + 1);
+    expect(block.find('input[name=genre]').length).toBe(1);
     expect(
       block
         .find('button')
@@ -44,15 +47,20 @@ describe('blog genre SSR block', () => {
   it('an empty classification says nothing: signed out it offers sign-in, signed in the picker', () => {
     const empty: GenreState = { status: 'ready', items: [] };
     const out = load(renderToString(<BlogGenresView state={empty} signedIn={false} loginUrl="/auth/google" />));
-    expect(out('section').text()).toBe('部落格類型登入後投票或提議類型 →');
+    expect(out('section').text()).toBe('部落格類型登入後投票或新增類型 →');
     const signed = load(renderToString(<BlogGenresView state={empty} signedIn loginUrl="/auth/google" />));
     expect(signed('section').text()).not.toContain('尚未分類');
-    expect(signed('select[name=genre]').length).toBe(1);
+    expect(signed('input[name=genre]').length).toBe(1);
   });
   it('distinguishes an unavailable read from a successfully empty classification', () => {
     const html = renderToString(<BlogGenresView state={{ status: 'unavailable', items: [] }} signedIn loginUrl="/auth/google" />);
     expect(html).toContain('類型資料暫時無法使用');
     expect(html).not.toContain('尚未分類');
-    expect(html).not.toContain('<select');
+    expect(html).not.toContain('<input');
+  });
+  it('reads what a reader typed as genre keys: separators split, starting names fold, junk drops', () => {
+    expect(typedGenres('美食、咖啡, ＃Single  Origin;;  ###')).toEqual(['food', '咖啡', 'single origin']);
+    expect(typedGenres('咖啡,咖啡')).toEqual(['咖啡']);
+    expect(typedGenres('  ')).toEqual([]);
   });
 });

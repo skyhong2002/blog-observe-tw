@@ -12,6 +12,8 @@ export type Blog = {
   name: string;
   url?: string | null;
   category?: string | null;
+  /** The directory's shown genres (app/src/catalog.js), several per blog. */
+  genres?: Array<{ value: string; label: string }>;
   iconUrl?: string | null;
   statusLabel?: string | null;
   description?: string | null;
@@ -139,17 +141,23 @@ export type HomeMentions = {
 };
 /** /api/overview?view=home: the overview's shape (posts and tags now empty) plus the body citations. */
 export type HomeOverview = Overview & { view: 'home'; mentions: HomeMentions };
-export type CatalogQuery = { q?: string; category?: string; status?: string; sort?: string; dir?: string; page?: string; limit?: string };
+export type CatalogQuery = { q?: string; category?: string; genre?: string; status?: string; sort?: string; dir?: string; page?: string; limit?: string };
 export type Catalog = {
   blogs: Blog[];
   totals: { blogs: number; posts: number; withUrls: number; authors: number };
   categories: Array<{ value: string; count: number }>;
+  /** Reader and AI genres with how many blogs show each (whole directory); absent from an older gateway. */
+  genres?: Array<{ value: string; label: string; count: number }>;
+  genreStatus?: 'ready' | 'unavailable';
+  /** Blogs no genre is shown for yet. */
+  ungenred?: number;
   statuses: Array<{ value: string; count: number }>;
   updatedAt: string | null;
   pagination: { page: number; pages: number; pageSize: number; total: number };
   filters: {
     q: string;
     category: string;
+    genre: string;
     status: string;
     sort: 'name' | 'category' | 'posts' | 'latest' | 'crawl' | 'status';
     dir: 'asc' | 'desc';

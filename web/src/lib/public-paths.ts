@@ -50,7 +50,7 @@ const blogPath = (tail: string) => new RegExp(`^/api/blogs/${SEGMENT}${tail}$`);
 const RULES: readonly Rule[] = [
   // view=home: the homepage's bounded projections (app/src/app.js, overview.js; topics/routes.ts).
   { kind: 'overview', path: /^\/api\/overview$/, query: [], views: { home: 'homeOverview' } },
-  { kind: 'catalog', path: /^\/api\/catalog$/, query: ['q', 'category', 'status', 'sort', 'dir', 'page', 'limit'] },
+  { kind: 'catalog', path: /^\/api\/catalog$/, query: ['q', 'category', 'genre', 'status', 'sort', 'dir', 'page', 'limit'] },
   { kind: 'collectionCount', path: /^\/api\/collection-count$/, query: [] },
   { kind: 'authors', path: /^\/api\/catalog\/authors$/, query: ['author', 'page', 'limit'] },
   { kind: 'search', path: /^\/api\/search$/, query: ['q', 'page', 'limit', 'blog'] },

@@ -3,7 +3,7 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import type { Pool, RowDataPacket } from 'mysql2/promise';
 import { isAdmin, requireAdminTransaction, writeAudit } from '../admin/identity.ts';
 import { readCookie, SESSION_COOKIE, type SessionUser } from '../auth/google-login.ts';
-import { isBlogGenre } from '../blog-genre-vocabulary.ts';
+import { genreKey, isGenreKey } from '../blog-genre-vocabulary.ts';
 import { readBlogGenres } from './store.ts';
 
 type Options = {
@@ -30,11 +30,11 @@ export function registerBlogGenreRoutes(app: FastifyInstance, options: Options) 
     const slug = (request.params as { slug: string }).slug;
     const [votes] = await pool.query<RowDataPacket[]>(
       `SET STATEMENT max_statement_time=1 FOR SELECT v.genre,v.vote FROM blog_genre_votes v JOIN blogs b ON b.id=v.blog_id
-       WHERE b.slug=? AND b.status='verified' AND v.user_id=? LIMIT 12`,
+       WHERE b.slug=? AND b.status='verified' AND v.user_id=? LIMIT 200`,
       [slug, user.id],
     );
     return {
-      votes: Object.fromEntries(votes.filter((v) => isBlogGenre(v.genre)).map((v) => [v.genre, Number(v.vote)])),
+      votes: Object.fromEntries(votes.filter((v) => isGenreKey(v.genre)).map((v) => [v.genre, Number(v.vote)])),
       admin: await isAdmin(pool, user, options.adminEmails),
       csrfToken: genreCsrfToken(session, options.sessionSecret),
     };
@@ -73,14 +73,14 @@ export function registerBlogGenreRoutes(app: FastifyInstance, options: Options) 
         const params = request.params as { slug: string; genre?: string };
         const body = request.body as Record<string, unknown> | null;
         const key = kind === 'propose' ? 'genre' : kind === 'vote' ? 'vote' : 'action';
-        const genre = kind === 'propose' ? body?.genre : params.genre;
+        // A proposal is whatever the reader typed, folded to its key; votes and admin actions name an existing key.
+        const genre = kind === 'propose' ? genreKey(body?.genre) : isGenreKey(params.genre) ? params.genre : null;
         if (
           !body ||
           typeof body !== 'object' ||
           Array.isArray(body) ||
           Object.keys(body).some((k) => k !== key) ||
           typeof genre !== 'string' ||
-          !isBlogGenre(genre) ||
           !/^[\w.-]{1,255}$/.test(params.slug) ||
           (kind === 'vote' && ![1, -1, 0].includes(body.vote as number)) ||
           (kind === 'admin' && !['set', 'hide', 'release'].includes(body.action as string))

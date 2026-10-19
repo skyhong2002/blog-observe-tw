@@ -85,11 +85,14 @@ describe('blog genre write routes', () => {
     const f = await fixture();
     try {
       for (const req of [
-        request('propose', { genre: 'unknown' }),
+        request('propose', { genre: '旅遊, 生活' }),
+        request('propose', { genre: '###' }),
+        request('propose', { genre: '字'.repeat(21) }),
         request('vote', { vote: 2 }),
         request('admin', { action: 'erase' }),
         request('vote', { vote: 1, userId: 99 }),
-        request('vote', { vote: -1 }, { url: '/api/blogs/a/genres/unknown/vote' }),
+        request('vote', { vote: -1 }, { url: '/api/blogs/a/genres/%23%23/vote' }),
+        request('vote', { vote: -1 }, { url: '/api/blogs/a/genres/Coffee/vote' }),
       ]) {
         expect((await f.app.inject(req)).statusCode).toBe(400);
       }
@@ -109,6 +112,11 @@ describe('blog genre write routes', () => {
       expect((await f.app.inject(request('vote', { vote: 0 }))).statusCode).toBe(200);
       expect(f.writes[3].sql).toContain('DELETE FROM blog_genre_votes');
       expect(f.committed()).toBe(3);
+      // Any genre a reader types: the starting names fold to their keys, everything else to its own folded text.
+      expect((await f.app.inject(request('propose', { genre: '美食' }))).statusCode).toBe(200);
+      expect(f.writes.at(-1)?.args).toEqual([1, 'food', 7, 1]);
+      expect((await f.app.inject(request('propose', { genre: '  ＃Single   Origin  ' }))).statusCode).toBe(200);
+      expect(f.writes.at(-1)?.args).toEqual([1, 'single origin', 7, 1]);
     } finally {
       await f.app.close();
     }

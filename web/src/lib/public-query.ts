@@ -14,13 +14,15 @@ const value = (query: QueryReader, key: string) => query.get(key) ?? undefined;
 
 /* /blogs/ ---------------------------------------------------------------- */
 
-const CATALOG_KEYS = ['q', 'category', 'status', 'sort', 'dir', 'page', 'limit'] as const;
+const CATALOG_KEYS = ['q', 'category', 'genre', 'status', 'sort', 'dir', 'page', 'limit'] as const;
 const catalogSorts = ['name', 'category', 'posts', 'authors', 'latest', 'crawl', 'status'] as const;
 /** A column of the table, or (only while searching) best match first. */
 export type CatalogSort = (typeof catalogSorts)[number] | 'relevance';
 export type CatalogFilters = {
   q: string;
   category: string;
+  /** A genre key, or '-' for blogs no genre is shown for yet (app/src/catalog.js). */
+  genre: string;
   status: string;
   sort: CatalogSort;
   dir: 'asc' | 'desc';
@@ -54,6 +56,7 @@ export function catalogFiltersOf(query: CatalogQuery): CatalogFilters {
   return {
     q,
     category: chars(query.category, 255),
+    genre: chars(query.genre, 40),
     status: chars(query.status, 64),
     sort,
     dir: query.dir === 'asc' || query.dir === 'desc' ? query.dir : ['name', 'category', 'status'].includes(sort) ? 'asc' : 'desc',

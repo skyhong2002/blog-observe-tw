@@ -92,7 +92,7 @@ function SearchBox({ q }: { q: string }) {
     // From the address bar, not the normalised filters: only a column the reader actually clicked stays (the
     // default latest-first order would otherwise override best-match ranking).
     const params = new URLSearchParams(window.location.search);
-    for (const key of ['page', ...['category', 'status'].filter((key) => !params.get(key))]) params.delete(key);
+    for (const key of ['page', ...['category', 'genre', 'status'].filter((key) => !params.get(key))]) params.delete(key);
     if (params.get('sort') === 'relevance') params.delete('sort');
     if (value.trim()) params.set('q', value.trim());
     else params.delete('q');
@@ -164,9 +164,9 @@ export default function BlogCatalogView({
   /** Showing the previous answer while the next search loads. */
   busy?: boolean;
 }) {
-  const { q, sort, dir, category, status: blogStatus, limit } = filters;
-  const query = { q, sort, dir, category, status: blogStatus, ...(limit !== 50 ? { limit: String(limit) } : {}) };
-  const { categories, statuses, blogs: rows } = data;
+  const { q, sort, dir, genre, status: blogStatus, limit } = filters;
+  const query = { q, sort, dir, genre, status: blogStatus, ...(limit !== 50 ? { limit: String(limit) } : {}) };
+  const { genres = [], ungenred = 0, statuses, blogs: rows } = data;
   const { page, pages, total } = data.pagination;
   const ready = status === 'ready';
   const words = q ? [...new Set(fold(q).split(' ').filter(Boolean))] : [];
@@ -242,15 +242,17 @@ export default function BlogCatalogView({
             })),
           ]}
         />
+        {/* Reader and AI genres, several per blog (部落格類型 on each blog page), not the imported category. */}
         <FilterChips
-          label="分類"
+          label="類型"
           items={[
-            { href: href({ category: null }), label: '全部分類', current: !query.category },
-            ...categories.map(({ value, count }) => ({
-              href: href({ category: value }),
-              label: `${value} ${count}`,
-              current: query.category === value,
+            { href: href({ genre: null }), label: '全部類型', current: !query.genre },
+            ...genres.map(({ value, label, count }) => ({
+              href: href({ genre: value }),
+              label: `${label} ${count}`,
+              current: query.genre === value,
             })),
+            ...(ungenred ? [{ href: href({ genre: '-' }), label: `未分類 ${ungenred}`, current: query.genre === '-' }] : []),
           ]}
         />
       </div>
@@ -275,7 +277,9 @@ export default function BlogCatalogView({
               <thead className="bg-zinc-50 text-left text-xs text-zinc-600 dark:bg-zinc-950 dark:text-zinc-400">
                 <tr>
                   <Th col="name" label="部落格" className={table.leadHead} />
-                  <Th col="category" label="分類" />
+                  <th scope="col" className={table.cell}>
+                    類型
+                  </th>
                   <Th col="posts" label="已收錄文章" className="text-right" />
                   <Th col="authors" label="作者" className="text-right" />
                   <Th col="latest" label="最新文章" />
@@ -316,9 +320,19 @@ export default function BlogCatalogView({
                         )}
                       </div>
                     </td>
-                    <td className={table.cell}>
-                      <span className="block max-w-40 truncate" title={blog.category ?? '未分類'}>
-                        {blog.category ?? '未分類'}
+                    <td className={`${table.cell} text-xs`}>
+                      <span className="flex max-w-56 flex-wrap gap-x-2 gap-y-0.5 whitespace-normal">
+                        {(blog.genres ?? []).slice(0, 3).map((g) => (
+                          <Link
+                            key={g.value}
+                            href={href({ genre: g.value })}
+                            scroll={false}
+                            className="text-brand-700 hover:underline dark:text-brand-400"
+                          >
+                            {g.label}
+                          </Link>
+                        ))}
+                        {(blog.genres?.length ?? 0) > 3 && <span className="text-zinc-500">+{(blog.genres?.length ?? 0) - 3}</span>}
                       </span>
                     </td>
                     <td className={table.num}>{blog.postCount?.toLocaleString('zh-TW') ?? '—'}</td>

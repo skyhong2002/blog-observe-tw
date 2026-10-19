@@ -1,5 +1,5 @@
 import type { Pool, RowDataPacket } from 'mysql2/promise';
-import { isBlogGenre } from '../blog-genre-vocabulary.ts';
+import { isGenreKey } from '../blog-genre-vocabulary.ts';
 import { resolveGenre } from '../blog-genres/resolve.ts';
 import { type RobotsStatus, robotsFor, robotsStatuses } from '../crawl/robots-observations.ts';
 
@@ -121,7 +121,7 @@ export async function adminBlogs(pool: Pool) {
   const voteOf = new Map(votes.map((v) => [`${v.blogId}:${v.genre}`, v]));
   const genresOf = new Map<number, AdminBlog['genres']>();
   for (const g of genres) {
-    if (!isBlogGenre(g.genre)) continue;
+    if (!isGenreKey(g.genre)) continue;
     const vote = voteOf.get(`${g.blogId}:${g.genre}`);
     const item = resolveGenre({
       genre: g.genre,

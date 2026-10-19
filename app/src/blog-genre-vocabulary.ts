@@ -25,3 +25,30 @@ export const BLOG_GENRES = {
 } as const;
 export type BlogGenre = keyof typeof BLOG_GENRES;
 export const isBlogGenre = (value: string): value is BlogGenre => Object.hasOwn(BLOG_GENRES, value);
+
+/** Longest reader-written genre, in characters (the column holds 32). */
+export const GENRE_TEXT_LIMIT = 20;
+const LABEL_KEYS = new Map(Object.entries(BLOG_GENRES).map(([key, label]) => [label.toLowerCase(), key as BlogGenre]));
+/**
+ * The stored key for what a reader typed (2026-10-19: readers may add any genre, shown at once). The starting
+ * vocabulary keeps its keys, so 美食, food and ＦＯＯＤ are one genre; anything else is its own folded text
+ * (NFKC, lower case, single spaces, no leading #). null without a letter or digit, too long, separators or control
+ * characters, so the directory's `genre=-` (no genre yet) can never be a genre.
+ */
+export function genreKey(text: unknown): string | null {
+  if (typeof text !== 'string') return null;
+  const folded = text
+    .normalize('NFKC')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .replace(/^#+\s*/, '')
+    .toLowerCase();
+  if (!/[\p{L}\p{N}]/u.test(folded) || Array.from(folded).length > GENRE_TEXT_LIMIT || /[\p{Cc}\p{Cf},，、;；/\\|<>]/u.test(folded))
+    return null;
+  if (isBlogGenre(folded)) return folded;
+  return LABEL_KEYS.get(folded) ?? folded;
+}
+/** A key genreKey could have made: a starting genre or a reader's folded text. */
+export const isGenreKey = (value: unknown): value is string => typeof value === 'string' && genreKey(value) === value;
+/** How a genre reads: the starting vocabulary's name, otherwise the reader's own text. */
+export const genreLabel = (key: string) => (isBlogGenre(key) ? BLOG_GENRES[key] : key);

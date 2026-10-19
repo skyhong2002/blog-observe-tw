@@ -149,7 +149,9 @@ export async function buildApp(config, { logger = false, store = null } = {}) {
   app.get('/api/catalog', async (request, reply) => {
     reply.header('cache-control', 'no-store');
     try {
-      return await loadCatalog(pool, request.query);
+      return await loadCatalog(pool, request.query, {
+        onGenreFailure: () => request.log.warn({ operation: 'catalog.genres' }, 'blog genres unavailable'),
+      });
     } catch {
       return reply.header('cache-control', 'no-store').code(503).send({ error: 'catalog unavailable' });
     }

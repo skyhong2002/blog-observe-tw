@@ -11,7 +11,7 @@
  * list is non-empty: an empty list, a null profile or "unavailable" vocabulary
  * are valid answers. Pure: node --test imports this file.
  */
-import { isBlogGenre } from '../../../app/src/blog-genre-vocabulary.ts';
+import { isGenreKey } from '../../../app/src/blog-genre-vocabulary.ts';
 import { pageInfoOf } from './page-links.ts';
 import type { PublicKind } from './public-paths.ts';
 
@@ -137,7 +137,8 @@ const genreState = (value: unknown) =>
     status: genreStatus,
     items: (items) =>
       rows(items, {
-        genre: (v) => text(v) && isBlogGenre(v as string),
+        genre: isGenreKey,
+        label: text,
         source: (v) => v === 'ai' || v === 'admin' || v === 'community',
         visible: boolean,
         agrees: count,
@@ -149,7 +150,7 @@ const genreState = (value: unknown) =>
 /** The full overview's keys (app/src/overview.js loadProjection). */
 const overviewShape = {
   genreStatus: optional(genreStatus),
-  posts: (value: unknown) => rows(value, { blogGenres: optional((v) => list(v) && v.every((g) => text(g) && isBlogGenre(g as string))) }),
+  posts: (value: unknown) => rows(value, { blogGenres: optional((v) => list(v) && v.every(isGenreKey)) }),
   tags: rows,
   authors: rows,
   blogs: rows,
@@ -372,6 +373,7 @@ export const PUBLIC_CONTRACTS: Record<PublicKind, (raw: unknown) => boolean> = {
     shape(raw, {
       blogs: (value) => rows(value, { slug: text, name: text }),
       categories: rows,
+      genres: optional((value) => rows(value, { value: isGenreKey, label: text, count })),
       statuses: rows,
       totals: (value) => shape(value, { blogs: number, posts: number, withUrls: number, authors: number }),
       pagination,

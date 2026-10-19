@@ -1,3 +1,5 @@
+import { genreKey } from './blog-genre-vocabulary.ts';
+import { loadShownGenres } from './blog-genres/store.ts';
 import { robotsFor, robotsStatuses } from './crawl/robots-observations.ts';
 import { iconManifest } from './v1/favicon-routes.ts';
 import { iconUrl } from './v1/icons.ts';
@@ -21,6 +23,7 @@ const sortColumns = {
 };
 /** The directory opens on the most recently updated blogs; a search opens on the best matches. */
 const DEFAULT_SORT = 'latest';
+export const NO_GENRE = '-';
 const SEARCH_SORT = 'relevance';
 /** Search text as tag.observe.tw folds it: NFKC (full-width ＡＢ → AB), lower case, single spaces. */
 export const searchText = (value) => value.normalize('NFKC').toLowerCase().replace(/\s+/gu, ' ').trim();
@@ -48,6 +51,8 @@ export function catalogFilters(query = {}) {
   return {
     q,
     category: text(query.category, 255),
+    // A genre key (blog-genre-vocabulary.ts genreKey), or '-' for blogs no genre is shown for yet.
+    genre: query.genre === NO_GENRE ? NO_GENRE : (genreKey(query.genre) ?? ''),
     status: text(query.status, 64),
     sort,
     dir: ['asc', 'desc'].includes(query.dir) ? query.dir : ['name', 'category', 'status'].includes(sort) ? 'asc' : 'desc',
@@ -55,10 +60,30 @@ export function catalogFilters(query = {}) {
     limit: Math.min(200, integer(query.limit, 50)),
   };
 }
-export async function loadCatalog(pool, query = {}) {
+export async function loadCatalog(pool, query = {}, { onGenreFailure } = {}) {
   const filters = catalogFilters(query);
   const where = ["b.status='verified'"];
   const parameters = [];
+  // Reader and AI genres, several per blog: the directory's 類型 chips and filter (replacing the imported category).
+  let genreStatus = 'ready';
+  const shown = await loadShownGenres(pool).catch((error) => {
+    genreStatus = 'unavailable';
+    onGenreFailure?.(error);
+    return new Map();
+  });
+  if (filters.genre && genreStatus === 'ready') {
+    const tagged = [...shown.keys()];
+    if (filters.genre === NO_GENRE) {
+      if (tagged.length) {
+        where.push('b.id NOT IN (?)');
+        parameters.push(tagged);
+      }
+    } else {
+      const ids = tagged.filter((id) => shown.get(id).some((item) => item.genre === filters.genre));
+      where.push(ids.length ? 'b.id IN (?)' : '0=1');
+      if (ids.length) parameters.push(ids);
+    }
+  }
   const words = filters.q ? searchWords(filters.q) : [];
   for (const word of words) {
     // utf8mb4_unicode_ci already ignores case; the words are NFKC-folded above.
@@ -120,6 +145,13 @@ export async function loadCatalog(pool, query = {}) {
   ).catch(() => new Map());
   const totals = totalsResult[0][0];
   const facets = (rows) => rows.map((row) => ({ value: row.value, count: Number(row.count) }));
+  // Like the other chips, genre counts describe the whole directory, not the current filters.
+  const genreCounts = new Map();
+  for (const items of shown.values())
+    for (const item of items) genreCounts.set(item.genre, { label: item.label, count: (genreCounts.get(item.genre)?.count ?? 0) + 1 });
+  const genres = [...genreCounts]
+    .map(([value, { label, count }]) => ({ value, label, count }))
+    .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label, 'zh-Hant'));
   return {
     blogs: blogs.map((blog) => ({
       ...blog,
@@ -127,6 +159,7 @@ export async function loadCatalog(pool, query = {}) {
       postCount: Number(blog.postCount),
       authorCount: Number(blog.authorCount),
       robots: robotsFor(robots, blog.url),
+      genres: (shown.get(Number(blog.id)) ?? []).map((item) => ({ value: item.genre, label: item.label })),
     })),
     totals: {
       blogs: Number(totals.blogs),
@@ -136,6 +169,9 @@ export async function loadCatalog(pool, query = {}) {
     },
     updatedAt: totals.updatedAt,
     categories: facets(categoriesResult[0]),
+    genreStatus,
+    genres,
+    ungenred: Number(totals.blogs) - shown.size,
     statuses: facets(statusesResult[0]),
     pagination: { page, pages, pageSize: filters.limit, total },
     filters: { ...filters, page },

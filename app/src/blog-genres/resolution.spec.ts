@@ -13,9 +13,11 @@ describe('resolved blog genres', () => {
     expect(resolveGenre({ ...input, disagrees: 1 }).visible).toBe(true);
     expect(resolveGenre({ ...input, agrees: 2, disagrees: 4 }).visible).toBe(false);
   });
-  it('requires two net community agreements, and votes remain effective after releasing overrides', () => {
-    expect(resolveGenre({ ...input, ai: false, agrees: 2, disagrees: 1 }).visible).toBe(false);
-    expect(resolveGenre({ ...input, ai: false, agrees: 3, disagrees: 1 })).toMatchObject({ visible: true, source: 'community' });
+  it('shows a reader-added genre at once, hides it when disagrees catch up, and votes stay effective after overrides', () => {
+    expect(resolveGenre({ ...input, ai: false, agrees: 1, disagrees: 0 })).toMatchObject({ visible: true, source: 'community' });
+    expect(resolveGenre({ ...input, ai: false, agrees: 1, disagrees: 1 }).visible).toBe(false);
+    expect(resolveGenre({ ...input, ai: false, agrees: 2, disagrees: 1 }).visible).toBe(true);
+    expect(resolveGenre({ ...input, genre: '咖啡', ai: false, agrees: 1 })).toMatchObject({ label: '咖啡', visible: true });
     expect(resolveGenre({ ...input, admin: 'set', disagrees: 20 })).toMatchObject({ visible: true, source: 'admin', disagrees: 20 });
     expect(resolveGenre({ ...input, admin: 'hide', agrees: 20 }).visible).toBe(false);
     expect(resolveGenre({ ...input, admin: null, disagrees: 20 }).visible).toBe(false);
@@ -37,7 +39,7 @@ describe('resolved blog genres', () => {
     expect(result.blogs.size).toBe(0);
     expect(failures).toBe(1);
   });
-  it('bounds one read to requested verified slugs and resolves only known genres', async () => {
+  it('bounds one read to requested verified slugs and resolves only valid genre keys', async () => {
     const calls: { sql: string; args: unknown }[] = [];
     const pool = {
       query: async (sql: string, args: unknown) => {
@@ -45,7 +47,7 @@ describe('resolved blog genres', () => {
         return [
           [
             { slug: 'a', genre: 'food', ai: 1, adminHide: 1, agrees: 20, disagrees: 0 },
-            { slug: 'a', genre: 'unknown', ai: 1 },
+            { slug: 'a', genre: 'a/b', ai: 1, agrees: 0, disagrees: 0 },
           ],
         ];
       },
@@ -56,7 +58,7 @@ describe('resolved blog genres', () => {
     expect(calls[0].sql).toContain("b.status='verified'");
     expect(calls[0].args).toEqual([['a', 'b']]);
     expect(result.get('a')?.items).toEqual([
-      { genre: 'food', source: 'admin', visible: false, agrees: 20, disagrees: 0, adminOverride: 'hide' },
+      { genre: 'food', label: '美食', source: 'admin', visible: false, agrees: 20, disagrees: 0, adminOverride: 'hide' },
     ]);
     expect(result.get('b')).toEqual({ status: 'ready', items: [] });
     await expect(
