@@ -172,8 +172,9 @@ export async function buildApp(config, { logger = false, store = null } = {}) {
   app.get('/api/catalog.opml', async (request, reply) => {
     reply.header('cache-control', 'no-store');
     try {
-      const { filters, feeds } = await loadCatalogFeeds(pool, request.query);
-      const named = [filters.q && `「${filters.q}」`, filters.status, filters.genre, filters.kind].filter(Boolean);
+      const { filters, genreLabel, feeds } = await loadCatalogFeeds(pool, request.query);
+      const kinds = { personal: '個人', group: '多人', organization: '組織', unknown: '經營者未確認' };
+      const named = [filters.q && `「${filters.q}」`, filters.status, genreLabel, kinds[filters.kind]].filter(Boolean);
       return reply
         .type('text/x-opml; charset=utf-8')
         .header('content-disposition', 'attachment; filename=blog-observe-directory.opml')

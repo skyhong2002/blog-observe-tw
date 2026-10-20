@@ -207,7 +207,12 @@ export async function loadCatalog(pool, query = {}, options = {}) {
 export const OPML_LIMIT = 1000;
 export async function loadCatalogFeeds(pool, query = {}) {
   const filters = catalogFilters(query);
-  const { condition, parameters } = await catalogCondition(pool, filters);
+  const { condition, parameters, shown } = await catalogCondition(pool, filters);
+  // The chip text of the asked genre, for the file's title ('-' is 未分類).
+  const genreLabel =
+    filters.genre === NO_GENRE
+      ? '未分類'
+      : ([...shown.values()].flat().find((item) => item.genre === filters.genre)?.label ?? filters.genre);
   // The newest feed that last worked, as /me/opml picks it; blogs without one are left out.
   const [rows] = await pool.query(
     `SELECT b.name,b.url,f.url AS feedUrl,f.type FROM blogs b
@@ -216,5 +221,5 @@ export async function loadCatalogFeeds(pool, query = {}) {
       WHERE ${condition} ORDER BY b.name,b.id LIMIT ?`,
     [...parameters, OPML_LIMIT],
   );
-  return { filters, feeds: rows };
+  return { filters, genreLabel: filters.genre ? genreLabel : '', feeds: rows };
 }

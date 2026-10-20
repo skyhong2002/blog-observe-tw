@@ -263,11 +263,14 @@ export default function BlogCatalogView({
             label="經營者"
             items={[
               { href: href({ kind: null }), label: '全部經營者', current: !query.kind },
-              ...kinds.map(({ value, count }) => ({
-                href: href({ kind: value }),
-                label: `${SITE_KIND_LABELS[value] ?? value} ${count}`,
-                current: query.kind === value,
-              })),
+              // An empty kind is left out unless it is the one asked for.
+              ...kinds
+                .filter(({ value, count }) => count > 0 || query.kind === value)
+                .map(({ value, count }) => ({
+                  href: href({ kind: value }),
+                  label: `${SITE_KIND_LABELS[value] ?? value} ${count}`,
+                  current: query.kind === value,
+                })),
             ]}
           />
         )}
