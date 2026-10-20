@@ -10,6 +10,7 @@ import { filterChipClass, filterRowClass } from '@/components/FilterChips';
 import FooterMethod, { methodHeading } from '@/components/FooterMethod';
 import MethodLink from '@/components/MethodLink';
 import Link from '@/components/NoPrefetchLink';
+import { SectionUnavailable } from '@/components/SectionBoundary';
 import SectionTabs from '@/components/SectionTabs';
 import { taipei } from '@/lib/api';
 import { blogLink } from '@/lib/page-links';
@@ -37,7 +38,7 @@ export default function RelationMapView({ days, load }: { days: Period; load: Pu
           正在載入近 {days} 天的關係資料…
         </p>
       ) : (
-        <p role="status">關係資料暫時無法讀取，請稍後再試。</p>
+        <SectionUnavailable label="關係資料" />
       )}
       <FooterMethod page notes={load.status === 'ready' ? <RelationNotes data={load.data} /> : null} />
     </div>
@@ -243,8 +244,9 @@ function RelationNotes({ data }: { data: Relations }) {
 const parseRelations = asIs<Relations>;
 
 /** Reads ?days= (inside the page's Suspense boundary); periods other than the prerendered one come from /api/relations. */
-export function RelationMapFromUrl({ baseline }: { baseline: Relations }) {
+export function RelationMapFromUrl({ baseline }: { baseline: Relations | null }) {
   const days = periodOf(useSearchParams(), RELATIONS_PERIOD);
-  const load = usePublicJson(days === RELATIONS_PERIOD ? null : relationsApiPath(days), parseRelations);
-  return <RelationMapView days={days} load={load ?? { status: 'ready', data: baseline }} />;
+  // No server baseline (its read failed): the browser reads the 90-day map like the other periods.
+  const load = usePublicJson(days === RELATIONS_PERIOD && baseline ? null : relationsApiPath(days), parseRelations);
+  return <RelationMapView days={days} load={load ?? (baseline ? { status: 'ready', data: baseline } : { status: 'pending' })} />;
 }

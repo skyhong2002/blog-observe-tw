@@ -416,12 +416,13 @@ describe('topic ranking', () => {
 
   for (const [name, state, expected] of [
     ['pending', { status: 'pending' }, '正在載入近 7 天的話題…'],
-    ['error', { status: 'error' }, '話題資料暫時無法讀取，請稍後再試。'],
+    // The failure box: the sentence and its retry button.
+    ['error', { status: 'error' }, '話題資料暫時無法載入，請稍後再試。重新載入'],
   ] as const) {
     test(`${name}: one block with only the generic source notes`, () => {
       const $ = render(<TopicRankingView days="7" load={state} />, '/topics/');
       const block = expectOnePageBlock($);
-      const message = $('main p[role="status"]');
+      const message = $('main [role="status"]').first();
       expect(message.text()).toBe(expected);
       expect(position($, message)).toBeLessThan(position($, block));
       expect(block.text()).not.toContain('話題計算方式');
@@ -481,4 +482,15 @@ describe('framework error and 404 pages', () => {
       expect($('details').length).toBe(0);
     });
   }
+});
+
+describe('a failed server baseline', () => {
+  test('/topics/ without a baseline reads the 30-day ranking in the browser instead of failing the page', () => {
+    publicJson.paths = [];
+    publicJson.load = { status: 'pending' };
+    const $ = render(<TopicRankingFromUrl baseline={null} />, '/topics/');
+    expect(publicJson.paths).toContain(topicsApiPath('30'));
+    expect($('main [role="status"]').first().text()).toBe('正在載入近 30 天的話題…');
+    expect($('h1').text()).toBe('大家正在寫什麼');
+  });
 });

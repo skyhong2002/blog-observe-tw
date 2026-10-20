@@ -7,6 +7,7 @@ import { useState } from 'react';
 import FooterMethod from '@/components/FooterMethod';
 import MethodLink from '@/components/MethodLink';
 import Link from '@/components/NoPrefetchLink';
+import { SectionUnavailable } from '@/components/SectionBoundary';
 import SectionTabs from '@/components/SectionTabs';
 import SortIndicator from '@/components/SortIndicator';
 import TableScroller from '@/components/TableScroller';
@@ -41,7 +42,7 @@ export default function TopicRankingView({ days, load }: { days: Period; load: P
           正在載入近 {days} 天的話題…
         </p>
       ) : (
-        <p role="status">話題資料暫時無法讀取，請稍後再試。</p>
+        <SectionUnavailable label="話題資料" />
       )}
       <FooterMethod
         page
@@ -153,8 +154,9 @@ function TopicRows({ days, data }: { days: Period; data: Topics }) {
 const parseTopics = asIs<Topics>;
 
 /** Reads ?days= (inside the page's Suspense boundary); periods other than the prerendered one come from /api/topics. */
-export function TopicRankingFromUrl({ baseline }: { baseline: Topics }) {
+export function TopicRankingFromUrl({ baseline }: { baseline: Topics | null }) {
   const days = periodOf(useSearchParams(), TOPICS_PERIOD);
-  const load = usePublicJson(days === TOPICS_PERIOD ? null : topicsApiPath(days), parseTopics);
-  return <TopicRankingView days={days} load={load ?? { status: 'ready', data: baseline }} />;
+  // No server baseline (its read failed): the browser reads the 30-day ranking like the other periods.
+  const load = usePublicJson(days === TOPICS_PERIOD && baseline ? null : topicsApiPath(days), parseTopics);
+  return <TopicRankingView days={days} load={load ?? (baseline ? { status: 'ready', data: baseline } : { status: 'pending' })} />;
 }
