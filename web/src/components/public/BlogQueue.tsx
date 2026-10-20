@@ -93,6 +93,7 @@ export function BlogQueueView({
   submit?: React.ReactNode;
 }) {
   const filters = queue?.filters ?? { q: '', state: '', source: '', page: 1, sort: 'added', dir: 'desc' };
+  const reasons = Boolean(queue?.items.some((item) => candidateReasonText(item.reason)));
   const href = (patch: Record<string, string | null>) => {
     // The default order (newest added first) stays out of the link.
     const sorted = filters.sort !== 'added' || filters.dir !== 'desc';
@@ -190,13 +191,14 @@ export function BlogQueueView({
         </p>
       ) : queue.items.length ? (
         <>
+          {/* 說明 only when a row on this page has one; an unchecked site leaves 最近檢查 blank. */}
           <TableScroller card label="待查清單表格，可左右捲動">
             <table aria-busy={status === 'pending'} className={`w-full min-w-[52rem] text-sm ${status === 'pending' ? 'opacity-60' : ''}`}>
               <thead className="bg-zinc-50 text-left text-xs text-zinc-600 dark:bg-zinc-950 dark:text-zinc-400">
                 <tr>
                   <Th col="site" label="網站" lead />
                   <Th col="state" label="狀態" />
-                  <Th label="說明" />
+                  {reasons && <Th label="說明" />}
                   <Th col="source" label="來源" />
                   <Th col="checked" label="最近檢查" />
                   <Th col="added" label="加入" />
@@ -232,9 +234,13 @@ export function BlogQueueView({
                         QUEUE_STATE_LABELS[item.state]
                       )}
                     </td>
-                    <td className={`${table.cell} text-xs text-zinc-600 dark:text-zinc-400`}>{candidateReasonText(item.reason)}</td>
+                    {reasons && (
+                      <td className={`${table.cell} text-xs text-zinc-600 dark:text-zinc-400`}>{candidateReasonText(item.reason)}</td>
+                    )}
                     <td className={`${table.cell} whitespace-nowrap text-xs`}>{CANDIDATE_SOURCES[item.source] ?? item.source}</td>
-                    <td className={`${table.cell} whitespace-nowrap text-xs tabular-nums text-zinc-500`}>{taipei(item.checkedAt)}</td>
+                    <td className={`${table.cell} whitespace-nowrap text-xs tabular-nums text-zinc-500`}>
+                      {item.checkedAt ? taipei(item.checkedAt) : ''}
+                    </td>
                     <td className={`${table.cell} whitespace-nowrap text-xs tabular-nums text-zinc-500`}>{taipei(item.addedAt)}</td>
                   </tr>
                 ))}

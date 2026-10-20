@@ -48,6 +48,7 @@ export default function ProfilePostsView({ blog, posts: allPosts, query }: { blo
           {posts.map((post) => (
             <ArticleListItem
               key={post.id ?? post.guid ?? post.url}
+              hideBlog={!post.blogSlug || post.blogSlug === blog.slug}
               post={{
                 ...post,
                 blogSlug: post.blogSlug ?? blog.slug,

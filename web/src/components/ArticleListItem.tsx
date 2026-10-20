@@ -14,8 +14,11 @@ export default function ArticleListItem({
   snippet,
   matchSource,
   evidence,
+  hideBlog = false,
 }: {
   post: Post;
+  /** On the blog's own page every row is that blog: its icon and name are left out. */
+  hideBlog?: boolean;
   /** Search hit context from /api/search, already plain text and ≤240 characters. */
   snippet?: string | null;
   /** Where the search matched; shown as a small label beside the snippet. */
@@ -33,7 +36,7 @@ export default function ArticleListItem({
     mediaTitle: post.blogName,
   };
   const href = article.url;
-  const showMedia = Boolean(article.media);
+  const showMedia = Boolean(article.media) && !hideBlog;
   // Display text only: entities are decoded once here; post.title itself is left as the gateway sent it.
   const shownTitle = displayTitle(post.title);
   const match = /^\[([^\]]{1,20})\]\s*([\s\S]+)$/.exec(shownTitle);
