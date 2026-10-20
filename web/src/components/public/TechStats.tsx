@@ -91,9 +91,11 @@ function RankTable({ technologies, scanned, filters }: { technologies: TechTechn
             // Low-confidence hosting / CDN rows follow the site software under their own heading row, so a large
             // count there (Cloudflare) does not read as out of order.
             const firstInfra = infra && (i === 0 || !isInfra(rows[i - 1].category));
+            // Most-used versions first, so the three shown are the ones that matter; the title keeps the gateway's order.
             const all = explicitVersions(tech).map((v) => `${v.version}（${v.blogs}）`);
+            const byUse = [...explicitVersions(tech)].sort((a, b) => b.blogs - a.blogs).map((v) => `${v.version}（${v.blogs}）`);
             const versions = all.join('、');
-            const shown = all.length > VERSIONS_SHOWN ? `${all.slice(0, VERSIONS_SHOWN).join('、')} 等 ${all.length} 個版本` : versions;
+            const shown = all.length > VERSIONS_SHOWN ? `${byUse.slice(0, VERSIONS_SHOWN).join('、')} 等 ${all.length} 個版本` : versions;
             return (
               <Fragment key={tech.id}>
                 {firstInfra ? (

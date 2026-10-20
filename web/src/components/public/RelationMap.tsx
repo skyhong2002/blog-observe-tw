@@ -3,9 +3,10 @@
 // One view for the prerendered 90-day relation map and the browser's ?days=7|30; see app/relations/page.tsx.
 
 import { useSearchParams } from 'next/navigation';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import BlogIcon from '@/components/BlogIcon';
 import BlogRelationGraph from '@/components/BlogRelationGraph';
+import { filterChipClass, filterRowClass } from '@/components/FilterChips';
 import FooterMethod, { methodHeading } from '@/components/FooterMethod';
 import MethodLink from '@/components/MethodLink';
 import Link from '@/components/NoPrefetchLink';
@@ -60,8 +61,26 @@ function MoreButton({ total, open, onClick }: { total: number; open: boolean; on
   );
 }
 
+/** Narrower views of a dense period: links whose two blogs both mention each other, or links of 3+ articles. */
+const GRAPH_VIEWS = [
+  { key: 'all', label: '全部連結' },
+  { key: 'mutual', label: '互相提及' },
+  { key: 'repeat', label: '提及 3 篇以上' },
+] as const;
+type GraphView = (typeof GRAPH_VIEWS)[number]['key'];
+
+/** The graph in one view; the lists below always cover the whole period. */
+function graphFor(data: Relations, view: GraphView) {
+  if (view === 'all') return { nodes: data.nodes, edges: data.edges };
+  const edges = data.edges.filter((e) => (view === 'mutual' ? e.mutual : e.count >= 3));
+  const kept = new Set(edges.flatMap((e) => [e.sourceBlogId, e.targetBlogId]));
+  return { nodes: data.nodes.filter((n) => kept.has(n.id)), edges };
+}
+
 function RelationDetails({ data }: { data: Relations }) {
   const [showAll, setShowAll] = useState({ most: false, mutual: false });
+  const [view, setView] = useState<GraphView>('all');
+  const graph = useMemo(() => graphFor(data, view), [data, view]);
   const nodes = new Map(data.nodes.map((n) => [n.id, n]));
   const name = (id: number) => nodes.get(id)?.name ?? `部落格 #${id}`;
   const blog = (id: number) => {
@@ -98,8 +117,26 @@ function RelationDetails({ data }: { data: Relations }) {
   return (
     <>
       {data.edges.length > 0 && (
-        <section className="rounded-xl border border-zinc-300 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">
-          <BlogRelationGraph nodes={data.nodes} edges={data.edges} />
+        <section className="space-y-3 rounded-xl border border-zinc-300 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">
+          <div className={`${filterRowClass} justify-between`}>
+            <div role="group" aria-label="關係圖範圍" className={filterRowClass}>
+              {GRAPH_VIEWS.map((v) => (
+                <button
+                  key={v.key}
+                  type="button"
+                  aria-pressed={view === v.key}
+                  onClick={() => setView(v.key)}
+                  className={filterChipClass(view === v.key)}
+                >
+                  {v.label}
+                </button>
+              ))}
+            </div>
+            <span role="status" className="text-xs tabular-nums text-zinc-500 dark:text-zinc-400">
+              {graph.nodes.length} 個部落格 · {graph.edges.length} 條連結
+            </span>
+          </div>
+          <BlogRelationGraph nodes={graph.nodes} edges={graph.edges} />
         </section>
       )}
       {/* min-w-0: a grid item is otherwise as wide as its widest row, and two long chips pushed the page sideways. */}
@@ -180,6 +217,10 @@ function RelationNotes({ data }: { data: Relations }) {
         {data.coverage.graphTruncated ? '圖中只顯示部分節點與連結。' : ''}
       </p>
       <p>連結明細的「篇」是提及方提到目標站的文章數。</p>
+      <p>
+        關係圖上方的「互相提及」只畫兩個方向都有正文提及的連結，「提及 3 篇以上」只畫同一方向有 3
+        篇以上文章的連結；最常被提及、互相提及與連結明細仍涵蓋整段期間。
+      </p>
       <p>文章依每日預算逐批分析；這段期間沒有可確認的提及時，關係圖、最常被提及與互相提及留白，不代表各站之間沒有連結。</p>
       {data.coverage.aggregationTruncated ? <p>關係統計超過 10,000 條上限，排行僅呈現目前可載入的部分。</p> : null}
       {/* countText: a count the gateway did not send is 未提供, never 0. */}
