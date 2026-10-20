@@ -1,13 +1,9 @@
 'use client';
-import { useRouter } from 'next/navigation';
-import { startTransition, useState } from 'react';
 import Link from '@/components/NoPrefetchLink';
 import TopicMethodFallback from '@/components/TopicMethodFallback';
 
-// reset() alone only re-renders on the client; a server read that failed must be read again (router.refresh) first.
-export default function ErrorPage({ reset }: { error: Error; reset: () => void }) {
-  const router = useRouter();
-  const [retrying, setRetrying] = useState(false);
+// retry() re-fetches the segment's server data and re-renders it (reset() alone would redraw the same failure).
+export default function ErrorPage({ retry }: { error: Error; retry: () => void }) {
   return (
     <>
       <section className="space-y-4 py-12">
@@ -16,18 +12,10 @@ export default function ErrorPage({ reset }: { error: Error; reset: () => void }
         <div className="flex flex-wrap items-center gap-3">
           <button
             type="button"
-            disabled={retrying}
-            onClick={() => {
-              setRetrying(true);
-              startTransition(() => {
-                router.refresh();
-                reset();
-                setRetrying(false);
-              });
-            }}
-            className="rounded-full bg-brand-700 px-4 py-2 text-sm text-white hover:bg-brand-800 disabled:opacity-60"
+            onClick={() => retry()}
+            className="rounded-full bg-brand-700 px-4 py-2 text-sm text-white hover:bg-brand-800"
           >
-            {retrying ? '重新載入中…' : '重新載入'}
+            重新載入
           </button>
           <Link href="/" className="rounded-full border border-zinc-300 px-4 py-2 text-sm hover:border-brand-700 dark:border-zinc-700">
             回首頁

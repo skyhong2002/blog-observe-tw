@@ -30,7 +30,6 @@ const flag = vi.hoisted(() => ({ on: true }));
 vi.mock('next/navigation', () => ({
   usePathname: () => nav.pathname,
   useSearchParams: () => new URLSearchParams(nav.search),
-  useRouter: () => ({ refresh: () => undefined }),
   notFound: () => {
     throw new Error('NEXT_NOT_FOUND');
   },
@@ -515,7 +514,7 @@ describe('/tech/ server page and its switches', () => {
   test('a gateway failure is thrown to the error page, which keeps one method block on /tech/', async () => {
     gateway.answer = () => Promise.reject(new PublicGatewayError('/api/tech', 503));
     await expect(TechPage()).rejects.toBeInstanceOf(PublicGatewayError);
-    for (const page of [<ErrorPage key="error" error={new Error('boom')} reset={() => undefined} />, <NotFound key="404" />]) {
+    for (const page of [<ErrorPage key="error" error={new Error('boom')} retry={() => undefined} />, <NotFound key="404" />]) {
       const $ = render(page);
       expectOneBlock($);
       expect(blogTable($).length).toBe(0);

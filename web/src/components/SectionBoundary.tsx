@@ -1,35 +1,19 @@
 'use client';
 
-// A section-sized error boundary: a read that throws inside it (a server component streamed in its own Suspense)
-// replaces only that section, not the whole page (app/error.tsx). The fallback says the section failed and offers a
-// retry that re-reads the page's server data (router.refresh), so a slow gateway answer can be tried again in place.
-// `quiet` sections (decoration such as the masthead cloud) render nothing when they fail.
+// A section-sized error boundary (next/error catchError): a read that throws inside it (a server component streamed
+// in its own Suspense) replaces only that section, not the whole page (app/error.tsx). The fallback says the section
+// failed and offers retry(), which re-fetches and re-renders just this boundary's children, so a slow gateway answer
+// can be tried again in place. `quiet` sections (decoration such as the masthead cloud) render nothing when they fail.
 
-import { useRouter } from 'next/navigation';
-import { Component, type ReactNode, startTransition } from 'react';
+import { catchError, type ErrorInfo } from 'next/error';
 
-type Props = { label?: string; quiet?: boolean; className?: string; children: ReactNode };
+type Props = { label?: string; quiet?: boolean; className?: string };
 
-class Boundary extends Component<Props & { retry: () => void }, { failed: boolean }> {
-  state = { failed: false };
-  static getDerivedStateFromError() {
-    return { failed: true };
-  }
-  // A refresh brings a new server payload as new children: try them, instead of keeping the old failure.
-  componentDidUpdate(prev: Props) {
-    if (this.state.failed && prev.children !== this.props.children) this.setState({ failed: false });
-  }
-  render() {
-    if (!this.state.failed) return this.props.children;
-    if (this.props.quiet) return null;
-    return <SectionUnavailable label={this.props.label} className={this.props.className} onRetry={this.props.retry} />;
-  }
+function SectionFallback({ label, quiet, className }: Props, { retry }: ErrorInfo) {
+  return quiet ? null : <SectionUnavailable label={label} className={className} onRetry={() => retry()} />;
 }
 
-export default function SectionBoundary(props: Props) {
-  const router = useRouter();
-  return <Boundary {...props} retry={() => startTransition(() => router.refresh())} />;
-}
+export default catchError(SectionFallback);
 
 /** 「…暫時無法載入，請稍後再試。」 with a retry; the same words a failed section uses everywhere. */
 export function SectionUnavailable({ label, className, onRetry }: { label?: string; className?: string; onRetry?: () => void }) {
