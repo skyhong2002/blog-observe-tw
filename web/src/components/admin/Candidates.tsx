@@ -30,6 +30,7 @@ const STATUSES = [
 const SOURCES: Record<string, string> = {
   'blogblog-club': 'BlogBlog.Club 名單',
   'indieweb-wiki': 'IndieWeb 名單',
+  indieping: 'IndiePing 名單',
   'article-link': '文章裡的連結',
   blogroll: '部落格友站連結',
   'seed-url-resolution': '種子名單',

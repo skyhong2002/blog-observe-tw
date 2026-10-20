@@ -46,14 +46,28 @@ export function indiewebListing(evidence: unknown): string | null {
   const page = object(object(evidence).indiewebListing).page;
   return page === INDIEWEB_LISTING ? page : null;
 }
+/** IndiePing (JN's hand-approved list of Chinese indie blogs, crawl/indieping.ts; reuse agreed 2026-10-21). Like the
+ * IndieWeb list, a member counts as listed only when its home is in Chinese. */
+export const INDIEPING_LISTING = 'https://indieping.giveanornot.com/';
+export function indiepingListing(evidence: unknown): string | null {
+  const page = object(object(evidence).indiepingListing).page;
+  return page === INDIEPING_LISTING ? page : null;
+}
+/** Listings whose members must also have a Chinese home (candidate-validation.ts). */
+export const CHINESE_ONLY_LISTINGS = new Set(['indieweb-wiki', 'indieping']);
 /** The directory listing a candidate of this source carries, else null. */
 export function listingOf(sourceType: string, evidence: unknown): string | null {
   if (sourceType === 'blogblog-club') return directoryListing(evidence);
   if (sourceType === 'indieweb-wiki') return indiewebListing(evidence);
+  if (sourceType === 'indieping') return indiepingListing(evidence);
   return null;
 }
 export const listingLabel = (sourceType: string) =>
-  sourceType === 'indieweb-wiki' ? 'IndieWeb 名單自動收錄' : 'BlogBlog.Club 名單自動收錄';
+  sourceType === 'indieweb-wiki'
+    ? 'IndieWeb 名單自動收錄'
+    : sourceType === 'indieping'
+      ? 'IndiePing 名單自動收錄'
+      : 'BlogBlog.Club 名單自動收錄';
 /** Mostly Chinese: declared zh, or Han characters dominate the visible text (and it is not Japanese kana text). */
 export function chineseContent(lang: string, text: string) {
   if (/^zh\b/i.test(lang.trim())) return true;

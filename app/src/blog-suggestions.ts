@@ -90,7 +90,15 @@ export async function suggestionState(pool: Pool, input: unknown): Promise<Sugge
 // Owner-excluded hosts and readers' private OPML imports are never listed.
 export const QUEUE_STATES = ['waiting', 'failed', 'listed', 'rejected'] as const;
 export type QueueState = (typeof QUEUE_STATES)[number];
-export const QUEUE_SOURCES = ['reader-suggestion', 'blogblog-club', 'indieweb-wiki', 'article-link', 'blogroll', 'seed-url-resolution'];
+export const QUEUE_SOURCES = [
+  'reader-suggestion',
+  'blogblog-club',
+  'indieweb-wiki',
+  'indieping',
+  'article-link',
+  'blogroll',
+  'seed-url-resolution',
+];
 export const QUEUE_SORTS = ['added', 'checked', 'site', 'state', 'source'] as const;
 export type QueueSort = (typeof QUEUE_SORTS)[number];
 /** Dates start newest first; text and state columns start from the top of their order. */

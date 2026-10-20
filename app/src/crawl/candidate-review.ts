@@ -125,6 +125,7 @@ export async function runCandidateReviewBatch(
      AND ${robotsReopened()}))`
    }
    ORDER BY JSON_EXTRACT(source_evidence,'$.directoryListing') IS NULL AND JSON_EXTRACT(source_evidence,'$.indiewebListing') IS NULL
+     AND JSON_EXTRACT(source_evidence,'$.indiepingListing') IS NULL
      AND source_type<>'reader-suggestion',
      COALESCE(JSON_UNQUOTE(JSON_EXTRACT(source_evidence,'$.automaticReview.checkedAt')),''),id LIMIT ?`,
       // A spent per-host or admission budget is retried once it resets (the next UTC day), not after the weekly recheck;

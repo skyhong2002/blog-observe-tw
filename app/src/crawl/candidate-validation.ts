@@ -3,7 +3,7 @@ import { XMLParser, XMLValidator } from 'fast-xml-parser';
 import { type PersonalEvidence, personalHomepage } from '../ai/personal.ts';
 import { type SitemapArticleEvidence, verifyArticleSitemap } from '../ai/publication-sitemap.ts';
 import { identityKey, publicationDecision } from '../relations/identity.ts';
-import { chineseContent, listingOf } from './directory-listing.ts';
+import { CHINESE_ONLY_LISTINGS, chineseContent, listingOf } from './directory-listing.ts';
 import { type FeedCrawlerOptions, isAllowedCrawlUrl, parseFeed, politeFetch, ROBOTS_UNREACHABLE, readFeedBody } from './feed.ts';
 import { seedIdentityKey } from './seed-url-resolution.ts';
 import { isSeedPlatformRoot, type SeedUrlValidation, validateSeedUrl } from './seed-url-validation.ts';
@@ -183,13 +183,13 @@ export async function validateCandidate(candidate: DiscoveryCandidate, options: 
       return result;
     }
     const html = await readFeedBody(home);
-    // IndieWeb members are listed only when their home is in Chinese; others stay ordinary, unreviewed candidates.
-    if (candidate.source_type === 'indieweb-wiki') {
+    // IndieWeb and IndiePing members are listed only when their home is in Chinese; others stay ordinary candidates.
+    if (CHINESE_ONLY_LISTINGS.has(candidate.source_type)) {
       const $ = cheerio.load(html);
       $('script,style,noscript,template').remove();
       if (!chineseContent($('html').attr('lang') || '', $('body').text().slice(0, 20000))) {
         delete result.directoryListing;
-        result.reason = 'indieweb_listing_not_chinese';
+        result.reason = candidate.source_type === 'indieping' ? 'indieping_listing_not_chinese' : 'indieweb_listing_not_chinese';
         return result;
       }
     }

@@ -12,7 +12,7 @@ import {
   candidatePreflight,
   publicationContains,
 } from './candidate-validation.ts';
-import { DIRECTORY_ADMISSIONS_DAILY, listingLabel, listingOf } from './directory-listing.ts';
+import { CHINESE_ONLY_LISTINGS, DIRECTORY_ADMISSIONS_DAILY, listingLabel, listingOf } from './directory-listing.ts';
 import { isAllowedCrawlUrl } from './feed.ts';
 import { seedIdentityKey } from './seed-url-resolution.ts';
 
@@ -132,8 +132,8 @@ export async function recordCandidateCheck(
     }
     // Re-read from the locked row, never from the check: a BlogBlog.Club listing replaces the personal-homepage proof.
     const listing = listingOf(candidate.source_type, sourceEvidence);
-    // An IndieWeb listing counts only once validation found the home Chinese (it then carries the listing).
-    const listed = listing && (candidate.source_type !== 'indieweb-wiki' || check.directoryListing === listing) ? listing : null;
+    // An IndieWeb or IndiePing listing counts only once validation found the home Chinese (it then carries the listing).
+    const listed = listing && (!CHINESE_ONLY_LISTINGS.has(candidate.source_type) || check.directoryListing === listing) ? listing : null;
     const effectiveName =
       check.enrichedName && (['article-link', 'blogroll', 'reader-suggestion'].includes(candidate.source_type) || listed)
         ? check.enrichedName

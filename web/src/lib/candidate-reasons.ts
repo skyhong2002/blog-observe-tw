@@ -6,6 +6,7 @@ export const CANDIDATE_SOURCES: Record<string, string> = {
   'reader-suggestion': '讀者新增',
   'blogblog-club': 'BlogBlog.Club 名單',
   'indieweb-wiki': 'IndieWeb 名單',
+  indieping: 'IndiePing 名單',
   'article-link': '文章裡的連結',
   blogroll: '部落格友站連結',
   'seed-url-resolution': '種子名單',
@@ -14,7 +15,7 @@ export const CANDIDATE_SOURCES: Record<string, string> = {
 /** First match wins; a spent daily budget is a wait, not a failure, so it says nothing. */
 const REASONS: Array<[RegExp, string]> = [
   [/budget_exhausted/, ''],
-  [/indieweb_listing_not_chinese/, '首頁不是中文'],
+  [/listing_not_chinese/, '首頁不是中文'],
   [/^homepage_|fetch_failed|timeout/, '首頁打不開'],
   [/personal|organization/, '還無法確認是個人部落格'],
   [/missing_identity_name/, '首頁沒有網站名稱'],
