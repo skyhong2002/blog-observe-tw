@@ -18,10 +18,13 @@ export default async function BlogTopics({ slug }: { slug: string }) {
             <li key={t.id}>
               <Link
                 {...topicLink(t.id, t.canonicalPath, BLOG_TOPICS_PERIOD)}
-                className="inline-flex rounded-md border border-zinc-300 px-3 py-2 text-sm hover:bg-zinc-100 dark:border-zinc-700 dark:hover:bg-zinc-800"
+                className="inline-flex items-baseline gap-1.5 rounded-full border border-zinc-300 px-3 py-1.5 text-sm hover:border-brand-700 dark:border-zinc-700 dark:hover:border-brand-400"
               >
-                {t.label} · {t.posts} 篇
-                <span className="ml-2 text-xs text-zinc-500 dark:text-zinc-400">{t.source === 'rss-category' ? 'RSS' : '共同詞彙'}</span>
+                {t.label}
+                <span className="sr-only"> · </span>
+                <span className="text-xs tabular-nums text-zinc-500 dark:text-zinc-400">
+                  {t.posts} 篇{t.source === 'rss-category' ? ' · RSS' : ''}
+                </span>
               </Link>
             </li>
           ))}

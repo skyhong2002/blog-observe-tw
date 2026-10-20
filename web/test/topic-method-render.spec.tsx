@@ -27,6 +27,7 @@ const publicJson = vi.hoisted(() => ({ load: null as unknown, paths: [] as Array
 vi.mock('next/navigation', () => ({
   usePathname: () => nav.pathname,
   useSearchParams: () => new URLSearchParams(nav.search),
+  useRouter: () => ({ refresh: () => undefined }),
 }));
 vi.mock('next/link', async () => {
   const { createElement } = await import('react');
@@ -444,7 +445,7 @@ describe('topic ranking', () => {
 
 describe('framework error and 404 pages', () => {
   const pages = [
-    ['error', <ErrorPage key="error" error={new Error('boom')} reset={() => undefined} />, '資料暫時無法載入'],
+    ['error', <ErrorPage key="error" error={new Error('boom')} reset={() => undefined} />, '這一頁暫時無法載入'],
     ['404', <NotFound key="404" />, '找不到這個頁面'],
   ] as const;
 

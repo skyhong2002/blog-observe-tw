@@ -42,6 +42,19 @@ function loadedIcons(urls: string[]): Promise<Set<string>> {
     ),
   ).then((list) => new Set(list.filter((url): url is string => url !== null)));
 }
+/**
+ * A blog without a usable icon: its first character on a rounded square, the same stand-in MediaIcon uses in the
+ * lists below, so every node can still be told apart without hovering. An inline SVG (no request).
+ */
+export function glyphSymbol(name: string, dark: boolean) {
+  const letter = (Array.from(name.trim())[0] ?? '?').replace(/[<>&"']/g, '?');
+  const [bg, fg] = dark ? ['#3f3f46', '#e4e4e7'] : ['#e4e4e7', '#52525b'];
+  const svg =
+    `<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">` +
+    `<rect width="64" height="64" rx="12" fill="${bg}"/>` +
+    `<text x="32" y="33" font-size="38" font-family="sans-serif" fill="${fg}" text-anchor="middle" dominant-baseline="central">${letter}</text></svg>`;
+  return `image://data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+}
 function extent(points: number[][]) {
   const xs = points.map((p) => p[0]),
     ys = points.map((p) => p[1]);
@@ -51,6 +64,8 @@ function extent(points: number[][]) {
 }
 export default function BlogRelationGraph({ nodes, edges }: { nodes: RelationNode[]; edges: RelationEdge[] }) {
   const ref = useRef<HTMLDivElement>(null);
+  // Panning and zooming (roam) have no way back of their own; this redraws the settled layout at its fitted view.
+  const reset = useRef<() => void>(() => undefined);
   useEffect(() => {
     if (!ref.current) return;
     const chart = echarts.init(ref.current);
@@ -116,14 +131,14 @@ export default function BlogRelationGraph({ nodes, edges }: { nodes: RelationNod
                 ...labelStyle(),
               },
               lineStyle: { color: dark ? '#a1a1aa' : '#71717a', opacity: 0.55, curveness: 0.12 },
-              // Each blog is drawn as its own icon; without one (or when it does not load), a green dot.
+              // Each blog is drawn as its own icon; without one (or when it does not load), its first character.
               data: linked.map((n, i) => {
                 const src = icon.get(n.id);
                 return {
                   id: String(n.id),
                   name: n.name,
                   ...(placed ? { x: placed.points[i][0], y: placed.points[i][1] } : {}),
-                  symbol: src && loaded.has(src) ? `image://${src}` : 'circle',
+                  symbol: src && loaded.has(src) ? `image://${src}` : glyphSymbol(n.name, dark),
                   symbolSize: symbolSize(n),
                   label: { show: placed?.sides.has(i) ?? false, position: placed?.sides.get(i) ?? 'bottom' },
                   itemStyle: { color: brandMark(dark) },
@@ -199,6 +214,8 @@ export default function BlogRelationGraph({ nodes, edges }: { nodes: RelationNod
       place();
     });
     resize.observe(ref.current);
+    // replaceMerge rebuilds the series from the option, which carries no zoom or centre.
+    reset.current = () => !disposed && render();
     const theme = new MutationObserver(render);
     theme.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
     return () => {
@@ -209,11 +226,20 @@ export default function BlogRelationGraph({ nodes, edges }: { nodes: RelationNod
     };
   }, [nodes, edges]);
   return (
-    <div
-      ref={ref}
-      className="h-[520px] w-full lg:h-[600px]"
-      role="img"
-      aria-label="部落格正文提及關係圖；箭頭指向被提及的部落格，詳細資料列於下方表格"
-    />
+    <div className="relative">
+      <div
+        ref={ref}
+        className="h-[520px] w-full lg:h-[600px]"
+        role="img"
+        aria-label="部落格正文提及關係圖；箭頭指向被提及的部落格，詳細資料列於下方表格"
+      />
+      <button
+        type="button"
+        onClick={() => reset.current()}
+        className="absolute top-0 right-0 inline-flex min-h-9 items-center rounded-full border border-zinc-300 bg-white/90 px-3 text-xs text-zinc-700 hover:border-brand-700 dark:border-zinc-700 dark:bg-zinc-900/90 dark:text-zinc-300 dark:hover:border-brand-400"
+      >
+        重設縮放
+      </button>
+    </div>
   );
 }

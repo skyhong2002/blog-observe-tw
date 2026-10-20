@@ -3,10 +3,12 @@
 // One view for the prerendered 30-day ranking and the browser's ?days=7|90; see app/topics/page.tsx.
 
 import { useSearchParams } from 'next/navigation';
+import { useState } from 'react';
 import FooterMethod from '@/components/FooterMethod';
 import MethodLink from '@/components/MethodLink';
 import Link from '@/components/NoPrefetchLink';
 import SectionTabs from '@/components/SectionTabs';
+import SortIndicator from '@/components/SortIndicator';
 import TableScroller from '@/components/TableScroller';
 import { VocabularySummary } from '@/components/VocabularyNotice';
 import { topicLink } from '@/lib/page-links';
@@ -59,42 +61,63 @@ export default function TopicRankingView({ days, load }: { days: Period; load: P
   );
 }
 
+type SortKey = 'rank' | 'blogs' | 'posts' | 'score' | 'lift';
+
+/** "title / body-only"; a title-only term's body side was never counted, so it shows — rather than 0. */
+const splitText = (t: Topics['items'][number]) =>
+  t.matchingReason && typeof t.titlePosts === 'number' ? `${t.titlePosts.toLocaleString('zh-TW')} / —` : matchSplit(t);
+
 function TopicRows({ days, data }: { days: Period; data: Topics }) {
   const liftTitle = liftExplanation(data.matchingPolicy?.frequency?.baselineDays);
+  // The gateway's order is the ranking (heat × breadth); a header re-sorts this page's rows only, and the rank stays.
+  const [sort, setSort] = useState<{ key: SortKey; descending: boolean }>({ key: 'rank', descending: false });
+  const ranked = data.items.map((t, i) => ({ t, rank: i + 1 }));
+  const value = (row: (typeof ranked)[number]) =>
+    sort.key === 'rank' ? row.rank : sort.key === 'lift' ? (row.t.lift ?? -1) : Number(row.t[sort.key]);
+  const rows =
+    sort.key === 'rank' && !sort.descending
+      ? ranked
+      : [...ranked].sort((a, b) => (sort.descending ? value(b) - value(a) : value(a) - value(b)) || a.rank - b.rank);
+  const toggle = (key: SortKey) =>
+    setSort((now) => (now.key === key ? { key, descending: !now.descending } : { key, descending: key !== 'rank' }));
+  const header = (key: SortKey, label: string, className: string, title?: string) => (
+    <th scope="col" className={className} aria-sort={sort.key === key ? (sort.descending ? 'descending' : 'ascending') : undefined}>
+      <button
+        type="button"
+        onClick={() => toggle(key)}
+        title={title}
+        className="inline-flex items-center gap-1 hover:text-zinc-900 dark:hover:text-zinc-100"
+      >
+        {label}
+        <SortIndicator active={sort.key === key} descending={sort.descending} />
+      </button>
+    </th>
+  );
   return (
     <>
       <TableScroller card label="共同話題表格，可左右捲動">
         <table className="w-full whitespace-nowrap text-sm">
           <thead className="bg-zinc-50 text-left text-xs text-zinc-600 dark:bg-zinc-950 dark:text-zinc-400">
             <tr>
+              {header('rank', '#', `${table.num} w-12`)}
               <th scope="col" className={table.leadHead}>
                 話題
               </th>
-              <th scope="col" className={table.cell}>
-                來源
-              </th>
-              <th scope="col" className={table.num}>
-                部落格
-              </th>
-              <th scope="col" className={table.num}>
-                文章
-              </th>
+              {header('blogs', '部落格', table.num)}
+              {header('posts', '文章', table.num)}
               <th scope="col" className={table.num}>
                 標題／僅正文
               </th>
-              <th scope="col" className={table.num}>
-                加權貢獻
-              </th>
-              <th scope="col" className={table.num} title={liftTitle}>
-                升溫倍率
-              </th>
+              {header('score', '加權貢獻', table.num)}
+              {header('lift', '升溫倍率', table.num, liftTitle)}
             </tr>
           </thead>
           <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
-            {data.items.map((t) => (
+            {rows.map(({ t, rank }) => (
               <tr key={t.id} className={table.row}>
+                <td className={`${table.num} text-xs text-zinc-500 dark:text-zinc-400`}>{rank}</td>
                 <td className={table.lead}>
-                  <div className={table.leadBox}>
+                  <div className={`${table.leadBox} flex items-baseline gap-2`}>
                     <Link
                       className={`${table.leadText} block text-brand-700 hover:underline dark:text-brand-400 sm:max-w-80`}
                       {...topicLink(t.id, t.canonicalPath, days)}
@@ -102,20 +125,15 @@ function TopicRows({ days, data }: { days: Period; data: Topics }) {
                     >
                       {t.label}
                     </Link>
+                    {t.source === 'rss-category' ? (
+                      <span className={`${table.leadExtra} text-xs text-zinc-500 dark:text-zinc-400`}>RSS 標籤</span>
+                    ) : null}
                   </div>
-                </td>
-                <td className={`${table.cell} text-xs text-zinc-600 dark:text-zinc-400`}>
-                  {t.source === 'rss-category' ? 'RSS 標籤' : '共同關鍵字'}
                 </td>
                 <td className={table.num}>{t.blogs.toLocaleString('zh-TW')}</td>
                 <td className={table.num}>{t.posts.toLocaleString('zh-TW')}</td>
-                <td className={table.num}>
-                  {matchSplit(t)}
-                  {t.matchingReason ? (
-                    <span className="ml-1 text-xs text-zinc-500 dark:text-zinc-400" title={matchingReasonLabel(t.matchingReason)}>
-                      只計標題
-                    </span>
-                  ) : null}
+                <td className={table.num} title={t.matchingReason ? matchingReasonLabel(t.matchingReason) : undefined}>
+                  {splitText(t)}
                 </td>
                 <td className={table.num}>{Number(t.score).toFixed(2)}</td>
                 <td className={`${table.num}${t.lift == null ? ' text-xs text-zinc-500 dark:text-zinc-400' : ''}`} title={liftTitle}>

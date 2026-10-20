@@ -8,6 +8,7 @@
 import BlogIcon from '@/components/BlogIcon';
 import Link from '@/components/NoPrefetchLink';
 import PostTags from '@/components/PostTags';
+import { SectionUnavailable } from '@/components/SectionBoundary';
 import { displayTitle, type HomeMention, type HomeMentions, taipei } from '@/lib/api';
 import { externalHref } from '@/lib/images';
 import { blogLink } from '@/lib/page-links';
@@ -115,7 +116,7 @@ export default function HomeMentionsSection({ mentions }: { mentions: HomeMentio
         <Link href="/relations/">關係圖 →</Link>
       </div>
       {mentions.status === 'unavailable' ? (
-        <p className={styles.notice}>部落格引用暫時無法載入。</p>
+        <SectionUnavailable label="部落格引用" className={styles.notice} />
       ) : cards.length ? (
         <div className={styles.storyList}>
           {cards.map((card) => (

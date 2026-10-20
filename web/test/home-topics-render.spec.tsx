@@ -75,7 +75,7 @@ describe('homepage topic list (view=home)', () => {
     expect(rows.length).toBe(2);
     expect(rows.eq(0).find('.rank').text()).toBe('01');
     expect(rows.eq(0).find('strong').text()).toBe('話題1');
-    expect(rows.eq(0).find('small').text()).toBe('2 個部落格 · 3 篇 · 共同詞彙');
+    expect(rows.eq(0).find('small').text()).toBe('2 個部落格 · 3 篇');
     expect(rows.eq(1).find('small').text()).toBe('2 個部落格 · 4 篇 · RSS');
     expect(rows.eq(0).find('a').attr('href')).toBe('/topics/%E8%A9%B1%E9%A1%8C1/');
     $('a').each((_, el) => {

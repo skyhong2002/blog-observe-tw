@@ -35,7 +35,7 @@ export default async function HomeTopicRanking() {
             <span className={styles.rankBody}>
               <strong>{tag.label}</strong>
               <small>
-                {tag.blogs} 個部落格 · {tag.posts} 篇 · {tag.source === 'rss-category' ? 'RSS' : '共同詞彙'}
+                {tag.blogs} 個部落格 · {tag.posts} 篇{tag.source === 'rss-category' ? ' · RSS' : ''}
               </small>
             </span>
           </Link>

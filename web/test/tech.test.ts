@@ -216,7 +216,7 @@ test('coverage: a body fragment is never the whole site; shares need a denominat
   assert.equal(coverageNote({ ...base, sourceType: 'html' }), '檢查既有的公開 HTML 回應（首頁或文章）。');
   assert.equal(sourceTypeText.html, '公開 HTML（首頁或文章）');
   assert.equal(coverageNote(null), '沒有觀測範圍紀錄。');
-  assert.equal(share(1, 4), '25%');
+  assert.equal(share(1, 4), '25.0%');
   assert.equal(share(1, 3), '33.3%');
   assert.equal(share(0, 0), '—');
   assert.equal(

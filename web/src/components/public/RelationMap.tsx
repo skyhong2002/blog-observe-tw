@@ -3,6 +3,7 @@
 // One view for the prerendered 90-day relation map and the browser's ?days=7|30; see app/relations/page.tsx.
 
 import { useSearchParams } from 'next/navigation';
+import { useState } from 'react';
 import BlogIcon from '@/components/BlogIcon';
 import BlogRelationGraph from '@/components/BlogRelationGraph';
 import FooterMethod, { methodHeading } from '@/components/FooterMethod';
@@ -42,8 +43,27 @@ export default function RelationMapView({ days, load }: { days: Period; load: Pu
   );
 }
 
+const LIST_PREVIEW = 20;
+
+/** Shows the rest of a long list in place; left out when the list is already short. */
+function MoreButton({ total, open, onClick }: { total: number; open: boolean; onClick: () => void }) {
+  if (total <= LIST_PREVIEW) return null;
+  return (
+    <button
+      type="button"
+      aria-expanded={open}
+      onClick={onClick}
+      className="mt-2 inline-flex min-h-9 items-center rounded-full border border-zinc-300 px-3 text-xs text-zinc-700 hover:border-brand-700 dark:border-zinc-700 dark:text-zinc-300 dark:hover:border-brand-400"
+    >
+      {open ? '只看前 20 名' : `顯示全部 ${total} 筆`}
+    </button>
+  );
+}
+
 function RelationDetails({ data }: { data: Relations }) {
+  const [showAll, setShowAll] = useState({ most: false, mutual: false });
   const nodes = new Map(data.nodes.map((n) => [n.id, n]));
+  const name = (id: number) => nodes.get(id)?.name ?? `部落格 #${id}`;
   const blog = (id: number) => {
     const n = nodes.get(id);
     return n ? (
@@ -87,24 +107,27 @@ function RelationDetails({ data }: { data: Relations }) {
         <section className="min-w-0 rounded-xl border border-zinc-300 p-4 dark:border-zinc-800">
           <h2 className="font-semibold">最常被提及</h2>
           <ol className="mt-3 divide-y divide-zinc-200 dark:divide-zinc-800">
-            {data.mostMentioned.map((r) => (
-              <li className="flex items-center justify-between gap-4 py-2.5 text-sm" key={r.blogId}>
-                {chip(r.blogId)}
+            {(showAll.most ? data.mostMentioned : data.mostMentioned.slice(0, LIST_PREVIEW)).map((r, i) => (
+              <li className="flex items-center gap-3 py-2.5 text-sm" key={r.blogId}>
+                <span className="w-6 shrink-0 text-right text-xs tabular-nums text-zinc-500 dark:text-zinc-400">{i + 1}</span>
+                <span className="min-w-0 flex-1">{chip(r.blogId)}</span>
                 <span className="shrink-0 text-xs tabular-nums text-zinc-600 dark:text-zinc-400">
-                  {r.incomingBlogs} 站 · {r.mentions} 篇
+                  {r.incomingBlogs} 個部落格提及 · {r.mentions} 篇
                 </span>
               </li>
             ))}
           </ol>
+          <MoreButton total={data.mostMentioned.length} open={showAll.most} onClick={() => setShowAll((s) => ({ ...s, most: !s.most }))} />
         </section>
         <section className="min-w-0 rounded-xl border border-zinc-300 p-4 dark:border-zinc-800">
           <h2 className="font-semibold">互相提及</h2>
           {/* Same pills as the homepage's citation cards. Each direction is its own articles and dates (see the foot's
               引用與交流), so the counts stay per direction and the pair is never called a same-time exchange. */}
           <ol className="mt-3 divide-y divide-zinc-200 dark:divide-zinc-800">
-            {data.mutual.map((r) => (
+            {(showAll.mutual ? data.mutual : data.mutual.slice(0, LIST_PREVIEW)).map((r) => (
               <li className="py-2.5" key={`${r.sourceBlogId}:${r.targetBlogId}`}>
-                <p className="flex min-w-0 items-center gap-1.5">
+                {/* Chips wrap rather than cut a name short; the arrows read from the first chip to the second. */}
+                <p className="flex min-w-0 flex-wrap items-center gap-1.5">
                   {chip(r.sourceBlogId)}
                   <span aria-hidden="true" className="text-xs text-zinc-500">
                     ⇄
@@ -113,11 +136,20 @@ function RelationDetails({ data }: { data: Relations }) {
                   {chip(r.targetBlogId)}
                 </p>
                 <p className="mt-1 text-xs tabular-nums text-zinc-600 dark:text-zinc-400">
-                  分別提及 {r.forwardCount}／{r.reverseCount} 篇
+                  <span title={`${name(r.sourceBlogId)} 提及 ${name(r.targetBlogId)}`}>
+                    <span aria-hidden="true">→</span>
+                    <span className="sr-only">{name(r.sourceBlogId)} 提及對方</span> {r.forwardCount} 篇
+                  </span>
+                  <span aria-hidden="true"> · </span>
+                  <span title={`${name(r.targetBlogId)} 提及 ${name(r.sourceBlogId)}`}>
+                    <span aria-hidden="true">←</span>
+                    <span className="sr-only">{name(r.targetBlogId)} 提及對方</span> {r.reverseCount} 篇
+                  </span>
                 </p>
               </li>
             ))}
           </ol>
+          <MoreButton total={data.mutual.length} open={showAll.mutual} onClick={() => setShowAll((s) => ({ ...s, mutual: !s.mutual }))} />
         </section>
       </div>
       <details className="rounded-xl border border-zinc-300 p-4 dark:border-zinc-800">

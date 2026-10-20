@@ -25,8 +25,10 @@ test('home: only the compact overview is awaited; the topic list streams in its 
   // The ranking's rule is in the closed method block at the page foot, not under the list (FooterMethod).
   assert.match(
     page,
-    /<h2>最近共同話題<\/h2>\s*<Link href="\/topics\/">完整排行 →<\/Link>\s*<\/div>\s*<Suspense[\s\S]*?<\/Suspense>\s*<\/aside>/,
+    /<h2>最近共同話題<\/h2>\s*<Link href="\/topics\/">完整排行 →<\/Link>\s*<\/div>\s*<SectionBoundary[^>]*>\s*<Suspense[\s\S]*?<\/Suspense>\s*<\/SectionBoundary>\s*<\/aside>/,
   );
+  // A failed ranking stays in its own section (with a retry); the rest of the homepage is not replaced by error.tsx.
+  assert.match(page, /<SectionBoundary label="最近共同話題"[^>]*>\s*<Suspense fallback=\{<HomeTopicsPending \/>\}>/);
   assert.doesNotMatch(page, /同站貢獻逐次遞減/);
   assert.match(page, /^import Link from '@\/components\/NoPrefetchLink';$/m);
   assert.doesNotMatch(page, /^'use client';/m);
@@ -61,7 +63,7 @@ test('clouds: drawn from the local topic ranking only, one shared path each, str
   // The mark/tagline render with the overview; the cloud is a Suspense slot, not awaited by the page.
   assert.match(
     page,
-    /<MastheadCloud\s+edition=\{updated\}\s+cloud=\{\s*<Suspense fallback=\{null\}>\s*<HomeTopicCloud \/>\s*<\/Suspense>\s*\}\s*\/>/,
+    /<MastheadCloud\s+edition=\{updated\}\s+cloud=\{\s*<SectionBoundary quiet>\s*<Suspense fallback=\{null\}>\s*<HomeTopicCloud \/>\s*<\/Suspense>\s*<\/SectionBoundary>\s*\}\s*\/>/,
   );
   assert.doesNotMatch(page, /data\.tags|data\.posts|NewsImage/);
   const masthead = source('app/_home/MastheadCloud.tsx');

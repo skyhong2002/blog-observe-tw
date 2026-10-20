@@ -105,7 +105,7 @@ export const statusNote: Record<TechStatus, string> = {
   'not-observed': '還沒有可供辨識的公開回應（尚未有觀測紀錄），不能當成「未使用」。',
 };
 export const statusTone: Record<TechStatus, string> = {
-  detected: 'text-brand-700 dark:text-brand-400',
+  detected: 'text-zinc-900 dark:text-zinc-100',
   unknown: 'text-zinc-600 dark:text-zinc-400',
   failed: 'text-amber-700 dark:text-amber-400',
   blocked: 'text-amber-700 dark:text-amber-400',
@@ -197,7 +197,7 @@ export const isHistorical = (blog: Pick<TechBlog, 'status' | 'detections'>) =>
 /** Percent of `total`, one decimal; '—' without a denominator. */
 export function share(count: number, total: number) {
   if (!(total > 0)) return '—';
-  return `${((count / total) * 100).toLocaleString('zh-TW', { maximumFractionDigits: 1 })}%`;
+  return `${((count / total) * 100).toLocaleString('zh-TW', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`;
 }
 
 /** Below this many blogs with any observation, rankings and shares say they are thin. */

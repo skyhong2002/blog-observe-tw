@@ -4,9 +4,9 @@ import test from 'node:test';
 
 const read = (path: string) => readFileSync(new URL(`../src/${path}`, import.meta.url), 'utf8');
 
-test('relation graph: blogs drawn as their icons (green dot only without one), labels in the page font, overlaps hidden', () => {
+test('relation graph: blogs drawn as their icons (first-character glyph without one), labels in the page font, overlaps hidden', () => {
   const graph = read('components/BlogRelationGraph.tsx');
-  assert.match(graph, /symbol: src && loaded\.has\(src\) \? `image:\/\/\$\{src\}` : 'circle'/);
+  assert.match(graph, /symbol: src && loaded\.has\(src\) \? `image:\/\/\$\{src\}` : glyphSymbol\(n\.name, dark\)/);
   assert.match(graph, /image\.onerror/);
   assert.match(graph, /placeLabels\(/);
   assert.match(graph, /fontFamily: getComputedStyle\(document\.body\)\.fontFamily/);
@@ -15,7 +15,7 @@ test('relation graph: blogs drawn as their icons (green dot only without one), l
 test('relation lists keep each icon and name on one line', () => {
   const map = read('components/public/RelationMap.tsx');
   assert.match(map, /className="inline-flex min-w-0 items-center gap-1\.5/);
-  assert.match(map, /<li className="flex items-center justify-between gap-4 py-2\.5 text-sm"/);
+  assert.match(map, /<li className="flex items-center gap-3 py-2\.5 text-sm"/);
   assert.match(map, /rounded-full border border-zinc-300/);
   // Phones: both list cards may shrink below their widest pair of chips (no sideways page scroll).
   assert.equal(map.match(/<section className="min-w-0 rounded-xl border border-zinc-300 p-4/g)?.length, 2);

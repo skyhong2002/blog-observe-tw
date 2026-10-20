@@ -11,7 +11,7 @@ function Frame({ children }: { children: React.ReactNode }) {
     <section aria-label="話題文字雲">
       <div className="flex items-baseline justify-between gap-2">
         <h2 className="text-sm font-semibold">近 90 天話題</h2>
-        <span className="text-xs text-zinc-500 dark:text-zinc-400">共同詞彙</span>
+        <span className="text-xs text-zinc-500 dark:text-zinc-400">共同關鍵字</span>
       </div>
       {children}
     </section>

@@ -30,6 +30,7 @@ const flag = vi.hoisted(() => ({ on: true }));
 vi.mock('next/navigation', () => ({
   usePathname: () => nav.pathname,
   useSearchParams: () => new URLSearchParams(nav.search),
+  useRouter: () => ({ refresh: () => undefined }),
   notFound: () => {
     throw new Error('NEXT_NOT_FOUND');
   },
@@ -283,7 +284,7 @@ describe('/tech/ baseline', () => {
         .find('thead th')
         .map((_, el) => $(el).text())
         .get(),
-    ).toEqual(['技術', '類別', '部落格', '佔已讀取', '明確版本']);
+    ).toEqual(['技術', '類別', '部落格', '佔比', '明確版本']);
     const wordpress = rankRow($, 'WordPress');
     expect(wordpress.find('a').attr('href')).toBe('/tech/?technology=wordpress');
     expect(wordpress.find('td').eq(1).text()).toBe('CMS／平台');
@@ -314,7 +315,7 @@ describe('/tech/ baseline', () => {
         .find('thead th')
         .map((_, el) => $(el).text())
         .get(),
-    ).toEqual(['部落格', '狀態', '技術數', '辨識到的技術', '觀測範圍', '成功觀測', '最後嘗試']);
+    ).toEqual(['部落格', '狀態', '技術數', '辨識到的技術', '觀測範圍', '成功觀測']);
     expect(tableEl.find('tbody tr').length).toBe(5);
     tableEl.find('tbody tr').each((_, row) => {
       const first = $(row).find('td').first();
@@ -341,8 +342,9 @@ describe('/tech/ baseline', () => {
     expect(techs.text()).toBe('WordPress6.4、Elementor·主機／CDN（低信心）Cloudflare');
     expect(techs.find('a[href="/tech/?technology=wp-plugin%3Aelementor"]').length).toBe(1);
     expect(detected.find('td').eq(4).text()).toBe('公開 HTML（首頁或文章）');
+    // One time column: the success; the last attempt is its title (and shown only when it failed).
     expect(detected.find('td').eq(5).text()).toBe(taipei(OBSERVED));
-    expect(detected.find('td').eq(6).text()).toBe(taipei(OBSERVED));
+    expect(detected.find('td').eq(5).attr('title')).toBe(`最後嘗試：${taipei(OBSERVED)}`);
 
     expect(rowOf($, '測試站乙').find('td').eq(1).text()).toBe('未辨識');
     expect(rowOf($, '測試站乙').find('td').eq(4).text()).toBe('文章內文片段（部分）');
@@ -351,18 +353,17 @@ describe('/tech/ baseline', () => {
     const failed = rowOf($, '測試站丙');
     expect(failed.find('td').eq(1).text()).toBe('觀測失敗 · 連線逾時');
     expect(failed.find('td').eq(3).text()).toBe('上次成功：WordPress');
-    expect(failed.find('td').eq(5).text()).toBe(taipei(OLD_SUCCESS));
-    expect(failed.find('td').eq(6).text()).toBe(taipei(LAST_ATTEMPT));
+    expect(failed.find('td').eq(5).text()).toBe(`${taipei(OLD_SUCCESS)}嘗試 ${taipei(LAST_ATTEMPT)}`);
 
     const blocked = rowOf($, '測試站丁');
     expect(blocked.find('td').eq(1).text()).toBe('來源阻擋 · robots.txt 不允許');
     expect(blocked.find('td').eq(3).text()).toBe('—');
-    expect(blocked.find('td').eq(5).text()).toBe('尚無成功觀測');
+    expect(blocked.find('td').eq(5).text()).toMatch(/^尚無成功觀測嘗試 /);
 
     const unregistered = rowOf($, '測試站戊');
     expect(unregistered.find('td').first().find('a').length).toBe(0);
     expect(unregistered.find('td').eq(1).text()).toBe('未辨識');
-    expect(unregistered.find('td').eq(6).text()).toBe('尚未嘗試');
+    expect(unregistered.find('td').eq(5).attr('title')).toBe('尚未嘗試');
 
     const main = $('main').text();
     expect(main).not.toContain('6.5');

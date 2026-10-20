@@ -6,6 +6,7 @@
 // asked for, like the topic pages; the layout's footer leaves its copy out on /tech/ (FooterMethod).
 
 import { useSearchParams } from 'next/navigation';
+import { Fragment } from 'react';
 import BlogIcon from '@/components/BlogIcon';
 import FilterChips from '@/components/FilterChips';
 import FooterMethod from '@/components/FooterMethod';
@@ -54,6 +55,7 @@ const link = 'text-brand-700 hover:underline dark:text-brand-400';
 // SiteFooter's methodHeading; not imported, since that module reads the catalog on the server.
 const methodHeading = 'font-medium text-zinc-900 dark:text-zinc-100';
 const n = (value: number) => value.toLocaleString('zh-TW');
+const VERSIONS_SHOWN = 3;
 
 /** Every recognised technology in one table, like /ranking/: site software first, then low-confidence hosting / CDN. */
 function RankTable({ technologies, scanned, filters }: { technologies: TechTechnology[]; scanned: number; filters: Filters }) {
@@ -73,8 +75,8 @@ function RankTable({ technologies, scanned, filters }: { technologies: TechTechn
             <th scope="col" className={table.num}>
               部落格
             </th>
-            <th scope="col" className={table.num}>
-              佔已讀取
+            <th scope="col" className={table.num} title={`佔本次讀取的 ${n(scanned)} 個部落格`}>
+              佔比
             </th>
             <th scope="col" className={table.cell}>
               明確版本
@@ -82,39 +84,55 @@ function RankTable({ technologies, scanned, filters }: { technologies: TechTechn
           </tr>
         </thead>
         <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
-          {rows.map((tech) => {
+          {rows.map((tech, i) => {
             const current = tech.id === filters.technology;
             const infra = isInfra(tech.category);
-            const versions = explicitVersions(tech)
-              .map((v) => `${v.version}（${v.blogs}）`)
-              .join('、');
+            // Low-confidence hosting / CDN rows follow the site software under their own heading row, so a large
+            // count there (Cloudflare) does not read as out of order.
+            const firstInfra = infra && (i === 0 || !isInfra(rows[i - 1].category));
+            const all = explicitVersions(tech).map((v) => `${v.version}（${v.blogs}）`);
+            const versions = all.join('、');
+            const shown = all.length > VERSIONS_SHOWN ? `${all.slice(0, VERSIONS_SHOWN).join('、')} 等 ${all.length} 個版本` : versions;
             return (
-              <tr key={tech.id} className={table.row}>
-                <td className={table.lead}>
-                  <div className={table.leadBox}>
-                    <Link
-                      href={techHref({ q: filters.q, status: filters.status, technology: current ? undefined : tech.id })}
-                      scroll={false}
-                      aria-current={current ? 'true' : undefined}
-                      title={current ? `取消篩選 ${tech.name}` : `看保留證據中有 ${tech.name} 的部落格`}
-                      className={`${table.leadText} sm:max-w-60 ${current ? 'font-semibold text-brand-800 dark:text-brand-300' : infra ? 'text-zinc-600 hover:underline dark:text-zinc-400' : link}`}
+              <Fragment key={tech.id}>
+                {firstInfra ? (
+                  <tr>
+                    <th
+                      scope="rowgroup"
+                      colSpan={5}
+                      className="bg-zinc-50 px-2 py-1.5 text-left text-xs font-medium text-zinc-600 sm:px-3 dark:bg-zinc-950 dark:text-zinc-400"
                     >
-                      {tech.name}
-                    </Link>
-                  </div>
-                </td>
-                <td className={`${table.cell} text-xs ${muted}`}>
-                  {categoryText[tech.category]}
-                  {infra ? '（低信心）' : ''}
-                </td>
-                <td className={table.num}>{n(tech.blogs)}</td>
-                <td className={`${table.num} ${muted}`}>{share(tech.blogs, scanned)}</td>
-                <td className={`${table.cell} text-xs tabular-nums ${muted}`}>
-                  <span className="block max-w-72 truncate" title={versions || undefined}>
-                    {versions || '—'}
-                  </span>
-                </td>
-              </tr>
+                      主機與 CDN（低信心）
+                    </th>
+                  </tr>
+                ) : null}
+                <tr className={table.row}>
+                  <td className={table.lead}>
+                    <div className={table.leadBox}>
+                      <Link
+                        href={techHref({ q: filters.q, status: filters.status, technology: current ? undefined : tech.id })}
+                        scroll={false}
+                        aria-current={current ? 'true' : undefined}
+                        title={current ? `取消篩選 ${tech.name}` : `看保留證據中有 ${tech.name} 的部落格`}
+                        className={`${table.leadText} sm:max-w-60 ${current ? 'font-semibold text-brand-800 dark:text-brand-300' : infra ? 'text-zinc-600 hover:underline dark:text-zinc-400' : link}`}
+                      >
+                        {tech.name}
+                      </Link>
+                    </div>
+                  </td>
+                  <td className={`${table.cell} text-xs ${muted}`}>
+                    {categoryText[tech.category]}
+                    {infra ? '（低信心）' : ''}
+                  </td>
+                  <td className={table.num}>{n(tech.blogs)}</td>
+                  <td className={`${table.num} ${muted}`}>{share(tech.blogs, scanned)}</td>
+                  <td className={`${table.cell} text-xs tabular-nums ${muted}`}>
+                    <span className="block max-w-80 truncate" title={versions || undefined}>
+                      {shown || '—'}
+                    </span>
+                  </td>
+                </tr>
+              </Fragment>
             );
           })}
         </tbody>
@@ -237,7 +255,7 @@ export default function TechStatsView({
         </p>
       </header>
 
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+      <div className="grid max-w-md grid-cols-2 gap-3">
         <div className={card}>
           <div className="text-xs text-zinc-600 dark:text-zinc-400">公開部落格</div>
           <div className="mt-1 text-2xl font-semibold tabular-nums tracking-tight">{n(coverage.totalBlogs)}</div>
@@ -281,7 +299,7 @@ export default function TechStatsView({
         </h2>
         <form action="/tech/" className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex min-w-0 flex-wrap items-center gap-2">
-            <label htmlFor="tech-query" className="text-xs font-medium text-zinc-600 dark:text-zinc-400">
+            <label htmlFor="tech-query" className="sr-only">
               搜尋部落格名稱或網址
             </label>
             <input
@@ -292,11 +310,14 @@ export default function TechStatsView({
               defaultValue={filters.q}
               maxLength={100}
               placeholder="搜尋名稱或網址"
-              className="min-h-11 w-48 min-w-0 rounded-lg border border-zinc-300 bg-white px-3 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+              className="min-h-11 w-56 min-w-0 rounded-full border border-zinc-300 bg-white px-4 text-sm dark:border-zinc-700 dark:bg-zinc-900"
             />
             {filters.technology && <input type="hidden" name="technology" value={filters.technology} />}
             {activeStatus && <input type="hidden" name="status" value={activeStatus} />}
-            <button type="submit" className="min-h-11 rounded-lg bg-brand-700 px-4 text-sm text-white hover:bg-brand-800">
+            <button
+              type="submit"
+              className="min-h-11 rounded-full border border-zinc-300 px-4 text-sm text-zinc-700 hover:border-brand-700 dark:border-zinc-700 dark:text-zinc-300 dark:hover:border-brand-400"
+            >
               搜尋
             </button>
             {filters.technology && (
@@ -327,7 +348,7 @@ export default function TechStatsView({
         {ready ? (
           <>
             <TableScroller card label="部落格技術觀測表格，可左右捲動">
-              <table className="w-full min-w-[56rem] whitespace-nowrap text-sm">
+              <table className="w-full min-w-[48rem] whitespace-nowrap text-sm">
                 <thead className="bg-zinc-50 text-left text-xs text-zinc-600 dark:bg-zinc-950 dark:text-zinc-400">
                   <tr>
                     <th scope="col" className={table.leadHead}>
@@ -347,9 +368,6 @@ export default function TechStatsView({
                     </th>
                     <th scope="col" className={table.cell}>
                       成功觀測
-                    </th>
-                    <th scope="col" className={table.cell}>
-                      最後嘗試
                     </th>
                   </tr>
                 </thead>
@@ -408,11 +426,15 @@ export default function TechStatsView({
                             {scope}
                           </span>
                         </td>
-                        <td className={`${table.cell} text-xs tabular-nums ${muted}`}>
+                        {/* The last attempt is the title; a failed one also shows under the success it did not replace. */}
+                        <td
+                          className={`${table.cell} text-xs tabular-nums ${muted}`}
+                          title={blog.lastAttemptAt ? `最後嘗試：${taipei(blog.lastAttemptAt)}` : '尚未嘗試'}
+                        >
                           {blog.observedAt ? taipei(blog.observedAt) : '尚無成功觀測'}
-                        </td>
-                        <td className={`${table.cell} text-xs tabular-nums ${muted}`}>
-                          {blog.lastAttemptAt ? taipei(blog.lastAttemptAt) : '尚未嘗試'}
+                          {failed && blog.lastAttemptAt ? (
+                            <span className="block text-amber-700 dark:text-amber-400">嘗試 {taipei(blog.lastAttemptAt)}</span>
+                          ) : null}
                         </td>
                       </tr>
                     );

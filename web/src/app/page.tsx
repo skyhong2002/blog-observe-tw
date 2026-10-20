@@ -4,6 +4,7 @@ import { Suspense } from 'react';
 import BlogIcon from '@/components/BlogIcon';
 import Link from '@/components/NoPrefetchLink';
 import PostTags from '@/components/PostTags';
+import SectionBoundary from '@/components/SectionBoundary';
 import { displayTitle, taipei } from '@/lib/api';
 import { recentBlogRows } from '@/lib/home';
 import { externalHref } from '@/lib/images';
@@ -18,8 +19,9 @@ import MastheadCloud from './_home/MastheadCloud';
 // Rendered per request with no-store reads (public-read.ts): no stored page can
 // keep showing an article the gateway has since hidden. A failed read throws.
 // Only the bounded overview is awaited here; the topic ranking and the masthead's
-// cloud stream in their own Suspense (one shared topic read) and their failure
-// throws to the same error boundary. The mark and tagline never wait for them.
+// cloud stream in their own Suspense (one shared topic read). Their failure stays
+// in a SectionBoundary: the ranking says it could not load (with a retry), the
+// cloud is left out, and the rest of the page stays. The mark and tagline never wait for them.
 export const dynamic = 'force-dynamic';
 export const metadata = staticPageMetadata('/');
 export default async function HomePage() {
@@ -34,9 +36,11 @@ export default async function HomePage() {
         <MastheadCloud
           edition={updated}
           cloud={
-            <Suspense fallback={null}>
-              <HomeTopicCloud />
-            </Suspense>
+            <SectionBoundary quiet>
+              <Suspense fallback={null}>
+                <HomeTopicCloud />
+              </Suspense>
+            </SectionBoundary>
           }
         />
         <div className={styles.columns}>
@@ -45,9 +49,11 @@ export default async function HomePage() {
               <h2>最近共同話題</h2>
               <Link href="/topics/">完整排行 →</Link>
             </div>
-            <Suspense fallback={<HomeTopicsPending />}>
-              <HomeTopicRanking />
-            </Suspense>
+            <SectionBoundary label="最近共同話題" className={styles.notice}>
+              <Suspense fallback={<HomeTopicsPending />}>
+                <HomeTopicRanking />
+              </Suspense>
+            </SectionBoundary>
           </aside>
           <HomeMentionsSection mentions={data.mentions} />
           <aside className={styles.right} aria-label="部落格收錄概況">
