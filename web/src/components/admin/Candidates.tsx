@@ -45,6 +45,90 @@ const host = (url: string | null) => {
     return url ?? '';
   }
 };
+const record = (x: unknown): Record<string, unknown> =>
+  x && typeof x === 'object' && !Array.isArray(x) ? (x as Record<string, unknown>) : {};
+const text = (x: unknown) => (typeof x === 'string' && x.trim() ? x.trim() : null);
+const BLOGROLL_STATUS: Record<string, string> = {
+  'observed-link': '對方頁面有這條連結',
+  'pending-human-confirmation': '待人工確認',
+};
+const RSS_STATUS: Record<string, string> = { pending: '尚未偵測' };
+
+/**
+ * The parts of a candidate's evidence a reviewer reads first, in words: how the crawler got here (page by page),
+ * the link's own text, which listing names it, the blogroll link and the RSS check. Fields an evidence kind does not
+ * have are left out; the raw JSON stays below, closed.
+ */
+function EvidenceSummary({ value }: { value: unknown }) {
+  let data = value;
+  if (typeof data === 'string') {
+    try {
+      data = JSON.parse(data);
+    } catch {}
+  }
+  const e = record(data);
+  const seen = record(e.crawlerObservation);
+  const pick = (key: string) => e[key] ?? seen[key];
+  const path = (Array.isArray(pick('discoveryPathUrls')) ? (pick('discoveryPathUrls') as unknown[]) : [])
+    .map(text)
+    .filter(Boolean) as string[];
+  const relation = record(pick('blogrollRelationship'));
+  const listing = text(record(e.directoryListing).page) ?? text(record(e.indiewebListing).page) ?? text(record(e.indiepingListing).page);
+  const rows: Array<[string, React.ReactNode]> = [];
+  if (path.length)
+    rows.push([
+      '發現路徑',
+      <ol key="path" className="flex flex-wrap items-center gap-1">
+        {path.map((url, i) => {
+          const href = safeAdminLink(url);
+          return (
+            // biome-ignore lint/suspicious/noArrayIndexKey: a path may pass the same page twice; its position is its identity.
+            <li key={`${i}:${url}`} className="flex items-center gap-1">
+              {i > 0 ? (
+                <span aria-hidden="true" className="text-zinc-400">
+                  →
+                </span>
+              ) : null}
+              {href ? (
+                <a
+                  href={href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-brand-700 hover:underline dark:text-brand-400"
+                  title={url}
+                >
+                  {url.replace(/^https?:\/\/(www\.)?/, '').replace(/\/$/, '')}
+                </a>
+              ) : (
+                <span>{url}</span>
+              )}
+            </li>
+          );
+        })}
+      </ol>,
+    ]);
+  const anchor = text(pick('anchorText'));
+  if (anchor) rows.push(['連結文字', `「${anchor}」`]);
+  if (listing) rows.push(['名單頁面', listing]);
+  const status = text(relation.status);
+  if (status) rows.push(['友站連結', BLOGROLL_STATUS[status] ?? status]);
+  const rss = text(pick('rssDetection'));
+  if (rss) rows.push(['RSS', RSS_STATUS[rss] ?? rss]);
+  const at = text(pick('observedAt'));
+  if (at) rows.push(['觀測時間', taipei(at)]);
+  if (!rows.length) return null;
+  return (
+    <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 py-2 text-xs">
+      {rows.map(([label, content]) => (
+        <Fragment key={label}>
+          <dt className="text-zinc-500 dark:text-zinc-400">{label}</dt>
+          <dd className="min-w-0 break-words text-zinc-800 dark:text-zinc-200">{content}</dd>
+        </Fragment>
+      ))}
+    </dl>
+  );
+}
+
 const chip = (active: boolean) =>
   `whitespace-nowrap rounded-full px-3 py-1 ${active ? 'bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900' : 'bg-zinc-100 text-zinc-700 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-300'}`;
 
@@ -173,8 +257,8 @@ export default function Candidates({ run, busy }: { run: RunAction; busy: boolea
                 <th scope="col" className={table.cell}>
                   發現時間
                 </th>
-                <th scope="col" className={table.cell}>
-                  <span className="sr-only">證據</span>
+                <th scope="col" className={`${table.cell} text-right`}>
+                  證據
                 </th>
               </tr>
             </thead>
@@ -256,8 +340,8 @@ export default function Candidates({ run, busy }: { run: RunAction; busy: boolea
                     {open === c.id ? (
                       <tr>
                         <td colSpan={pending ? 6 : 5} className="whitespace-normal px-3 pb-3">
-                          <p className="text-xs text-zinc-500">發現路徑、blogroll 與 RSS 驗證證據</p>
-                          <Evidence value={c.sourceEvidence} label="原始資料" open />
+                          <EvidenceSummary value={c.sourceEvidence} />
+                          <Evidence value={c.sourceEvidence} label="原始資料（JSON）" />
                         </td>
                       </tr>
                     ) : null}
@@ -276,7 +360,8 @@ export default function Candidates({ run, busy }: { run: RunAction; busy: boolea
         </TableScroller>
       )}
       {pending && data ? (
-        <div className="flex flex-wrap items-end gap-2 border-t border-zinc-200 pt-4 dark:border-zinc-800">
+        // Stays in view while rows are being ticked further up a long page.
+        <div className="sticky bottom-0 z-20 flex flex-wrap items-end gap-2 border-t border-zinc-200 bg-white/95 py-3 backdrop-blur dark:border-zinc-800 dark:bg-zinc-950/95">
           <label className="min-w-64 flex-1 text-sm">
             處理原因（必填，會留在稽核紀錄）
             <input className={input} value={note} onChange={(e) => setNote(e.target.value)} maxLength={500} />

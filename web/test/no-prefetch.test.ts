@@ -51,7 +51,7 @@ test('private RSS/OPML files are plain anchors, pages stay client-side links', (
     assert.equal(isFileHref(href), false, href);
   // The header and account menu file links all resolve to plain anchors through the wrapper.
   const navFiles = NAV_GROUPS.flatMap((group) => group.links.map((link) => link.href)).filter((href) => href.startsWith('/me/'));
-  assert.deepEqual(navFiles, ['/me/feed.xml']);
+  assert.deepEqual(navFiles, []);
   for (const href of navFiles) assert.ok(isFileHref(href), href);
   for (const path of ['components/AccountMenu.tsx', 'app/my/page.tsx'])
     for (const href of source(path).match(/['"]\/me\/[^'"]+['"]/g) ?? []) assert.ok(isFileHref(href.slice(1, -1)), `${path} ${href}`);

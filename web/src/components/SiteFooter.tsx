@@ -22,19 +22,21 @@ const COLUMNS: Array<{ label: string; links: FooterLink[] }> = [
   {
     label: '資料與透明度',
     links: [
-      // The always-on wall-screen board; not in the header since it is not a reading page.
-      { href: '/blogs/', label: '收錄部落格' },
-      { href: '/about/', label: '資料蒐集' },
-      { href: METHOD_HREF, label: '資料來源與計算方式' },
-      // This browser's Google Analytics choice (noindex).
-      { href: '/observe/opt-out/', label: '不計入統計' },
+      // /about/ is one page; its own title names it.
+      { href: METHOD_HREF, label: '資料來源與收錄方式' },
+      // Reader suggestions and the candidates waiting to be checked; not in the header.
+      { href: '/queue/', label: '推薦部落格與待查清單' },
+      // This browser's Google Analytics choice (noindex): about the reader's visits, not about any blog.
+      { href: '/observe/opt-out/', label: '不送出我的瀏覽統計' },
     ],
   },
   {
     label: '開發與聯絡',
     links: [
       { href: '/api/', label: 'API 文件與狀態' },
-      { href: 'https://github.com/skyhong2002/blog-observe-tw/issues/new', label: '聯絡與移除請求', external: true },
+      // The address /about/ gives; a removal request need not be a public GitHub issue.
+      { href: 'mailto:b@blog.observe.tw', label: '聯絡與移除請求' },
+      { href: 'https://github.com/skyhong2002/blog-observe-tw/issues/new', label: '問題回報', external: true },
       { href: 'https://tag.observe.tw', label: '姊妹站 新文易數', external: true },
     ],
   },
@@ -111,10 +113,11 @@ export default function SiteFooter({ notes }: { notes?: React.ReactNode }) {
               </Suspense>
             </div>
             <div className="flex flex-wrap gap-2">
-              <a href="/me/feed.xml" className={pill}>
+              {/* /me/feed.xml needs a signed-in browser; /my/ explains that (and links it) instead of a bare 401. */}
+              <Link href="/my/" className={pill}>
                 <Icon d={ICONS.rss} />
-                RSS
-              </a>
+                個人 RSS
+              </Link>
               <a href="https://github.com/skyhong2002/blog-observe-tw" target="_blank" rel="noopener noreferrer" className={pill}>
                 <Icon d={ICONS.github} fill />
                 GitHub
@@ -139,6 +142,10 @@ export default function SiteFooter({ notes }: { notes?: React.ReactNode }) {
                           <span aria-hidden="true" className="ml-0.5 text-zinc-400">
                             ↗
                           </span>
+                        </a>
+                      ) : l.href.startsWith('mailto:') ? (
+                        <a href={l.href} className={link}>
+                          {l.label}
                         </a>
                       ) : (
                         <Link href={l.href} className={link}>

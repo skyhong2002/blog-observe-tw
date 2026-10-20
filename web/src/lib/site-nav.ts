@@ -22,8 +22,8 @@ export const NAV_GROUPS: Array<{ label: string; links: NavLink[] }> = [
   {
     label: '我的',
     links: [
+      // 個人 RSS needs a signed-in browser: it is on /my/ and in the account menu, not a bare header link.
       { href: '/my/', label: '我的追蹤', short: '追蹤' },
-      { href: '/me/feed.xml', label: '個人 RSS', short: 'RSS' },
       { href: '/api/', label: 'API 文件', short: 'API' },
     ],
   },
