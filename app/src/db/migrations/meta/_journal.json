@@ -239,6 +239,13 @@
       "when": 1792266418048,
       "tag": "0033_search_usage_daily",
       "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "5",
+      "when": 1792529145659,
+      "tag": "0034_blog_site_observations",
+      "breakpoints": true
     }
   ]
 }

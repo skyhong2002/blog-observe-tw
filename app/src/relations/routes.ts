@@ -5,6 +5,7 @@ import { withJobLease } from '../jobs/lease.ts';
 import { publicSummary } from '../public-post.ts';
 import { iconManifest } from '../v1/favicon-routes.ts';
 import { iconUrl } from '../v1/icons.ts';
+import { loadProfileMentions } from './home-feed.ts';
 import { PUBLIC_RELATION } from './public-relation.ts';
 import { loadSharedTags } from './shared-tags.ts';
 import { loadProfileTextSimilarity } from './text-similarity-profile.ts';
@@ -312,6 +313,18 @@ export async function registerRelationRoutes(app: FastifyInstance, pool: Pool) {
     const [[blog]] = await pool.query<RowDataPacket[]>("SELECT id,slug,name FROM blogs WHERE slug=? AND status='verified'", [slug]);
     if (!blog) return reply.code(404).send({ error: 'blog_not_found' });
     return projectionResponse(reply, () => readBlogRelations(pool, { id: Number(blog.id) }, days));
+  });
+  // The blog page's 最近被這些部落格提到: read fresh each time, so a hide override applies at once.
+  app.get('/api/blogs/:slug/mentions', async (request, reply) => {
+    reply.header('cache-control', 'no-store');
+    const { slug } = request.params as { slug: string };
+    const [[blog]] = await pool.query<RowDataPacket[]>("SELECT id FROM blogs WHERE slug=? AND status='verified'", [slug]);
+    if (!blog) return reply.code(404).send({ error: 'blog_not_found' });
+    try {
+      return await loadProfileMentions(pool, Number(blog.id));
+    } catch {
+      return reply.header('retry-after', '2').code(503).send({ error: 'mentions_unavailable' });
+    }
   });
 }
 

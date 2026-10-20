@@ -39,7 +39,9 @@ describe('runtime favicon projection with an empty bundled manifest', () => {
     const responses = [[{ blogs: 1, posts: 2, withUrls: 1, authors: 1 }], [], [], [{ total: 1 }], [blog]];
     // The directory's shown-genre read (blog-genres/store.ts) answers empty on its own.
     const catalog = await loadCatalog({
-      query: async (sql: string) => [sql.includes('blog_genre_assignments') ? [] : responses.shift()],
+      query: async (sql: string) => [
+        sql.includes('blog_genre_assignments') || sql.startsWith('SELECT kind AS value') ? [] : responses.shift(),
+      ],
     });
     expect(catalog.blogs[0].iconUrl).toBe(expected);
     const overviewRows = [[], [], [], [blog], [{ blogs: 1, posts: 2 }], [blog]];

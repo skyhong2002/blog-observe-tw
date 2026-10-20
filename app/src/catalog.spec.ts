@@ -6,6 +6,7 @@ function fixture(
   total = 275,
   rows: Record<string, unknown>[] = [{ id: 251, slug: 'after-200', name: '第 251 個站', postCount: '4', authorCount: '2' }],
   genreRows: Record<string, unknown>[] = [],
+  kindRows: Record<string, unknown>[] = [],
 ) {
   const responses = [
     [{ blogs: '275', posts: '12000', withUrls: '264', authors: '230', updatedAt: '2026-10-12T00:00:00.000Z' }],
@@ -21,10 +22,12 @@ function fixture(
     rows,
   ];
   // The shown-genre read (blog-genres/store.ts) answers on its own; the positional responses are the catalog's.
+  // The shown-genre read and the 經營者 facet answer on their own; the positional responses are the catalog's.
+  const own = (sql: string) => sql.includes('blog_genre_assignments') || sql.startsWith('SELECT kind AS value');
   const query = vi.fn(async (sql: string, _parameters?: unknown[]) =>
-    sql.includes('blog_genre_assignments') ? [genreRows] : [responses.shift()],
+    sql.includes('blog_genre_assignments') ? [genreRows] : sql.startsWith('SELECT kind AS value') ? [kindRows] : [responses.shift()],
   );
-  const calls = () => query.mock.calls.filter(([sql]) => !sql.includes('blog_genre_assignments'));
+  const calls = () => query.mock.calls.filter(([sql]) => !own(sql));
   return { query, calls };
 }
 
@@ -149,7 +152,7 @@ describe('complete blog catalog', () => {
         sort: '__proto__',
         dir: 'DESC; DROP TABLE blogs',
       }),
-    ).toEqual({ q: '', category: '', genre: '', status: '', page: 1, limit: 200, sort: 'latest', dir: 'desc' });
+    ).toEqual({ q: '', category: '', genre: '', status: '', kind: '', page: 1, limit: 200, sort: 'latest', dir: 'desc' });
     expect(catalogFilters({ sort: 'authors' })).toMatchObject({ sort: 'authors', dir: 'desc' });
     expect(catalogFilters({ sort: 'latest', page: '0', limit: '0', q: '字'.repeat(120) })).toMatchObject({
       sort: 'latest',
@@ -210,6 +213,54 @@ describe('complete blog catalog', () => {
       expect(failed.statusCode).toBe(503);
       expect(failed.json()).toEqual({ error: 'catalog unavailable' });
       expect(failed.body).not.toContain('private database');
+    } finally {
+      await app.close();
+    }
+  });
+
+  it('filters by site kind with the same expression it counts, in a fixed chip order', async () => {
+    const pool = fixture(
+      1,
+      undefined,
+      [],
+      [
+        { value: 'personal', count: '300' },
+        { value: 'unknown', count: '150' },
+      ],
+    );
+    const data = await loadCatalog(pool, { kind: 'personal' });
+    expect(data.filters.kind).toBe('personal');
+    expect(pool.calls()[3][1]).toEqual(['personal']);
+    expect(pool.calls()[3][0]).toContain('blog_site_observations');
+    expect(data.kinds).toEqual([
+      { value: 'personal', count: 300 },
+      { value: 'group', count: 0 },
+      { value: 'organization', count: 0 },
+      { value: 'unknown', count: 150 },
+    ]);
+    expect(catalogFilters({ kind: 'shop' }).kind).toBe('');
+  });
+
+  it('exports the filtered directory as OPML, unpaged and escaped', async () => {
+    const query = vi.fn(async (sql: string, parameters?: unknown[]) => {
+      if (sql.includes('blog_genre_assignments')) return [[]];
+      expect(sql).toContain('feed_sources');
+      expect(parameters).toEqual(['已核對', 1000]);
+      return [[{ name: 'A & <B>', url: 'https://a.example/', feedUrl: 'https://a.example/feed?x=1&y=2', type: 'rss' }]];
+    });
+    const app = await buildApp(
+      { login: null, uiOrigin: 'http://127.0.0.1:1', port: 18165 },
+      // @ts-expect-error JS gateway accepts the injected store despite its null default.
+      { store: { pool: { query } } },
+    );
+    try {
+      const response = await app.inject('/api/catalog.opml?status=%E5%B7%B2%E6%A0%B8%E5%B0%8D&page=3');
+      expect(response.statusCode).toBe(200);
+      expect(response.headers['content-type']).toContain('text/x-opml');
+      expect(response.headers['cache-control']).toBe('no-store');
+      expect(response.body).toContain('<title>部落格觀察 部落格目錄：已核對</title>');
+      expect(response.body).toContain('text="A &amp; &lt;B&gt;"');
+      expect(response.body).toContain('xmlUrl="https://a.example/feed?x=1&amp;y=2"');
     } finally {
       await app.close();
     }

@@ -12,6 +12,16 @@ const statusLabel = "COALESCE(NULLIF(b.status_label,''),'待核對')";
 const latestPublished = '(SELECT MAX(p.published_at) FROM posts p WHERE p.blog_id=b.id AND p.published_at<=UTC_TIMESTAMP())';
 const authorCount = `(SELECT COUNT(DISTINCT ba.author_id) FROM blog_authors ba JOIN authors a ON a.id=ba.author_id
   WHERE ba.blog_id=b.id AND ba.status='active' AND a.status<>'rejected')`;
+/**
+ * Who runs the blog, from evidence only (crawl/site-observation.ts and the author rows): 組織 when the homepage
+ * says so (編輯部, 公司, 商店…), 個人 when it introduces one person in the first person or the blog has one named
+ * author, 多人 at three or more named authors. Everything else — two names (often one person's two spellings),
+ * or no names at all — stays 未確認 rather than guessed.
+ */
+export const SITE_KINDS = ['personal', 'group', 'organization', 'unknown'];
+const observed = (column) => `EXISTS(SELECT 1 FROM blog_site_observations o WHERE o.blog_id=b.id AND o.${column}=1)`;
+const siteKind = `CASE WHEN ${observed('organization')} THEN 'organization' WHEN ${observed('personal')} THEN 'personal'
+  WHEN ${authorCount}>=3 THEN 'group' WHEN ${authorCount}=1 THEN 'personal' ELSE 'unknown' END`;
 const sortColumns = {
   name: 'b.name',
   category: categoryLabel,
@@ -54,14 +64,15 @@ export function catalogFilters(query = {}) {
     // A genre key (blog-genre-vocabulary.ts genreKey), or '-' for blogs no genre is shown for yet.
     genre: query.genre === NO_GENRE ? NO_GENRE : (genreKey(query.genre) ?? ''),
     status: text(query.status, 64),
+    kind: SITE_KINDS.includes(query.kind) ? query.kind : '',
     sort,
     dir: ['asc', 'desc'].includes(query.dir) ? query.dir : ['name', 'category', 'status'].includes(sort) ? 'asc' : 'desc',
     page: integer(query.page, 1),
     limit: Math.min(200, integer(query.limit, 50)),
   };
 }
-export async function loadCatalog(pool, query = {}, { onGenreFailure } = {}) {
-  const filters = catalogFilters(query);
+/** The WHERE clause of a directory query (filters as catalogFilters returns them); shared with the OPML export. */
+async function catalogCondition(pool, filters, { onGenreFailure } = {}) {
   const where = ["b.status='verified'"];
   const parameters = [];
   // Reader and AI genres, several per blog: the directory's 類型 chips and filter (replacing the imported category).
@@ -98,9 +109,18 @@ export async function loadCatalog(pool, query = {}, { onGenreFailure } = {}) {
     where.push(`${statusLabel}=?`);
     parameters.push(filters.status);
   }
-  const condition = where.join(' AND ');
+  if (filters.kind) {
+    where.push(`${siteKind}=?`);
+    parameters.push(filters.kind);
+  }
+  return { condition: where.join(' AND '), parameters, shown, genreStatus };
+}
+
+export async function loadCatalog(pool, query = {}, options = {}) {
+  const filters = catalogFilters(query);
+  const { condition, parameters, shown, genreStatus } = await catalogCondition(pool, filters, options);
   // Facets and summary cards describe the full catalog, independent of page and filters.
-  const [totalsResult, categoriesResult, statusesResult, countResult] = await Promise.all([
+  const [totalsResult, categoriesResult, statusesResult, kindsResult, countResult] = await Promise.all([
     pool.query(`SELECT COUNT(*) AS blogs,COALESCE(SUM(b.url IS NOT NULL AND b.url<>''),0) AS withUrls,
       MAX(b.last_crawl_success_at) AS updatedAt,
       (SELECT COUNT(*) FROM posts p JOIN blogs pb ON pb.id=p.blog_id WHERE pb.status='verified' AND (p.published_at IS NULL OR p.published_at<=UTC_TIMESTAMP())) AS posts,
@@ -112,6 +132,9 @@ export async function loadCatalog(pool, query = {}, { onGenreFailure } = {}) {
     ),
     pool.query(
       `SELECT ${statusLabel} AS value,COUNT(*) AS count FROM blogs b WHERE b.status='verified' GROUP BY ${statusLabel} ORDER BY value`,
+    ),
+    pool.query(
+      `SELECT kind AS value,COUNT(*) AS count FROM (SELECT ${siteKind} AS kind FROM blogs b WHERE b.status='verified') k GROUP BY kind`,
     ),
     pool.query(`SELECT COUNT(*) AS total FROM blogs b WHERE ${condition}`, parameters),
   ]);
@@ -132,7 +155,7 @@ export async function loadCatalog(pool, query = {}, { onGenreFailure } = {}) {
   const [blogs] = await pool.query(
     `SELECT b.id,b.slug,b.name,b.url,${categoryLabel} AS category,${statusLabel} AS statusLabel,
       b.last_crawl_success_at AS lastCrawlSuccessAt,${latestPublished} AS lastPublishedAt,${authorCount} AS authorCount,
-      b.expected_interval_hours AS expectedIntervalHours,
+      ${siteKind} AS siteKind,b.expected_interval_hours AS expectedIntervalHours,
       (SELECT COUNT(*) FROM posts p WHERE p.blog_id=b.id AND (p.published_at IS NULL OR p.published_at<=UTC_TIMESTAMP())) AS postCount
       FROM blogs b WHERE ${condition} ORDER BY ${order} LIMIT ? OFFSET ?`,
     [...parameters, ...orderParameters, filters.limit, (page - 1) * filters.limit],
@@ -173,7 +196,25 @@ export async function loadCatalog(pool, query = {}, { onGenreFailure } = {}) {
     genres,
     ungenred: Number(totals.blogs) - shown.size,
     statuses: facets(statusesResult[0]),
+    // Fixed order, so the chips do not move as counts change.
+    kinds: SITE_KINDS.map((value) => ({ value, count: Number(kindsResult[0].find((row) => row.value === value)?.count ?? 0) })),
     pagination: { page, pages, pageSize: filters.limit, total },
     filters: { ...filters, page },
   };
+}
+
+/** Feeds of every blog the directory filters match (no paging; capped), for an OPML export of the filtered list. */
+export const OPML_LIMIT = 1000;
+export async function loadCatalogFeeds(pool, query = {}) {
+  const filters = catalogFilters(query);
+  const { condition, parameters } = await catalogCondition(pool, filters);
+  // The newest feed that last worked, as /me/opml picks it; blogs without one are left out.
+  const [rows] = await pool.query(
+    `SELECT b.name,b.url,f.url AS feedUrl,f.type FROM blogs b
+      JOIN feed_sources f ON f.id=(SELECT f2.id FROM feed_sources f2 WHERE f2.blog_id=b.id AND f2.type IN ('rss','atom')
+        AND f2.last_success_at IS NOT NULL ORDER BY f2.last_success_at DESC,f2.id LIMIT 1)
+      WHERE ${condition} ORDER BY b.name,b.id LIMIT ?`,
+    [...parameters, OPML_LIMIT],
+  );
+  return { filters, feeds: rows };
 }

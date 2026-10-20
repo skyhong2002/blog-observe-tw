@@ -376,6 +376,7 @@ export const PUBLIC_CONTRACTS: Record<PublicKind, (raw: unknown) => boolean> = {
       categories: rows,
       genres: optional((value) => rows(value, { value: isGenreKey, label: text, count })),
       statuses: rows,
+      kinds: optional((value) => rows(value, { value: text, count })),
       totals: (value) => shape(value, { blogs: number, posts: number, withUrls: number, authors: number }),
       pagination,
       filters: object,
@@ -440,6 +441,24 @@ export const PUBLIC_CONTRACTS: Record<PublicKind, (raw: unknown) => boolean> = {
       topics: rows,
     }),
   blogContent: (raw) => shape(raw, { blog: object, sources: rows }),
+  // app/src/relations/home-feed.ts loadProfileMentions: body citations only, one row per citing article.
+  blogMentions: (raw) =>
+    shape(raw, {
+      days: count,
+      evidenceType: (v) => v === 'direct-link',
+      location: (v) => v === 'body',
+      truncated: boolean,
+      items: (items) =>
+        rows(items, {
+          postId: count,
+          postTitle: text,
+          postUrl: nullable(text),
+          publishedAt: nullable(text),
+          sourceBlogSlug: text,
+          sourceBlogName: text,
+          quote: text,
+        }),
+    }),
   // app/src/blog-suggestions.ts loadBlogQueue: the view reads every one of these keys.
   blogQueue: (raw) =>
     shape(raw, {

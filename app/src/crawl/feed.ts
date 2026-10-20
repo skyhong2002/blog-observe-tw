@@ -10,6 +10,7 @@ import { type Completeness, type ContentKind, MAX_CONTENT_HTML_BYTES } from '../
 import { ingestContentEvidence } from '../content/store.ts';
 import { identityKey, publicationDecision } from '../relations/identity.ts';
 import { type BodyIndexOptions, createBodyIndexStages } from '../search-index-staging.ts';
+import { cleanAuthorName, normalizedAuthorName } from './author-name.ts';
 
 export type FeedSourceType = 'rss' | 'atom' | 'sitemap' | 'wordpress' | 'scraper';
 export type FeedLink = { url: string; type: FeedSourceType };
@@ -160,6 +161,18 @@ const textOf = (value: unknown): string => {
   }
   return '';
 };
+/** The first field that holds a person's name; addresses and placeholders are skipped (author-name.ts). */
+const firstAuthorName = (values: unknown[]): string | null => {
+  for (const value of values)
+    for (const item of asArray(value)) {
+      const name = cleanAuthorName(textOf(item));
+      if (name) return name;
+    }
+  return null;
+};
+/** Atom allows several <author> elements, each with its own <name>; the first named one is kept. */
+const atomAuthorName = (value: unknown): string | null =>
+  firstAuthorName(asArray(value).map((item) => (item && typeof item === 'object' ? (item as Record<string, unknown>).name : item)));
 const absolute = (value: unknown, base: string): string | null => {
   try {
     const raw = textOf(value).trim();
@@ -694,6 +707,8 @@ export function parseFeed(xml: string, baseUrl: string): FeedEntry[] {
   const channel = (root.rss as Record<string, unknown> | undefined)?.channel as Record<string, unknown> | undefined;
   if (channel) {
     if (isCommentsFeed(baseUrl, textOf(channel.title))) return [];
+    // A feed whose items name nobody may still name its owner once (managingEditor, itunes:author, dc:creator).
+    const channelAuthor = firstAuthorName([channel.managingEditor, channel.author, channel.creator]);
     return asArray(channel.item as unknown)
       .map((item, index): FeedEntry | null => {
         const object = (item || {}) as Record<string, unknown>;
@@ -719,7 +734,7 @@ export function parseFeed(xml: string, baseUrl: string): FeedEntry[] {
                 }),
               }
             : {}),
-          author: textOf(object.author || object.creator || object['dc:creator']) || null,
+          author: firstAuthorName([object.author, object.creator, object['dc:creator']]) ?? channelAuthor,
           publishedAt: dateOf(object.pubDate || object.published || object.date),
           updatedAt: dateOf(object.updated || object.pubDate),
           imageUrl: absolute(
@@ -735,6 +750,7 @@ export function parseFeed(xml: string, baseUrl: string): FeedEntry[] {
   const atom = root.feed as Record<string, unknown> | undefined;
   if (atom) {
     if (isCommentsFeed(baseUrl, textOf(atom.title))) return [];
+    const feedAuthor = atomAuthorName(atom.author);
     return asArray(atom.entry as unknown)
       .map((entry, index): FeedEntry | null => {
         const object = (entry || {}) as Record<string, unknown>;
@@ -762,7 +778,7 @@ export function parseFeed(xml: string, baseUrl: string): FeedEntry[] {
                 }),
               }
             : {}),
-          author: textOf((object.author as Record<string, unknown> | undefined)?.name || object.author) || null,
+          author: atomAuthorName(object.author) ?? feedAuthor,
           publishedAt: dateOf(object.published),
           updatedAt: dateOf(object.updated || object.published),
           imageUrl: null,
@@ -987,7 +1003,8 @@ export async function writeFeedEntries(
     // it long before a JavaScript string reaches 65k characters.
     // Parsers already emit plain text. Re-parsing it as HTML would erase literal code such as <div>.
     const summary = truncateCharacters((entry.summary || '').replace(/\s+/g, ' ').trim(), MAX_PUBLIC_SUMMARY_CHARACTERS);
-    const author = entry.author ? truncateCharacters(entry.author.trim(), 255) || null : null;
+    // Every writer (feeds, history imports, scrapers) passes here, so no address reaches posts or authors.
+    const author = cleanAuthorName(entry.author);
     // Truncating a URL creates a different resource; omit an oversized image.
     const imageUrl = entry.imageUrl && entry.imageUrl.length <= 1024 ? entry.imageUrl : null;
     const contentHash = shortHash(`${title}\n${summary}`);
@@ -1042,7 +1059,7 @@ export async function writeFeedEntries(
     // merges them. Crawler updates never replace manual/community links.
     if (author) {
       const displayName = author;
-      const normalized = truncateCharacters(displayName.normalize('NFKC').toLocaleLowerCase('zh-TW').replace(/\s+/g, ' ').trim(), 255);
+      const normalized = normalizedAuthorName(displayName);
       const [existing] = await pool.execute(
         `SELECT a.id FROM authors a JOIN blog_authors ba ON ba.author_id=a.id
            WHERE ba.blog_id=? AND a.normalized_name=? LIMIT 1`,

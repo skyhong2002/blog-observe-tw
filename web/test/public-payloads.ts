@@ -102,6 +102,15 @@ export const EMPTY: Record<PublicKind, unknown> = {
   },
   blogTopics: { days: 90, vocabulary, items: [], truncated: false, minimumBlogs: 1 },
   blogInference: { label: 'AI 推定', profile: null, overridden: false, provenance: null, topics: [] },
+  blogMentions: {
+    days: 365,
+    evidenceType: 'direct-link',
+    location: 'body',
+    limit: 10,
+    truncated: false,
+    generatedAt: '2026-10-21T00:00:00.000Z',
+    items: [],
+  },
   blogContent: {
     blog: { slug: 'a', name: '甲', platform: null, lastMethod: null, status: null },
     sources: [],
@@ -205,6 +214,7 @@ export const PATHS: Record<PublicKind, string> = {
   blogTopics: '/api/blogs/a/topics?days=90',
   blogInference: '/api/blogs/a/inference',
   blogContent: '/api/blogs/a/content',
+  blogMentions: '/api/blogs/a/mentions',
   tech: '/api/tech?technology=wp-plugin%3Aelementor&status=detected&cursor=12',
   blogTech: '/api/blogs/a/tech',
   blogPage: '/api/pages/blogs/example.com',

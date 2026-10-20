@@ -154,3 +154,54 @@ export async function loadHomeMentions(pool: Pool, now = new Date()) {
     }),
   };
 }
+
+export const PROFILE_MENTION_LIMIT = 10;
+export const PROFILE_MENTION_DAYS = 365;
+/**
+ * A blog page's 最近被這些部落格提到: the newest articles of other collected blogs that write about this blog in a
+ * sentence, one row per article (its first such link). The homepage's predicates (ELIGIBLE_LINK, QUOTED_LINK) over a
+ * year, since most blogs are cited rarely; found through relation_links_target, so only this blog's links are read.
+ */
+export const PROFILE_MENTIONS_SQL = `SET STATEMENT max_statement_time=1 FOR WITH picked AS (
+ SELECT p.id postId,p.blog_id sourceBlogId,p.published_at publishedAt,MIN(l.ordinal) ordinal
+ FROM relation_links l FORCE INDEX (relation_links_target)
+ STRAIGHT_JOIN posts p ON p.id=l.source_post_id AND p.blog_id=l.source_blog_id
+ STRAIGHT_JOIN blogs a ON a.id=l.source_blog_id STRAIGHT_JOIN blogs b ON b.id=l.target_blog_id
+ STRAIGHT_JOIN relation_observations o ON o.post_id=p.id
+ WHERE l.target_blog_id=? AND p.published_at>=? AND p.published_at<=? AND ${ELIGIBLE_LINK}
+ GROUP BY p.id,p.blog_id,p.published_at ORDER BY p.published_at DESC,p.id DESC LIMIT ${PROFILE_MENTION_LIMIT + 1}
+)
+ SELECT p.id postId,p.title postTitle,p.url postUrl,p.published_at publishedAt,
+ a.id sourceBlogId,a.slug sourceBlogSlug,a.name sourceBlogName,
+ l.target_url targetUrl,l.anchor_text anchor,l.context
+ FROM picked k
+ STRAIGHT_JOIN posts p ON p.id=k.postId AND p.blog_id=k.sourceBlogId
+ STRAIGHT_JOIN relation_links l ON l.source_post_id=k.postId AND l.source_blog_id=k.sourceBlogId AND l.ordinal=k.ordinal
+ STRAIGHT_JOIN blogs a ON a.id=l.source_blog_id
+ ORDER BY k.publishedAt DESC,k.postId DESC`;
+
+export async function loadProfileMentions(pool: Pool, blogId: number, now = new Date()) {
+  const from = new Date(now.getTime() - PROFILE_MENTION_DAYS * 86400_000);
+  const [rows] = await pool.query<RowDataPacket[]>(PROFILE_MENTIONS_SQL, [blogId, from, now, now]);
+  const icons = await iconManifest();
+  return {
+    days: PROFILE_MENTION_DAYS,
+    evidenceType: 'direct-link' as const,
+    location: 'body' as const,
+    limit: PROFILE_MENTION_LIMIT,
+    truncated: rows.length > PROFILE_MENTION_LIMIT,
+    generatedAt: now.toISOString(),
+    items: rows.slice(0, PROFILE_MENTION_LIMIT).map((r) => ({
+      postId: Number(r.postId),
+      postTitle: String(r.postTitle ?? ''),
+      postUrl: mentionPublicUrl(r.postUrl),
+      publishedAt: iso(r.publishedAt),
+      sourceBlogSlug: String(r.sourceBlogSlug),
+      sourceBlogName: String(r.sourceBlogName),
+      sourceIconUrl: iconUrl(r.sourceBlogSlug, icons),
+      targetUrl: mentionPublicUrl(r.targetUrl),
+      anchor: String(r.anchor ?? '').slice(0, 255),
+      quote: mentionQuote(String(r.context ?? ''), String(r.anchor ?? '')),
+    })),
+  };
+}

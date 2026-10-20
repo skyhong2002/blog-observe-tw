@@ -14,7 +14,8 @@ const value = (query: QueryReader, key: string) => query.get(key) ?? undefined;
 
 /* /blogs/ ---------------------------------------------------------------- */
 
-const CATALOG_KEYS = ['q', 'category', 'genre', 'status', 'sort', 'dir', 'page', 'limit'] as const;
+const CATALOG_KEYS = ['q', 'category', 'genre', 'status', 'kind', 'sort', 'dir', 'page', 'limit'] as const;
+const siteKinds = ['personal', 'group', 'organization', 'unknown'] as const;
 const catalogSorts = ['name', 'category', 'posts', 'authors', 'latest', 'crawl', 'status'] as const;
 /** A column of the table, or (only while searching) best match first. */
 export type CatalogSort = (typeof catalogSorts)[number] | 'relevance';
@@ -24,6 +25,8 @@ export type CatalogFilters = {
   /** A genre key, or '-' for blogs no genre is shown for yet (app/src/catalog.js). */
   genre: string;
   status: string;
+  /** Who runs the blog (app/src/catalog.js SITE_KINDS), or '' for all. */
+  kind?: (typeof siteKinds)[number] | '';
   sort: CatalogSort;
   dir: 'asc' | 'desc';
   page: number;
@@ -58,6 +61,7 @@ export function catalogFiltersOf(query: CatalogQuery): CatalogFilters {
     category: chars(query.category, 255),
     genre: chars(query.genre, 40),
     status: chars(query.status, 64),
+    kind: siteKinds.find((kind) => kind === query.kind) ?? '',
     sort,
     dir: query.dir === 'asc' || query.dir === 'desc' ? query.dir : ['name', 'category', 'status'].includes(sort) ? 'asc' : 'desc',
     page: positive(query.page, 1),
@@ -71,6 +75,14 @@ export function catalogApiPath(query: CatalogQuery): string {
   for (const key of CATALOG_KEYS) if (typeof query[key] === 'string') params.set(key, query[key]);
   const search = params.toString();
   return search ? `/api/catalog?${search}` : '/api/catalog';
+}
+
+/** The same query as an OPML file of the matching blogs' feeds (no paging or order). */
+export function catalogOpmlPath(query: CatalogQuery): string {
+  const params = new URLSearchParams();
+  for (const key of ['q', 'category', 'genre', 'status', 'kind'] as const) if (query[key]) params.set(key, query[key]);
+  const search = params.toString();
+  return search ? `/api/catalog.opml?${search}` : '/api/catalog.opml';
 }
 
 /** True when the URL asks for something other than the prerendered catalog. */

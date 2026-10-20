@@ -14,13 +14,14 @@ import MethodLink from '@/components/MethodLink';
 import Link from '@/components/NoPrefetchLink';
 import ReloadButton from '@/components/public/ReloadButton';
 import TableScroller from '@/components/TableScroller';
-import { type Catalog, taipei } from '@/lib/api';
+import { type Catalog, SITE_KIND_LABELS, taipei } from '@/lib/api';
 import { blogLink } from '@/lib/page-links';
 import {
   type CatalogFilters,
   type CatalogSort,
   catalogApiPath,
   catalogFiltersOf,
+  catalogOpmlPath,
   catalogQueryOf,
   isCatalogBaseline,
 } from '@/lib/public-query';
@@ -92,7 +93,7 @@ function SearchBox({ q }: { q: string }) {
     // From the address bar, not the normalised filters: only a column the reader actually clicked stays (the
     // default latest-first order would otherwise override best-match ranking).
     const params = new URLSearchParams(window.location.search);
-    for (const key of ['page', ...['category', 'genre', 'status'].filter((key) => !params.get(key))]) params.delete(key);
+    for (const key of ['page', ...['category', 'genre', 'status', 'kind'].filter((key) => !params.get(key))]) params.delete(key);
     if (params.get('sort') === 'relevance') params.delete('sort');
     if (value.trim()) params.set('q', value.trim());
     else params.delete('q');
@@ -164,9 +165,9 @@ export default function BlogCatalogView({
   /** Showing the previous answer while the next search loads. */
   busy?: boolean;
 }) {
-  const { q, sort, dir, genre, status: blogStatus, limit } = filters;
-  const query = { q, sort, dir, genre, status: blogStatus, ...(limit !== 50 ? { limit: String(limit) } : {}) };
-  const { genres = [], ungenred = 0, statuses, blogs: rows } = data;
+  const { q, sort, dir, genre, status: blogStatus, kind = '', limit } = filters;
+  const query = { q, sort, dir, genre, status: blogStatus, kind, ...(limit !== 50 ? { limit: String(limit) } : {}) };
+  const { genres = [], ungenred = 0, statuses, kinds = [], blogs: rows } = data;
   const { page, pages, total } = data.pagination;
   const ready = status === 'ready';
   const words = q ? [...new Set(fold(q).split(' ').filter(Boolean))] : [];
@@ -256,12 +257,30 @@ export default function BlogCatalogView({
             ...(ungenred ? [{ href: href({ genre: '-' }), label: `未分類 ${ungenred}`, current: query.genre === '-' }] : []),
           ]}
         />
+        {/* Who runs the blog, from the homepage and the named authors (catalog.js siteKind); absent from an older gateway. */}
+        {kinds.length > 0 && (
+          <FilterChips
+            label="經營者"
+            items={[
+              { href: href({ kind: null }), label: '全部經營者', current: !query.kind },
+              ...kinds.map(({ value, count }) => ({
+                href: href({ kind: value }),
+                label: `${SITE_KIND_LABELS[value] ?? value} ${count}`,
+                current: query.kind === value,
+              })),
+            ]}
+          />
+        )}
       </div>
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
           <SearchBox q={q} />
           <Link href="/queue/#add" className="text-sm text-brand-700 hover:underline dark:text-brand-400">
             新增部落格 →
+          </Link>
+          {/* The blogs these filters match, as a subscription list for a feed reader (plain file link). */}
+          <Link href={catalogOpmlPath(query)} className="text-sm text-brand-700 hover:underline dark:text-brand-400">
+            匯出 OPML
           </Link>
         </div>
         <span role="status" className="text-xs text-zinc-500">
@@ -342,7 +361,8 @@ export default function BlogCatalogView({
                       </span>
                     </td>
                     <td className={table.num}>{blog.postCount?.toLocaleString('zh-TW') ?? '—'}</td>
-                    <td className={table.num}>{blog.authorCount?.toLocaleString('zh-TW') ?? '—'}</td>
+                    {/* No author named anywhere (feed or homepage) is not zero authors. */}
+                    <td className={table.num}>{blog.authorCount ? blog.authorCount.toLocaleString('zh-TW') : '—'}</td>
                     <td className={`${table.cell} text-xs tabular-nums text-zinc-500`}>{taipei(blog.lastPublishedAt)}</td>
                     <td className={`${table.cell} text-xs tabular-nums text-zinc-500`}>{taipei(blog.lastCrawlSuccessAt)}</td>
                     <RobotsCell robots={blog.robots} />

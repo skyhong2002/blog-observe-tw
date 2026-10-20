@@ -31,6 +31,8 @@ export type Blog = {
   postCount?: number;
   /** /api/catalog: distinct active authors recorded for the blog. */
   authorCount?: number;
+  /** /api/catalog: who runs it (app/src/catalog.js siteKind); absent from an older gateway. */
+  siteKind?: SiteKind;
   /** /api/catalog: the latest robots.txt read for the blog's host; `null` before the first read. */
   robots?: RobotsStatus | null;
   /** /api/overview: the blog's newest collected post; `null` means none. Absent on older gateways. */
@@ -143,7 +145,19 @@ export type HomeMentions = {
 };
 /** /api/overview?view=home: the overview's shape (posts and tags now empty) plus the body citations. */
 export type HomeOverview = Overview & { view: 'home'; mentions: HomeMentions };
-export type CatalogQuery = { q?: string; category?: string; genre?: string; status?: string; sort?: string; dir?: string; page?: string; limit?: string };
+export type SiteKind = 'personal' | 'group' | 'organization' | 'unknown';
+export const SITE_KIND_LABELS: Record<SiteKind, string> = { personal: '個人', group: '多人', organization: '組織', unknown: '未確認' };
+export type CatalogQuery = {
+  q?: string;
+  category?: string;
+  genre?: string;
+  status?: string;
+  kind?: string;
+  sort?: string;
+  dir?: string;
+  page?: string;
+  limit?: string;
+};
 export type Catalog = {
   blogs: Blog[];
   totals: { blogs: number; posts: number; withUrls: number; authors: number };
@@ -154,6 +168,8 @@ export type Catalog = {
   /** Blogs no genre is shown for yet. */
   ungenred?: number;
   statuses: Array<{ value: string; count: number }>;
+  /** Blogs per site kind, whole directory, fixed order; absent from an older gateway. */
+  kinds?: Array<{ value: SiteKind; count: number }>;
   updatedAt: string | null;
   pagination: { page: number; pages: number; pageSize: number; total: number };
   filters: {
@@ -161,6 +177,7 @@ export type Catalog = {
     category: string;
     genre: string;
     status: string;
+    kind?: SiteKind | '';
     sort: 'name' | 'category' | 'posts' | 'latest' | 'crawl' | 'status';
     dir: 'asc' | 'desc';
     page: number;

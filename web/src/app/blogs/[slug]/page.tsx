@@ -4,6 +4,7 @@ import { Suspense } from 'react';
 import BlogContentSources from '@/components/BlogContentSources';
 import BlogGenres from '@/components/BlogGenres';
 import BlogInference from '@/components/BlogInference';
+import BlogMentions from '@/components/BlogMentions';
 import BlogRelations from '@/components/BlogRelations';
 import BlogTech, { BlogTechPending } from '@/components/BlogTech';
 import BlogTopicCloud from '@/components/BlogTopicCloud';
@@ -71,6 +72,7 @@ export default async function BlogDetailPage({ params }: Props) {
           </>
         }
       />
+      <BlogMentions slug={blog.slug} />
       <BlogRelations slug={blog.slug} />
       <BlogTopics slug={blog.slug} />
       <BlogInference slug={blog.slug} />

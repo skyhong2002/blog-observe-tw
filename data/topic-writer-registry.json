@@ -143,6 +143,15 @@
       "occurrences": 1
     },
     {
+      "path": "app/src/crawl/author-cleanup.ts",
+      "digest": "9167e2af498722abbc9d41ea0a954c7bf3d5c15ce50c7785602ca6c28f674202",
+      "tables": [
+        "posts"
+      ],
+      "dynamic": false,
+      "occurrences": 1
+    },
+    {
       "path": "app/src/crawl/blogroll-store.ts",
       "digest": "ba0594ad7894c4b4989b29ac609e8c09ad1edc9a7aa9c25c3e05cfadbe368527",
       "tables": [],
@@ -569,6 +578,13 @@
     {
       "path": "app/src/relations/home-feed.ts",
       "digest": "78122ebea9f138701500429d9739c5a6e1075ab51e55eafc538384ec1bb0d0e2",
+      "tables": [],
+      "dynamic": true,
+      "occurrences": 1
+    },
+    {
+      "path": "app/src/relations/home-feed.ts",
+      "digest": "d48ae6ae15e3a74aa9da18e0d836158b7bb24b0c1fdf158d5806ca3ff97e0686",
       "tables": [],
       "dynamic": true,
       "occurrences": 1

@@ -606,6 +606,21 @@ export const robotsObservations = mysqlTable('robots_observations', {
   readableAt: datetime('readable_at'),
 });
 
+/** The latest read of a blog's homepage (crawl/site-observation.ts): who it names as its author and whether it
+ * introduces one person or an organisation. The directory's 經營者 filter is derived from it and the author rows. */
+export const blogSiteObservations = mysqlTable('blog_site_observations', {
+  blogId: int('blog_id').primaryKey(),
+  homepageUrl: varchar('homepage_url', { length: 1024 }).notNull(),
+  httpStatus: int('http_status'),
+  /** A person's name from JSON-LD, meta author or an h-card; never the site's own name. */
+  authorName: varchar('author_name', { length: 255 }),
+  personal: boolean('personal'),
+  organization: boolean('organization'),
+  reason: varchar('reason', { length: 64 }).notNull(),
+  identitySnippet: text('identity_snippet'),
+  observedAt: datetime('observed_at').notNull(),
+});
+
 /** Daily /api/search counts (app/src/search-usage.ts), Taiwan calendar days. No query text, results or client details. */
 export const searchUsageDaily = mysqlTable('search_usage_daily', {
   day: char('day', { length: 10 }).primaryKey(),

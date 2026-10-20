@@ -14,6 +14,7 @@ import { createHistoryStore, selectHistoryBlogs } from './crawl/history-store.ts
 import { discoverIndieweb } from './crawl/indieweb.ts';
 import { recordRobotsObservations } from './crawl/robots-observations.ts';
 import { createTagSimilarSitesClient } from './crawl/similarweb-client.ts';
+import { observeSites } from './crawl/site-observation.ts';
 import { createDb } from './db/client.ts';
 import { runPublicationDiscoveryBatch } from './relations/home.ts';
 import { runRelationSnapshotBatch } from './relations/routes.ts';
@@ -93,6 +94,8 @@ for (const [name, every, enabled] of [
   ['blogs-candidate-review', 5 * 60_000, candidateReviewEnabled],
   ['blogs-missing-icons', 15 * 60_000, missingIconsEnabled],
   ['blogs-public-routes', 15 * 60_000, true],
+  // Ten homepages an hour, each blog again after 30 days: 作者 for feeds that name nobody, and the 經營者 filter.
+  ['blogs-site-observations', 60 * 60_000, process.env.BLOG_SITE_OBSERVATIONS_ENABLED !== 'false'],
 ] as const) {
   if (enabled) await queue.upsertJobScheduler(name, { every }, { name, data: {}, opts: { removeOnComplete: 20, removeOnFail: 20 } });
   else await queue.removeJobScheduler(name);
@@ -110,6 +113,11 @@ const worker = new Worker(
       userAgent: config.crawlUserAgent,
       delayMs: config.crawlDelayMs,
     };
+    if (job.name === 'blogs-site-observations')
+      return observeSites(store.pool, {
+        limit: 10,
+        options: { userAgent: config.crawlUserAgent, delayMs: config.crawlDelayMs, timeoutMs: 15000 },
+      });
     if (job.name === 'blogs-public-routes') {
       // Missing-only batches avoid rewriting the full vocabulary or changing established slugs.
       const blogs = await backfillPublicRoutes(store.pool, { kind: 'blog', limit: 100, missingOnly: true });

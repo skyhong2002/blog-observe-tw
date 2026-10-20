@@ -10,7 +10,7 @@ import { registerBlogGenreRoutes } from './blog-genres/routes.ts';
 import { readBlogGenres } from './blog-genres/store.ts';
 import { registerBlogSuggestionRoutes } from './blog-suggestions.ts';
 import { installPrivateCachePolicy } from './cache-policy.ts';
-import { loadCatalog } from './catalog.js';
+import { loadCatalog, loadCatalogFeeds } from './catalog.js';
 import { loadAuthorCatalog } from './catalog-authors.js';
 import { registerCollectionCount } from './collection-count.ts';
 import { registerContentRoutes } from './content/routes.ts';
@@ -45,6 +45,17 @@ import { registerSimilarwebTraffic } from './v1/similarweb-routes.ts';
 
 const esc = (value) =>
   String(value ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&apos;' })[c]);
+/** An OPML 2.0 subscription list; entries without a site or feed address are left out. */
+const opml = (title, items) => {
+  const outlines = items
+    .filter((item) => item.url && item.feedUrl)
+    .map(
+      (item) =>
+        `<outline type="rss" text="${esc(item.name)}" title="${esc(item.name)}" htmlUrl="${esc(item.url)}" xmlUrl="${esc(item.feedUrl)}"/>`,
+    )
+    .join('');
+  return `<?xml version="1.0" encoding="UTF-8"?><opml version="2.0"><head><title>${esc(title)}</title></head><body>${outlines}</body></opml>`;
+};
 const sameOrigin = (request, origin) => !request.headers.origin || request.headers.origin === origin;
 
 export async function buildApp(config, { logger = false, store = null } = {}) {
@@ -157,6 +168,21 @@ export async function buildApp(config, { logger = false, store = null } = {}) {
     }
   });
 
+  // The directory's current filters as an OPML file (/blogs/ 匯出 OPML); same query keys as /api/catalog, no paging.
+  app.get('/api/catalog.opml', async (request, reply) => {
+    reply.header('cache-control', 'no-store');
+    try {
+      const { filters, feeds } = await loadCatalogFeeds(pool, request.query);
+      const named = [filters.q && `「${filters.q}」`, filters.status, filters.genre, filters.kind].filter(Boolean);
+      return reply
+        .type('text/x-opml; charset=utf-8')
+        .header('content-disposition', 'attachment; filename=blog-observe-directory.opml')
+        .send(opml(`部落格觀察 部落格目錄${named.length ? `：${named.join(' · ')}` : ''}`, feeds));
+    } catch {
+      return reply.code(503).send({ error: 'catalog unavailable' });
+    }
+  });
+
   app.get('/api/overview', async (request, reply) => {
     reply.header('cache-control', 'no-store');
     if (request.query?.view !== undefined && request.query.view !== 'home') return reply.code(400).send({ error: 'invalid_view' });
@@ -222,7 +248,7 @@ export async function buildApp(config, { logger = false, store = null } = {}) {
     );
     const [authors] = await pool.query(
       `SELECT a.id,a.display_name AS displayName,a.bio,a.homepage_url AS homepageUrl,ba.role,ba.is_primary AS isPrimary
-       FROM blog_authors ba JOIN authors a ON a.id=ba.author_id WHERE ba.blog_id=? AND ba.status <> 'rejected' ORDER BY ba.is_primary DESC,a.display_name`,
+       FROM blog_authors ba JOIN authors a ON a.id=ba.author_id WHERE ba.blog_id=? AND ba.status <> 'rejected' AND a.status <> 'rejected' ORDER BY ba.is_primary DESC,a.display_name`,
       [blogs[0].id],
     );
     const [tags] = await pool.query(
@@ -334,19 +360,10 @@ export async function buildApp(config, { logger = false, store = null } = {}) {
       "SELECT b.name,b.url,(SELECT fs.url FROM feed_sources fs WHERE fs.blog_id=b.id AND fs.last_success_at IS NOT NULL AND fs.type IN ('rss','atom') ORDER BY fs.last_success_at DESC,fs.id LIMIT 1) AS feedUrl FROM user_follows f JOIN blogs b ON b.id=f.blog_id WHERE f.user_id=? AND b.status='verified' ORDER BY b.name",
       [user.id],
     );
-    const outlines = follows
-      .filter((item) => item.url && item.feedUrl)
-      .map(
-        (item) =>
-          `<outline type="rss" text="${esc(item.name)}" title="${esc(item.name)}" htmlUrl="${esc(item.url)}" xmlUrl="${esc(item.feedUrl)}"/>`,
-      )
-      .join('');
     return reply
       .type('text/x-opml; charset=utf-8')
       .header('content-disposition', 'attachment; filename=blog-observe.opml')
-      .send(
-        `<?xml version="1.0" encoding="UTF-8"?><opml version="2.0"><head><title>blog.observe.tw subscriptions</title></head><body>${outlines}</body></opml>`,
-      );
+      .send(opml('blog.observe.tw subscriptions', follows));
   });
   app.post('/api/me/opml', async (request, reply) => {
     if (!sameOrigin(request, config.publicOrigin)) return reply.code(403).send({ error: 'same-origin requests only' });
