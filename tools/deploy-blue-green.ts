@@ -91,8 +91,9 @@ async function ready(slot: Slot) {
   )
     throw Error('slot_oauth_failed');
 }
+// Up to 60 s: on the shared host under swap pressure a cold gateway takes 12–25 s before it even listens.
 async function waitHealth(slot: Slot) {
-  for (let i = 0; i < 20; i++) {
+  for (let i = 0; i < 120; i++) {
     try {
       await requireHealth(slot);
       return;

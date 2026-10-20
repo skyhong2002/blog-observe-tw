@@ -9,6 +9,7 @@ import FilterChips from '@/components/FilterChips';
 import FooterMethod, { methodHeading } from '@/components/FooterMethod';
 import MethodLink from '@/components/MethodLink';
 import Link from '@/components/NoPrefetchLink';
+import SearchBox from '@/components/SearchBox';
 import SectionTabs from '@/components/SectionTabs';
 import { type Post, taipei } from '@/lib/api';
 import {
@@ -283,25 +284,16 @@ export default function ArticlesView({
           { href: '/tags/', label: '標籤與主題' },
         ]}
       />
-      <form action="/articles/" className="flex gap-2">
-        <label className="sr-only" htmlFor="article-query">
-          搜尋文章
-        </label>
-        <input
-          key={asked.q}
-          id="article-query"
-          name="q"
-          type="search"
-          defaultValue={asked.q}
-          maxLength={QUERY_MAX}
-          placeholder="搜尋文章標題、摘要與內文"
-          className="min-h-10 min-w-0 flex-1 rounded-lg border border-zinc-300 bg-white px-3 text-sm dark:border-zinc-700 dark:bg-zinc-900"
-        />
+      <SearchBox
+        action="/articles/"
+        id="article-query"
+        label="搜尋文章"
+        placeholder="搜尋文章標題、摘要與內文"
+        defaultValue={asked.q}
+        maxLength={QUERY_MAX}
+      >
         {asked.blog && <input type="hidden" name="blog" value={asked.blog} />}
-        <button type="submit" className="rounded-lg bg-brand-700 px-4 text-sm text-white hover:bg-brand-800">
-          搜尋
-        </button>
-      </form>
+      </SearchBox>
       {asked.blog && (
         <p className="text-xs text-zinc-600 dark:text-zinc-400">
           只搜尋{' '}

@@ -13,6 +13,7 @@ import FooterMethod from '@/components/FooterMethod';
 import MethodLink from '@/components/MethodLink';
 import Link from '@/components/NoPrefetchLink';
 import ReloadButton from '@/components/public/ReloadButton';
+import SearchBox from '@/components/SearchBox';
 import TableScroller from '@/components/TableScroller';
 import { taipei } from '@/lib/api';
 import { blogLink } from '@/lib/page-links';
@@ -297,29 +298,20 @@ export default function TechStatsView({
         <h2 id="tech-blogs" className="text-sm font-semibold">
           {filters.technology ? `保留證據中有「${activeTech?.name ?? filters.technology}」的部落格` : '部落格清單'}
         </h2>
-        <form action="/tech/" className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex min-w-0 flex-wrap items-center gap-2">
-            <label htmlFor="tech-query" className="sr-only">
-              搜尋部落格名稱或網址
-            </label>
-            <input
-              key={filters.q}
+            <SearchBox
+              action="/tech/"
               id="tech-query"
-              name="q"
-              type="search"
+              label="搜尋部落格名稱或網址"
+              placeholder="搜尋部落格名稱或網址"
               defaultValue={filters.q}
               maxLength={100}
-              placeholder="搜尋名稱或網址"
-              className="min-h-11 w-56 min-w-0 rounded-full border border-zinc-300 bg-white px-4 text-sm dark:border-zinc-700 dark:bg-zinc-900"
-            />
-            {filters.technology && <input type="hidden" name="technology" value={filters.technology} />}
-            {activeStatus && <input type="hidden" name="status" value={activeStatus} />}
-            <button
-              type="submit"
-              className="min-h-11 rounded-full border border-zinc-300 px-4 text-sm text-zinc-700 hover:border-brand-700 dark:border-zinc-700 dark:text-zinc-300 dark:hover:border-brand-400"
+              className="w-64"
             >
-              搜尋
-            </button>
+              {filters.technology && <input type="hidden" name="technology" value={filters.technology} />}
+              {activeStatus && <input type="hidden" name="status" value={activeStatus} />}
+            </SearchBox>
             {filters.technology && (
               <Link href={techHref({ q: filters.q, status: activeStatus ?? undefined })} scroll={false} className={`${chip} text-xs`}>
                 技術：{activeTech?.name ?? filters.technology}
@@ -342,7 +334,7 @@ export default function TechStatsView({
                 ? '正在載入符合條件的部落格…'
                 : '技術統計暫時無法載入'}
           </span>
-        </form>
+        </div>
         {ignored && <p className={`text-xs ${muted}`}>網址中有無法辨識的篩選條件，已略過。</p>}
 
         {ready ? (

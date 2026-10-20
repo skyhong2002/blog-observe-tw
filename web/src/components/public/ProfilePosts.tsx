@@ -7,6 +7,7 @@
 import { useSearchParams } from 'next/navigation';
 import ArticleListItem from '@/components/ArticleListItem';
 import Link from '@/components/NoPrefetchLink';
+import SearchBox from '@/components/SearchBox';
 import type { Post } from '@/lib/api';
 import { blogHref } from '@/lib/page-links';
 import { profileQueryOf } from '@/lib/public-query';
@@ -19,23 +20,15 @@ export default function ProfilePostsView({ blog, posts: allPosts, query }: { blo
     : allPosts;
   return (
     <>
-      <form action={blogHref(blog.slug, blog.canonicalPath)} className="mb-1 flex gap-2">
-        <input
-          key={query}
-          name="q"
-          defaultValue={query}
-          maxLength={100}
-          aria-label="搜尋這個部落格的文章"
-          placeholder="搜尋這個部落格的文章"
-          className="min-w-0 flex-1 rounded border border-zinc-300 bg-white px-2.5 py-1.5 text-xs dark:border-zinc-700 dark:bg-zinc-950"
-        />
-        <button
-          type="submit"
-          className="rounded border border-zinc-300 px-3 py-1.5 text-xs hover:bg-zinc-100 dark:border-zinc-700 dark:hover:bg-zinc-900"
-        >
-          搜尋
-        </button>
-      </form>
+      <SearchBox
+        action={blogHref(blog.slug, blog.canonicalPath)}
+        id="profile-post-query"
+        label="搜尋這個部落格的文章"
+        placeholder="搜尋這個部落格的文章"
+        defaultValue={query}
+        maxLength={100}
+        className="mb-1 w-full"
+      />
       <p className="text-xs text-zinc-500 dark:text-zinc-400">
         本頁 {posts.length} 篇
         {query && (

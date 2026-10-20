@@ -13,6 +13,7 @@ import MediaTabs from '@/components/MediaTabs';
 import MethodLink from '@/components/MethodLink';
 import Link from '@/components/NoPrefetchLink';
 import ReloadButton from '@/components/public/ReloadButton';
+import { SearchIcon, searchFrame } from '@/components/SearchBox';
 import TableScroller from '@/components/TableScroller';
 import { type Catalog, SITE_KIND_LABELS, taipei } from '@/lib/api';
 import { blogLink } from '@/lib/page-links';
@@ -111,6 +112,10 @@ function SearchBox({ q }: { q: string }) {
       <label htmlFor="blog-query" className="sr-only">
         搜尋部落格：名稱、網址或簡介
       </label>
+      {/* Searches as you type, so the magnifier is a mark, not a button (SearchBox's look otherwise). */}
+      <span className="pointer-events-none absolute top-1/2 left-2.5 -translate-y-1/2 text-zinc-500 dark:text-zinc-400">
+        <SearchIcon />
+      </span>
       <input
         ref={input}
         id="blog-query"
@@ -133,7 +138,7 @@ function SearchBox({ q }: { q: string }) {
             go('');
           }
         }}
-        className="min-h-9 w-full rounded-lg border border-zinc-300 bg-white py-1.5 pr-8 pl-3 text-base sm:text-sm dark:border-zinc-700 dark:bg-zinc-900 [&::-webkit-search-cancel-button]:hidden"
+        className={`${searchFrame} min-h-10 w-full py-1.5 pr-8 pl-9 outline-none text-base sm:text-sm [&::-webkit-search-cancel-button]:hidden`}
       />
       {text ? (
         <button
