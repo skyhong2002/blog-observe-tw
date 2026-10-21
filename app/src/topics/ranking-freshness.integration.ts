@@ -143,7 +143,7 @@ async function rankingBarrier(pool: Pool, mutation: 'seed' | 'rejected' | 'moved
     return result;
   }) as Pool['query'];
   const app = Fastify();
-  registerTopicRoutes(app, routePool);
+  registerTopicRoutes(app, routePool, { homeRefreshMs: 0 });
   let a: Promise<LightMyRequestResponse> | undefined;
   try {
     await pool.execute("INSERT INTO topic_snapshots(id,manifest,status,generated_at,synced_at) VALUES (?,?,'published',?,?)", [

@@ -6,6 +6,7 @@ import { backgroundExcludedSql, DISPLAY_GATE, nativeLabelCte, nativeLabelJoin, w
 import { FREQUENCY_POLICY } from './frequency.ts';
 import { historyReadsEnabled } from './history-contracts.ts';
 import { durableTopicDetail } from './history-read.ts';
+import { HOME_RANKING_REFRESH_MS, HomeRankingSnapshot } from './home-snapshot.ts';
 import { digest, MATCHER_VERSION, normalizeTerm, POLICY_VERSION } from './policy.ts';
 import { PUBLICATION_NOISE_VERSION, publicationExclusionReason, publicationLabelSql } from './publication-noise.ts';
 import { enrichTopicSharedLabels } from './shared-label-enrichment.ts';
@@ -372,17 +373,20 @@ export async function topicEvidenceDetail(
     truncated: blogs.length > 100 || articles.length > 100,
   };
 }
-const caches = new WeakMap<Pool, Set<TopicResponseCache>>();
+const caches = new WeakMap<Pool, Set<{ clear(): void }>>();
 export function invalidateTopicCache(pool: Pool) {
   for (const cache of caches.get(pool) ?? []) cache.clear();
 }
-export function registerTopicRoutes(app: FastifyInstance, pool: Pool) {
+export function registerTopicRoutes(app: FastifyInstance, pool: Pool, { homeRefreshMs = HOME_RANKING_REFRESH_MS } = {}) {
   const cache = new TopicResponseCache();
-  const active = caches.get(pool) ?? new Set<TopicResponseCache>();
+  const home = new HomeRankingSnapshot<Record<string, unknown>>(homeRefreshMs);
+  const active = caches.get(pool) ?? new Set<{ clear(): void }>();
   active.add(cache);
+  active.add(home);
   caches.set(pool, active);
   app.addHook('onClose', async () => {
     active.delete(cache);
+    active.delete(home);
     if (!active.size) caches.delete(pool);
   });
   const metadata = () => ({ generatedAt: new Date().toISOString(), cacheSeconds: cache.ttlMs / 1000, matchingPolicy });
@@ -392,24 +396,27 @@ export function registerTopicRoutes(app: FastifyInstance, pool: Pool) {
     if (!days) return reply.code(400).send({ error: 'invalid_days' });
     if (req.query.view !== undefined && req.query.view !== 'home') return reply.code(400).send({ error: 'invalid_view' });
     if (req.query.view === 'home')
-      return cache.get(`rank:${days}:home`, async () => {
-        // One fresh ranking read serves both the compact list and the larger masthead cloud.
-        // The cloud draws 30 words but skips body-mention words (web topicCloudWords), so it
-        // gets twice that many ranked candidates.
-        const results = await compactHomeRanking(pool, days, undefined, 60);
-        return {
-          ...metadata(),
-          view: 'home',
-          days,
-          source: 'tag-vocabulary',
-          items: results.items.slice(0, 8),
-          truncated: results.items.length > 8 || results.truncated,
-          cloudItems: results.items,
-          cloudTruncated: results.truncated,
-          minimumBlogs: 2,
-          limit: 8,
-        };
-      });
+      return home.get(`rank:${days}:home`, () =>
+        cache.get(`rank:${days}:home`, async () => {
+          // One ranking read serves both the compact list and the larger masthead cloud, and every
+          // request until the next refresh (home-snapshot.ts). The cloud draws 30 words but skips
+          // body-mention words (web topicCloudWords), so it gets twice that many ranked candidates.
+          const results = await compactHomeRanking(pool, days, undefined, 60);
+          return {
+            ...metadata(),
+            cacheSeconds: home.refreshMs / 1000,
+            view: 'home',
+            days,
+            source: 'tag-vocabulary',
+            items: results.items.slice(0, 8),
+            truncated: results.items.length > 8 || results.truncated,
+            cloudItems: results.items,
+            cloudTruncated: results.truncated,
+            minimumBlogs: 2,
+            limit: 8,
+          };
+        }),
+      );
     return cache.get(`rank:${days}`, async () => {
       const now = new Date();
       const [results, vocabulary] = await Promise.all([fullRanking(pool, days, now), vocabularyStatus(pool)]);

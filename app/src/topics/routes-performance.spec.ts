@@ -34,7 +34,7 @@ describe('fresh topic ranking coverage', () => {
       const response = await app.inject('/api/topics?days=30&view=home');
       expect(response.headers['cache-control']).toBe('no-store');
       expect(response.statusCode).toBe(200);
-      expect(response.json()).toMatchObject({ view: 'home', days: 30, limit: 8, minimumBlogs: 2, cacheSeconds: 0 });
+      expect(response.json()).toMatchObject({ view: 'home', days: 30, limit: 8, minimumBlogs: 2, cacheSeconds: 300 });
       expect(response.json()).not.toHaveProperty('coverage');
       expect(response.json()).not.toHaveProperty('vocabulary');
       expect(queries).toHaveLength(1);
@@ -62,7 +62,7 @@ describe('fresh topic ranking coverage', () => {
       await app.close();
     }
   });
-  it('home ranking after a hide commit does not inherit the older in-flight result', async () => {
+  it('home ranking without a snapshot: a read after a hide commit does not inherit the older in-flight result', async () => {
     let hidden = false,
       release!: () => void,
       started!: () => void;
@@ -85,7 +85,8 @@ describe('fresh topic ranking coverage', () => {
       },
     } as unknown as Pool;
     const app = Fastify();
-    registerTopicRoutes(app, pool);
+    // With the home snapshot off (home-snapshot.ts), each read is its own.
+    registerTopicRoutes(app, pool, { homeRefreshMs: 0 });
     try {
       const a = app.inject('/api/topics?days=30&view=home');
       await reading;

@@ -259,7 +259,8 @@ const homeTopics = (raw: unknown) => {
     !shape(raw, {
       view: (v) => v === 'home',
       generatedAt: text,
-      cacheSeconds: (v) => v === 0,
+      // The gateway recomputes the home ranking at most every 5 minutes (app/src/topics/home-snapshot.ts); 0 = per request.
+      cacheSeconds: (v) => count(v) && (v as number) <= 3600,
       days: count,
       source: (v) => v === 'tag-vocabulary',
       items: (items) => rows(items, homeTopicRow),
