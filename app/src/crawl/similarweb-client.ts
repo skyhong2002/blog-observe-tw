@@ -4,9 +4,10 @@ import { homedir } from 'node:os';
 import { join } from 'node:path';
 import type { SimilarWebResult, TagRequestKind, TagRequestStatus, TagSimilarSitesClient, TagSimilarSitesPayload } from './similarweb.ts';
 
-// Verified against tag's external-routes.ts/external.ts contract (898f463).
+// traffic.observe.tw (the machine's only Similarweb requester since 2026-10-21)
+// serves the same contract tag did (tag 898f463), with the same blog token.
 // No caller-controlled origin, endpoint, headers, redirect or provider fallback.
-export const TAG_SIMILARWEB_BASE = 'http://127.0.0.1:18130/internal/similarweb';
+export const TRAFFIC_SIMILARWEB_BASE = 'http://127.0.0.1:18150/internal/similarweb';
 export const TAG_SIMILARWEB_BODY_LIMIT = 1024 * 1024;
 const TIMEOUT_MS = 10_000;
 const TOKEN_LIMIT = 4096;
@@ -237,7 +238,7 @@ export function createTagSimilarSitesClient(options: ClientOptions = {}): TagSim
     let responseStatus: number | undefined;
     try {
       const response = await fetcher(
-        kind ? `${TAG_SIMILARWEB_BASE}/requests` : `${TAG_SIMILARWEB_BASE}/results?${new URLSearchParams({ domain })}`,
+        kind ? `${TRAFFIC_SIMILARWEB_BASE}/requests` : `${TRAFFIC_SIMILARWEB_BASE}/results?${new URLSearchParams({ domain })}`,
         {
           method: kind ? 'POST' : 'GET',
           redirect: 'error',

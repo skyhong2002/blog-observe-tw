@@ -6,7 +6,7 @@ import {
   createTagSimilarSitesClient,
   normalizeSimilarDomain,
   readTagSimilarwebToken,
-  TAG_SIMILARWEB_BASE,
+  TRAFFIC_SIMILARWEB_BASE,
   TAG_SIMILARWEB_BODY_LIMIT,
 } from './similarweb-client.ts';
 
@@ -125,7 +125,7 @@ describe('tag-only Similarweb client', () => {
     expect(output.sourceEvidence).toEqual(validPayload());
     expect(fetcher).toHaveBeenCalledOnce();
     const [url, init] = fetcher.mock.calls[0] as unknown as [string, RequestInit];
-    expect(url).toBe(`${TAG_SIMILARWEB_BASE}/results?domain=medium.com`);
+    expect(url).toBe(`${TRAFFIC_SIMILARWEB_BASE}/results?domain=medium.com`);
     expect(init).toMatchObject({
       method: 'GET',
       redirect: 'error',
@@ -142,7 +142,7 @@ describe('tag-only Similarweb client', () => {
     await expect(client.submit('medium.com')).resolves.toMatchObject({ status: 'pending', created: true, candidates: [] });
     expect(fetcher).toHaveBeenCalledOnce();
     const [url, init] = fetcher.mock.calls[0] as unknown as [string, RequestInit];
-    expect(url).toBe(`${TAG_SIMILARWEB_BASE}/requests`);
+    expect(url).toBe(`${TRAFFIC_SIMILARWEB_BASE}/requests`);
     expect(init.method).toBe('POST');
     expect(JSON.parse(init.body as string)).toEqual({ domain: 'medium.com', kind: 'similar_sites' });
   });
@@ -314,7 +314,7 @@ describe('tag-only Similarweb client', () => {
     });
     await client.getResult('medium.com');
     expect(String((fetcher.mock.calls[0] as unknown as [string])[0])).toMatch(
-      /^http:\/\/127\.0\.0\.1:18130\/internal\/similarweb\/results/,
+      /^http:\/\/127\.0\.0\.1:18150\/internal\/similarweb\/results/,
     );
   });
   it('wrapper requires explicit client injection and never submits a request', async () => {

@@ -2,9 +2,11 @@
 
 方案一已獲使用者核准；tag 的 `898f463` / migration `0035` 提供唯一供應商工作。blog 不直接請求 Similarweb、不持有供應商 cookie、不讀寫 tag DB 或 Redis。舊 provider client、模擬 extension headers、mkdir 鎖已移除。
 
-## tag API
+## traffic API
 
-固定 `http://127.0.0.1:18130/internal/similarweb`，只能本機直連，不轉送 Cookie、CF 或 X-Forwarded-For。認證從 `~/.config/observe-similarweb/blog-token` 讀取 Bearer token，檔案須為本人持有的普通檔案、權限 0600、不是 symlink；密鑰不進日誌、Git 或 review packet。測試可使用獨立注入的 mock token。
+2026-10-21 起 Similarweb 請求改由獨立的 traffic.observe.tw 送出（tag 只轉送），blog 直接呼叫它。契約、token 與下列規則都沒變。
+
+固定 `http://127.0.0.1:18150/internal/similarweb`，只能本機直連，不轉送 Cookie、CF 或 X-Forwarded-For。認證從 `~/.config/observe-similarweb/blog-token` 讀取 Bearer token，檔案須為本人持有的普通檔案、權限 0600、不是 symlink；密鑰不進日誌、Git 或 review packet。測試可使用獨立注入的 mock token。
 
 - `POST /requests`：`{domain,kind:"traffic"|"similar_sites"}`；202 新排入，200 既有工作，400 不合法，429 當日提交上限。
 - `GET /results?domain=…`：來源 `similarweb-extension`、抓取時間、各 kind 的 pending/ok/no-data/blocked、traffic 摘要與 similarSites。只有精確的 `404 not_requested` 可視為尚未提交；認證遮蔽的 404 會停止整輪。
