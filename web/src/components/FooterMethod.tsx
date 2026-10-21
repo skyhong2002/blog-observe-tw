@@ -36,7 +36,7 @@ function sectionsFor(pathname: string) {
         <a className={inlineLink} href="https://indieweb.org/chat-names" rel="noopener" target="_blank">
           IndieWeb 維基的 chat-names 頁面
         </a>
-        。感謝這些名單的維護者；這些網站仍要通過本站自己的檢查才會收錄。本站也不使用 IndiePing 的反向連結數量做任何排行或比較。
+        。感謝這些名單的維護者；這些網站仍要通過本站自己的檢查才會收錄。
       </p>
       <p>沒有資料的區塊留白，資料暫時載入失敗時只寫「暫時無法載入」；留白或載入失敗都不表示沒有收錄、沒有符合的結果或數量為 0。</p>
       {pathname === '/' ? (
