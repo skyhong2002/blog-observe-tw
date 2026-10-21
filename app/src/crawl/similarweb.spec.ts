@@ -6,8 +6,10 @@ import {
   createTagSimilarSitesClient,
   normalizeSimilarDomain,
   readTagSimilarwebToken,
-  TRAFFIC_SIMILARWEB_BASE,
+  registerBlogWatchList,
   TAG_SIMILARWEB_BODY_LIMIT,
+  TRAFFIC_SIMILARWEB_BASE,
+  TRAFFIC_WATCH_URL,
 } from './similarweb-client.ts';
 
 // Fail the assertions if a future implementation revives local lock/budget I/O.
@@ -362,5 +364,31 @@ describe('tag service token loading', () => {
     await expect(readTagSimilarwebToken({})).resolves.toBe(TOKEN);
     expect(String(vi.mocked(filesystem.open).mock.calls[0][0])).toMatch(/\/.config\/observe-similarweb\/blog-token$/);
     expect(close).toHaveBeenCalledOnce();
+  });
+});
+
+describe('registerBlogWatchList', () => {
+  it("replaces blog's standing list at traffic.observe.tw with every normalised blog domain", async () => {
+    const fetcher = vi.fn(async () => Response.json({ watched: 2, refused: [] }));
+    const result = await registerBlogWatchList(['WWW.Example.com', 'example.com', 'other.blog', 'localhost'], {
+      fetcher,
+      tokenReader: async () => TOKEN,
+    });
+    expect(result).toEqual({ status: 'ok', watched: 2, refused: 0 });
+    const [url, init] = fetcher.mock.calls[0] as unknown as [string, RequestInit];
+    expect(url).toBe(TRAFFIC_WATCH_URL);
+    expect(init.method).toBe('PUT');
+    expect(init.redirect).toBe('error');
+    expect(JSON.parse(init.body as string)).toEqual({ domains: ['example.com', 'other.blog'], refreshDays: 30 });
+    expect((init.headers as Record<string, string>).authorization).toBe(`Bearer ${TOKEN}`);
+  });
+  it('reports a missing token or a refusal without throwing', async () => {
+    const fetcher = vi.fn(async () => new Response('', { status: 404 }));
+    expect(await registerBlogWatchList(['example.com'], { fetcher, tokenReader: async () => null })).toEqual({ status: 'config' });
+    expect(fetcher).not.toHaveBeenCalled();
+    expect(await registerBlogWatchList(['example.com'], { fetcher, tokenReader: async () => TOKEN })).toEqual({
+      status: 'error',
+      httpStatus: 404,
+    });
   });
 });

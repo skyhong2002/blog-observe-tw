@@ -13,7 +13,7 @@ import { runHistoryBatch } from './crawl/history.ts';
 import { createHistoryStore, selectHistoryBlogs } from './crawl/history-store.ts';
 import { discoverIndieweb } from './crawl/indieweb.ts';
 import { recordRobotsObservations } from './crawl/robots-observations.ts';
-import { createTagSimilarSitesClient } from './crawl/similarweb-client.ts';
+import { createTagSimilarSitesClient, registerBlogWatchList } from './crawl/similarweb-client.ts';
 import { observeSites } from './crawl/site-observation.ts';
 import { createDb } from './db/client.ts';
 import { runPublicationDiscoveryBatch } from './relations/home.ts';
@@ -252,12 +252,14 @@ const worker = new Worker(
       const [domains] = (await store.pool.query(
         'SELECT canonical_host AS domain FROM blogs WHERE status="verified" AND canonical_host IS NOT NULL',
       )) as [Array<{ domain: string }>, unknown];
+      // Every verified blog is tracked by traffic.observe.tw; the lookups below only add similar sites.
+      const watch = similarWeb.enabled ? await registerBlogWatchList(domains.map((row) => row.domain)) : { status: 'disabled' };
       const similar = await discoverSimilar(
         store.pool,
         domains.map((row) => row.domain),
         similarWeb,
       );
-      return similar;
+      return { ...similar, watch };
     }
     if (job.name !== 'blogs-feed') return { skipped: job.name };
     const [rows] = (await store.pool.query('SELECT id,slug,url FROM blogs WHERE status="verified" AND url IS NOT NULL ORDER BY id')) as [

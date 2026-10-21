@@ -9,6 +9,8 @@ import type { SimilarWebResult, TagRequestKind, TagRequestStatus, TagSimilarSite
 // No caller-controlled origin, endpoint, headers, redirect or provider fallback.
 export const TRAFFIC_SIMILARWEB_BASE = 'http://127.0.0.1:18150/internal/similarweb';
 export const TAG_SIMILARWEB_BODY_LIMIT = 1024 * 1024;
+/** traffic.observe.tw's standing list for this requester: refreshed on its interval, replaced as a whole on every PUT. */
+export const TRAFFIC_WATCH_URL = 'http://127.0.0.1:18150/internal/v1/watch';
 const TIMEOUT_MS = 10_000;
 const TOKEN_LIMIT = 4096;
 const PRIVATE_SUFFIXES = [
@@ -314,4 +316,51 @@ export function createTagSimilarSitesClient(options: ClientOptions = {}): TagSim
     }
   }
   return { getResult: (domain) => request(domain), submit: (domain, kind = 'similar_sites') => request(domain, kind) };
+}
+
+/**
+ * Hands traffic.observe.tw every verified blog as blog's standing list
+ * (Similarweb monthly, Cloudflare Radar daily), so the whole directory is
+ * tracked, not just the ones looked up one by one. Same token and loopback
+ * rules as the lookups; never throws, never reports the token.
+ */
+export async function registerBlogWatchList(
+  domains: string[],
+  {
+    fetcher = fetch,
+    tokenReader = readTagSimilarwebToken,
+    refreshDays = 30,
+  }: { fetcher?: typeof fetch; tokenReader?: () => Promise<string | null>; refreshDays?: number } = {},
+): Promise<{ status: 'ok'; watched: number; refused: number } | { status: 'config' | 'error'; httpStatus?: number }> {
+  const list = [...new Set(domains.map(normalizeSimilarDomain).filter((d): d is string => !!d))].sort();
+  let token: string | null;
+  try {
+    token = await tokenReader();
+  } catch {
+    return { status: 'config' };
+  }
+  if (!validToken(token)) return { status: 'config' };
+  try {
+    const response = await fetcher(TRAFFIC_WATCH_URL, {
+      method: 'PUT',
+      redirect: 'error',
+      credentials: 'omit',
+      cache: 'no-store',
+      signal: AbortSignal.timeout(TIMEOUT_MS),
+      headers: { accept: 'application/json', 'content-type': 'application/json', authorization: `Bearer ${token}` },
+      body: JSON.stringify({ domains: list, refreshDays }),
+    });
+    if (response.status !== 200 || response.redirected) {
+      await response.body?.cancel();
+      return { status: 'error', httpStatus: response.status };
+    }
+    const payload = (await readJson(response, AbortSignal.timeout(TIMEOUT_MS))) as { watched?: unknown; refused?: unknown };
+    return {
+      status: 'ok',
+      watched: typeof payload?.watched === 'number' ? payload.watched : 0,
+      refused: Array.isArray(payload?.refused) ? payload.refused.length : 0,
+    };
+  } catch {
+    return { status: 'error' };
+  }
 }
