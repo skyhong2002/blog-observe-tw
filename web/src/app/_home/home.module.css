@@ -100,6 +100,11 @@
 .storyList { border: 1px solid var(--line); border-radius: 12px; background: var(--panel); overflow: hidden; }
 .story { display: flex; gap: 14px; padding: 18px 16px; align-items: flex-start; }
 .story + .story { border-top: 1px solid var(--soft-line); }
+/* /mentions/ on a wide screen: two columns of separate cards, read left to right then down, newest first. */
+@media (min-width: 1024px) {
+  .feedGrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; border: 0; border-radius: 0; background: none; overflow: visible; }
+  .feedGrid > .story, .feedGrid > .story + .story { border: 1px solid var(--line); border-radius: 12px; background: var(--panel); }
+}
 .storyBody { flex: 1; min-width: 0; }
 .storyTags { color: var(--accent); font-size: 11px; margin-bottom: 6px; }
 .story h3 { font-size: 16px; line-height: 1.65; font-weight: 500; text-wrap: pretty; }

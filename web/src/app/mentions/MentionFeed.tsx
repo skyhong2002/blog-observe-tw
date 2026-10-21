@@ -56,7 +56,7 @@ export default function MentionFeedView({ first }: { first: MentionFeed | null }
   return (
     <section className={styles.feed} aria-label="部落格引用" aria-busy={state === 'pending'}>
       {cards.length ? (
-        <div className={styles.storyList}>
+        <div className={`${styles.storyList} ${styles.feedGrid}`}>
           {cards.map((card) => (
             <MentionCardView key={card.key} card={card} />
           ))}
