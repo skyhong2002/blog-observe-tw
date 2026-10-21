@@ -1,5 +1,6 @@
 import { genreKey } from './blog-genre-vocabulary.ts';
 import { loadShownGenres } from './blog-genres/store.ts';
+import { listingLabel } from './crawl/directory-listing.ts';
 import { robotsFor, robotsStatuses } from './crawl/robots-observations.ts';
 import { iconManifest } from './v1/favicon-routes.ts';
 import { iconUrl } from './v1/icons.ts';
@@ -43,6 +44,14 @@ const searchWords = (q) => [...new Set(searchText(q).split(' ').filter(Boolean))
 const like = (word) => word.replace(/[=%_]/g, '=$&');
 const searchFields = `CONCAT_WS(' ',b.name,b.url,b.slug,b.description,
   (SELECT GROUP_CONCAT(u.url SEPARATOR ' ') FROM blog_urls u WHERE u.blog_id=b.id))`;
+/** Short ?status= codes for the list sources, so the links stay readable; the label itself keeps working. The web
+ * keeps the same table (web/src/lib/public-query.ts STATUS_CODES). */
+export const STATUS_CODES = {
+  blogblog: listingLabel('blogblog-club'),
+  indieping: listingLabel('indieping'),
+  indieweb: listingLabel('indieweb-wiki'),
+};
+const statusOf = (value) => (Object.hasOwn(STATUS_CODES, value) ? STATUS_CODES[value] : value);
 const text = (value, length) => (typeof value === 'string' ? Array.from(value.trim()).slice(0, length).join('') : '');
 const integer = (value, fallback) => {
   if (typeof value !== 'string' || !/^\d+$/.test(value)) return fallback;
@@ -63,7 +72,7 @@ export function catalogFilters(query = {}) {
     category: text(query.category, 255),
     // A genre key (blog-genre-vocabulary.ts genreKey), or '-' for blogs no genre is shown for yet.
     genre: query.genre === NO_GENRE ? NO_GENRE : (genreKey(query.genre) ?? ''),
-    status: text(query.status, 64),
+    status: statusOf(text(query.status, 64)),
     kind: SITE_KINDS.includes(query.kind) ? query.kind : '',
     sort,
     dir: ['asc', 'desc'].includes(query.dir) ? query.dir : ['name', 'category', 'status'].includes(sort) ? 'asc' : 'desc',

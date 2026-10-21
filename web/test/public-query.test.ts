@@ -18,6 +18,7 @@ import {
   profileQueryOf,
   RELATIONS_PERIOD,
   relationsApiPath,
+  statusCodeOf,
   TOPICS_PERIOD,
   tagApiPath,
   topicApiPath,
@@ -57,6 +58,9 @@ test('catalog query: pending filters match the gateway normaliser', () => {
     'sort=bogus&dir=sideways',
     'sort=latest&dir=asc',
     'q=%20%20咖啡%20&category=旅行&status=已核對',
+    'status=indieping',
+    'status=blogblog&sort=status',
+    'status=__proto__',
     'page=0&limit=500',
     'page=abc&limit=-1',
     'page=99999999999999999999',
@@ -71,6 +75,14 @@ test('catalog query: pending filters match the gateway normaliser', () => {
     const asked = catalogQueryOf(q(search));
     assert.deepEqual(catalogFiltersOf(asked), catalogFilters(asked), search);
   }
+});
+
+test('status links use the short code of a list source and the label otherwise', () => {
+  assert.equal(statusCodeOf('IndiePing 名單自動收錄'), 'indieping');
+  assert.equal(statusCodeOf('BlogBlog.Club 名單自動收錄'), 'blogblog');
+  assert.equal(statusCodeOf('IndieWeb 名單自動收錄'), 'indieweb');
+  assert.equal(statusCodeOf('已核對'), '已核對');
+  assert.equal(statusCodeOf(''), '');
 });
 
 test('author query: ids the gateway accepts, baseline without keys', () => {

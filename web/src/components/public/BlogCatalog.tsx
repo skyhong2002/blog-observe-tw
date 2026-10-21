@@ -25,6 +25,7 @@ import {
   catalogOpmlPath,
   catalogQueryOf,
   isCatalogBaseline,
+  statusCodeOf,
 } from '@/lib/public-query';
 import { type RobotsStatus, robotsLabel, robotsTone } from '@/lib/robots';
 import { table } from '@/lib/table-styles';
@@ -171,7 +172,7 @@ export default function BlogCatalogView({
   busy?: boolean;
 }) {
   const { q, sort, dir, genre, status: blogStatus, kind = '', limit } = filters;
-  const query = { q, sort, dir, genre, status: blogStatus, kind, ...(limit !== 50 ? { limit: String(limit) } : {}) };
+  const query = { q, sort, dir, genre, status: statusCodeOf(blogStatus), kind, ...(limit !== 50 ? { limit: String(limit) } : {}) };
   const { genres = [], ungenred = 0, statuses, kinds = [], blogs: rows } = data;
   const { page, pages, total } = data.pagination;
   const ready = status === 'ready';
@@ -243,9 +244,9 @@ export default function BlogCatalogView({
           items={[
             { href: href({ status: null }), label: '全部狀態', current: !query.status },
             ...statuses.map(({ value, count }) => ({
-              href: href({ status: value }),
+              href: href({ status: statusCodeOf(value) }),
               label: `${value} ${count}`,
-              current: query.status === value,
+              current: query.status === statusCodeOf(value),
             })),
           ]}
         />

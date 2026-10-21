@@ -51,6 +51,16 @@ const positive = (text: string | undefined, fallback: number) => {
   return Number.isSafeInteger(number) ? Math.max(1, number) : Number.MAX_SAFE_INTEGER;
 };
 
+/** Short ?status= codes for the list sources (app/src/catalog.js STATUS_CODES, which answers them too). */
+const STATUS_CODES: Record<string, string> = {
+  blogblog: 'BlogBlog.Club 名單自動收錄',
+  indieping: 'IndiePing 名單自動收錄',
+  indieweb: 'IndieWeb 名單自動收錄',
+};
+const statusLabelOf = (code: string) => (Object.hasOwn(STATUS_CODES, code) ? STATUS_CODES[code] : code);
+/** The link form of a status: its short code when it has one, else the label itself. */
+export const statusCodeOf = (label: string) => Object.entries(STATUS_CODES).find(([, text]) => text === label)?.[0] ?? label;
+
 /** Mirrors the gateway's catalogFilters (app/src/catalog.js) so a pending view highlights what was asked. */
 export function catalogFiltersOf(query: CatalogQuery): CatalogFilters {
   const q = chars(query.q, 100);
@@ -60,7 +70,7 @@ export function catalogFiltersOf(query: CatalogQuery): CatalogFilters {
     q,
     category: chars(query.category, 255),
     genre: chars(query.genre, 40),
-    status: chars(query.status, 64),
+    status: statusLabelOf(chars(query.status, 64)),
     kind: siteKinds.find((kind) => kind === query.kind) ?? '',
     sort,
     dir: query.dir === 'asc' || query.dir === 'desc' ? query.dir : ['name', 'category', 'status'].includes(sort) ? 'asc' : 'desc',

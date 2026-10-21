@@ -141,6 +141,19 @@ describe('complete blog catalog', () => {
     expect(catalogFilters({ q: 'iku', sort: 'relevance' })).toMatchObject({ sort: 'relevance' });
   });
 
+  it('answers the short list-source status codes and still the full labels', () => {
+    for (const [code, label] of [
+      ['indieping', 'IndiePing 名單自動收錄'],
+      ['blogblog', 'BlogBlog.Club 名單自動收錄'],
+      ['indieweb', 'IndieWeb 名單自動收錄'],
+    ]) {
+      expect(catalogFilters({ status: code }).status).toBe(label);
+      expect(catalogFilters({ status: label }).status).toBe(label);
+    }
+    expect(catalogFilters({ status: '已核對' }).status).toBe('已核對');
+    expect(catalogFilters({ status: '__proto__' }).status).toBe('__proto__');
+  });
+
   it('bounds inputs and limits and never interpolates unknown sort expressions or directions', async () => {
     expect(
       catalogFilters({
