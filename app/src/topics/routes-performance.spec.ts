@@ -86,7 +86,7 @@ describe('fresh topic ranking coverage', () => {
     } as unknown as Pool;
     const app = Fastify();
     // With the home snapshot off (home-snapshot.ts), each read is its own.
-    registerTopicRoutes(app, pool, { homeRefreshMs: 0 });
+    registerTopicRoutes(app, pool, { rankingRefreshMs: 0 });
     try {
       const a = app.inject('/api/topics?days=30&view=home');
       await reading;
@@ -130,6 +130,33 @@ describe('fresh topic ranking coverage', () => {
         expect(bad.statusCode).toBe(400);
         expect(bad.json().error).toBe('invalid_order');
       }
+    } finally {
+      await app.close();
+    }
+  });
+  it('full rankings are served from the snapshot, one entry per period and order', async () => {
+    let reads = 0;
+    const pool = {
+      query: async (sql: string) => {
+        if (sql.includes('topic_gate AS')) return [[{ n: 5 }]];
+        if (sql.includes('per_blog AS')) return [[topicRow(`tag:read-${++reads}`, 3)]];
+        if (sql.includes('SELECT s.id,s.manifest')) return [[]];
+        if (sql.includes('datedPosts')) return [[{ datedPosts: 10, bodyObservedPosts: 7 }]];
+        if (sql.includes('unknownDatePosts')) return [[{ unknownDatePosts: 2 }]];
+        return [[{ n: 0 }]];
+      },
+    } as unknown as Pool;
+    const app = Fastify();
+    registerTopicRoutes(app, pool);
+    try {
+      const first = await app.inject('/api/topics?days=30&order=blogs');
+      const second = await app.inject('/api/topics?days=30&order=blogs');
+      expect(first.json().cacheSeconds).toBe(300);
+      expect(second.json().items[0].id).toBe(first.json().items[0].id);
+      expect(reads).toBe(1);
+      await app.inject('/api/topics?days=30');
+      await app.inject('/api/topics?days=7&order=blogs');
+      expect(reads).toBe(3);
     } finally {
       await app.close();
     }
@@ -204,7 +231,7 @@ describe('fresh topic ranking coverage', () => {
       },
     } as unknown as Pool;
     const app = Fastify();
-    registerTopicRoutes(app, pool);
+    registerTopicRoutes(app, pool, { rankingRefreshMs: 0 });
     try {
       const first = await app.inject('/api/topics?days=30');
       const second = await app.inject('/api/topics?days=30');

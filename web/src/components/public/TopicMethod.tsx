@@ -59,7 +59,9 @@ export default function TopicMethod({
     <>
       <h3 className={methodHeading}>話題計算方式</h3>
       <p>
-        {ranking ? '同站對同一詞的貢獻逐篇遞減，讓大量發文的站不會獨占排行。' : ''}
+        {ranking
+          ? '排行每 5 分鐘重新計算一次，期間所有讀者看到同一份結果，所以新文章或被隱藏的文章最多晚幾分鐘才反映。同站對同一詞的貢獻逐篇遞減，讓大量發文的站不會獨占排行。'
+          : ''}
         {matchingPolicyText(matchingPolicy)}
         {ranking === 'blogs'
           ? '排行依期間內寫到這個詞的部落格數排序，同數時看上面逐篇遞減後的加權貢獻，再看文章數；至少兩個部落格參與才列入。想看最近明顯變多的詞，見「正在升溫」。'

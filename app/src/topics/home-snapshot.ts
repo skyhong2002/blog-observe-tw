@@ -1,5 +1,5 @@
-/** The homepage ranking, computed at most once per refresh interval and shared by every request.
- * The user accepted (2026-10-21) that the home list and cloud may lag a few minutes behind new or
+/** The topic rankings (homepage, /topics/, /topics/trending/), each at most once per refresh interval and shared by every request.
+ * The user accepted (2026-10-21, extended to the ranking pages 2026-10-22) that rankings may lag a few minutes behind new or
  * hidden articles, in exchange for not running the 30-day aggregation on each visit while the host is busy.
  * - younger than refreshMs: served as is;
  * - older, but younger than maxAgeMs: served as is while one background read replaces it;

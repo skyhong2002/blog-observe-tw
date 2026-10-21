@@ -384,9 +384,9 @@ const caches = new WeakMap<Pool, Set<{ clear(): void }>>();
 export function invalidateTopicCache(pool: Pool) {
   for (const cache of caches.get(pool) ?? []) cache.clear();
 }
-export function registerTopicRoutes(app: FastifyInstance, pool: Pool, { homeRefreshMs = HOME_RANKING_REFRESH_MS } = {}) {
+export function registerTopicRoutes(app: FastifyInstance, pool: Pool, { rankingRefreshMs = HOME_RANKING_REFRESH_MS } = {}) {
   const cache = new TopicResponseCache();
-  const home = new HomeRankingSnapshot<Record<string, unknown>>(homeRefreshMs);
+  const home = new HomeRankingSnapshot<Record<string, unknown>>(rankingRefreshMs);
   const active = caches.get(pool) ?? new Set<{ clear(): void }>();
   active.add(cache);
   active.add(home);
@@ -428,40 +428,44 @@ export function registerTopicRoutes(app: FastifyInstance, pool: Pool, { homeRefr
           };
         }),
       );
-    return cache.get(`rank:${days}:${order}`, async () => {
-      const now = new Date();
-      const [results, vocabulary] = await Promise.all([fullRanking(pool, days, now, order), vocabularyStatus(pool)]);
-      const dates = range(days, now);
-      const [[coverage]] = await pool.query<RowDataPacket[]>(
-        `SELECT COUNT(*) datedPosts,COALESCE(SUM(cb.status='ok' OR o.status='ok'),0) bodyObservedPosts FROM posts p JOIN blogs b ON b.id=p.blog_id ${topicBodyJoins} WHERE p.published_at>=? AND p.published_at<=? AND b.status='verified'`,
-        dates,
-      );
-      const [[undated]] = await pool.query<RowDataPacket[]>(
-        "SELECT COUNT(*) unknownDatePosts FROM posts p JOIN blogs b ON b.id=p.blog_id WHERE p.published_at IS NULL AND b.status='verified'",
-      );
-      const [[capped]] = await pool.query<RowDataPacket[]>(
-        "SELECT COUNT(*) n FROM topic_post_indexes_v3 i JOIN topic_current c ON c.snapshot_id=i.snapshot_id AND c.source=? WHERE i.status='capped' AND i.matcher_version=?",
-        [SOURCE, MATCHER_VERSION],
-      );
-      return {
-        ...metadata(),
-        days,
-        order,
-        source: 'tag-vocabulary',
-        vocabulary,
-        coverage: {
-          datedPosts: Number(coverage.datedPosts ?? 0),
-          unknownDatePosts: Number(undated.unknownDatePosts ?? 0),
-          bodyObservedPosts: Number(coverage.bodyObservedPosts ?? 0),
-          matchedPosts: results.matchedPosts ?? 0,
-          cappedPosts: Number(capped.n),
-        },
-        items: results.items,
-        truncated: results.truncated,
-        minimumBlogs: 2,
-        limit: 100,
-      };
-    });
+    // The full rankings (/topics/, /topics/trending/) share the home snapshot's interval and invalidation.
+    return home.get(`rank:${days}:${order}`, () =>
+      cache.get(`rank:${days}:${order}`, async () => {
+        const now = new Date();
+        const [results, vocabulary] = await Promise.all([fullRanking(pool, days, now, order), vocabularyStatus(pool)]);
+        const dates = range(days, now);
+        const [[coverage]] = await pool.query<RowDataPacket[]>(
+          `SELECT COUNT(*) datedPosts,COALESCE(SUM(cb.status='ok' OR o.status='ok'),0) bodyObservedPosts FROM posts p JOIN blogs b ON b.id=p.blog_id ${topicBodyJoins} WHERE p.published_at>=? AND p.published_at<=? AND b.status='verified'`,
+          dates,
+        );
+        const [[undated]] = await pool.query<RowDataPacket[]>(
+          "SELECT COUNT(*) unknownDatePosts FROM posts p JOIN blogs b ON b.id=p.blog_id WHERE p.published_at IS NULL AND b.status='verified'",
+        );
+        const [[capped]] = await pool.query<RowDataPacket[]>(
+          "SELECT COUNT(*) n FROM topic_post_indexes_v3 i JOIN topic_current c ON c.snapshot_id=i.snapshot_id AND c.source=? WHERE i.status='capped' AND i.matcher_version=?",
+          [SOURCE, MATCHER_VERSION],
+        );
+        return {
+          ...metadata(),
+          days,
+          order,
+          source: 'tag-vocabulary',
+          vocabulary,
+          coverage: {
+            datedPosts: Number(coverage.datedPosts ?? 0),
+            unknownDatePosts: Number(undated.unknownDatePosts ?? 0),
+            bodyObservedPosts: Number(coverage.bodyObservedPosts ?? 0),
+            matchedPosts: results.matchedPosts ?? 0,
+            cappedPosts: Number(capped.n),
+          },
+          items: results.items,
+          truncated: results.truncated,
+          minimumBlogs: 2,
+          limit: 100,
+          cacheSeconds: home.refreshMs / 1000,
+        };
+      }),
+    );
   });
   app.get<{ Params: { id: string }; Querystring: { days?: string; historyCursor?: string } }>('/api/topics/:id', async (req, reply) => {
     const days = daysValue(req.query.days);

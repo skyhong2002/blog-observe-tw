@@ -231,7 +231,7 @@ export async function runTopicsQualityIntegration(pool: Pool) {
         [p.insertId, tagId, origin, live, live, live, live],
       );
     }
-    registerTopicRoutes(app, counted);
+    registerTopicRoutes(app, counted, { rankingRefreshMs: 0 });
     // Every request gets its own read, including identical keys. Hold all eight
     // admitted builders until the other four have explicitly failed closed.
     gateEnabled = true;
