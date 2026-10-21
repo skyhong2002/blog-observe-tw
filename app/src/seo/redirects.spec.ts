@@ -29,6 +29,9 @@ describe('canonical public page redirects', () => {
       '/blogs/a/b/',
       '/api/blogs/x',
       '/blogs/x#fragment',
+      // web/src/app/topics/trending/ is a page, not a topic key.
+      '/topics/trending/',
+      '/topics/trending/?days=7',
     ])
       expect(publicPageRequest(path)).toBeNull();
   });

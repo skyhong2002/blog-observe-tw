@@ -3,7 +3,7 @@ import type { Pool } from 'mysql2/promise';
 import { TopicResponseCache } from '../topics/cache.ts';
 import { historyReadsEnabled } from '../topics/history-contracts.ts';
 import { topicHistoryDisposition } from '../topics/history-read.ts';
-import { isPublicRouteKey, type PublicPageKind, resolvePublicPage } from './page-routes.ts';
+import { isPublicRouteKey, type PublicPageKind, RESERVED_TOPIC_KEYS, resolvePublicPage } from './page-routes.ts';
 
 /** Only a single public page segment is eligible. Never normalize a raw URL into another origin. */
 export function publicPageRequest(raw: string): { kind: PublicPageKind; key: string; path: string; query: string } | null {
@@ -18,6 +18,8 @@ export function publicPageRequest(raw: string): { kind: PublicPageKind; key: str
   }
   const kind = match[1] === 'blogs' ? 'blog' : 'topic';
   if (!isPublicRouteKey(kind, key)) return null;
+  // A static page under /topics/ (e.g. /topics/trending/) is the web's, never a topic lookup.
+  if (kind === 'topic' && RESERVED_TOPIC_KEYS.has(key.toLowerCase())) return null;
   return { kind, key, path: raw.split('?')[0], query: match[3] ?? '' };
 }
 
