@@ -212,6 +212,15 @@ const homeMentions = (value: unknown) =>
     items: (items) => rows(items, homeMention) && atMost(8)(items),
     status: optional(oneOf('available', 'unavailable')),
   });
+/** /api/mentions (home-feed.ts loadMentionFeed): the same rows as the homepage, a page of source articles at a time. */
+const mentionFeed = (raw: unknown) =>
+  shape(raw, {
+    evidenceType: (v) => v === 'direct-link',
+    location: (v) => v === 'body',
+    generatedAt: text,
+    items: (items) => rows(items, homeMention),
+    nextCursor: nullable(text),
+  });
 /**
  * /api/overview?view=home (loadHomeProjection): marked view 'home', the overview's shape at the homepage's bounds,
  * recentBlogs always sent and no directory rows. A full overview (no mark, 200 posts, its blogs) is not this answer.
@@ -368,6 +377,7 @@ const techCoverage = (value: unknown) => {
 export const PUBLIC_CONTRACTS: Record<PublicKind, (raw: unknown) => boolean> = {
   overview: (raw) => shape(raw, overviewShape),
   homeOverview,
+  mentions: mentionFeed,
   homeTopics,
   collectionCount: (raw) => shape(raw, { blogs: count }),
   catalog: (raw) =>

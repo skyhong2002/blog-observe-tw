@@ -120,7 +120,7 @@ export const PERIODS = ['7', '30', '90'] as const;
 export type Period = (typeof PERIODS)[number];
 /** The period each page prerenders; the others are read in the browser. */
 export const TOPICS_PERIOD: Period = '30';
-export const RELATIONS_PERIOD: Period = '90';
+export const RELATIONS_PERIOD: Period = '7';
 
 /** `?days=` when it is one of the offered periods, otherwise the page's default. */
 export function periodOf(query: QueryReader, fallback: Period): Period {
@@ -136,6 +136,8 @@ export const BLOG_TOPICS_PERIOD: Period = '90';
 export const blogTopicsApiPath = (slug: string) => `/api/blogs/${encodeURIComponent(slug)}/topics?days=${BLOG_TOPICS_PERIOD}`;
 export const homeTopicsApiPath = (days: Period) => `/api/topics?days=${days}&view=home`;
 export const relationsApiPath = (days: Period) => `/api/relations?days=${days}`;
+/** /mentions/: the newest page, or the page after `cursor` (the gateway's opaque nextCursor). */
+export const mentionsApiPath = (cursor?: string) => (cursor ? `/api/mentions?cursor=${encodeURIComponent(cursor)}` : '/api/mentions');
 /** `id` is always the stable topic id (never the readable canonical path); `historyCursor` asks for the next history page. */
 export function topicApiPath(id: string, days: Period, historyCursor?: string) {
   const path = `/api/topics/${encodeURIComponent(id)}?days=${days}`;

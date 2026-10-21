@@ -17,7 +17,7 @@ const PAGE_ORIGIN = 'https://blog.observe.tw';
 // Route allowlist, not a generic /api hook: never traverse credentials, admin
 // evidence, page-registry responses, OpenAPI, sessions or arbitrary plugin DTOs.
 export function pageLinksEndpoint(path: string): boolean {
-  return /^\/api\/(?:overview|catalog(?:\/authors)?|search|traffic|relations|me\/follows|tags\/[^/]+|blogs(?:\/[^/]+(?:\/(?:topics|relations))?)?|topics(?:\/[^/]+)?|v1\/(?:articles|relations|blogs(?:\/[^/]+(?:\/(?:articles|relations))?)?|topics(?:\/[^/]+)?))$/.test(
+  return /^\/api\/(?:overview|mentions|catalog(?:\/authors)?|search|traffic|relations|me\/follows|tags\/[^/]+|blogs(?:\/[^/]+(?:\/(?:topics|relations))?)?|topics(?:\/[^/]+)?|v1\/(?:articles|relations|blogs(?:\/[^/]+(?:\/(?:articles|relations))?)?|topics(?:\/[^/]+)?))$/.test(
     path,
   );
 }

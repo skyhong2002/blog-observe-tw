@@ -1,6 +1,16 @@
 import type { Pool } from 'mysql2/promise';
 import { describe, expect, it, vi } from 'vitest';
-import { HOME_MENTIONS_SQL, loadHomeMentions, mentionPublicUrl, mentionQuote } from './home-feed.ts';
+import {
+  HOME_MENTIONS_SQL,
+  loadHomeMentions,
+  loadMentionFeed,
+  MENTION_FEED_AFTER_SQL,
+  MENTION_FEED_PAGE,
+  MENTION_FEED_SQL,
+  mentionPublicUrl,
+  mentionQuote,
+  parseMentionCursor,
+} from './home-feed.ts';
 import { PUBLIC_RELATION } from './public-relation.ts';
 
 vi.mock('../v1/favicon-routes.ts', () => ({ iconManifest: async () => ({}) }));
@@ -143,5 +153,37 @@ describe('homepage citations are links the article writes about in a sentence', 
     expect(mentionQuote(`${'乙'.repeat(10)}B${'丙'.repeat(309)}`, 'B')).toBe(`${'乙'.repeat(10)}B${'丙'.repeat(309)}…`);
     expect(mentionQuote('沒有連結文字', '')).toBe('');
     expect(mentionQuote('上下文', 'X')).toBe('');
+  });
+});
+
+describe('/mentions/ feed pages by source article', () => {
+  const at = (postId: number, publishedAt: string, targetBlogId = 2) => ({ ...row, postId, publishedAt, targetBlogId });
+  it('keeps every target of the first MENTION_FEED_PAGE articles and points the cursor at the last one', async () => {
+    const rows = Array.from({ length: MENTION_FEED_PAGE + 1 }, (_, i) =>
+      at(100 - i, `2026-10-${String(20 - i).padStart(2, '0')}T01:00:00Z`),
+    );
+    rows.splice(1, 0, at(100, '2026-10-20T01:00:00Z', 3));
+    const query = vi.fn(async () => [rows]);
+    const now = new Date('2026-10-21T00:00:00Z');
+    const data = await loadMentionFeed({ query } as unknown as Pool, null, now);
+    expect(query).toHaveBeenCalledWith(MENTION_FEED_SQL, [now, now, now]);
+    expect(new Set(data.items.map((m) => m.postId)).size).toBe(MENTION_FEED_PAGE);
+    expect(data.items.filter((m) => m.postId === 100).map((m) => m.targetBlogId)).toEqual([2, 3]);
+    expect(data.nextCursor).toBe(`2026-10-09T01:00:00.000Z_${100 - MENTION_FEED_PAGE + 1}`);
+  });
+  it('reads after a cursor with a keyset on publish time and post id; the oldest page has no cursor', async () => {
+    const query = vi.fn(async () => [[at(5, '2026-01-01T00:00:00Z')]]);
+    const now = new Date('2026-10-21T00:00:00Z');
+    const cursor = parseMentionCursor('2026-10-09T01:00:00.000Z_89');
+    expect(cursor).toEqual({ publishedAt: new Date('2026-10-09T01:00:00.000Z'), postId: 89 });
+    const data = await loadMentionFeed({ query } as unknown as Pool, cursor, now);
+    expect(query).toHaveBeenCalledWith(MENTION_FEED_AFTER_SQL, [now, cursor?.publishedAt, cursor?.publishedAt, 89, now, now]);
+    expect(MENTION_FEED_AFTER_SQL).toContain('(p.published_at<? OR (p.published_at=? AND p.id<?))');
+    expect(MENTION_FEED_AFTER_SQL).toContain(PUBLIC_RELATION);
+    expect(data.nextCursor).toBeNull();
+  });
+  it('rejects anything but its own cursor shape', () => {
+    for (const bad of ['', '89', '2026-10-09_89', '2026-10-09T01:00:00.000Z_0', '2026-10-09T01:00:00.000Z_-1', 'x_1', 42, null])
+      expect(parseMentionCursor(bad)).toBeNull();
   });
 });

@@ -1,6 +1,6 @@
 'use client';
 
-// One view for the prerendered 90-day relation map and the browser's ?days=7|30; see app/relations/page.tsx.
+// One view for the prerendered 7-day relation map and the browser's ?days=30|90; see app/relations/page.tsx.
 
 import { useSearchParams } from 'next/navigation';
 import { useMemo, useState } from 'react';
@@ -10,6 +10,7 @@ import { filterChipClass, filterRowClass } from '@/components/FilterChips';
 import FooterMethod, { methodHeading } from '@/components/FooterMethod';
 import MethodLink from '@/components/MethodLink';
 import Link from '@/components/NoPrefetchLink';
+import RelationTabs from '@/components/RelationTabs';
 import { SectionUnavailable } from '@/components/SectionBoundary';
 import SectionTabs from '@/components/SectionTabs';
 import { taipei } from '@/lib/api';
@@ -22,6 +23,7 @@ export default function RelationMapView({ days, load }: { days: Period; load: Pu
   return (
     <div className="space-y-5 pb-8">
       <header>
+        <RelationTabs current="relations" />
         <h1 className="text-2xl font-semibold">部落格關係圖</h1>
         <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
           誰在文章中提到誰 · <MethodLink />
@@ -246,7 +248,7 @@ const parseRelations = asIs<Relations>;
 /** Reads ?days= (inside the page's Suspense boundary); periods other than the prerendered one come from /api/relations. */
 export function RelationMapFromUrl({ baseline }: { baseline: Relations | null }) {
   const days = periodOf(useSearchParams(), RELATIONS_PERIOD);
-  // No server baseline (its read failed): the browser reads the 90-day map like the other periods.
+  // No server baseline (its read failed): the browser reads the 7-day map like the other periods.
   const load = usePublicJson(days === RELATIONS_PERIOD && baseline ? null : relationsApiPath(days), parseRelations);
   return <RelationMapView days={days} load={load ?? (baseline ? { status: 'ready', data: baseline } : { status: 'pending' })} />;
 }

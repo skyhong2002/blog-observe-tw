@@ -2,10 +2,11 @@ import type { FastifyInstance, FastifyReply } from 'fastify';
 import type { Pool, RowDataPacket } from 'mysql2/promise';
 import type { BatchOptions, BatchResult } from '../jobs/contracts.ts';
 import { withJobLease } from '../jobs/lease.ts';
+import { loadPostTags } from '../post-tags.ts';
 import { publicSummary } from '../public-post.ts';
 import { iconManifest } from '../v1/favicon-routes.ts';
 import { iconUrl } from '../v1/icons.ts';
-import { loadProfileMentions } from './home-feed.ts';
+import { loadMentionFeed, loadProfileMentions, parseMentionCursor } from './home-feed.ts';
 import { PUBLIC_RELATION } from './public-relation.ts';
 import { loadSharedTags } from './shared-tags.ts';
 import { loadProfileTextSimilarity } from './text-similarity-profile.ts';
@@ -313,6 +314,31 @@ export async function registerRelationRoutes(app: FastifyInstance, pool: Pool) {
     const [[blog]] = await pool.query<RowDataPacket[]>("SELECT id,slug,name FROM blogs WHERE slug=? AND status='verified'", [slug]);
     if (!blog) return reply.code(404).send({ error: 'blog_not_found' });
     return projectionResponse(reply, () => readBlogRelations(pool, { id: Number(blog.id) }, days));
+  });
+  // /mentions/: every citation the homepage would show, a page of source articles at a time (home-feed.ts
+  // loadMentionFeed). Fresh like the homepage, so a hide applies at once; author tags are decoration.
+  app.get('/api/mentions', async (request, reply) => {
+    reply.header('cache-control', 'no-store');
+    const raw = (request.query as { cursor?: unknown }).cursor;
+    const cursor = raw === undefined ? null : parseMentionCursor(raw);
+    if (raw !== undefined && !cursor) return reply.code(400).send({ error: 'invalid_cursor' });
+    let feed: Awaited<ReturnType<typeof loadMentionFeed>>;
+    try {
+      feed = await loadMentionFeed(pool, cursor);
+    } catch {
+      return reply.header('retry-after', '2').code(503).send({ error: 'mentions_unavailable' });
+    }
+    const tags = await loadPostTags(
+      pool,
+      feed.items.map((m) => m.postId),
+    ).catch(() => new Map());
+    return {
+      ...feed,
+      items: feed.items.map((m) => {
+        const found = tags.get(m.postId);
+        return found ? { ...m, postTags: found.tags, postTagCount: found.tagCount } : m;
+      }),
+    };
   });
   // The blog page's 最近被這些部落格提到: read fresh each time, so a hide override applies at once.
   app.get('/api/blogs/:slug/mentions', async (request, reply) => {

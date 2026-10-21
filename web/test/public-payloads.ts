@@ -159,6 +159,14 @@ export const EMPTY: Record<PublicKind, unknown> = {
       items: [],
     },
   },
+  mentions: {
+    evidenceType: 'direct-link',
+    location: 'body',
+    limit: 12,
+    generatedAt: '2026-10-21T00:00:00.000Z',
+    items: [],
+    nextCursor: null,
+  },
   homeTopics: {
     view: 'home',
     generatedAt: '2026-10-12T00:00:00.000Z',
@@ -221,6 +229,7 @@ export const PATHS: Record<PublicKind, string> = {
   topicPage: '/api/pages/topics/%E6%97%85%E8%A1%8C',
   homeOverview: '/api/overview?view=home',
   homeTopics: '/api/topics?days=30&view=home',
+  mentions: '/api/mentions?cursor=2026-10-20T14%3A57%3A00.000Z_123',
   blogQueue: '/api/blog-queue?q=thelingwu.com&state=failed&source=reader-suggestion&page=2&sort=checked&dir=asc',
 };
 

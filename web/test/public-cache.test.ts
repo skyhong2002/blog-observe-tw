@@ -273,6 +273,7 @@ const PUBLIC_DATA_PAGES = [
   'app/articles/page.tsx',
   'app/topics/page.tsx',
   'app/relations/page.tsx',
+  'app/mentions/page.tsx',
   'app/tags/page.tsx',
 ];
 

@@ -9,7 +9,8 @@ export const NAV_GROUPS: Array<{ label: string; links: NavLink[] }> = [
       { href: '/tags/', label: '文章標籤', short: '標籤' },
     ],
   },
-  { label: '看關係', links: [{ href: '/relations/', label: '部落格關係圖', short: '關係圖' }] },
+  // The relation map is the second tab of /mentions/ (RelationTabs), not a header link of its own.
+  { label: '看關係', links: [{ href: '/mentions/', label: '部落格引用', short: '引用' }] },
   { label: '看話題', links: [{ href: '/topics/', label: '大家正在寫什麼', short: '話題' }] },
   {
     label: '看部落格',

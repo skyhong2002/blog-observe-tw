@@ -61,7 +61,7 @@ function MentionQuote({ mention }: { mention: HomeMention }) {
   );
 }
 
-function MentionCardView({ card }: { card: MentionCard }) {
+export function MentionCardView({ card }: { card: MentionCard }) {
   const m = card.article;
   const original = externalHref(m.postUrl);
   const title = displayTitle(m.postTitle).trim() || '未提供標題';
@@ -113,7 +113,7 @@ export default function HomeMentionsSection({ mentions }: { mentions: HomeMentio
     <section className={styles.center} aria-label="最近的部落格引用">
       <div className={styles.sectionHeading}>
         <h2>最近的部落格引用</h2>
-        <Link href="/relations/">關係圖 →</Link>
+        <Link href="/mentions/">更多引用 →</Link>
       </div>
       {mentions.status === 'unavailable' ? (
         <SectionUnavailable label="部落格引用" className={styles.notice} />
@@ -122,8 +122,8 @@ export default function HomeMentionsSection({ mentions }: { mentions: HomeMentio
           {cards.map((card) => (
             <MentionCardView key={card.key} card={card} />
           ))}
-          <Link href="/relations/" className={styles.more}>
-            看全站關係圖 <span aria-hidden="true">→</span>
+          <Link href="/mentions/" className={styles.more}>
+            看更多部落格引用 <span aria-hidden="true">→</span>
           </Link>
         </div>
       ) : null}

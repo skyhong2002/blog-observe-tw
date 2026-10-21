@@ -96,6 +96,7 @@ const STATIC_PUBLIC: Record<string, string> = {
   '/articles/': 'articles',
   '/authors/': 'authors',
   '/blogs/': 'blogs',
+  '/mentions/': 'mentions',
   '/queue/': 'queue',
   '/ranking/': 'ranking',
   '/relations/': 'relations',

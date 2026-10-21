@@ -143,6 +143,8 @@ export type HomeMentions = {
   /** The bounded query can degrade independently; this is distinct from an empty result. */
   status?: 'available' | 'unavailable';
 };
+/** /api/mentions: one page of the citation feed; `nextCursor` reads the page after it, null at the oldest. */
+export type MentionFeed = { generatedAt: string; items: HomeMention[]; nextCursor: string | null };
 /** /api/overview?view=home: the overview's shape (posts and tags now empty) plus the body citations. */
 export type HomeOverview = Overview & { view: 'home'; mentions: HomeMentions };
 export type SiteKind = 'personal' | 'group' | 'organization' | 'unknown';

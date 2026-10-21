@@ -86,11 +86,11 @@ test('author query: ids the gateway accepts, baseline without keys', () => {
 
 test('periods: 7/30/90 only, each page keeps its own default', () => {
   assert.equal(TOPICS_PERIOD, '30');
-  assert.equal(RELATIONS_PERIOD, '90');
+  assert.equal(RELATIONS_PERIOD, '7');
   assert.equal(periodOf(q(''), TOPICS_PERIOD), '30');
   assert.equal(periodOf(q('days=7'), TOPICS_PERIOD), '7');
   assert.equal(periodOf(q('days=90'), TOPICS_PERIOD), '90');
-  assert.equal(periodOf(q('days=365'), RELATIONS_PERIOD), '90');
+  assert.equal(periodOf(q('days=365'), RELATIONS_PERIOD), '7');
   assert.equal(periodOf(q('days=7&days=30'), RELATIONS_PERIOD), '7');
   for (const days of ['7', '30', '90'] as const) {
     assert.equal(isPublicApiPath(topicsApiPath(days)), true);

@@ -334,9 +334,12 @@ describe('homepage centre: body citations', () => {
     expect($('body').text()).toContain('每一種生活，各自怎麼寫');
   });
 
-  test('the more link only leads to the map; an empty 90-day window leaves the section blank, its meaning in the method block', async () => {
+  test('the more links lead to the /mentions/ feed; an empty 90-day window leaves the section blank, its meaning in the method block', async () => {
     answer(OVERVIEW, overview({ mentions: mentions([mention()], { truncated: true }) }));
-    expect((await renderHome())('section[aria-label="最近的部落格引用"] a.more').text()).toBe('看全站關係圖 →');
+    const home = await renderHome();
+    expect(home('section[aria-label="最近的部落格引用"] a.more').text()).toBe('看更多部落格引用 →');
+    expect(home('section[aria-label="最近的部落格引用"] a.more').attr('href')).toBe('/mentions/');
+    expect(home('section[aria-label="最近的部落格引用"] h2 + a').attr('href')).toBe('/mentions/');
     answer(OVERVIEW, overview());
     const $ = await renderHome();
     expect($('[data-mention]').length).toBe(0);

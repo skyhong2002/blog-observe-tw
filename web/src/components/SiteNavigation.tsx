@@ -86,7 +86,9 @@ export default function SiteNavigation({ techEnabled = false }: { techEnabled?: 
                   href === section ||
                   (href === '/byline/' && pathname.startsWith('/journalist/')) ||
                   // /ranking/ is the other tab of the tags section (SectionTabs 標籤觀察).
-                  (href === '/tags/' && pathname.startsWith('/ranking/'));
+                  (href === '/tags/' && pathname.startsWith('/ranking/')) ||
+                  // /relations/ is the other tab of the mentions section (RelationTabs).
+                  (href === '/mentions/' && pathname.startsWith('/relations/'));
                 return (
                   <Link
                     key={href}

@@ -1,4 +1,5 @@
-.home {
+/* .feed: the same palette for the /mentions/ feed, which sits in the ordinary page frame. */
+.home, .feed {
   --paper: var(--color-zinc-50);
   --panel: #fff;
   --line: var(--color-zinc-300);
@@ -8,14 +9,16 @@
   --accent: var(--color-brand-700);
   --tint: var(--color-brand-50);
   --chip: var(--color-zinc-100);
+}
+.home {
   min-height: 100vh;
   background: var(--paper);
   color: var(--ink);
   font-family: inherit;
 }
-.main a { text-decoration: none; }
-.main a:hover { color: var(--accent); }
-.home a:focus-visible, .home button:focus-visible, .main input:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; }
+.main a, .feed a { text-decoration: none; }
+.main a:hover, .feed a:hover { color: var(--accent); }
+.home a:focus-visible, .home button:focus-visible, .feed a:focus-visible, .feed button:focus-visible, .main input:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; }
 .skip { position: fixed; top: -80px; left: 16px; padding: 12px 20px; border-radius: 8px; background: var(--panel); color: var(--accent); z-index: 50; }
 .skip:focus { top: 12px; }
 .main { max-width: 1152px; margin: auto; padding: 24px 16px 0; }
@@ -126,7 +129,7 @@
 .empty p { font-size: 13px; color: var(--muted); line-height: 1.8; margin: 12px 0 24px; }
 .empty a { color: var(--accent); font-size: 13px; }
 
-:global([data-theme="dark"]) .home {
+:global([data-theme="dark"]) .home, :global([data-theme="dark"]) .feed {
   --paper: var(--color-zinc-950);
   --panel: var(--color-zinc-900);
   --line: var(--color-zinc-800);

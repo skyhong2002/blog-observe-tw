@@ -39,6 +39,7 @@ export const PUBLIC_KINDS = [
   'homeOverview',
   'homeTopics',
   'blogQueue',
+  'mentions',
 ] as const;
 export type PublicKind = (typeof PUBLIC_KINDS)[number];
 
@@ -58,6 +59,8 @@ const RULES: readonly Rule[] = [
   { kind: 'topics', path: /^\/api\/topics$/, query: ['days'], views: { home: 'homeTopics' } },
   { kind: 'topic', path: new RegExp(`^/api/topics/${SEGMENT}$`), query: ['days', 'historyCursor'] },
   { kind: 'relations', path: /^\/api\/relations$/, query: ['days'] },
+  // /mentions/: the homepage's body citations as a feed, older pages by cursor (app/src/relations/home-feed.ts).
+  { kind: 'mentions', path: /^\/api\/mentions$/, query: ['cursor'] },
   { kind: 'traffic', path: /^\/api\/traffic$/, query: ['blog'] },
   { kind: 'tag', path: new RegExp(`^/api/tags/${SEGMENT}$`), query: [] },
   { kind: 'blog', path: blogPath(''), query: [] },

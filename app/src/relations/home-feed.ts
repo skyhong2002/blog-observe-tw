@@ -40,13 +40,18 @@ const ELIGIBLE_LINK = `l.source_post_id=p.id AND l.source_blog_id=p.blog_id AND 
  * still hit the one-second statement budget with a cold buffer pool. Visibility
  * predicates are unchanged.
  */
-export const HOME_MENTIONS_SQL = `SET STATEMENT max_statement_time=1 FOR WITH recent_posts AS (
+const mentionsSql = (
+  range: string,
+  posts: number,
+  rowLimit: string,
+  seconds = 1,
+) => `SET STATEMENT max_statement_time=${seconds} FOR WITH recent_posts AS (
  SELECT DISTINCT p.id,p.blog_id,p.published_at FROM relation_links l FORCE INDEX (relation_links_target)
  STRAIGHT_JOIN posts p ON p.id=l.source_post_id AND p.blog_id=l.source_blog_id
  STRAIGHT_JOIN blogs a ON a.id=l.source_blog_id STRAIGHT_JOIN blogs b ON b.id=l.target_blog_id
  STRAIGHT_JOIN relation_observations o ON o.post_id=p.id
- WHERE l.target_blog_id IS NOT NULL AND p.published_at>=? AND p.published_at<=? AND ${ELIGIBLE_LINK}
- ORDER BY p.published_at DESC,p.id DESC LIMIT 9
+ WHERE l.target_blog_id IS NOT NULL AND ${range} AND ${ELIGIBLE_LINK}
+ ORDER BY p.published_at DESC,p.id DESC LIMIT ${posts}
 ), eligible_links AS (
  SELECT p.id postId,p.blog_id sourceBlogId,p.published_at publishedAt,
    l.ordinal,l.target_blog_id targetBlogId,
@@ -60,7 +65,7 @@ export const HOME_MENTIONS_SQL = `SET STATEMENT max_statement_time=1 FOR WITH re
 ), picked AS (
  SELECT postId,sourceBlogId,publishedAt,ordinal,targetBlogId
  FROM eligible_links WHERE link_number=1
- ORDER BY publishedAt DESC,postId DESC,targetBlogId LIMIT 9
+ ORDER BY publishedAt DESC,postId DESC,targetBlogId${rowLimit}
 )
  SELECT p.id postId,p.title postTitle,p.url postUrl,p.image_url postImageUrl,p.published_at publishedAt,
  a.id sourceBlogId,a.slug sourceBlogSlug,a.name sourceBlogName,
@@ -73,6 +78,7 @@ export const HOME_MENTIONS_SQL = `SET STATEMENT max_statement_time=1 FOR WITH re
  STRAIGHT_JOIN blogs b ON b.id=k.targetBlogId
  STRAIGHT_JOIN relation_observations o ON o.post_id=k.postId
  ORDER BY k.publishedAt DESC,k.postId DESC,k.targetBlogId`;
+export const HOME_MENTIONS_SQL = mentionsSql('p.published_at>=? AND p.published_at<=?', 9, ' LIMIT 9');
 
 /** parser.ts keeps up to 100 characters before the anchor and 320 in all. */
 const CONTEXT_LEAD = 100,
@@ -109,6 +115,36 @@ export function mentionPublicUrl(value: unknown): string | null {
     return null;
   }
 }
+/** One article→blog row as the homepage and /mentions/ send it. */
+function mentionRow(r: RowDataPacket, icons: Awaited<ReturnType<typeof iconManifest>>) {
+  const targetHomeUrl = mentionPublicUrl(r.targetHomeUrl);
+  return {
+    postId: Number(r.postId),
+    postTitle: r.postTitle,
+    postUrl: mentionPublicUrl(r.postUrl),
+    postImageUrl: mentionPublicUrl(r.postImageUrl),
+    publishedAt: iso(r.publishedAt),
+    sourceBlogId: Number(r.sourceBlogId),
+    sourceBlogSlug: r.sourceBlogSlug,
+    sourceBlogName: r.sourceBlogName,
+    sourceIconUrl: iconUrl(r.sourceBlogSlug, icons),
+    targetBlogId: Number(r.targetBlogId),
+    targetBlogSlug: r.targetBlogSlug,
+    targetBlogName: r.targetBlogName,
+    targetHomeUrl,
+    targetUrl: mentionPublicUrl(r.targetUrl),
+    targetDomain: targetHomeUrl ? new URL(targetHomeUrl).hostname : null,
+    targetIconUrl: iconUrl(r.targetBlogSlug, icons),
+    evidenceType: 'direct-link' as const,
+    location: 'body' as const,
+    anchor: String(r.anchor ?? '').slice(0, 255),
+    context: String(r.context ?? '').slice(0, 240),
+    quote: mentionQuote(String(r.context ?? ''), String(r.anchor ?? '')),
+    observedAt: iso(r.observedAt),
+    matchVersion: r.matchVersion,
+    contextSource: 'body' as const,
+  };
+}
 /** Fresh SQL on every overview read: a hide committed before B cannot inherit A's data. */
 export async function loadHomeMentions(pool: Pool, now = new Date()) {
   if (!Number.isFinite(now.getTime())) throw Error('invalid_home_mention_date');
@@ -123,35 +159,51 @@ export async function loadHomeMentions(pool: Pool, now = new Date()) {
     truncated: rows.length > HOME_MENTION_LIMIT,
     generatedAt: now.toISOString(),
     status: 'available' as const,
-    items: rows.slice(0, HOME_MENTION_LIMIT).map((r) => {
-      const targetHomeUrl = mentionPublicUrl(r.targetHomeUrl);
-      return {
-        postId: Number(r.postId),
-        postTitle: r.postTitle,
-        postUrl: mentionPublicUrl(r.postUrl),
-        postImageUrl: mentionPublicUrl(r.postImageUrl),
-        publishedAt: iso(r.publishedAt),
-        sourceBlogId: Number(r.sourceBlogId),
-        sourceBlogSlug: r.sourceBlogSlug,
-        sourceBlogName: r.sourceBlogName,
-        sourceIconUrl: iconUrl(r.sourceBlogSlug, icons),
-        targetBlogId: Number(r.targetBlogId),
-        targetBlogSlug: r.targetBlogSlug,
-        targetBlogName: r.targetBlogName,
-        targetHomeUrl,
-        targetUrl: mentionPublicUrl(r.targetUrl),
-        targetDomain: targetHomeUrl ? new URL(targetHomeUrl).hostname : null,
-        targetIconUrl: iconUrl(r.targetBlogSlug, icons),
-        evidenceType: 'direct-link' as const,
-        location: 'body' as const,
-        anchor: String(r.anchor ?? '').slice(0, 255),
-        context: String(r.context ?? '').slice(0, 240),
-        quote: mentionQuote(String(r.context ?? ''), String(r.anchor ?? '')),
-        observedAt: iso(r.observedAt),
-        matchVersion: r.matchVersion,
-        contextSource: 'body' as const,
-      };
-    }),
+    items: rows.slice(0, HOME_MENTION_LIMIT).map((r) => mentionRow(r, icons)),
+  };
+}
+
+/** Source articles per /mentions/ page; every blog each one writes about comes with it. */
+export const MENTION_FEED_PAGE = 12;
+/**
+ * /mentions/ (/api/mentions): the homepage's citations as a feed with no date bound, MENTION_FEED_PAGE source
+ * articles at a time, newest first. An older page starts after the last article shown (keyset on publish time and
+ * post id), so a new article arriving between reads neither repeats nor skips one. One extra article tells whether
+ * there is a next page. The same predicates as the homepage; found through relation_links_target as well.
+ */
+export const MENTION_FEED_SQL = mentionsSql('p.published_at<=?', MENTION_FEED_PAGE + 1, '', 2);
+export const MENTION_FEED_AFTER_SQL = mentionsSql(
+  'p.published_at<=? AND (p.published_at<? OR (p.published_at=? AND p.id<?))',
+  MENTION_FEED_PAGE + 1,
+  '',
+  2,
+);
+/** `<publish time ISO>_<post id>` of the last article on a page. */
+export type MentionCursor = { publishedAt: Date; postId: number };
+export function parseMentionCursor(value: unknown): MentionCursor | null {
+  const match = typeof value === 'string' ? /^(\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:\.\d{3})?Z)_([1-9]\d{0,15})$/.exec(value) : null;
+  if (!match) return null;
+  const publishedAt = new Date(match[1]);
+  const postId = Number(match[2]);
+  return Number.isFinite(publishedAt.getTime()) && Number.isSafeInteger(postId) ? { publishedAt, postId } : null;
+}
+export async function loadMentionFeed(pool: Pool, cursor: MentionCursor | null = null, now = new Date()) {
+  const [rows] = cursor
+    ? await pool.query<RowDataPacket[]>(MENTION_FEED_AFTER_SQL, [now, cursor.publishedAt, cursor.publishedAt, cursor.postId, now, now])
+    : await pool.query<RowDataPacket[]>(MENTION_FEED_SQL, [now, now, now]);
+  const posts = [...new Set(rows.map((r) => Number(r.postId)))];
+  const shown = new Set(posts.slice(0, MENTION_FEED_PAGE));
+  const kept = rows.filter((r) => shown.has(Number(r.postId)));
+  const last = kept.at(-1);
+  const lastAt = last ? iso(last.publishedAt) : null;
+  const icons = await iconManifest();
+  return {
+    evidenceType: 'direct-link' as const,
+    location: 'body' as const,
+    limit: MENTION_FEED_PAGE,
+    generatedAt: now.toISOString(),
+    items: kept.map((r) => mentionRow(r, icons)),
+    nextCursor: posts.length > MENTION_FEED_PAGE && last && lastAt ? `${lastAt}_${Number(last.postId)}` : null,
   };
 }
 
