@@ -24,12 +24,19 @@ function sectionsFor(pathname: string) {
       </p>
       <p>標籤保留原站、社群與人工整理的來源；同名作者不會自動跨站合併。候選站經確認後才納入追蹤。</p>
       <p>
-        部分部落格是從
+        部分部落格是從公開名單發現的：
+        <a className={inlineLink} href="https://blogblog.club/" rel="noopener" target="_blank">
+          BlogBlog.Club
+        </a>
+        （Wiwi 維護，本站自行整理頁面上的連結）、
         <a className={inlineLink} href="https://indieping.giveanornot.com/" rel="noopener" target="_blank">
           IndiePing
         </a>
-        的收錄名單發現的，感謝 IndiePing 與 JN 維護這份名單；這些網站仍要通過本站自己的檢查才會收錄，也不使用 IndiePing
-        的反向連結數量做任何排行或比較。
+        （JN 維護）與
+        <a className={inlineLink} href="https://indieweb.org/chat-names" rel="noopener" target="_blank">
+          IndieWeb 維基的 chat-names 頁面
+        </a>
+        。感謝這些名單的維護者；這些網站仍要通過本站自己的檢查才會收錄。本站也不使用 IndiePing 的反向連結數量做任何排行或比較。
       </p>
       <p>沒有資料的區塊留白，資料暫時載入失敗時只寫「暫時無法載入」；留白或載入失敗都不表示沒有收錄、沒有符合的結果或數量為 0。</p>
       {pathname === '/' ? (
