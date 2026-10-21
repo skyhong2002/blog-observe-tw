@@ -65,6 +65,7 @@ vi.mock('@/app/_home/HomeTopicCloud', async (original) => {
 });
 
 import HomeTopicCloud from '@/app/_home/HomeTopicCloud';
+import { HomeTopicCloudFromBrowser } from '@/app/_home/HomeTopicsFromBrowser';
 import HomePage from '@/app/page';
 
 const OVERVIEW = '/api/overview?view=home';
@@ -589,12 +590,12 @@ describe('masthead cloud: the local 30-day topic ranking only', () => {
     }
   });
 
-  test('an empty ranking draws nothing (no words, no fallback); a failed read throws like the ranking', async () => {
+  test('an empty ranking draws nothing (no words, no fallback); a slow gateway hands over to the browser, a wrong answer throws', async () => {
     stubs.cloud = false;
     answer(TOPICS, topics([]));
     expect(await HomeTopicCloud()).toBeNull();
     answer(TOPICS, { error: 'busy' }, 503);
-    await expect(HomeTopicCloud()).rejects.toBeInstanceOf(PublicGatewayError);
+    expect((await HomeTopicCloud())?.type).toBe(HomeTopicCloudFromBrowser);
     answer(TOPICS, EMPTY.topics);
     await expect(HomeTopicCloud()).rejects.toBeInstanceOf(PublicGatewayError);
     // Malformed counts, provenance or display gate: a failed read, not a fake empty cloud.
@@ -638,7 +639,7 @@ describe('homepage: author hashtags under article titles', () => {
     expect(cardTags.find('a').first().attr('href')).toBe('/tags/?tag=css');
     expect(cardTags.find('a').eq(2).attr('href')).toBe(`/tags/?tag=${encodeURIComponent('台北美食')}`);
     expect(cardTags.children('li').last().text()).toBe('+4');
-    const rowTags = $('aside[aria-label="部落格收錄概況"] li').find('ul[aria-label="作者標籤"]');
+    const rowTags = $('aside[aria-label="最新更新的部落格"] li').find('ul[aria-label="作者標籤"]');
     expect(rowTags.prev().text()).toBe('丙的文章');
     expect(
       rowTags

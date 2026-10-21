@@ -44,19 +44,7 @@ export default async function HomePage() {
           }
         />
         <div className={styles.columns}>
-          <aside className={styles.left} aria-label="最近共同話題">
-            <div className={styles.sectionHeading}>
-              <h2>最近共同話題</h2>
-              <Link href="/topics/">完整排行 →</Link>
-            </div>
-            <SectionBoundary label="最近共同話題" className={styles.notice}>
-              <Suspense fallback={<HomeTopicsPending />}>
-                <HomeTopicRanking />
-              </Suspense>
-            </SectionBoundary>
-          </aside>
-          <HomeMentionsSection mentions={data.mentions} />
-          <aside className={styles.right} aria-label="部落格收錄概況">
+          <aside className={styles.left} aria-label="部落格觀察與最近共同話題">
             <div className={styles.sectionHeading}>
               <h2>部落格觀察</h2>
               <Link href="/blogs/">完整目錄 →</Link>
@@ -72,6 +60,18 @@ export default async function HomePage() {
               </Link>
             </div>
             <div className={`${styles.sectionHeading} ${styles.sectionHeadingLater}`}>
+              <h2>最近共同話題</h2>
+              <Link href="/topics/">完整排行 →</Link>
+            </div>
+            <SectionBoundary label="最近共同話題" className={styles.notice}>
+              <Suspense fallback={<HomeTopicsPending />}>
+                <HomeTopicRanking />
+              </Suspense>
+            </SectionBoundary>
+          </aside>
+          <HomeMentionsSection mentions={data.mentions} />
+          <aside className={styles.right} aria-label="最新更新的部落格">
+            <div className={styles.sectionHeading}>
               <h2>最新更新的部落格</h2>
               <Link href="/blogs/?sort=latest&dir=desc">依最新排序 →</Link>
             </div>

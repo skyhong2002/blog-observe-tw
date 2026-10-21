@@ -4,14 +4,15 @@
 // directions of a pair are different source articles, so separate cards with their own dates. Sidebar, blogroll and
 // comment links, shared tags and text similarity are never rows here and never called an exchange. How rows are
 // chosen is in the page's 本頁的資料來源與計算方式 (FooterMethod). Markup reuses home.module.css's story list.
+// When the overview's citation read gave up, the browser reads the same rows itself (HomeMentionsFromBrowser).
 
 import BlogIcon from '@/components/BlogIcon';
 import Link from '@/components/NoPrefetchLink';
 import PostTags from '@/components/PostTags';
-import { SectionUnavailable } from '@/components/SectionBoundary';
 import { displayTitle, type HomeMention, type HomeMentions, taipei } from '@/lib/api';
 import { externalHref } from '@/lib/images';
 import { blogLink } from '@/lib/page-links';
+import HomeMentionsFromBrowser from './HomeMentionsFromBrowser';
 import styles from './home.module.css';
 import NewsImage from './NewsImage';
 
@@ -116,7 +117,7 @@ export default function HomeMentionsSection({ mentions }: { mentions: HomeMentio
         <Link href="/mentions/">更多引用 →</Link>
       </div>
       {mentions.status === 'unavailable' ? (
-        <SectionUnavailable label="部落格引用" className={styles.notice} />
+        <HomeMentionsFromBrowser />
       ) : cards.length ? (
         <div className={styles.storyList}>
           {cards.map((card) => (

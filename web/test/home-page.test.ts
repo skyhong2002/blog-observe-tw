@@ -34,12 +34,19 @@ test('home: only the compact overview is awaited; the topic list streams in its 
   assert.doesNotMatch(page, /^'use client';/m);
 });
 
-test('home: the topic list reads view=home itself, lets failures throw, and keeps nothing across requests', () => {
-  const list = source('app/_home/HomeTopics.tsx');
-  assert.doesNotMatch(list, /^'use client';/m);
-  assert.match(list, /const topics = await publicJson<HomeTopics>\(homeTopicsApiPath\('30'\)\);/);
-  // A failed or malformed read is the error boundary's, never an empty list.
-  assert.doesNotMatch(list, /\btry\b|\.catch\(|publicJsonOrNull|暫時無法讀取/);
+test('home: the topic list reads view=home itself, a slow gateway goes to the browser, and keeps nothing across requests', () => {
+  const read = source('app/_home/HomeTopics.tsx');
+  assert.doesNotMatch(read, /^'use client';/m);
+  assert.match(read, /publicJson<HomeTopics>\(homeTopicsApiPath\('30'\)\)\.catch\(/);
+  // Only a transient failure (no answer, 5xx) is handed to the browser; a malformed read still throws, never an empty list.
+  assert.match(read, /error\.status === null \|\| error\.status >= 500/);
+  assert.match(read, /return topics \? <HomeTopicList topics=\{topics\} \/> : <HomeTopicRankingFromBrowser \/>;/);
+  assert.doesNotMatch(read, /publicJsonOrNull|暫時無法讀取/);
+  // The browser's read keeps nothing once it settles (home-topics-browser.ts).
+  const browser = source('app/_home/home-topics-browser.ts');
+  assert.match(browser, /if \(flight === read\) flight = null;/);
+  assert.doesNotMatch(browser, /localStorage|sessionStorage|new Map/);
+  const list = source('app/_home/HomeTopicList.tsx');
   assert.doesNotMatch(list, /new Map|unstable_cache|\bcache\(|revalidate|data-analytics|sendEvent|gtag/);
   assert.match(list, /^import Link from '@\/components\/NoPrefetchLink';$/m);
   assert.match(list, /<Link \{\.\.\.topicLink\(tag\.id, tag\.canonicalPath, '30'\)\}>/);
@@ -71,10 +78,7 @@ test('clouds: drawn from the local topic ranking only, one shared path each, str
   // Homepage cloud and ranking read the identical path, so public-api.ts's per-request cache makes one read.
   const cloud = source('app/_home/HomeTopicCloud.tsx');
   // The same one topic read, alongside tag's optional pictures (lib/tag-visuals.ts never throws).
-  assert.match(
-    cloud,
-    /const \[topics, visuals\] = await Promise\.all\(\[publicJson<HomeTopics>\(homeTopicsApiPath\('30'\)\), tagCloudVisuals\(\)\]\);/,
-  );
+  assert.match(cloud, /const \[topics, visuals\] = await Promise\.all\(\[serverHomeTopics\(\), tagCloudVisuals\(\)\]\);/);
   assert.match(source('app/_home/HomeTopics.tsx'), /publicJson<HomeTopics>\(homeTopicsApiPath\('30'\)\)/);
   assert.doesNotMatch(cloud, /\btry\b|\.catch\(|data\.tags|\/tags\//);
   // Profile: list and cloud share blogTopicsApiPath; the client profile only receives a server slot.

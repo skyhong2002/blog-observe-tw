@@ -11,6 +11,7 @@ import { load } from 'cheerio';
 import { renderToString } from 'react-dom/server';
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 import HomeTopicRanking, { HomeTopicsPending } from '@/app/_home/HomeTopics';
+import { HomeTopicRankingFromBrowser } from '@/app/_home/HomeTopicsFromBrowser';
 import { PublicGatewayError } from '@/lib/public-read';
 import { EMPTY } from './public-payloads.ts';
 
@@ -101,9 +102,17 @@ describe('homepage topic list (view=home)', () => {
       () => answer(home([], { vocabulary: (EMPTY.topics as { vocabulary: unknown }).vocabulary })),
     ],
     ['the gateway 404', () => answer({ error: 'not found' }, 404)],
-    ['a 503 twice', () => answer({ error: 'busy' }, 503)],
-    ['a 500', () => answer({ error: 'boom' }, 500)],
   ];
+  // No answer in time (the shared host is often slow): the browser reads the ranking itself, never an empty list.
+  for (const [name, status] of [
+    ['a 503 twice', 503],
+    ['a 500', 500],
+  ] as const)
+    test(`${name}: hands the list to the browser's own read`, async () => {
+      answer({ error: 'busy' }, status);
+      const element = await HomeTopicRanking();
+      expect(element.type).toBe(HomeTopicRankingFromBrowser);
+    });
   for (const [name, setup] of failures)
     test(`${name}: throws to the error boundary, never an empty list`, async () => {
       setup();

@@ -78,7 +78,8 @@ const mentionsSql = (
  STRAIGHT_JOIN blogs b ON b.id=k.targetBlogId
  STRAIGHT_JOIN relation_observations o ON o.post_id=k.postId
  ORDER BY k.publishedAt DESC,k.postId DESC,k.targetBlogId`;
-export const HOME_MENTIONS_SQL = mentionsSql('p.published_at>=? AND p.published_at<=?', 9, ' LIMIT 9');
+// Two seconds, like the feed: one second timed out about three times an hour on the loaded shared host.
+export const HOME_MENTIONS_SQL = mentionsSql('p.published_at>=? AND p.published_at<=?', 9, ' LIMIT 9', 2);
 
 /** parser.ts keeps up to 100 characters before the anchor and 320 in all. */
 const CONTEXT_LEAD = 100,
