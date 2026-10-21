@@ -101,6 +101,39 @@ describe('fresh topic ranking coverage', () => {
       await app.close();
     }
   });
+  it('order=blogs ranks by participating blogs; heat stays the default; anything else is refused', async () => {
+    const queries: string[] = [];
+    const pool = {
+      query: async (sql: string) => {
+        queries.push(sql);
+        if (sql.includes('topic_gate AS')) return [[{ n: 5 }]];
+        if (sql.includes('per_blog AS')) return [[topicRow('tag:a', 3)]];
+        if (sql.includes('SELECT s.id,s.manifest')) return [[]];
+        if (sql.includes('datedPosts')) return [[{ datedPosts: 10, bodyObservedPosts: 7 }]];
+        if (sql.includes('unknownDatePosts')) return [[{ unknownDatePosts: 2 }]];
+        return [[{ n: 0 }]];
+      },
+    } as unknown as Pool;
+    const app = Fastify();
+    registerTopicRoutes(app, pool);
+    try {
+      const blogs = await app.inject('/api/topics?days=30&order=blogs');
+      expect(blogs.statusCode).toBe(200);
+      expect(blogs.json().order).toBe('blogs');
+      expect(queries.find((sql) => sql.includes('per_blog AS'))).toContain('ORDER BY blogs DESC,score DESC,posts DESC,topic_id');
+      queries.length = 0;
+      const heat = await app.inject('/api/topics?days=30');
+      expect(heat.json().order).toBe('heat');
+      expect(queries.find((sql) => sql.includes('per_blog AS'))).toContain('ORDER BY rank_score DESC');
+      for (const path of ['/api/topics?days=30&order=posts', '/api/topics?days=30&view=home&order=blogs']) {
+        const bad = await app.inject(path);
+        expect(bad.statusCode).toBe(400);
+        expect(bad.json().error).toBe('invalid_order');
+      }
+    } finally {
+      await app.close();
+    }
+  });
   it('retains coverage when all matched topics have only one blog', async () => {
     const queries: string[] = [];
     const pool = {

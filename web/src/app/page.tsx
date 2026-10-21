@@ -61,7 +61,7 @@ export default async function HomePage() {
             </div>
             <div className={`${styles.sectionHeading} ${styles.sectionHeadingLater}`}>
               <h2>最近共同話題</h2>
-              <Link href="/topics/">完整排行 →</Link>
+              <Link href="/topics/trending/">完整排行 →</Link>
             </div>
             <SectionBoundary label="最近共同話題" className={styles.notice}>
               <Suspense fallback={<HomeTopicsPending />}>

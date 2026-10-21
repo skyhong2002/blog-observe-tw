@@ -103,6 +103,7 @@ const STATIC_PUBLIC: Record<string, string> = {
   '/tags/': 'tags',
   '/tech/': 'tech',
   '/topics/': 'topics',
+  '/topics/trending/': 'topics_trending',
   '/traffic/': 'traffic',
 };
 
@@ -193,7 +194,8 @@ export function safeContentId(type: 'blog' | 'topic', value: unknown): string | 
  */
 export function selectContentTarget(pathname: string, contentId?: string): { content_type: 'blog' | 'topic'; content_id?: string } | null {
   const blog = /^\/blogs\/([^/]+)\/?$/.exec(pathname);
-  const topic = blog ? null : /^\/topics\/([^/]+)\/?$/.exec(pathname);
+  // /topics/trending/ is a ranking page, not a topic.
+  const topic = blog ? null : /^\/topics\/(?!trending\/?$)([^/]+)\/?$/.exec(pathname);
   if (!blog && !topic) return null;
   const declared = safeContentId(blog ? 'blog' : 'topic', contentId);
   if (declared) return { content_type: blog ? 'blog' : 'topic', content_id: declared };

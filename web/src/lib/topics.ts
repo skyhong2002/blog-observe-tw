@@ -180,6 +180,8 @@ export type TopicHistory = {
 };
 export type Topics = {
   days: number;
+  /** How the gateway ordered items (app/src/topics/routes.ts); absent on older gateways, which ranked by heat. */
+  order?: 'blogs' | 'heat';
   vocabulary: VocabularyStatus;
   matchingPolicy?: MatchingPolicy;
   coverage?: { datedPosts: number; unknownDatePosts: number; bodyObservedPosts: number; matchedPosts: number; cappedPosts: number };

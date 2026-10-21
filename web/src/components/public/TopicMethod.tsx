@@ -46,7 +46,8 @@ export default function TopicMethod({
   matchingReason?: string | null;
   /** The ranking's period coverage. */
   coverage?: Topics['coverage'];
-  ranking?: boolean;
+  /** Which ranking the page shows (TopicRanking): by participating blogs, or by heat. */
+  ranking?: 'blogs' | 'heat' | false;
   /** The detail page's shared-label block, when it renders one (sharedLabelsView). */
   sharedLabels?: SharedLabelsView | null;
   /** The list on the page was cut short; says how. */
@@ -60,9 +61,11 @@ export default function TopicMethod({
       <p>
         {ranking ? '同站對同一詞的貢獻逐篇遞減，讓大量發文的站不會獨占排行。' : ''}
         {matchingPolicyText(matchingPolicy)}
-        {ranking
-          ? `排行依熱度乘上 log₂(1＋參與部落格數)排序，不看篇數多寡：熱度＝期間文章數 ÷ 依長期基準占比推算的預期篇數，兩邊各加 5 篇平滑；平常就很多的詞熱度約 1，會排在最近明顯變多、很多站都在寫的詞後面。${liftExplanation(matchingPolicy?.frequency?.baselineDays)}`
-          : ''}
+        {ranking === 'blogs'
+          ? '排行依期間內寫到這個詞的部落格數排序，同數時看上面逐篇遞減後的加權貢獻，再看文章數；至少兩個部落格參與才列入。想看最近明顯變多的詞，見「正在升溫」。'
+          : ranking
+            ? `排行依熱度乘上 log₂(1＋參與部落格數)排序，不看篇數多寡：熱度＝期間文章數 ÷ 依長期基準占比推算的預期篇數，兩邊各加 5 篇平滑；平常就很多的詞熱度約 1，會排在最近明顯變多、很多站都在寫的詞後面。${liftExplanation(matchingPolicy?.frequency?.baselineDays)}`
+            : ''}
       </p>
       {ranking && displayGateText(matchingPolicy) ? <p>{displayGateText(matchingPolicy)}</p> : null}
       {ranking && backgroundGateText(matchingPolicy) ? <p data-method="background-gate">{backgroundGateText(matchingPolicy)}</p> : null}

@@ -390,7 +390,7 @@ describe('topic ranking', () => {
   };
 
   test('the table, then one closed block with the period counts and the long record', () => {
-    const $ = render(<TopicRankingView days="30" load={ready(ranking)} />, '/topics/');
+    const $ = render(<TopicRankingView order="heat" days="30" load={ready(ranking)} />, '/topics/');
     const block = expectOnePageBlock($);
     const table = $('table');
     expect(table.find('tbody tr').length).toBe(1);
@@ -406,7 +406,7 @@ describe('topic ranking', () => {
   });
 
   test('an empty ranking leaves the table empty, says no reason inline, and keeps one block after it', () => {
-    const $ = render(<TopicRankingView days="30" load={ready({ ...ranking, items: [], coverage: undefined })} />, '/topics/');
+    const $ = render(<TopicRankingView order="heat" days="30" load={ready({ ...ranking, items: [], coverage: undefined })} />, '/topics/');
     const block = expectOnePageBlock($);
     expect($('tbody tr').length).toBe(0);
     expect($.text()).not.toContain('這段期間尚無跨至少');
@@ -420,7 +420,7 @@ describe('topic ranking', () => {
     ['error', { status: 'error' }, '話題資料暫時無法載入，請稍後再試。重新載入'],
   ] as const) {
     test(`${name}: one block with only the generic source notes`, () => {
-      const $ = render(<TopicRankingView days="7" load={state} />, '/topics/');
+      const $ = render(<TopicRankingView order="heat" days="7" load={state} />, '/topics/');
       const block = expectOnePageBlock($);
       const message = $('main [role="status"]').first();
       expect(message.text()).toBe(expected);
@@ -430,16 +430,88 @@ describe('topic ranking', () => {
   }
 
   test('?days=7 reads /api/topics and shows its pending state; the default period renders the baseline', () => {
-    let $ = render(<TopicRankingFromUrl baseline={ranking} />, '/topics/', 'days=7');
-    expect(publicJson.paths).toContain(topicsApiPath('7'));
+    let $ = render(<TopicRankingFromUrl order="heat" baseline={ranking} visuals={[]} />, '/topics/trending/', 'days=7');
+    expect(publicJson.paths).toContain(topicsApiPath('7', 'heat'));
     expect($('p[aria-busy="true"]').text()).toBe('正在載入近 7 天的話題…');
     expectOnePageBlock($);
 
     publicJson.paths = [];
-    $ = render(<TopicRankingFromUrl baseline={ranking} />, '/topics/');
+    $ = render(<TopicRankingFromUrl order="heat" baseline={ranking} visuals={[]} />, '/topics/trending/');
     expect(publicJson.paths.filter(Boolean)).toEqual([]);
     expect($('table tbody tr').length).toBe(1);
     expectOnePageBlock($);
+  });
+});
+
+describe('the two rankings', () => {
+  const topics: Topics = {
+    days: 30,
+    vocabulary: { status: 'ready' } as Topics['vocabulary'],
+    items: [
+      {
+        id: 'tag:a',
+        label: '咖啡',
+        source: 'tag-vocabulary',
+        score: 4,
+        posts: 9,
+        blogs: 6,
+        titlePosts: 5,
+        bodyOnlyPosts: 4,
+        lift: 2.5,
+        heat: 3,
+      },
+      {
+        id: 'tag:b',
+        label: '旅行',
+        source: 'tag-vocabulary',
+        score: 3,
+        posts: 7,
+        blogs: 4,
+        titlePosts: 6,
+        bodyOnlyPosts: 1,
+        lift: 1.2,
+        heat: 2,
+      },
+    ] as Topics['items'],
+    minimumBlogs: 2,
+    limit: 100,
+    truncated: false,
+  };
+  test('/topics/ (blogs): its tab is current, no rise column, the title sits in the cloud frame', () => {
+    const $ = render(<TopicRankingView order="blogs" days="30" load={ready(topics)} />, '/topics/');
+    expect($('nav[aria-label="話題排行"] [aria-current="page"]').text()).toBe('大家在寫');
+    expect(
+      $('nav[aria-label="話題排行"] a')
+        .map((_, a) => $(a).attr('href'))
+        .get(),
+    ).toEqual(['/topics/', '/topics/trending/']);
+    expect(
+      $('nav[aria-label="話題期間"] a')
+        .map((_, a) => $(a).attr('href'))
+        .get(),
+    ).toEqual(['/topics/?days=7', '/topics/', '/topics/?days=90']);
+    expect($('h1').text()).toBe('大家正在寫什麼');
+    expect(
+      $('thead th')
+        .map((_, th) => $(th).text().replace(/[▲▼↕]/g, ''))
+        .get(),
+    ).toEqual(['#', '話題', '部落格', '文章', '標題／僅正文']);
+    expect($.text()).toContain('依期間內寫到這個詞的部落格數排序');
+  });
+  test('/topics/trending/ (heat): keeps the period across tabs and shows the rise column', () => {
+    const $ = render(<TopicRankingView order="heat" days="7" load={ready(topics)} />, '/topics/trending/');
+    expect(
+      $('nav[aria-label="話題排行"] a')
+        .map((_, a) => $(a).attr('href'))
+        .get(),
+    ).toEqual(['/topics/?days=7', '/topics/trending/?days=7']);
+    expect($('h1').text()).toBe('正在升溫的話題');
+    expect(
+      $('thead th')
+        .map((_, th) => $(th).text().replace(/[▲▼↕]/g, ''))
+        .get(),
+    ).toEqual(['#', '話題', '升溫倍率', '部落格', '文章', '標題／僅正文']);
+    expect($.text()).toContain('排行依熱度乘上');
   });
 });
 
@@ -488,8 +560,9 @@ describe('a failed server baseline', () => {
   test('/topics/ without a baseline reads the 30-day ranking in the browser instead of failing the page', () => {
     publicJson.paths = [];
     publicJson.load = { status: 'pending' };
-    const $ = render(<TopicRankingFromUrl baseline={null} />, '/topics/');
-    expect(publicJson.paths).toContain(topicsApiPath('30'));
+    const $ = render(<TopicRankingFromUrl order="blogs" baseline={null} visuals={[]} />, '/topics/');
+    expect(publicJson.paths).toContain(topicsApiPath('30', 'blogs'));
+    expect(topicsApiPath('30', 'blogs')).toBe('/api/topics?days=30&order=blogs');
     expect($('main [role="status"]').first().text()).toBe('正在載入近 30 天的話題…');
     expect($('h1').text()).toBe('大家正在寫什麼');
   });

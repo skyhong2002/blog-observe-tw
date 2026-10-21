@@ -56,7 +56,7 @@ const RULES: readonly Rule[] = [
   { kind: 'collectionCount', path: /^\/api\/collection-count$/, query: [] },
   { kind: 'authors', path: /^\/api\/catalog\/authors$/, query: ['author', 'page', 'limit'] },
   { kind: 'search', path: /^\/api\/search$/, query: ['q', 'page', 'limit', 'blog'] },
-  { kind: 'topics', path: /^\/api\/topics$/, query: ['days'], views: { home: 'homeTopics' } },
+  { kind: 'topics', path: /^\/api\/topics$/, query: ['days', 'order'], views: { home: 'homeTopics' } },
   { kind: 'topic', path: new RegExp(`^/api/topics/${SEGMENT}$`), query: ['days', 'historyCursor'] },
   { kind: 'relations', path: /^\/api\/relations$/, query: ['days'] },
   // /mentions/: the homepage's body citations as a feed, older pages by cursor (app/src/relations/home-feed.ts).

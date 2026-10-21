@@ -1,6 +1,7 @@
+import { readFileSync } from 'node:fs';
 import type { Pool } from 'mysql2/promise';
 import { describe, expect, it } from 'vitest';
-import { isPublicRouteKey, proposedBlogSlug, readableSlug, resolvePublicPage } from './page-routes.ts';
+import { isPublicRouteKey, proposedBlogSlug, RESERVED_TOPIC_KEYS, readableSlug, resolvePublicPage } from './page-routes.ts';
 
 describe('stable public page slugs', () => {
   it('normalizes labels without changing original identities', () => {
@@ -9,6 +10,13 @@ describe('stable public page slugs', () => {
     expect(readableSlug('Cafe\u0301')).toBe('café');
     expect(readableSlug('推薦／比較 & 閱讀')).toBe('推薦-比較-閱讀');
     expect([...readableSlug('長'.repeat(500))]).toHaveLength(120);
+  });
+  it('a topic never mints the key of a static page under /topics/', () => {
+    expect(RESERVED_TOPIC_KEYS.has('trending')).toBe(true);
+    // A reserved candidate counts as taken, so the topic falls through to its hashed suffix.
+    expect(readFileSync(new URL('./page-routes.ts', import.meta.url), 'utf8')).toMatch(
+      /: RESERVED_TOPIC_KEYS\.has\(candidate\.toLowerCase\(\)\)\s*\? \[\[\{ id: candidate \}\]\]/,
+    );
   });
   it('keeps existing readable blog keys but replaces discovery hashes using verified homes', () => {
     expect(proposedBlogSlug({ slug: 'kocpc', name: '電腦王阿達', url: 'https://www.kocpc.com.tw/' })).toBe('kocpc');

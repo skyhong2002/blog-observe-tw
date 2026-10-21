@@ -272,6 +272,7 @@ const PUBLIC_DATA_PAGES = [
   'app/blogs/[slug]/page.tsx',
   'app/articles/page.tsx',
   'app/topics/page.tsx',
+  'app/topics/trending/page.tsx',
   'app/relations/page.tsx',
   'app/mentions/page.tsx',
   'app/tags/page.tsx',
@@ -375,7 +376,8 @@ test('route contract: query pages read the URL in the browser inside Suspense, w
   for (const page of [
     'app/blogs/page.tsx',
     'app/articles/page.tsx',
-    'app/topics/page.tsx',
+    // /topics/ and /topics/trending/ share their server half.
+    'components/public/TopicRankingPage.tsx',
     'app/relations/page.tsx',
     'app/tags/page.tsx',
     'app/topics/[id]/page.tsx',

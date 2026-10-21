@@ -9,6 +9,9 @@ import { exclusionReason } from '../topics/policy.ts';
 import { publicationLabelSql } from '../topics/publication-noise.ts';
 import { SOURCE } from '../topics/snapshot-client.ts';
 
+/** Static pages under /topics/ (web/src/app/topics/trending/); a topic never gets one as its readable key. */
+export const RESERVED_TOPIC_KEYS = new Set(['trending']);
+
 export type PublicPageKind = 'blog' | 'topic';
 export type PublicPage = { entityId: string; stableId: string; slug: string; canonicalPath: string };
 export type BackfillOptions = { afterId?: string; limit?: number; missingOnly?: boolean };
@@ -201,7 +204,9 @@ async function register(
       const [[reserved]] =
         kind === 'blog'
           ? await c.query<RowDataPacket[]>('SELECT id FROM blogs WHERE BINARY slug=BINARY ? AND id<>? LIMIT 1', [candidate, entityId])
-          : [[]];
+          : RESERVED_TOPIC_KEYS.has(candidate.toLowerCase())
+            ? [[{ id: candidate }]]
+            : [[]];
       if (!reserved && (await claim(c, kind, candidate, entityId))) {
         canonical = candidate;
         break;

@@ -128,7 +128,10 @@ export function periodOf(query: QueryReader, fallback: Period): Period {
   return PERIODS.includes(days as Period) ? (days as Period) : fallback;
 }
 
-export const topicsApiPath = (days: Period) => `/api/topics?days=${days}`;
+/** /topics/ ranks by participating blogs (order=blogs); /topics/trending/ and the homepage rank by heat, the default. */
+export type TopicOrder = 'blogs' | 'heat';
+export const topicsApiPath = (days: Period, order: TopicOrder = 'heat') =>
+  `/api/topics?days=${days}${order === 'blogs' ? '&order=blogs' : ''}`;
 /** The homepage's bounded projections (view=home): their own kinds and contracts, never the full pages' payloads. */
 export const HOME_OVERVIEW_PATH = '/api/overview?view=home';
 /** A profile's topics over its original 90-day period: one path, so its list and its word cloud share one read. */

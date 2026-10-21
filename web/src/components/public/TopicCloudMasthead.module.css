@@ -1,0 +1,27 @@
+/* TopicCloudMasthead: the same frame as the homepage masthead cloud (app/_home/home.module.css .mastheadCloudFrame).
+ * One canvas per breakpoint; the frame is a size container, so --u is one canvas unit in px and the title scales
+ * with the words. The overlay lets the pointer through to the words, except on the line's link. */
+.frame {
+  --cw: var(--wide-w); --ch: var(--wide-h); --title: var(--wide-title); --line: var(--wide-line);
+  position: relative; container-type: inline-size; margin: 0 auto; max-width: var(--wide-max); aspect-ratio: var(--cw) / var(--ch);
+}
+.compact, .medium { display: none; }
+.centre {
+  --u: calc(100cqw / var(--cw));
+  position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+  display: flex; flex-direction: column; align-items: center; pointer-events: none; text-align: center;
+}
+.title { font-size: calc(var(--title) * var(--u)); line-height: 1.35; font-weight: 600; white-space: nowrap; }
+.line { font-size: calc(var(--line) * var(--u)); line-height: 1.7; white-space: nowrap; color: var(--color-zinc-600); }
+.line a, .line button { pointer-events: auto; }
+:global([data-theme="dark"]) .line { color: var(--color-zinc-400); }
+@media (max-width: 1023px) {
+  .frame { --cw: var(--medium-w); --ch: var(--medium-h); --title: var(--medium-title); --line: var(--medium-line); max-width: var(--medium-max); }
+  .wide { display: none; }
+  .medium { display: block; }
+}
+@media (max-width: 639px) {
+  .frame { --cw: var(--compact-w); --ch: var(--compact-h); --title: var(--compact-title); --line: var(--compact-line); max-width: var(--compact-max); }
+  .medium { display: none; }
+  .compact { display: block; }
+}

@@ -45,7 +45,7 @@ describe('background-term rule in the method notes', () => {
     reason: 'body-dominant-without-native-label-consensus',
   };
   test('stated from the payload inside the ranking method: baseline vs window, native-label consensus, nothing deleted', () => {
-    const $ = load(renderToString(<TopicMethod vocabulary={vocabulary} matchingPolicy={policy({ ...gate, background })} ranking />));
+    const $ = load(renderToString(<TopicMethod vocabulary={vocabulary} matchingPolicy={policy({ ...gate, background })} ranking="heat" />));
     const note = $('[data-method="background-gate"]');
     expect(note.length).toBe(1);
     const text = note.text();
@@ -60,7 +60,8 @@ describe('background-term rule in the method notes', () => {
   test('absent (legacy gate, or no gate) adds no background sentence; a detail page does not state it', () => {
     for (const p of [policy(gate), policy()])
       expect(
-        load(renderToString(<TopicMethod vocabulary={vocabulary} matchingPolicy={p} ranking />))('[data-method="background-gate"]').length,
+        load(renderToString(<TopicMethod vocabulary={vocabulary} matchingPolicy={p} ranking="heat" />))('[data-method="background-gate"]')
+          .length,
       ).toBe(0);
     expect(
       load(renderToString(<TopicMethod vocabulary={vocabulary} matchingPolicy={policy({ ...gate, background })} />))(
@@ -72,7 +73,7 @@ describe('background-term rule in the method notes', () => {
 
 describe('window display gate in the method notes', () => {
   test('the ranking notes state the gate from the payload: thresholds, window vs 365-day baseline, nothing deleted', () => {
-    const $ = load(renderToString(<TopicMethod vocabulary={vocabulary} matchingPolicy={policy(gate)} ranking />));
+    const $ = load(renderToString(<TopicMethod vocabulary={vocabulary} matchingPolicy={policy(gate)} ranking="heat" />));
     const text = $('body').text();
     expect(text).toContain('本期間高頻詞：期間內至少 3 個部落格使用、其中 2 個各有 2 篇以上且有一站達 3 篇');
     expect(text).toContain('並且期間內命中文章占比超過 2% 的詞，排行只計標題命中、不計正文貢獻。');
@@ -82,9 +83,9 @@ describe('window display gate in the method notes', () => {
   });
 
   test('no gate reported, no gate sentence; a detail page with the window reason explains it as title-only', () => {
-    expect(load(renderToString(<TopicMethod vocabulary={vocabulary} matchingPolicy={policy()} ranking />))('body').text()).not.toContain(
-      '本期間高頻詞',
-    );
+    expect(
+      load(renderToString(<TopicMethod vocabulary={vocabulary} matchingPolicy={policy()} ranking="heat" />))('body').text(),
+    ).not.toContain('本期間高頻詞');
     expect(displayGateText(policy())).toBeNull();
     const detail = load(
       renderToString(

@@ -226,7 +226,14 @@ const termBlogCtes = `term_blog AS (
        WHERE ${eligibleTermSql}
        HAVING n>0
      )`;
-export async function compactHomeRanking(pool: Pool, days: number, now = new Date(), requestedLimit = 30) {
+/** How a ranking is ordered: 'heat' (rising and widely written, HEAT_SQL × breadth; the homepage and /topics/trending/)
+ * or 'blogs' (what the most blogs are writing about now, then the weighted contribution; /topics/). */
+export type RankingOrder = 'heat' | 'blogs';
+const ORDER_SQL: Record<RankingOrder, string> = {
+  heat: 'rank_score DESC,score DESC,blogs DESC,posts DESC,topic_id',
+  blogs: 'blogs DESC,score DESC,posts DESC,topic_id',
+};
+export async function compactHomeRanking(pool: Pool, days: number, now = new Date(), requestedLimit = 30, order: RankingOrder = 'heat') {
   const limit = Math.min(100, Math.max(1, Math.floor(requestedLimit)));
   const [rows] = await pool.query<RowDataPacket[]>(
     `WITH ${freshPosts(false)}, ${nativeLabelCte},
@@ -256,17 +263,17 @@ export async function compactHomeRanking(pool: Pool, days: number, now = new Dat
        ${HEAT_SQL} heat,${HEAT_SQL}*LOG2(1+COUNT(*)) rank_score
      FROM qualified WHERE title_n>0 OR NOT window_high_frequency
      GROUP BY topic_id,label,source HAVING COUNT(*)>=2
-     ORDER BY rank_score DESC,score DESC,blogs DESC,posts DESC,topic_id LIMIT ${limit + 1}`,
+     ORDER BY ${ORDER_SQL[order]} LIMIT ${limit + 1}`,
     [...range(days, now), SOURCE, FREQUENCY_POLICY.version],
   );
   return { items: rows.slice(0, limit).map(item), truncated: rows.length > limit };
 }
-/** The /topics/ ranking, ordered like the homepage (heat × breadth, HEAT_SQL). It replaced
+/** The /topics/ rankings: by blogs (/topics/) or ordered like the homepage (heat × breadth, HEAT_SQL; /topics/trending/). It replaced
  * `ranking(…, 100, now, true)`, whose `evidence` CTE MariaDB re-evaluated for every reference (four times,
  * seconds per request). Items come from the compact projection; matchedPosts counts window posts with at least one surviving match: a title match, or
  * a body match on a term whose baseline allows body evidence and whose window gate did not close. */
-export async function fullRanking(pool: Pool, days: number, now = new Date()) {
-  const results = await compactHomeRanking(pool, days, now, 100);
+export async function fullRanking(pool: Pool, days: number, now = new Date(), order: RankingOrder = 'heat') {
+  const results = await compactHomeRanking(pool, days, now, 100, order);
   const [[matched]] = await pool.query<RowDataPacket[]>(
     `WITH ${freshPosts(false)}, ${termBlogCtes}, topic_gate AS (
        SELECT term_id,MAX(body_allowed) body_allowed,SUM(n) matched_posts,COUNT(*) blogs,SUM(n>=2) twice_sources,MAX(n) peak_posts
@@ -390,11 +397,15 @@ export function registerTopicRoutes(app: FastifyInstance, pool: Pool, { homeRefr
     if (!active.size) caches.delete(pool);
   });
   const metadata = () => ({ generatedAt: new Date().toISOString(), cacheSeconds: cache.ttlMs / 1000, matchingPolicy });
-  app.get<{ Querystring: { days?: string; view?: string } }>('/api/topics', async (req, reply) => {
+  app.get<{ Querystring: { days?: string; view?: string; order?: string } }>('/api/topics', async (req, reply) => {
     const days = daysValue(req.query.days);
     reply.header('cache-control', 'no-store');
     if (!days) return reply.code(400).send({ error: 'invalid_days' });
     if (req.query.view !== undefined && req.query.view !== 'home') return reply.code(400).send({ error: 'invalid_view' });
+    // order=blogs: what the most blogs write about (/topics/); absent or heat: rising topics (/topics/trending/, home).
+    const order = req.query.order ?? 'heat';
+    if (order !== 'heat' && order !== 'blogs') return reply.code(400).send({ error: 'invalid_order' });
+    if (req.query.view === 'home' && order !== 'heat') return reply.code(400).send({ error: 'invalid_order' });
     if (req.query.view === 'home')
       return home.get(`rank:${days}:home`, () =>
         cache.get(`rank:${days}:home`, async () => {
@@ -417,9 +428,9 @@ export function registerTopicRoutes(app: FastifyInstance, pool: Pool, { homeRefr
           };
         }),
       );
-    return cache.get(`rank:${days}`, async () => {
+    return cache.get(`rank:${days}:${order}`, async () => {
       const now = new Date();
-      const [results, vocabulary] = await Promise.all([fullRanking(pool, days, now), vocabularyStatus(pool)]);
+      const [results, vocabulary] = await Promise.all([fullRanking(pool, days, now, order), vocabularyStatus(pool)]);
       const dates = range(days, now);
       const [[coverage]] = await pool.query<RowDataPacket[]>(
         `SELECT COUNT(*) datedPosts,COALESCE(SUM(cb.status='ok' OR o.status='ok'),0) bodyObservedPosts FROM posts p JOIN blogs b ON b.id=p.blog_id ${topicBodyJoins} WHERE p.published_at>=? AND p.published_at<=? AND b.status='verified'`,
@@ -435,6 +446,7 @@ export function registerTopicRoutes(app: FastifyInstance, pool: Pool, { homeRefr
       return {
         ...metadata(),
         days,
+        order,
         source: 'tag-vocabulary',
         vocabulary,
         coverage: {
