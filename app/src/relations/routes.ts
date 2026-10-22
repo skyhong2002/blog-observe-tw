@@ -4,6 +4,7 @@ import type { BatchOptions, BatchResult } from '../jobs/contracts.ts';
 import { withJobLease } from '../jobs/lease.ts';
 import { loadPostTags } from '../post-tags.ts';
 import { publicSummary } from '../public-post.ts';
+import { SharedSnapshot, SNAPSHOT_REFRESH_MS } from '../shared-snapshot.ts';
 import { iconManifest } from '../v1/favicon-routes.ts';
 import { iconUrl } from '../v1/icons.ts';
 import { loadMentionFeed, loadProfileMentions, parseMentionCursor } from './home-feed.ts';
@@ -47,6 +48,8 @@ export type RelationDTO = {
 };
 type RelationCache = { revision: number; active: number };
 const relationCaches = new WeakMap<Pool, RelationCache>();
+// The gateway's shared /api/relations and first /api/mentions page (shared-snapshot.ts), dropped on every invalidation.
+const relationSnapshots = new WeakMap<Pool, Set<SharedSnapshot<unknown>>>();
 function cacheFor(pool: Pool): RelationCache {
   let cache = relationCaches.get(pool);
   if (!cache) {
@@ -59,6 +62,7 @@ function cacheFor(pool: Pool): RelationCache {
 export async function invalidateRelationCache(pool: Pool) {
   const cache = cacheFor(pool);
   cache.revision++;
+  for (const snapshot of relationSnapshots.get(pool) ?? []) snapshot.clear();
   const c = await pool.getConnection();
   try {
     await c.beginTransaction();
@@ -299,9 +303,17 @@ async function projectionResponse(reply: FastifyReply, build: () => Promise<unkn
     throw error;
   }
 }
-export async function registerRelationRoutes(app: FastifyInstance, pool: Pool) {
+export async function registerRelationRoutes(app: FastifyInstance, pool: Pool, { refreshMs = SNAPSHOT_REFRESH_MS } = {}) {
   registerTextSimilarityRoute(app, pool);
-  const read = (days: number) => readPublicRelations(pool, days);
+  const snapshot = new SharedSnapshot<unknown>(refreshMs);
+  const snapshots = relationSnapshots.get(pool) ?? new Set<SharedSnapshot<unknown>>();
+  snapshots.add(snapshot);
+  relationSnapshots.set(pool, snapshots);
+  app.addHook('onClose', async () => {
+    snapshots.delete(snapshot);
+  });
+  // The relation map: one live read per period every few minutes, shared by every visitor (shared-snapshot.ts).
+  const read = (days: number) => snapshot.get(`relations:${days}`, () => readPublicRelations(pool, days));
   app.get('/api/relations', async (request, reply) => {
     const days = relationDays((request.query as { days?: unknown }).days);
     if (days === null) return reply.code(400).send({ error: 'invalid_days' });
@@ -316,18 +328,10 @@ export async function registerRelationRoutes(app: FastifyInstance, pool: Pool) {
     return projectionResponse(reply, () => readBlogRelations(pool, { id: Number(blog.id) }, days));
   });
   // /mentions/: every citation the homepage would show, a page of source articles at a time (home-feed.ts
-  // loadMentionFeed). Fresh like the homepage, so a hide applies at once; author tags are decoration.
-  app.get('/api/mentions', async (request, reply) => {
-    reply.header('cache-control', 'no-store');
-    const raw = (request.query as { cursor?: unknown }).cursor;
-    const cursor = raw === undefined ? null : parseMentionCursor(raw);
-    if (raw !== undefined && !cursor) return reply.code(400).send({ error: 'invalid_cursor' });
-    let feed: Awaited<ReturnType<typeof loadMentionFeed>>;
-    try {
-      feed = await loadMentionFeed(pool, cursor);
-    } catch {
-      return reply.header('retry-after', '2').code(503).send({ error: 'mentions_unavailable' });
-    }
+  // loadMentionFeed). The first page is the shared snapshot (an admin hide drops it at once); later pages are
+  // read fresh, after the cursor. Author tags are decoration.
+  const mentionPage = async (cursor: Parameters<typeof loadMentionFeed>[1]) => {
+    const feed = await loadMentionFeed(pool, cursor);
     const tags = await loadPostTags(
       pool,
       feed.items.map((m) => m.postId),
@@ -339,6 +343,17 @@ export async function registerRelationRoutes(app: FastifyInstance, pool: Pool) {
         return found ? { ...m, postTags: found.tags, postTagCount: found.tagCount } : m;
       }),
     };
+  };
+  app.get('/api/mentions', async (request, reply) => {
+    reply.header('cache-control', 'no-store');
+    const raw = (request.query as { cursor?: unknown }).cursor;
+    const cursor = raw === undefined ? null : parseMentionCursor(raw);
+    if (raw !== undefined && !cursor) return reply.code(400).send({ error: 'invalid_cursor' });
+    try {
+      return await (cursor ? mentionPage(cursor) : snapshot.get('mentions:first', () => mentionPage(null)));
+    } catch {
+      return reply.header('retry-after', '2').code(503).send({ error: 'mentions_unavailable' });
+    }
   });
   // The blog page's 最近被這些部落格提到: read fresh each time, so a hide override applies at once.
   app.get('/api/blogs/:slug/mentions', async (request, reply) => {

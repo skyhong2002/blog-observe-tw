@@ -1,22 +1,24 @@
-/** The topic rankings (homepage, /topics/, /topics/trending/), each at most once per refresh interval and shared by every request.
- * The user accepted (2026-10-21, extended to the ranking pages 2026-10-22) that rankings may lag a few minutes behind new or
- * hidden articles, in exchange for not running the 30-day aggregation on each visit while the host is busy.
+/** A public read computed at most once per refresh interval and shared by every request: the topic rankings
+ * (homepage, /topics/, /topics/trending/), the relation map and the first page of /mentions/.
+ * The user accepted (2026-10-21 for the homepage, 2026-10-22 for every often-visited page) that these may lag a few
+ * minutes behind new or hidden articles, in exchange for not running the heavy aggregations on each visit while the
+ * host is busy. The public v1 API stays fresh per request (v1/openapi.ts).
  * - younger than refreshMs: served as is;
  * - older, but younger than maxAgeMs: served as is while one background read replaces it;
  * - missing or older than maxAgeMs: the request waits for a read (shared by concurrent requests).
  * refreshMs 0 turns the snapshot off: every request runs its own read, as before.
  * clear() drops the snapshot and orphans reads in flight, so the next request reads fresh.
  */
-export const HOME_RANKING_REFRESH_MS = 5 * 60_000;
+export const SNAPSHOT_REFRESH_MS = 5 * 60_000;
 
-export class HomeRankingSnapshot<T> {
+export class SharedSnapshot<T> {
   private entries = new Map<string, { at: number; value: T }>();
   private flights = new Map<string, Promise<T>>();
   private generation = 0;
   readonly refreshMs: number;
   readonly maxAgeMs: number;
   private now: () => number;
-  constructor(refreshMs = HOME_RANKING_REFRESH_MS, maxAgeMs = refreshMs * 6, now = Date.now) {
+  constructor(refreshMs = SNAPSHOT_REFRESH_MS, maxAgeMs = refreshMs * 6, now = Date.now) {
     this.refreshMs = refreshMs;
     this.maxAgeMs = maxAgeMs;
     this.now = now;

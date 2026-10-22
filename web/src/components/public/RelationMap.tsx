@@ -237,7 +237,10 @@ function RelationNotes({ data }: { data: Relations }) {
         {countText(data.coverage.unresolvedLinks)} 條，解析達上限 {countText(data.coverage.truncatedPosts)} 篇。
       </p>
       <p>互相提及：期間內兩個方向都有正文提及；各自的文章日期可能相隔很久，不代表同時期互相回應。</p>
-      <p>{taipei(data.generatedAt)} 計算。已收錄資料的連結觀測不代表實際造訪來源或完整網路關係。</p>
+      <p>
+        {taipei(data.generatedAt)} 計算。關係圖每 5
+        分鐘重新計算一次，期間所有讀者看到同一份結果，所以新文章或被隱藏的文章最多晚幾分鐘才反映。已收錄資料的連結觀測不代表實際造訪來源或完整網路關係。
+      </p>
     </>
   );
 }

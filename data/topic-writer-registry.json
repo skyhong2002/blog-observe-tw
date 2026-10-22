@@ -1455,6 +1455,20 @@
       "occurrences": 1
     },
     {
+      "path": "tools/fetch-wappalyzer-rules.ts",
+      "digest": "12c2ae18c413d9b6a27519e632405b9acb136077d2625eee3d9f24264fe2f627",
+      "tables": [],
+      "dynamic": true,
+      "occurrences": 1
+    },
+    {
+      "path": "tools/fetch-wappalyzer-rules.ts",
+      "digest": "5f466d3c80c12120008ac0d42ec499909c081533fd6a45ca8670bb811a5e4bfb",
+      "tables": [],
+      "dynamic": true,
+      "occurrences": 1
+    },
+    {
       "path": "tools/import-seeds.mjs",
       "digest": "5c3f6753980e7dac213c3b829a0eb90cfc4d0fce6e4ca78d927d5eaf90e139db",
       "tables": [

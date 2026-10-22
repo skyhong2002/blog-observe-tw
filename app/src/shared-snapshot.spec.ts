@@ -1,8 +1,8 @@
 import Fastify from 'fastify';
 import type { Pool } from 'mysql2/promise';
 import { describe, expect, it } from 'vitest';
-import { HomeRankingSnapshot } from './home-snapshot.ts';
-import { invalidateTopicCache, registerTopicRoutes } from './routes.ts';
+import { SharedSnapshot } from './shared-snapshot.ts';
+import { invalidateTopicCache, registerTopicRoutes } from './topics/routes.ts';
 
 const row = (id: string) => ({
   topic_id: id,
@@ -19,11 +19,11 @@ const row = (id: string) => ({
   high_frequency: 0,
 });
 
-describe('home ranking snapshot', () => {
+describe('shared snapshot', () => {
   it('serves one read until the refresh interval, then the old value while one background read replaces it', async () => {
     let clock = 0;
     let reads = 0;
-    const snapshot = new HomeRankingSnapshot<number>(1000, 6000, () => clock);
+    const snapshot = new SharedSnapshot<number>(1000, 6000, () => clock);
     const load = async () => ++reads;
     expect(await snapshot.get('k', load)).toBe(1);
     clock = 999;
@@ -44,7 +44,7 @@ describe('home ranking snapshot', () => {
     let clock = 0;
     let reads = 0;
     let fail = false;
-    const snapshot = new HomeRankingSnapshot<number>(1000, 6000, () => clock);
+    const snapshot = new SharedSnapshot<number>(1000, 6000, () => clock);
     const load = async () => {
       reads++;
       await new Promise((resolve) => setTimeout(resolve, 1));
@@ -68,7 +68,7 @@ describe('home ranking snapshot', () => {
     const held = new Promise<void>((resolve) => {
       release = resolve;
     });
-    const snapshot = new HomeRankingSnapshot<number>(1000, 6000, () => 0);
+    const snapshot = new SharedSnapshot<number>(1000, 6000, () => 0);
     const first = snapshot.get('k', async () => {
       await held;
       return ++reads;
@@ -82,7 +82,7 @@ describe('home ranking snapshot', () => {
 
   it('refreshMs 0 reads every time', async () => {
     let reads = 0;
-    const snapshot = new HomeRankingSnapshot<number>(0);
+    const snapshot = new SharedSnapshot<number>(0);
     await snapshot.get('k', async () => ++reads);
     await snapshot.get('k', async () => ++reads);
     expect(reads).toBe(2);

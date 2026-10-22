@@ -182,7 +182,7 @@ export async function runRelationVisibilityIntegration(pool: Pool) {
     const edge = (dto: Awaited<ReturnType<typeof loadRelations>>, source: number, target: number) =>
       dto.edges.find((e) => e.sourceBlogId === source && e.targetBlogId === target);
     await invalidateRelationCache(pool);
-    await registerRelationRoutes(app, pool);
+    await registerRelationRoutes(app, pool, { refreshMs: 0 });
     const baseline = (await app.inject('/api/relations?days=90')).json();
     check(edge(baseline, a, b)?.count === 2 && edge(baseline, a, b)?.share === 2 / 3 && edge(baseline, a, b)?.mutual);
     // Pause live SQL after its aggregation; the revision fence must recheck a concurrent hide.
@@ -280,7 +280,7 @@ export async function runRelationVisibilityIntegration(pool: Pool) {
     }) as Pool;
     const limitedApp = Fastify();
     installPrivateCachePolicy(limitedApp);
-    await registerRelationRoutes(limitedApp, limitedPool);
+    await registerRelationRoutes(limitedApp, limitedPool, { refreshMs: 0 });
     try {
       const loads = [
         ...Array.from({ length: 10 }, () => limitedApp.inject(`/api/blogs/visibility-a-${suffix}/relations?days=7`)),

@@ -85,7 +85,7 @@ describe('fresh topic ranking coverage', () => {
       },
     } as unknown as Pool;
     const app = Fastify();
-    // With the home snapshot off (home-snapshot.ts), each read is its own.
+    // With the home snapshot off (shared-snapshot.ts), each read is its own.
     registerTopicRoutes(app, pool, { rankingRefreshMs: 0 });
     try {
       const a = app.inject('/api/topics?days=30&view=home');

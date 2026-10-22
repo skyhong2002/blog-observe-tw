@@ -1,12 +1,12 @@
 import type { FastifyInstance } from 'fastify';
 import type { Pool, RowDataPacket } from 'mysql2/promise';
+import { SharedSnapshot, SNAPSHOT_REFRESH_MS } from '../shared-snapshot.ts';
 import { topicBodyHash, topicBodyJoins } from './body.ts';
 import { TopicResponseCache } from './cache.ts';
 import { backgroundExcludedSql, DISPLAY_GATE, nativeLabelCte, nativeLabelJoin, windowGateCtes, windowGateSql } from './display-gate.ts';
 import { FREQUENCY_POLICY } from './frequency.ts';
 import { historyReadsEnabled } from './history-contracts.ts';
 import { durableTopicDetail } from './history-read.ts';
-import { HOME_RANKING_REFRESH_MS, HomeRankingSnapshot } from './home-snapshot.ts';
 import { digest, MATCHER_VERSION, normalizeTerm, POLICY_VERSION } from './policy.ts';
 import { PUBLICATION_NOISE_VERSION, publicationExclusionReason, publicationLabelSql } from './publication-noise.ts';
 import { enrichTopicSharedLabels } from './shared-label-enrichment.ts';
@@ -384,9 +384,9 @@ const caches = new WeakMap<Pool, Set<{ clear(): void }>>();
 export function invalidateTopicCache(pool: Pool) {
   for (const cache of caches.get(pool) ?? []) cache.clear();
 }
-export function registerTopicRoutes(app: FastifyInstance, pool: Pool, { rankingRefreshMs = HOME_RANKING_REFRESH_MS } = {}) {
+export function registerTopicRoutes(app: FastifyInstance, pool: Pool, { rankingRefreshMs = SNAPSHOT_REFRESH_MS } = {}) {
   const cache = new TopicResponseCache();
-  const home = new HomeRankingSnapshot<Record<string, unknown>>(rankingRefreshMs);
+  const home = new SharedSnapshot<Record<string, unknown>>(rankingRefreshMs);
   const active = caches.get(pool) ?? new Set<{ clear(): void }>();
   active.add(cache);
   active.add(home);
@@ -410,7 +410,7 @@ export function registerTopicRoutes(app: FastifyInstance, pool: Pool, { rankingR
       return home.get(`rank:${days}:home`, () =>
         cache.get(`rank:${days}:home`, async () => {
           // One ranking read serves both the compact list and the larger masthead cloud, and every
-          // request until the next refresh (home-snapshot.ts). The cloud draws 30 words but skips
+          // request until the next refresh (shared-snapshot.ts). The cloud draws 30 words but skips
           // body-mention words (web topicCloudWords), so it gets twice that many ranked candidates.
           const results = await compactHomeRanking(pool, days, undefined, 60);
           return {
