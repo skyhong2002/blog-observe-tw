@@ -127,9 +127,12 @@ export async function ingestContentEvidence(
     return { postId: null, status: 'missing-post', changed: false, hash: null };
   let rule = await loadContentRule(db, evidence.blogId, evidence.blogUrl);
   const originalRule = rule;
-  const inferred = inferredRule(evidence.blogId, evidence.articleUrl, evidence.html);
-  if (rule.source === 'inferred' && rule.platform === 'generic' && inferred.platform !== 'generic')
-    rule = { ...inferred, revision: rule.revision };
+  // Only a whole article page names the platform (a feed's content is the author's text, see inferPlatform). An inferred
+  // platform is replaced whenever the page positively names another one, so a wrong guess does not stay for good; the
+  // page saying nothing changes nothing.
+  const inferred = inferredRule(evidence.blogId, evidence.articleUrl, evidence.kind === 'article-html' ? evidence.html : '');
+  const platformCorrected = rule.source === 'inferred' && inferred.platform !== 'generic' && inferred.platform !== rule.platform;
+  if (platformCorrected) rule = { ...inferred, revision: rule.revision };
   const api = evidence.kind === 'article-html' ? discoverWordpressApi(evidence.html, evidence.articleUrl) : null;
   if (api && rule.source !== 'manual')
     rule = { ...rule, platform: 'wordpress', adapterId: 'wordpress-public', rules: { ...rule.rules, apiBase: api } };
@@ -154,7 +157,11 @@ export async function ingestContentEvidence(
     now,
   );
   const adopt = replace && extracted.status === 'ok';
-  const persistedRule = adopt ? { ...rule, platform: extracted.platform, adapterId: extracted.adapterId } : originalRule;
+  const persistedRule = adopt
+    ? { ...rule, platform: extracted.platform, adapterId: extracted.adapterId }
+    : platformCorrected
+      ? rule
+      : originalRule;
   await db.execute(
     `INSERT INTO content_blog_rules(blog_id,platform,adapter_id,adapter_version,rules,rule_source,rule_revision,last_method,last_status,last_error,last_attempt_at,last_success_at,updated_at)
  VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?) ON DUPLICATE KEY UPDATE platform=IF(rule_source='manual',platform,VALUES(platform)),adapter_id=IF(rule_source='manual',adapter_id,VALUES(adapter_id)),adapter_version=IF(rule_source='manual',adapter_version,VALUES(adapter_version)),rules=IF(rule_source='manual',rules,VALUES(rules)),last_method=VALUES(last_method),last_status=VALUES(last_status),last_error=VALUES(last_error),last_attempt_at=VALUES(last_attempt_at),last_success_at=COALESCE(VALUES(last_success_at),last_success_at),updated_at=VALUES(updated_at)`,

@@ -37,3 +37,9 @@ Analytics consent/runtime and SEO metadata patterns selectively adapted from
 SiteAnalytics.tsx, analytics-consent.mts and seo.mts in the reviewed tag.observe.tw
 source (2026-10-12, checkout base d034b09f90819f11424891e9aecf7f510fb4c780).
 Copyright (c) 2026 Sky Hong
+
+Technology detection (app/src/tech/wappalyzer, tools/fetch-wappalyzer-rules.ts) evaluates
+the technology rules of the community fork enthec/webappanalyzer, a continuation of the
+Wappalyzer rule set, licensed GPL-3.0. Those rules are downloaded at deployment from a
+pinned commit (data/wappalyzer-pin.json) and are not part of this repository or of its
+MIT license. The matcher is original code written from the public rule format.

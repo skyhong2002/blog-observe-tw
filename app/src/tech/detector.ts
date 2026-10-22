@@ -8,6 +8,9 @@ import {
   type TechDetection,
   type TechObservation,
 } from './contracts.ts';
+import { matchInputOf } from './wappalyzer/input.ts';
+import { matchTech, type RuleKind } from './wappalyzer/matcher.ts';
+import { activeWappalyzerRules, type WappalyzerRules } from './wappalyzer/rules.ts';
 
 const products: Record<string, { name: string; category: TechCategory }> = {
   wordpress: { name: 'WordPress', category: 'cms' },
@@ -95,6 +98,79 @@ function header(input: DetectorInput, name: string): string {
   return typeof match?.[1] === 'string' ? match[1].slice(0, 512) : '';
 }
 const confidenceRank = { high: 0.95, medium: 0.7, low: 0.3 };
+const VERSION = /^\d{1,3}(?:\.\d{1,3}){0,3}(?:-(?:alpha|beta|rc)\d{0,3})?$/;
+
+/** What a matched Wappalyzer rule may say as evidence: a fixed phrase per rule kind, never the page's own text. */
+const RULE_EVIDENCE: Record<Exclude<RuleKind, 'meta'>, SafeTechEvidence> = {
+  url: { kind: 'marker', value: 'URL rule' },
+  html: { kind: 'marker', value: 'page markup rule' },
+  dom: { kind: 'marker', value: 'page markup rule' },
+  scripts: { kind: 'marker', value: 'inline script rule' },
+  scriptSrc: { kind: 'asset', value: 'script URL rule' },
+  headers: { kind: 'header', value: 'response header rule' },
+};
+const META_EVIDENCE: SafeTechEvidence = { kind: 'marker', value: 'meta tag rule' };
+const RULE_MARKERS = new Set(['URL rule', 'page markup rule', 'inline script rule', 'meta tag rule']);
+
+/**
+ * Detection by the pinned Wappalyzer rules (wappalyzer/rules.ts), limited to the products /tech/ publishes. The input
+ * is one whole response of the blog's own site; a version is read only from an explicit `meta generator`.
+ */
+function detectWithRules(
+  rules: WappalyzerRules,
+  input: DetectorInput,
+  html: string,
+  observation: TechObservation,
+  at: string,
+): TechObservation {
+  const { input: matchInput, inspectedNodes } = matchInputOf(input.url, html, input.headers);
+  observation.coverage.inspectedNodes = inspectedNodes;
+  const found: TechDetection[] = [];
+  for (const [id, entries] of rules.products) {
+    const product = products[id];
+    if (!product) continue;
+    let confidence = 0;
+    let generator = false;
+    const versions = new Set<string>();
+    const kinds = new Set<RuleKind>();
+    for (const entry of entries) {
+      const result = matchTech(entry, matchInput);
+      if (!result) continue;
+      confidence = Math.max(confidence, result.confidence);
+      generator ||= result.generator;
+      for (const version of result.generatorVersions) if (VERSION.test(version)) versions.add(version);
+      for (const kind of result.matched) kinds.add(kind);
+    }
+    if (confidence <= 0) continue;
+    // Conflicting explicit versions prove the product but not which one is running.
+    const version = versions.size === 1 ? [...versions][0] : 'unknown';
+    const evidence: SafeTechEvidence[] = [];
+    if (generator) evidence.push({ kind: 'generator', value: `${product.name}${version === 'unknown' ? '' : ` ${version}`}` });
+    else if (kinds.has('meta')) evidence.push(META_EVIDENCE);
+    for (const kind of kinds) {
+      if (kind === 'meta') continue;
+      const item = RULE_EVIDENCE[kind];
+      if (!evidence.some((e) => e.kind === item.kind && e.value === item.value)) evidence.push(item);
+    }
+    if (!evidence.length) continue;
+    found.push({
+      id,
+      ...product,
+      // Hosting and CDN signals are hints, never ownership.
+      confidence: ['hosting', 'cdn'].includes(product.category) ? Math.min(0.4, confidence / 100) : confidence / 100,
+      version,
+      ruleId: `wappalyzer:${id}`,
+      ruleVersion: rules.version,
+      observedAt: at,
+      evidence: evidence.slice(0, TECH_LIMITS.evidencePerDetection),
+    });
+  }
+  observation.ruleVersion = rules.version;
+  observation.detections = found.sort((a, b) => b.confidence - a.confidence || a.id.localeCompare(b.id)).slice(0, TECH_LIMITS.detections);
+  observation.detections.sort((a, b) => a.id.localeCompare(b.id));
+  observation.status = observation.detections.length ? 'detected' : 'unknown';
+  return observation;
+}
 
 /** Pure bounded parser. No fetch, DNS, filesystem, cookies, or external lookups. */
 export function detectTechnology(input: DetectorInput): TechObservation {
@@ -140,6 +216,10 @@ export function detectTechnology(input: DetectorInput): TechObservation {
   if (!observation.sourceUrl || (input.httpStatus !== undefined && (input.httpStatus < 200 || input.httpStatus >= 300)))
     return stop('failed', 'http-error');
   if (input.html === undefined && input.headers === undefined) return stop('failed', 'invalid-response');
+  // A stored post body is the author's text without the page's head: what it mentions says nothing about the site,
+  // so only whole responses go through the Wappalyzer rules.
+  const rules = sourceType === 'body-fragment' ? null : activeWappalyzerRules();
+  if (rules) return detectWithRules(rules, input, html, observation, at);
   const found = new Map<string, TechDetection>();
   const declaredVersions = new Map<string, Set<string>>();
   const add = (id: string, confidence: keyof typeof confidenceRank, evidence: SafeTechEvidence, version = 'unknown') => {
@@ -270,9 +350,15 @@ const headers: Record<string, string[]> = {
   githubpages: ['GitHub Pages response marker'],
   next: ['Next.js response marker'],
 };
-function allowedEvidence(d: TechDetection, e: SafeTechEvidence): boolean {
+const WAPPALYZER_RULE = /^wappalyzer-[0-9a-f]{12}$/;
+function allowedEvidence(d: TechDetection, e: SafeTechEvidence, byRules: boolean): boolean {
   if (e.kind === 'generator')
     return ['cms', 'framework'].includes(d.category) && e.value === `${d.name}${d.version === 'unknown' ? '' : ` ${d.version}`}`;
+  if (byRules) {
+    if (e.kind === 'marker') return RULE_MARKERS.has(e.value);
+    if (e.kind === 'header') return e.value === RULE_EVIDENCE.headers.value;
+    return e.kind === 'asset' && e.value === RULE_EVIDENCE.scriptSrc.value;
+  }
   if (e.kind === 'marker') return markers[d.id]?.includes(e.value) ?? false;
   if (e.kind === 'header') return headers[d.id]?.includes(e.value) ?? false;
   if (e.kind !== 'asset') return false;
@@ -283,7 +369,13 @@ function allowedEvidence(d: TechDetection, e: SafeTechEvidence): boolean {
 
 /** Defense at the persistence boundary: only bounded detector-owned vocabulary/evidence may be serialized. */
 export function validTechObservation(value: TechObservation): boolean {
-  if (!value || value.ruleVersion !== TECH_RULE_VERSION || !['detected', 'unknown', 'failed', 'blocked'].includes(value.status))
+  // Built-in detection carries TECH_RULE_VERSION; Wappalyzer-rule detection carries the pinned data's version.
+  const byRules = typeof value?.ruleVersion === 'string' && WAPPALYZER_RULE.test(value.ruleVersion);
+  if (
+    !value ||
+    (!byRules && value.ruleVersion !== TECH_RULE_VERSION) ||
+    !['detected', 'unknown', 'failed', 'blocked'].includes(value.status)
+  )
     return false;
   if (!['html', 'body-fragment', 'header'].includes(value.sourceType) || value.sourceUrl !== safeTechSourceUrl(value.sourceUrl ?? ''))
     return false;
@@ -314,8 +406,8 @@ export function validTechObservation(value: TechObservation): boolean {
       !products[d.id] ||
       d.name !== products[d.id].name ||
       d.category !== products[d.id].category ||
-      d.ruleId !== `passive:${d.id}` ||
-      d.ruleVersion !== TECH_RULE_VERSION ||
+      d.ruleId !== `${byRules ? 'wappalyzer' : 'passive'}:${d.id}` ||
+      d.ruleVersion !== value.ruleVersion ||
       d.observedAt !== value.observedAt
     )
       return false;
@@ -326,10 +418,10 @@ export function validTechObservation(value: TechObservation): boolean {
       (['hosting', 'cdn'].includes(d.category) && d.confidence > 0.4)
     )
       return false;
-    if (d.version !== 'unknown' && !/^\d{1,3}(?:\.\d{1,3}){0,3}(?:-(?:alpha|beta|rc)\d{0,3})?$/.test(d.version)) return false;
+    if (d.version !== 'unknown' && !VERSION.test(d.version)) return false;
     if (!Array.isArray(d.evidence) || !d.evidence.length || d.evidence.length > TECH_LIMITS.evidencePerDetection) return false;
     for (const e of d.evidence)
-      if (!allowedEvidence(d, e) || typeof e.value !== 'string' || e.value.length > 100 || !/^[a-zA-Z0-9 /.\-_:]+$/.test(e.value))
+      if (!allowedEvidence(d, e, byRules) || typeof e.value !== 'string' || e.value.length > 100 || !/^[a-zA-Z0-9 /.\-_:]+$/.test(e.value))
         return false;
     if (d.version !== 'unknown' && !d.evidence.some((e) => e.kind === 'generator' && e.value === `${d.name} ${d.version}`)) return false;
   }

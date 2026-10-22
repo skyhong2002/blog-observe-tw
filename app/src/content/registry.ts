@@ -1,5 +1,6 @@
 /** SourceSpec/registry pattern ported from tag.analysis.tw afe0a65, MIT Copyright (c) 2026 Sky Hong.
  * Rules are data, never page-provided executable code or arbitrary network endpoints. */
+import { documentPlatform } from '../tech/platform.ts';
 import { CONTENT_VERSION, type ContentRule, type ContentRules } from './contracts.ts';
 export const ADAPTER_SELECTORS: Record<string, string[]> = {
   wordpress: ['.entry-content', '.wp-block-post-content', '.td-post-content', '.elementor-widget-theme-post-content'],
@@ -13,18 +14,21 @@ export const ADAPTER_SELECTORS: Record<string, string[]> = {
   jekyll: ['.post-content', '.e-content', 'article .content'],
   generic: [],
 };
+/**
+ * The host decides for the hosted services; otherwise the page's own document does (tech/platform.ts, the Wappalyzer
+ * rules). `html` must be a whole article page of the blog: leave it empty for a feed's content or a stored post body,
+ * where another site's image or a quoted snippet of markup would say nothing about the blog.
+ */
 export function inferPlatform(url: string, html = ''): string {
   const host = new URL(url).hostname.toLowerCase();
-  if (/(^|\.)blogspot\./.test(host) || /blogger\.com/i.test(html.slice(0, 10000))) return 'blogger';
+  if (/(^|\.)blogspot\./.test(host)) return 'blogger';
   if (/(^|\.)pixnet\.net$/.test(host)) return 'pixnet';
   if (host === 'medium.com') return 'medium';
   if (/(^|\.)substack\.com$/.test(host)) return 'substack';
   if (host === 'vocus.cc') return 'vocus';
   if (/^matters\.(town|news)$/.test(host)) return 'matters';
-  if (/(^|\.)wordpress\.com$/.test(host) || /wp-content\/|wp-block-|name=["']generator["'][^>]*WordPress/i.test(html)) return 'wordpress';
-  if (/name=["']generator["'][^>]*Hugo/i.test(html)) return 'hugo';
-  if (/name=["']generator["'][^>]*Jekyll/i.test(html)) return 'jekyll';
-  return 'generic';
+  if (/(^|\.)wordpress\.com$/.test(host)) return 'wordpress';
+  return (html && documentPlatform(url, html)) || 'generic';
 }
 export function inferredRule(blogId: number, url: string, html = ''): ContentRule {
   const platform = inferPlatform(url, html);

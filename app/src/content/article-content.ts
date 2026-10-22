@@ -55,7 +55,9 @@ export function extractContent(evidence: ContentEvidence, rule: ContentRule): Ex
   const bounded = utf8Prefix(evidence.html, inputLimit);
   let truncated = Boolean(evidence.truncated) || bounded.length !== evidence.html.length;
   const $ = cheerio.load(bounded),
-    platform = rule.platform === 'generic' ? inferPlatform(evidence.articleUrl, bounded) : rule.platform;
+    // Only a whole article page tells the platform; a feed's content is the author's text (see inferPlatform).
+    platform =
+      rule.platform === 'generic' ? inferPlatform(evidence.articleUrl, evidence.kind === 'article-html' ? bounded : '') : rule.platform;
   const syndicated = evidence.kind !== 'article-html';
   let reason: string | null = null;
   let identityMismatch =
