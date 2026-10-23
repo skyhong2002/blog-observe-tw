@@ -55,7 +55,38 @@ switch 到 gen99 後，web 讀 `/api/pages/topics/<key>` 超過 web 的 10 秒�
 
 - 正式 migration（2026-10-23）：21:33:08 起以 `tools/migrate-drizzle.mjs` 在共用鎖內套用，21:34:14 完成，ledger `0035_body_hash_covering_indexes` 1 筆；`information_schema` 兩個索引定義與檔案一致。同一時段 edge／gateway 無錯誤紀錄。
 - 正式比較（`博物館`，956 證據列，首次讀，FORCE 先跑）：覆蓋索引 278 ms（cb 121 ms／419 次實體頁讀、o 74 ms／327）；接著 PRIMARY 571 ms（cb 387 ms／1,186、o 162 ms／518）。
-- 部署與三個舊失敗話題的冷／暖驗收：見正式紀錄（部署後補）。
+- 部署與驗收：見下節。
 - `/api/mentions` 第一頁同樣是 5 分鐘快照，撤回的引用文章最多晚約 5 分鐘消失（方法說明已寫明延遲）；其可見條件（成句、轉載上限等）較複雜，本輪未改。
 - root／blogs.xml 冷讀：posts 需全表掃描，索引需 COPY，未改。
 - `tech-routes` 整合測試既有失敗（見上）。
+
+## 正式部署與驗收（2026-10-23）
+
+- 部署：origin/main `24df583d993cfde376e1c18a8fc15a54c1f9f70e`（含 `6d54213`），gen100 blue，21:43:26 CST switch；公開回應 `x-blog-release: 24df583d…`、`x-blog-edge-generation: 100`。回滾目標 green gen99 `fd8b90d`（仍在執行）。
+  - 第一次 prepare 以 systemd-run 執行時 PATH 缺 `~/.local/bin`，`spawn npm` ENOENT 被遮成 `deployment_failed_check_local_service_status`；帶 PATH 重跑成功（21:41:19）。
+- switch 前 blue 自測：`/api/relations` 每個期間第一次讀要載入快照底（90 天 31.6 秒、30 天超過 40 秒，gen97 起即如此，主要是全站覆蓋率）；已在 switch 前讀過三個期間。之後每次請求的即時投影：7 天 0.07–0.15 秒、90 天 0.98–1.7 秒、30 天 0.24–4.8 秒。
+- 21:43:48 起依序各讀一次完整 HTML、`/api/pages/topics/…`、`/api/topics/tag:…?days=30`、再一次 HTML（負載約 12）。全部 200、canonical 自指、無 noindex、標題含話題名、HTML 含第一篇文章、metadata posts 等於歷史總數：
+
+| 話題 | 角色 | HTML① | metadata | /api/topics | HTML② | posts／history.total | blogs |
+|---|---|---|---|---|---|---|---|
+| 火車站 | 原失敗 | 200 0.95s | 200 0.91s | 200 1.12s | 200 0.97s | 1052／1052 | 69 |
+| 美術館 | 原失敗 | 200 1.02s | 200 0.5s | 200 0.78s | 200 1.62s | 1418／1418 | 99 |
+| 條件 | 原失敗 | 200 0.76s | 200 0.48s | 200 0.65s | 200 1.19s | 1357／1357 | 151 |
+| 溫泉 | 冷對照 | 200 0.85s | 200 0.53s | 200 0.59s | 200 0.67s | 1088／1088 | 56 |
+| 早餐 | 冷對照 | 200 0.75s | 200 0.5s | 200 0.65s | 200 0.68s | 1225／1225 | 89 |
+| 旅行 | 暖對照 | 200 0.69s | 200 0.47s | 200 0.55s | 200 0.59s | 1068／1068 | 102 |
+
+  冷對照 `溫泉`、`早餐` 當天未被讀過；三個原失敗話題當天讀過多次，DB 頁可能已在快取，不能代表冷讀。
+- 撤回邊界（正式）：`/topics/鮮豆漿/` 與 `/api/pages/topics/鮮豆漿`（all-evidence-revoked）410；未知話題 404；`/api/relations?days=90` 的 165 個部落格全部 verified。
+- control：首頁 200 1.02 秒、`/relations/` 200 0.70 秒；edge／gateway healthz 200。switch 後 edge／gateway／web 日誌無任何錯誤（至 21:44:31）。
+- 第二輪（21:49，過了 5 分鐘快照更新點，負載約 12）：
+
+  | 話題 | HTML① | metadata | /api/topics | HTML② |
+  |---|---|---|---|---|
+  | 火車站 | 200 2.16s | 200 0.88s | 200 0.89s | 200 0.70s |
+  | 美術館 | 200 1.32s | 200 0.91s | 200 1.35s | 200 0.83s |
+  | 條件 | 200 1.27s | 200 0.49s | 200 0.63s | 200 0.75s |
+  | 拉麵（冷對照） | 200 0.95s | 200 0.59s | 200 0.66s | 200 0.69s |
+
+  一致性、canonical、noindex 同第一輪。`/api/relations` 90／7／30 天 1.04／0.54／0.88 秒；首頁 1.61 秒。gateway 21:46:11 一筆 `home.mentions` statement-timeout（首頁引用區塊的既有降級，switch 前即多次出現，與本輪無關）。
+- 仍未知：17:40 等三次失敗當下的 SQL 秒數；更高負載（40 以上）時的冷讀；Google 端處理與收錄（Codex 追蹤）。
