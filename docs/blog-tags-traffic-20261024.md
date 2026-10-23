@@ -21,6 +21,15 @@
 
 一律叫「標籤」：部落格頁區塊標題「標籤」、「新增標籤」、「標籤資料暫時無法使用」；目錄 chip「全部標籤」，拿掉「未分類 N」（`?genre=-` 不再是篩選，會顯示全部）；最新文章「隱藏標籤」。管理頁原本的部落格標籤改稱「人工標籤」以免混淆。
 
+## 上線紀錄
+
+2026-10-24 06:4x（台北時間）gen102 blue `46a2cd7`，前一版 gen101 green `e40f2b2` 保留為回滾。worker 沒有移動（這版沒有改 worker 會跑的程式），仍在 `98-release-e40f2b2.conf`。
+
+- 上線前在乾淨 source worktree 跑完整 vitest（157 檔 1573 項）、web node test 249 項、render spec 208 項、兩個 tsc 全過；改到的檔案 biome 無錯（HEAD 本來就有 40 個檔案 lint 錯，與這次無關）。
+- 切換前重跑 traffic `tools/import-blog-tags.ts`：876 筆 AI 初判、3 票，沒有新列（舊表最後異動 2026-10-19 22:41 UTC，917 筆 assignment、3 票）。
+- 正式站匿名：`/blogs/`、`/blogs/?genre=food`、`/blogs/kocpc/`、`/articles/` 200，頁面有「標籤」、沒有「類型」「未分類」；`/api/catalog` 48 個標籤，`?genre=food` 與 `?genre=美食` 同為 68 個部落格（gen101 為 66：traffic 編輯清單的「美食」也算進來）；匿名投票與 `/api/me/blog-genres/kocpc` 回 401。
+- 正式站登入（擁有者帳號，臨時 session 用完即刪）：`/api/me` 回 `admin: true`（traffic 判斷）；跨來源投票 403；對 kocpc「3C」投同意後 traffic `/api/v1/tags/kocpc.com.tw` 同意 0 → 1，收回後回到 0。
+
 ## 回滾
 
 1. `tools/deploy-blue-green.sh switch <前一個 slot>`，回到 e40f2b2（gen101）。舊程式讀寫兩張舊表，那裡停在切換當下：這段期間在 traffic 投的票、新增的標籤不會出現在舊版。
