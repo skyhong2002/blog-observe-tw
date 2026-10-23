@@ -90,3 +90,6 @@ switch 到 gen99 後，web 讀 `/api/pages/topics/<key>` 超過 web 的 10 秒�
 
   一致性、canonical、noindex 同第一輪。`/api/relations` 90／7／30 天 1.04／0.54／0.88 秒；首頁 1.61 秒。gateway 21:46:11 一筆 `home.mentions` statement-timeout（首頁引用區塊的既有降級，switch 前即多次出現，與本輪無關）。
 - 仍未知：17:40 等三次失敗當下的 SQL 秒數；更高負載（40 以上）時的冷讀；Google 端處理與收錄（Codex 追蹤）。
+- Root 獨立正式驗收（匿名、正式網域）：21:45 首頁完整 200 1.651 秒；三個話題回應皆 gen100／release `24df583d`。`火車站` HTML 200 3.413 秒、metadata 200 1.388 秒（1052 篇／69 站）；`美術館` HTML 200 1.269 秒、metadata 0.685 秒（1418／99）；`條件` HTML 200 1.177 秒、metadata 0.658 秒（1357／151）。皆完整內容、自指 canonical、無 noindex；Brave 中 `火車站` 的文章與部落格列表實際 render 正常（已截圖）。
+- Google 側（Codex／root 操作）：GSC Blog 前綴 21:47:53 以 smartphone 即時抓取 `火車站` 成功，允許檢索與索引、canonical 正確；索引要求已 Accepted（priority queue），**尚未 indexed**。
+- 回滾：green gen99 `fd8b90d` 保留並仍在執行。
