@@ -6,13 +6,24 @@ Search Console 可提交 `https://blog.observe.tw/sitemap.xml`。它是 sitemap 
 
 - `/sitemaps/pages.xml`：首頁、部落格目錄、話題、API 文件、關於。
 - `/sitemaps/blogs.xml`：有有效網址、slug 且 verified 的部落格頁。
-- `/sitemaps/topics.xml`：維持原有近 90 天至少 1 篇有效文章的話題集合，網址改為可讀 canonical；原有雜訊、inactive 詞與高頻詞證據規則不變，另排除空白及純標點／符號。
+- `/sitemaps/topics.xml`（及 `topics-2.xml`…）：正式環境開啟 history 讀取，為至少 1 篇公開歷史文章的話題（revoked、merged、雜訊與非 verified 來源排除）；關閉時維持原有近 90 天至少 1 篇有效文章的話題集合，網址改為可讀 canonical；原有雜訊、inactive 詞與高頻詞證據規則不變，另排除空白及純標點／符號。
 
-每份子檔最多 10,000 個網址；超出時產生 `blogs-2.xml`、`topics-2.xml` 等，並自動列入 index。XML 另檢查 50 MB 上限。資料的 lastmod 取文章資料修改時間；固定頁取對應程式來源的修改時間。公開網址固定為 HTTPS 正式網域、結尾斜線、不含 query；私人閱讀清單、管理頁、未驗證來源、原始文章全文都不列入。
+部落格子檔每份最多 10,000 個網址，超出時產生 `blogs-2.xml` 等。話題子檔依 64 位 hex 話題 ID 的值域等分：`topics.xml`、`topics-2.xml`…`topics-N.xml`，N = ceil(話題 route 數 / 1,000)，第 k 份涵蓋 ID 前 8 位 hex 在 [floor((k−1)·2³²/N), floor(k·2³²/N)) 的話題（下界含、上界不含）。ID 是 SHA-256，所以每份約 1,000 個 route（2026-10-23 約 615 個實際列出的話題），遠低於每份 10,000 的硬上限與協定的 50,000；XML 另檢查 50 MB 上限。route 數（`public_page_routes` 的 PK COUNT）是列出數的上界，只決定份數，讓每份子檔不必先算全體；route 數跨過 1,000 的倍數時份數改變、各 ID 所屬子檔隨之移動。資料的 lastmod 取文章資料修改時間；固定頁取對應程式來源的修改時間。公開網址固定為 HTTPS 正式網域、結尾斜線、不含 query；私人閱讀清單、管理頁、未驗證來源、原始文章全文都不列入。
 
 `robots.txt` 允許公開內容，排除私人、登入、管理、搜尋及 API；明確允許 `/api/` 文件與 OpenAPI 規格。robots 只是爬蟲指引，私人內容仍由伺服器授權保護。
 
-檔案由 Fastify 提供，GET/HEAD 都可用；來源及共享快取 300 秒，stale-while-revalidate 600 秒。資料查詢採 300 秒 single-flight 快取，避免多個爬蟲重複掃描。帶私人認證的請求仍遵守既有 private/no-store 策略。
+檔案由 Fastify 提供，GET/HEAD 都可用，`cache-control: no-store`；不跨請求快取（撤銷、來源改為非 verified、合併等要在下一次請求就生效），以每個 gateway 最多 8 個並行讀取保護共用 DB。
+
+### Sitemap 專用精簡讀取（2026-10-23）
+
+`app/src/seo/sitemap-entries.ts` 只讀 sitemap 需要的 ID、canonical path 與 lastmod，集合與 `getIndexablePages` 相同：
+
+- 部落格：`public_page_routes` × verified blogs，沿用舊 slug／URL 規則與 route key 檢查；lastmod 為最新有效文章時間，否則 discovered_at。不讀任何話題資料，blog 子檔與 index 不再等話題全量。
+- 話題（history 讀取開啟時）：有 route、`topic_pages` active/pending、`historyPublicTopicSql` 與 `exclusionReason` 皆通過，且至少一筆 `historyPublicEvidenceSql` 公開證據（confirmed/pending、title/body、verified 來源、非未來文章）；lastmod 為這些文章的最新 published_at。與舊 `cumulativeTopics` 的差別只在不 LEFT JOIN 正文表算 fresh／title_hit（那兩欄只分級新鮮度，不影響成員與 lastmod）。每份子檔只查自己 ID 範圍，以 PK range 每 1,000 筆分批。
+- index 的話題 lastmod：從最新的公開文章往回找，第一篇是某個上列話題公開證據的文章日期，不聚合全部話題。
+- history 讀取關閉時仍用舊 projection，再依同一 ID 範圍切分。
+
+2026-10-23 根因：舊 index 與每個子檔都先 `getIndexablePages(blog)` 與 `getIndexablePages(topic)` 全量；blog 經 90 天 topic projection（正式約 15 秒），topic 的 `cumulativeTopics` 對 220 萬列證據 LEFT JOIN 8.3 GB 的 `content_post_bodies` 全歷史聚合，正式 DB 跑滿 280 秒仍被 max_statement_time 中斷；edge 等上游標頭 30 秒後回 503。
 
 ## 驗收
 

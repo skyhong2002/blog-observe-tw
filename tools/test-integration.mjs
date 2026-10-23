@@ -32,6 +32,7 @@ try {
           'staged-scan-proof',
           'staged-proof-inspector',
           'scheduler-candidates',
+          'sitemap',
         ].includes(process.argv[5])))
   )
     throw Error('explicit_private_clone_env_required');
@@ -174,7 +175,9 @@ try {
                             ? suites.filter(([label]) => label === 'staged-proof-inspector')
                             : process.argv[5] === 'scheduler-candidates'
                               ? suites.filter(([label]) => label.endsWith('-candidates'))
-                              : suites;
+                              : process.argv[5] === 'sitemap'
+                                ? suites.filter(([label]) => label === 'indexability' || label === 'topic-history-read')
+                                : suites;
   // Without --suite every suite gets its own fresh database: several assume an empty corpus
   // (staged-scan-proof asserts it), so sharing one database made the full run stop there.
   for (const [index, [label, module, entry]] of selected.entries()) {

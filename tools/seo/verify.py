@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Read-only sitemap/canonical smoke check. Optional origin is a local preview."""
-import json,re,sys,urllib.request,xml.etree.ElementTree as ET
+import json,re,sys,time,urllib.request,xml.etree.ElementTree as ET
 from urllib.parse import urlsplit
 ORIGIN='https://blog.observe.tw'
 base=sys.argv[1].rstrip('/') if len(sys.argv)>1 else ORIGIN
@@ -13,13 +13,13 @@ def get(url):
 robots,headers=get('/robots.txt')
 assert headers.get_content_type()=='text/plain'
 assert robots.decode().strip().endswith('Sitemap: '+ORIGIN+'/sitemap.xml')
-index,headers=get('/sitemap.xml')
+started=time.monotonic();index,headers=get('/sitemap.xml');indexSeconds=round(time.monotonic()-started,2)
 assert headers.get_content_type() in ('application/xml','text/xml')
-result={'sitemap':ORIGIN+'/sitemap.xml','children':[]}
+result={'sitemap':ORIGIN+'/sitemap.xml','seconds':indexSeconds,'children':[]}
 for child in ET.fromstring(index).findall('s:sitemap',ns):
     loc=child.findtext('s:loc',namespaces=ns)
     assert child.findtext('s:lastmod',namespaces=ns)
-    xml,_=get(loc);rows=ET.fromstring(xml).findall('s:url',ns)
+    started=time.monotonic();xml,_=get(loc);seconds=round(time.monotonic()-started,2);rows=ET.fromstring(xml).findall('s:url',ns)
     assert len(rows)<=50000 and len(xml)<=50*1024*1024
     urls=[]
     for row in rows:
@@ -34,5 +34,5 @@ for child in ET.fromstring(index).findall('s:sitemap',ns):
         assert 'noindex' not in h.get('X-Robots-Tag','').lower(),url
         assert not any('noindex' in value.lower() for value in re.findall(r'<meta name="robots" content="([^"]+)"',text)),url
         samples.append(url)
-    result['children'].append({'url':loc,'count':len(rows),'bytes':len(xml),'verifiedSamples':samples})
+    result['children'].append({'url':loc,'count':len(rows),'bytes':len(xml),'seconds':seconds,'verifiedSamples':samples})
 print(json.dumps(result,ensure_ascii=False,indent=2))

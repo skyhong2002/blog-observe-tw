@@ -3,10 +3,19 @@ import type { FastifyInstance } from 'fastify';
 import type { Pool } from 'mysql2/promise';
 import { TopicResponseCache } from '../topics/cache.ts';
 import { historyReadsEnabled } from '../topics/history-contracts.ts';
-import { getIndexablePages } from './indexability.ts';
+import {
+  type SitemapEntry,
+  sitemapBlogs,
+  sitemapTopicRoutes,
+  sitemapTopics,
+  sitemapTopicsLastmod,
+  type TopicRange,
+} from './sitemap-entries.ts';
 
 export const SEO_ORIGIN = 'https://blog.observe.tw';
 export const SITEMAP_PAGE_SIZE = 10_000;
+/** Topic files split the uniform SHA-256 ID space; each holds at most about this many routes, far below the per-file cap. */
+export const SITEMAP_TOPIC_BUCKET = 1_000;
 const MAX_XML_BYTES = 50 * 1024 * 1024;
 const CACHE = 'no-store';
 const staticPages = ['/', '/blogs/', '/topics/', '/api/', '/about/'] as const;
@@ -26,15 +35,26 @@ export function sitemapXml(entries: { loc: string; lastmod?: unknown }[], index 
   return xml;
 }
 const childPath = (kind: 'blogs' | 'topics', page: number) => `/sitemaps/${kind}${page === 1 ? '' : `-${page}`}.xml`;
-export function sitemapChildPaths(blogCount: number, topicCount: number) {
+const pageCount = (count: number, size: number) => {
+  if (!Number.isSafeInteger(count) || count < 0 || Math.ceil(count / size) > 4999) throw Error('sitemap_count_limit');
+  return Math.max(1, Math.ceil(count / size));
+};
+export const blogSitemapPages = (blogs: number) => pageCount(blogs, SITEMAP_PAGE_SIZE);
+export const topicSitemapPages = (topicRoutes: number) => pageCount(topicRoutes, SITEMAP_TOPIC_BUCKET);
+/** Topic file `page` of `pages` covers IDs from its 8-hex lower bound (inclusive) to the next file's (exclusive). */
+export function topicSitemapRange(page: number, pages: number): TopicRange {
+  const bound = (i: number) =>
+    i <= 0 || i >= pages
+      ? null
+      : Math.floor((i * 2 ** 32) / pages)
+          .toString(16)
+          .padStart(8, '0');
+  return { from: bound(page - 1), to: bound(page) };
+}
+export function sitemapChildPaths(blogCount: number, topicRoutes: number) {
   const paths = ['/sitemaps/pages.xml'];
-  for (const [kind, count] of [
-    ['blogs', blogCount],
-    ['topics', topicCount],
-  ] as const) {
-    if (!Number.isSafeInteger(count) || count < 0 || Math.ceil(count / SITEMAP_PAGE_SIZE) > 4999) throw Error('sitemap_count_limit');
-    for (let page = 1; page <= Math.max(1, Math.ceil(count / SITEMAP_PAGE_SIZE)); page++) paths.push(childPath(kind, page));
-  }
+  for (let page = 1; page <= blogSitemapPages(blogCount); page++) paths.push(childPath('blogs', page));
+  for (let page = 1; page <= topicSitemapPages(topicRoutes); page++) paths.push(childPath('topics', page));
   return paths;
 }
 export function registerSeoRoutes(app: FastifyInstance, pool: Pool) {
@@ -52,27 +72,28 @@ export function registerSeoRoutes(app: FastifyInstance, pool: Pool) {
         })),
       ),
     );
+  const newest = (rows: { lastmod: unknown }[]) =>
+    rows
+      .map((row) => iso(row.lastmod))
+      .filter((date): date is string => Boolean(date))
+      .sort()
+      .at(-1) ?? null;
+  // Blogs, the topic route count and the newest topic date are independent reads; none waits for a full topic list.
   const stats = () =>
     cache.get('counts', async () => {
-      const [blogs, topics] = await Promise.all([getIndexablePages(pool, 'blog'), getIndexablePages(pool, 'topic')]);
-      const newest = (rows: { lastmod: unknown }[]) =>
-        rows
-          .map((row) => iso(row.lastmod))
-          .filter((date): date is string => Boolean(date))
-          .sort()
-          .at(-1) ?? null;
-      const pages = await pageEntries();
-      const dates = pages
-        .map((p) => iso(p.lastmod))
-        .filter((d): d is string => Boolean(d))
-        .sort();
-      const fallback = await fileDate(new URL('./routes.ts', import.meta.url));
+      const [blogs, topicRoutes, topicsNewest, pages, fallback] = await Promise.all([
+        sitemapBlogs(pool),
+        sitemapTopicRoutes(pool),
+        sitemapTopicsLastmod(pool),
+        pageEntries(),
+        fileDate(new URL('./routes.ts', import.meta.url)),
+      ]);
       return {
         blogs: blogs.length,
-        topics: topics.length,
+        topicRoutes,
         blogsLastmod: newest(blogs) ?? iso(fallback),
-        topicsLastmod: newest(topics) ?? iso(fallback),
-        pagesLastmod: dates.at(-1) ?? iso(fallback),
+        topicsLastmod: iso(topicsNewest) ?? iso(fallback),
+        pagesLastmod: newest(pages) ?? iso(fallback),
       };
     });
   app.get('/robots.txt', async (_request, reply) =>
@@ -102,7 +123,7 @@ export function registerSeoRoutes(app: FastifyInstance, pool: Pool) {
     const xml = await cache.get('index', async () => {
       const counts = await stats();
       return sitemapXml(
-        sitemapChildPaths(counts.blogs, counts.topics).map((path) => ({
+        sitemapChildPaths(counts.blogs, counts.topicRoutes).map((path) => ({
           loc: SEO_ORIGIN + path,
           lastmod: path.includes('/blogs') ? counts.blogsLastmod : path.includes('/topics') ? counts.topicsLastmod : counts.pagesLastmod,
         })),
@@ -120,13 +141,18 @@ export function registerSeoRoutes(app: FastifyInstance, pool: Pool) {
     const match = /^(blogs|topics)(?:-([1-9]\d{0,5}))?\.xml$/.exec(file);
     if (!match || match[2] === '1') return reply.code(404).header('cache-control', 'no-store').send({ error: 'not_found' });
     const kind = match[1] as 'blogs' | 'topics',
-      page = Number(match[2] ?? 1),
-      counts = await stats();
-    if (page > Math.max(1, Math.ceil(counts[kind] / SITEMAP_PAGE_SIZE)))
-      return reply.code(404).header('cache-control', 'no-store').send({ error: 'not_found' });
+      page = Number(match[2] ?? 1);
     const xml = await cache.get(`${kind}:${page}`, async () => {
-      const offset = (page - 1) * SITEMAP_PAGE_SIZE;
-      const rows = (await getIndexablePages(pool, kind === 'blogs' ? 'blog' : 'topic')).slice(offset, offset + SITEMAP_PAGE_SIZE);
+      let rows: SitemapEntry[];
+      if (kind === 'blogs') {
+        const blogs = await sitemapBlogs(pool);
+        if (page > blogSitemapPages(blogs.length)) return null;
+        rows = blogs.slice((page - 1) * SITEMAP_PAGE_SIZE, page * SITEMAP_PAGE_SIZE);
+      } else {
+        const pages = topicSitemapPages(await sitemapTopicRoutes(pool));
+        if (page > pages) return null;
+        rows = await sitemapTopics(pool, topicSitemapRange(page, pages));
+      }
       const fallback =
         (await fileDate(
           new URL(
@@ -141,6 +167,7 @@ export function registerSeoRoutes(app: FastifyInstance, pool: Pool) {
         })),
       );
     });
+    if (xml === null) return reply.code(404).header('cache-control', 'no-store').send({ error: 'not_found' });
     return reply.type('application/xml; charset=utf-8').header('cache-control', CACHE).send(xml);
   });
 }

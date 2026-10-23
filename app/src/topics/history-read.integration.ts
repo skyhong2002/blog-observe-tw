@@ -6,6 +6,7 @@ import { getIndexablePages, getPageIndexability, getPageMetadata } from '../seo/
 import { registerPageApi } from '../seo/page-api.ts';
 import { getPublicPages, resolvePublicPage } from '../seo/page-routes.ts';
 import { createPublicPageRedirect } from '../seo/redirects.ts';
+import { sitemapBlogs, sitemapTopics } from '../seo/sitemap-entries.ts';
 import { durableTopicDetail, readTopicHistory, topicHistoryDisposition } from './history-read.ts';
 import { digest, MATCHER_VERSION } from './policy.ts';
 
@@ -99,6 +100,19 @@ export async function runTopicHistoryReadIntegration(pool: Pool) {
     const site = (await getIndexablePages(pool, 'topic')).find((p) => p.entityId === ids[0]);
     assert.ok(site);
     assert.equal(new Date(site.lastmod as Date).toISOString(), oldDate.toISOString());
+    // The lean sitemap read lists the same pages as the full one; revoked, noise and merged IDs stay out.
+    const lean = (await sitemapTopics(pool, { from: null, to: null })).filter((p) => ids.includes(p.entityId));
+    assert.deepEqual(
+      lean.map((p) => [p.entityId, p.canonicalPath, new Date(p.lastmod as Date).toISOString()]),
+      [[ids[0], `/topics/${keys[0]}/`, oldDate.toISOString()]],
+    );
+    const half = ids[0].slice(0, 8);
+    assert.equal((await sitemapTopics(pool, { from: half, to: null })).filter((p) => p.entityId === ids[0]).length, 1, 'from is inclusive');
+    assert.equal((await sitemapTopics(pool, { from: null, to: half })).filter((p) => p.entityId === ids[0]).length, 0, 'to is exclusive');
+    assert.ok(
+      (await sitemapBlogs(pool)).some((p) => p.entityId === String(blog)) === false,
+      'a blog without a readable route is not listed',
+    );
     for (const key of [keys[3], `tag%3A${ids[3]}`]) {
       const r = await app.inject(`/topics/${key}/?days=90`);
       assert.equal(r.statusCode, 301);
@@ -116,6 +130,7 @@ export async function runTopicHistoryReadIntegration(pool: Pool) {
     assert.equal((await app.inject(`/topics/${keys[0]}/`)).statusCode, 200);
     await pool.execute("UPDATE blogs SET status='seed' WHERE id=?", [blog]);
     assert.equal((await topicHistoryDisposition(pool, ids[0])).status, 'masked');
+    assert.ok(!(await sitemapTopics(pool, { from: null, to: null })).some((p) => p.entityId === ids[0]), 'unverified source drops at once');
     assert.equal((await readTopicHistory(pool, ids[0])).total, 0);
     const masked = await app.inject(`/api/pages/topics/${keys[0]}`);
     assert.equal(masked.statusCode, 404);
@@ -123,6 +138,10 @@ export async function runTopicHistoryReadIntegration(pool: Pool) {
     assert.equal((await app.inject(`/topics/${keys[0]}/`)).statusCode, 404);
     await pool.execute("UPDATE blogs SET status='verified' WHERE id=?", [blog]);
     assert.equal((await app.inject(`/topics/${keys[0]}/`)).statusCode, 200);
+    assert.ok((await sitemapTopics(pool, { from: null, to: null })).some((p) => p.entityId === ids[0]));
+    await pool.execute("UPDATE topic_article_evidence SET state='revoked' WHERE canonical_id=?", [ids[0]]);
+    assert.ok(!(await sitemapTopics(pool, { from: null, to: null })).some((p) => p.entityId === ids[0]), 'revoked evidence drops at once');
+    await pool.execute("UPDATE topic_article_evidence SET state='confirmed' WHERE canonical_id=?", [ids[0]]);
     const [[e]] = await pool.query<RowDataPacket[]>('SELECT state FROM topic_article_evidence WHERE canonical_id=?', [ids[0]]);
     assert.equal(e.state, 'confirmed');
     await pool.execute('DELETE FROM posts WHERE id=?', [post]);

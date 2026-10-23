@@ -2,12 +2,32 @@ import { stat } from 'node:fs/promises';
 import Fastify from 'fastify';
 import type { Pool } from 'mysql2/promise';
 import { describe, expect, it, vi } from 'vitest';
-import { registerSeoRoutes, SEO_ORIGIN, sitemapChildPaths, sitemapXml, xmlEscape } from './routes.ts';
+import {
+  registerSeoRoutes,
+  SEO_ORIGIN,
+  SITEMAP_TOPIC_BUCKET,
+  sitemapChildPaths,
+  sitemapXml,
+  topicSitemapPages,
+  topicSitemapRange,
+  xmlEscape,
+} from './routes.ts';
+import { inTopicRange, type TopicRange } from './sitemap-entries.ts';
 
-vi.mock('./indexability.ts', () => ({
-  getIndexablePages: async (pool: Pool, kind: string) => (await pool.query(`fixture:${kind}`))[0],
+vi.mock('./sitemap-entries.ts', async (actual) => ({
+  ...(await actual<typeof import('./sitemap-entries.ts')>()),
+  sitemapBlogs: async (pool: Pool) => (await pool.query('fixture:blog'))[0],
+  sitemapTopicRoutes: async (pool: Pool) => ((await pool.query('fixture:topic'))[0] as unknown[]).length,
+  sitemapTopics: async (pool: Pool, range: TopicRange) =>
+    ((await pool.query('fixture:topic'))[0] as { entityId: string }[]).filter((row) => inTopicRange(row.entityId, range)),
+  sitemapTopicsLastmod: async (pool: Pool) => (await pool.query('fixture:topic-lastmod'))[0],
 }));
-function fixture(blogCount = 1, lastmod = '2026-01-01T00:00:00.000Z') {
+const topicId = (i: number) => ((i * 2654435761) % 2 ** 32).toString(16).padStart(8, '0') + 'f'.repeat(56);
+function fixture(blogCount = 1, lastmod = '2026-01-01T00:00:00.000Z', topicCount = 1) {
+  const topics =
+    topicCount === 1
+      ? [{ entityId: 'a'.repeat(64), canonicalPath: '/topics/%E4%BA%BA%E5%B7%A5%E6%99%BA%E6%85%A7/', lastmod: '2026-01-02T00:00:00.000Z' }]
+      : Array.from({ length: topicCount }, (_, i) => ({ entityId: topicId(i), canonicalPath: `/topics/topic-${i}/`, lastmod }));
   const query = vi.fn(async (sql: string) => [
     sql === 'fixture:blog'
       ? Array.from({ length: blogCount }, (_, i) => ({
@@ -15,7 +35,11 @@ function fixture(blogCount = 1, lastmod = '2026-01-01T00:00:00.000Z') {
           canonicalPath: `/blogs/${i === 0 ? 'kocpc' : `blog-${i}`}/`,
           lastmod,
         }))
-      : [{ entityId: 'a'.repeat(64), canonicalPath: '/topics/%E4%BA%BA%E5%B7%A5%E6%99%BA%E6%85%A7/', lastmod: '2026-01-02T00:00:00.000Z' }],
+      : sql === 'fixture:topic-lastmod'
+        ? topicCount === 1
+          ? '2026-01-02T00:00:00.000Z'
+          : lastmod
+        : topics,
   ]);
   const app = Fastify({ exposeHeadRoutes: true });
   registerSeoRoutes(app, { query } as unknown as Pool);
@@ -119,12 +143,62 @@ describe('public crawler discovery routes', () => {
     expect(sitemapXml([{ loc: 'https://example.test/?a=1&b=<x>', lastmod: 'invalid' }])).toContain('?a=1&amp;b=&lt;x&gt;');
     expect(sitemapXml([{ loc: 'https://example.test/', lastmod: 'invalid' }])).not.toContain('lastmod');
     expect(() => sitemapXml(Array.from({ length: 10001 }, () => ({ loc: SEO_ORIGIN })))).toThrow('entry_limit');
-    expect(sitemapChildPaths(10000, 10001)).toEqual([
+    expect(sitemapChildPaths(10000, SITEMAP_TOPIC_BUCKET + 1)).toEqual([
       '/sitemaps/pages.xml',
       '/sitemaps/blogs.xml',
       '/sitemaps/topics.xml',
       '/sitemaps/topics-2.xml',
     ]);
+    expect(sitemapChildPaths(10001, 0)).toEqual([
+      '/sitemaps/pages.xml',
+      '/sitemaps/blogs.xml',
+      '/sitemaps/blogs-2.xml',
+      '/sitemaps/topics.xml',
+    ]);
     expect(() => sitemapChildPaths(-1, 0)).toThrow();
+    expect(() => sitemapChildPaths(0, SITEMAP_TOPIC_BUCKET * 4999 + 1)).toThrow('count_limit');
+  });
+  it('splits topics into contiguous ID ranges: every ID in exactly one file, boundaries inclusive below', () => {
+    expect(topicSitemapPages(0)).toBe(1);
+    expect(topicSitemapPages(SITEMAP_TOPIC_BUCKET)).toBe(1);
+    expect(topicSitemapPages(49_379)).toBe(50);
+    expect(topicSitemapRange(1, 1)).toEqual({ from: null, to: null });
+    expect(topicSitemapRange(1, 2)).toEqual({ from: null, to: '80000000' });
+    expect(topicSitemapRange(2, 2)).toEqual({ from: '80000000', to: null });
+    for (const pages of [2, 3, 7, 50, 257]) {
+      const ranges = Array.from({ length: pages }, (_, i) => topicSitemapRange(i + 1, pages));
+      for (let i = 1; i < pages; i++) expect(ranges[i].from).toBe(ranges[i - 1].to);
+      const edges = [
+        '0'.repeat(64),
+        'f'.repeat(64),
+        ...ranges.flatMap((r) =>
+          r.from ? [r.from + '0'.repeat(56), (BigInt(`0x${r.from}`) - 1n).toString(16).padStart(8, '0') + 'f'.repeat(56)] : [],
+        ),
+      ];
+      for (const id of edges) expect(ranges.filter((r) => inTopicRange(id, r))).toHaveLength(1);
+    }
+  });
+  it('serves every topic exactly once across the files the index lists, each under the per-file cap', async () => {
+    const count = SITEMAP_TOPIC_BUCKET * 3 + 17;
+    const { app } = fixture(1, '2026-01-01T00:00:00.000Z', count);
+    try {
+      const index = await app.inject('/sitemap.xml');
+      const files = [...index.body.matchAll(/<loc>https:\/\/blog\.observe\.tw(\/sitemaps\/topics[^<]*)<\/loc>/g)].map((m) => m[1]);
+      expect(files).toEqual(['/sitemaps/topics.xml', '/sitemaps/topics-2.xml', '/sitemaps/topics-3.xml', '/sitemaps/topics-4.xml']);
+      const seen: string[] = [];
+      for (const file of files) {
+        const res = await app.inject(file);
+        expect(res.statusCode).toBe(200);
+        const urls = [...res.body.matchAll(/<loc>([^<]+)<\/loc>/g)].map((m) => m[1]);
+        expect(urls.length).toBeGreaterThan(0);
+        expect(urls.length).toBeLessThanOrEqual(10_000);
+        seen.push(...urls);
+      }
+      expect(seen).toHaveLength(count);
+      expect(new Set(seen).size).toBe(count);
+      expect((await app.inject('/sitemaps/topics-5.xml')).statusCode).toBe(404);
+    } finally {
+      await app.close();
+    }
   });
 });

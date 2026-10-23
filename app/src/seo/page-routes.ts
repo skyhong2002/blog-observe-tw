@@ -59,7 +59,7 @@ export function proposedBlogSlug(blog: { slug: string; url?: string | null; name
   }
   return readableSlug(blog.name) || 'blog';
 }
-function page(kind: PublicPageKind, row: RowDataPacket): PublicPage {
+export function publicPage(kind: PublicPageKind, row: RowDataPacket): PublicPage {
   return {
     entityId: String(row.entity_id),
     stableId: String(row.stable_id),
@@ -94,7 +94,7 @@ export async function getPublicPages(pool: Pool, kind: PublicPageKind, entityIds
     return new Map(
       rows
         .filter((r) => isPublicRouteKey(kind, r.canonical_key) && !exclusionReason(r.label))
-        .map((r) => [String(r.entity_id), page(kind, r)]),
+        .map((r) => [String(r.entity_id), publicPage(kind, r)]),
     );
   }
   const [rows] = await pool.query<RowDataPacket[]>(
@@ -103,7 +103,7 @@ export async function getPublicPages(pool: Pool, kind: PublicPageKind, entityIds
       : `SELECT r.entity_id,r.canonical_key,CONCAT('tag:',r.entity_id) stable_id FROM public_page_routes r JOIN topic_current c ON c.source=? JOIN topic_canonical_terms_v3 t ON t.snapshot_id=c.snapshot_id AND t.id=r.entity_id WHERE r.kind='topic' AND r.entity_id IN (?) AND ${publicationLabelSql('t.label')}`,
     kind === 'blog' ? [ids] : [SOURCE, ids],
   );
-  return new Map(rows.filter((r) => isPublicRouteKey(kind, r.canonical_key)).map((r) => [String(r.entity_id), page(kind, r)]));
+  return new Map(rows.filter((r) => isPublicRouteKey(kind, r.canonical_key)).map((r) => [String(r.entity_id), publicPage(kind, r)]));
 }
 export async function resolvePublicPage(pool: Pool, kind: PublicPageKind, key: string): Promise<PublicPage | null> {
   if (!isPublicRouteKey(kind, key)) return null;

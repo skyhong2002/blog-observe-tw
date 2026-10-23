@@ -21,9 +21,9 @@ export type PageIndexability = {
 export type IndexablePage = PublicPage & PageIndexability & { lastmod: unknown };
 type Counts = { posts: number; blogs: number; lastmod: unknown };
 type Projection = { version: string | null; topics: Map<string, Counts>; blogs: Map<string, Counts>; sitemapBlogIds: Set<string> };
-const validPostDate =
+export const validPostDate =
   'COALESCE(CASE WHEN p.updated_at<=UTC_TIMESTAMP() THEN p.updated_at END,CASE WHEN p.published_at<=UTC_TIMESTAMP() THEN p.published_at END,CASE WHEN p.created_at<=UTC_TIMESTAMP() THEN p.created_at END)';
-const legacySitemapBlog = (row: RowDataPacket) =>
+export const legacySitemapBlog = (row: RowDataPacket) =>
   row.status === 'verified' &&
   typeof row.slug === 'string' &&
   /^[a-z0-9][a-z0-9_-]{0,179}$/.test(row.slug) &&

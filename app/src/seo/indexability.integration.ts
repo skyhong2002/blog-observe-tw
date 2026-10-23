@@ -9,6 +9,7 @@ import { SOURCE } from '../topics/snapshot-client.ts';
 import { getIndexablePages, getPageIndexability } from './indexability.ts';
 import { registerPageApi } from './page-api.ts';
 import { registerSeoRoutes, SEO_ORIGIN } from './routes.ts';
+import { sitemapBlogs, sitemapTopics } from './sitemap-entries.ts';
 
 export async function runIndexabilityIntegration(pool: Pool) {
   assert.equal((pool as unknown as { pool: { config: { connectionConfig: { port: number } } } }).pool.config.connectionConfig.port, 18169);
@@ -128,6 +129,10 @@ export async function runIndexabilityIntegration(pool: Pool) {
         'sitemap preserves the old >=1 valid evidence set without adding a page noindex gate',
       );
     }
+    const pick = (rows: { entityId: string; canonicalPath: string; lastmod: unknown }[]) =>
+      rows.map((p) => [p.entityId, p.canonicalPath, p.lastmod instanceof Date ? p.lastmod.toISOString() : p.lastmod]);
+    assert.deepEqual(pick(await sitemapBlogs(pool)), pick(await getIndexablePages(pool, 'blog')), 'lean blog read = full blog read');
+    assert.deepEqual(pick(await sitemapTopics(pool, { from: null, to: null })), pick(list));
     const blogXml = await app.inject('/sitemaps/blogs.xml');
     assert.ok(blogXml.body.includes(`/blogs/quality-0-${snapshot.slice(0, 8)}.example/`));
     assert.ok(!blogXml.body.includes(`/blogs/quality-2-${snapshot.slice(0, 8)}.example/`));

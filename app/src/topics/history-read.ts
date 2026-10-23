@@ -22,6 +22,9 @@ export const historyPublicTopicSql = (alias = 't') => `${publicationLabelSql(`${
  AND COALESCE(${alias}.reason,'') NOT IN ('explicit-noise','noise','excluded-term')
  AND NOT EXISTS (SELECT 1 FROM topic_current hc JOIN topic_canonical_terms_v3 ht ON ht.snapshot_id=hc.snapshot_id
  WHERE hc.source=${quote(SOURCE)} AND ht.id=${alias}.canonical_id AND ht.exclusion_reason IS NOT NULL)`;
+/** Which evidence rows (e, joined to posts p and blogs b) are public history. Hashes only grade freshness, never membership. */
+export const historyPublicEvidenceSql = `e.state IN ('confirmed','pending') AND e.source IN ('title','body')
+ AND b.status='verified' AND (p.published_at IS NULL OR p.published_at<=UTC_TIMESTAMP())`;
 /** Per-article public historical evidence. Changed hashes are pending, never a negative verdict. */
 export const historyEvidenceSql = (scoped: boolean | 'many' = true) => `historical AS (
  SELECT e.canonical_id,p.id post_id,p.blog_id,p.published_at,MAX(e.last_observed_at) observed_at,
@@ -29,8 +32,7 @@ export const historyEvidenceSql = (scoped: boolean | 'many' = true) => `historic
  AND (e.source='title' OR (e.body_hash IS NOT NULL AND (e.body_hash<=>(${topicBodyHash}))))) fresh,
  MAX(e.source='title' AND e.state='confirmed' AND e.matcher_version=${quote(MATCHER_VERSION)} AND e.post_hash IS NOT NULL AND (e.post_hash<=>p.content_hash)) title_hit
  FROM topic_article_evidence e JOIN posts p ON p.id=e.post_id JOIN blogs b ON b.id=p.blog_id ${topicBodyJoins}
- WHERE ${scoped === 'many' ? 'e.canonical_id IN (?) AND ' : scoped ? 'e.canonical_id=? AND ' : ''}e.state IN ('confirmed','pending') AND e.source IN ('title','body')
- AND b.status='verified' AND (p.published_at IS NULL OR p.published_at<=UTC_TIMESTAMP())
+ WHERE ${scoped === 'many' ? 'e.canonical_id IN (?) AND ' : scoped ? 'e.canonical_id=? AND ' : ''}${historyPublicEvidenceSql}
  GROUP BY e.canonical_id,p.id,p.blog_id,p.published_at)`;
 /** Deliberately uncached: restores and explicit revocations must not be hidden by negative caches. */
 export async function topicHistoryDisposition(pool: Pool, key: string): Promise<TopicHistoryDisposition> {
