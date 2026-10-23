@@ -1,5 +1,5 @@
 import type { Pool, RowDataPacket } from 'mysql2/promise';
-import { topicBodyHash, topicBodyJoins } from './body.ts';
+import { topicBodyHash, topicBodyHashJoins } from './body.ts';
 import { FREQUENCY_POLICY } from './frequency.ts';
 import { historyReadsEnabled, type TopicHistory } from './history-contracts.ts';
 import { digest, exclusionReason, MATCHER_VERSION, normalizeTerm } from './policy.ts';
@@ -31,7 +31,7 @@ export const historyEvidenceSql = (scoped: boolean | 'many' = true) => `historic
  MAX(e.state='confirmed' AND e.matcher_version=${quote(MATCHER_VERSION)} AND e.post_hash IS NOT NULL AND (e.post_hash<=>p.content_hash)
  AND (e.source='title' OR (e.body_hash IS NOT NULL AND (e.body_hash<=>(${topicBodyHash}))))) fresh,
  MAX(e.source='title' AND e.state='confirmed' AND e.matcher_version=${quote(MATCHER_VERSION)} AND e.post_hash IS NOT NULL AND (e.post_hash<=>p.content_hash)) title_hit
- FROM topic_article_evidence e JOIN posts p ON p.id=e.post_id JOIN blogs b ON b.id=p.blog_id ${topicBodyJoins}
+ FROM topic_article_evidence e JOIN posts p ON p.id=e.post_id JOIN blogs b ON b.id=p.blog_id ${topicBodyHashJoins}
  WHERE ${scoped === 'many' ? 'e.canonical_id IN (?) AND ' : scoped ? 'e.canonical_id=? AND ' : ''}${historyPublicEvidenceSql}
  GROUP BY e.canonical_id,p.id,p.blog_id,p.published_at)`;
 /** Deliberately uncached: restores and explicit revocations must not be hidden by negative caches. */

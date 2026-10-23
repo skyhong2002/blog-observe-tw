@@ -22,6 +22,7 @@ switch 到 gen99 後，web 讀 `/api/pages/topics/<key>` 超過 web 的 10 秒�
 3. Migration `0035_body_hash_covering_indexes`：`content_bodies_hash (post_id, blog_id, status, content_hash)`、`relation_observations_hash (同欄)`。`topicBodyHash` 只讀這幾欄，JOIN 改為 index-only，HTML 歷史讀取（`readTopicHistory`、`durableTopicDetail`）不改 SQL 也受益。
    - 可安全重跑：MariaDB 每個 CREATE INDEX 各自 commit；用 `CREATE INDEX IF NOT EXISTS`，每個索引建立後以 `information_schema.STATISTICS` 核對欄位順序、非 unique、無 prefix、BTREE、ASC、未 ignored，不符就 SIGNAL 失敗且不記 ledger。
    - `ALGORITHM=INPLACE LOCK=NONE`；`lock_wait_timeout=5`：被長交易擋住時 5 秒失敗，排在後面的讀取最多等約 5 秒（低於 web 10 秒上限），不會無限排隊。
+   - 正式套用後 EXPLAIN 顯示優化器仍走 PRIMARY eq_ref（合成資料時會選覆蓋索引），所以 `historyEvidenceSql` 改用 `topicBodyHashJoins`，只在這條只讀 hash 的 JOIN 上 `FORCE INDEX`（同 `PROFILE_MENTIONS_SQL` 的作法）；需要 body_text 的 worker 查詢不變。索引必須先於程式存在：已於 2026-10-23 21:34:14 CST 套用。
    - posts 不加索引：`posts_blog_guid … USING HASH` 讓 posts 任何新增索引都只能 ALGORITHM=COPY（以正式 DDL 在一次性 DB 實測），會擋爬蟲寫入，所以 root／blogs.xml 冷讀（posts 全表掃描，19:30 實測 3.0 秒／4,505 次實體頁讀）本輪不改，lastmod 仍為 updated_at 優先。
 
 不做：加長 timeout／重試、回空殼、把存在的話題改 404／noindex、跨請求快取、改公開邊界或刪歷史。
@@ -52,7 +53,9 @@ switch 到 gen99 後，web 讀 `/api/pages/topics/<key>` 超過 web 的 10 秒�
 
 ## 未完成／注意
 
-- 正式 migration、部署與三個舊失敗話題的冷／暖驗收：見下方正式紀錄（待補）。
+- 正式 migration（2026-10-23）：21:33:08 起以 `tools/migrate-drizzle.mjs` 在共用鎖內套用，21:34:14 完成，ledger `0035_body_hash_covering_indexes` 1 筆；`information_schema` 兩個索引定義與檔案一致。同一時段 edge／gateway 無錯誤紀錄。
+- 正式比較（`博物館`，956 證據列，首次讀，FORCE 先跑）：覆蓋索引 278 ms（cb 121 ms／419 次實體頁讀、o 74 ms／327）；接著 PRIMARY 571 ms（cb 387 ms／1,186、o 162 ms／518）。
+- 部署與三個舊失敗話題的冷／暖驗收：見正式紀錄（部署後補）。
 - `/api/mentions` 第一頁同樣是 5 分鐘快照，撤回的引用文章最多晚約 5 分鐘消失（方法說明已寫明延遲）；其可見條件（成句、轉載上限等）較複雜，本輪未改。
 - root／blogs.xml 冷讀：posts 需全表掃描，索引需 COPY，未改。
 - `tech-routes` 整合測試既有失敗（見上）。
