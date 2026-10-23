@@ -11,11 +11,10 @@ export type AccountMetric = { key: string; label: string; group: Group };
 export const ACCOUNT_METRICS: AccountMetric[] = [
   { key: 'follows', label: '追蹤', group: 'use' },
   { key: 'apiKeys', label: 'API 金鑰', group: 'use' },
-  { key: 'votes', label: '類型投票', group: 'contribute' },
   { key: 'candidates', label: '審核候選', group: 'admin' },
   { key: 'profiles', label: '簡介與主題', group: 'admin' },
   { key: 'tags', label: '部落格標籤', group: 'admin' },
-  { key: 'genres', label: '類型裁定', group: 'admin' },
+  { key: 'genres', label: '標籤裁定', group: 'admin' },
   { key: 'relations', label: '連結關係', group: 'admin' },
   { key: 'similarweb', label: 'Similarweb', group: 'admin' },
   { key: 'blogs', label: '部落格資料', group: 'admin' },
@@ -96,7 +95,8 @@ export async function adminAccounts(pool: Pool, adminEmails: Set<string>) {
     pool
       .query<RowDataPacket[]>('SELECT user_id who,COUNT(*) n,MAX(created_at) last FROM user_api_keys GROUP BY user_id')
       .then(byUser('apiKeys')),
-    pool.query<RowDataPacket[]>('SELECT user_id who,COUNT(*) n,MAX(at) last FROM blog_genre_votes GROUP BY user_id').then(byUser('votes')),
+    // Tag votes moved to traffic.observe.tw on 2026-10-24 (blog-genres/traffic.ts), which has no per-voter counts
+    // for services yet; blog_genre_votes is frozen, so its old counts are not shown as if they were current.
     pool
       .query<RowDataPacket[]>(
         'SELECT actor_user_id who,action,COUNT(*) n,MAX(created_at) last FROM admin_audits WHERE actor_user_id IS NOT NULL GROUP BY actor_user_id,action',

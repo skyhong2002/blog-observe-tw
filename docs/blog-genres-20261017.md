@@ -1,5 +1,8 @@
 # Blog genres and reader contributions
 
+> Since 2026-10-24 blog genres (now called 標籤) live on traffic.observe.tw; blog only proxies reads and votes.
+> The tables below are frozen for rollback. See [blog-tags-traffic-20261024.md](blog-tags-traffic-20261024.md).
+
 ## Scope and evidence
 
 This follow-up supersedes the initial heuristic classification in

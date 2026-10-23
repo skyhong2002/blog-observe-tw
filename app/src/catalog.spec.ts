@@ -1,5 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
+import { fakeTagClient, tag } from '../test/tag-client.ts';
 import { buildApp } from './app.js';
+import { setTagClient } from './blog-genres/traffic.ts';
 import { catalogFilters, loadCatalog } from './catalog.js';
 
 function fixture(
@@ -21,11 +23,11 @@ function fixture(
     [{ total }],
     rows,
   ];
-  // The shown-genre read (blog-genres/store.ts) answers on its own; the positional responses are the catalog's.
-  // The shown-genre read and the 經營者 facet answer on their own; the positional responses are the catalog's.
-  const own = (sql: string) => sql.includes('blog_genre_assignments') || sql.startsWith('SELECT kind AS value');
+  // The tag read's blog list (blog-genres/store.ts) and the 經營者 facet answer on their own; the positional
+  // responses are the catalog's.
+  const own = (sql: string) => sql.includes('canonical_host host') || sql.startsWith('SELECT kind AS value');
   const query = vi.fn(async (sql: string, _parameters?: unknown[]) =>
-    sql.includes('blog_genre_assignments') ? [genreRows] : sql.startsWith('SELECT kind AS value') ? [kindRows] : [responses.shift()],
+    sql.includes('canonical_host host') ? [genreRows] : sql.startsWith('SELECT kind AS value') ? [kindRows] : [responses.shift()],
   );
   const calls = () => query.mock.calls.filter(([sql]) => !own(sql));
   return { query, calls };
@@ -180,14 +182,19 @@ describe('complete blog catalog', () => {
     expect(pool.calls().every(([sql]) => !sql.includes('DROP TABLE') && !sql.includes('DESC;'))).toBe(true);
   });
 
-  it('filters and counts by shown genres, several per blog, with - for blogs no genre is shown for yet', async () => {
+  it("filters and counts by traffic's shown tags, several per blog, by key, editors' tags included", async () => {
     const genreRows = [
-      { blogId: 251, genre: 'travel', ai: 1, adminSet: 0, adminHide: 0, agrees: 0, disagrees: 0 },
-      { blogId: 251, genre: '咖啡', ai: 0, adminSet: 0, adminHide: 0, agrees: 1, disagrees: 0 },
-      { blogId: 252, genre: 'travel', ai: 1, adminSet: 0, adminHide: 0, agrees: 0, disagrees: 0 },
-      // A reader genre someone disagreed with is not shown, so it is neither counted nor filtered on.
-      { blogId: 252, genre: '露營', ai: 0, adminSet: 0, adminHide: 0, agrees: 1, disagrees: 1 },
+      { id: 251, slug: 'after-200', host: 'www.a.blog.tw' },
+      { id: 252, slug: 'b', host: 'b.blog.tw' },
+      { id: 253, slug: 'c', host: 'unknown.blog.tw' },
     ];
+    setTagClient(
+      fakeTagClient({
+        'a.blog.tw': [tag('個人', { source: 'editor' }), tag('咖啡', { source: 'community', agrees: 1 }), tag('旅遊')],
+        // A reader tag someone disagreed with is not shown, so it is neither counted nor filtered on.
+        'b.blog.tw': [tag('旅遊'), tag('露營', { source: 'community', visible: false, agrees: 1, disagrees: 1 })],
+      }).client,
+    );
     let pool = fixture(1, undefined, genreRows);
     const data = await loadCatalog(pool, { genre: '旅遊' });
     expect(data.filters.genre).toBe('travel');
@@ -196,15 +203,21 @@ describe('complete blog catalog', () => {
     expect(data.genres).toEqual([
       { value: 'travel', label: '旅遊', count: 2 },
       { value: '咖啡', label: '咖啡', count: 1 },
+      { value: '個人', label: '個人', count: 1 },
     ]);
-    expect(data.ungenred).toBe(273);
+    expect(data).not.toHaveProperty('ungenred');
     expect(data.blogs[0].genres).toEqual([
+      { value: '個人', label: '個人' },
       { value: '咖啡', label: '咖啡' },
       { value: 'travel', label: '旅遊' },
     ]);
+    // The old ?genre=food links keep working; the retired `-` (no tag) is no filter at all.
     pool = fixture(1, undefined, genreRows);
-    await loadCatalog(pool, { genre: '-' });
-    expect(pool.calls()[3][0]).toContain('b.id NOT IN (?)');
+    await loadCatalog(pool, { genre: 'food' });
+    expect(pool.calls()[3][0]).toContain('0=1');
+    pool = fixture(1, undefined, genreRows);
+    expect((await loadCatalog(pool, { genre: '-' })).filters.genre).toBe('');
+    expect(pool.calls()[3][0]).not.toContain('b.id');
     pool = fixture(0, [], genreRows);
     await loadCatalog(pool, { genre: '露營' });
     expect(pool.calls()[3][0]).toContain('0=1');
@@ -256,7 +269,7 @@ describe('complete blog catalog', () => {
 
   it('exports the filtered directory as OPML, unpaged and escaped', async () => {
     const query = vi.fn(async (sql: string, parameters?: unknown[]) => {
-      if (sql.includes('blog_genre_assignments')) return [[]];
+      if (sql.includes('canonical_host host')) return [[]];
       expect(sql).toContain('feed_sources');
       expect(parameters).toEqual(['已核對', 1000]);
       return [[{ name: 'A & <B>', url: 'https://a.example/', feedUrl: 'https://a.example/feed?x=1&y=2', type: 'rss' }]];

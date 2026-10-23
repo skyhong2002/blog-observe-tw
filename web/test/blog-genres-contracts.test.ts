@@ -18,6 +18,14 @@ test('genre public fields are optional for older gateways but validated when pre
     }),
     true,
   );
+  // traffic.observe.tw's editors' tags (個人, 科技) arrive as source editor.
+  assert.equal(
+    PUBLIC_CONTRACTS.blog({
+      ...blog,
+      blog: { ...blog.blog, genreState: { ...state, items: [{ ...state.items[0], genre: '個人', label: '個人', source: 'editor' }] } },
+    }),
+    true,
+  );
   for (const patch of [
     { genre: 'Coffee' },
     { genre: '旅遊,生活' },

@@ -184,6 +184,7 @@ async function loadProjection(pool, { onFailure } = {}) {
     () => {
       onFailure?.({ operation: 'full.genres', message: 'blog genres unavailable' });
     },
+    { cached: true },
   );
   const row = totalRows[0][0];
   return {

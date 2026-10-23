@@ -63,7 +63,7 @@ export default function SourceProfile({ blog, sidebar, cloud }: { blog: Blog; si
             <FollowButton slug={blog.slug} />
           </div>
           <p className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-zinc-500 dark:text-zinc-400">
-            {/* Shown genres (部落格類型 below), not the imported category; none yet leaves the place empty. */}
+            {/* Shown tags (標籤 below, from traffic.observe.tw), not the imported category; none leaves the place empty. */}
             {genres.length > 0 && (
               <>
                 <span>{genres.join('、')}</span>

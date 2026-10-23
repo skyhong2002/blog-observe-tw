@@ -1,26 +1,49 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import type { Pool, RowDataPacket } from 'mysql2/promise';
-import { isAdmin, requireAdminTransaction, writeAudit } from '../admin/identity.ts';
+import { writeAudit } from '../admin/identity.ts';
 import { readCookie, SESSION_COOKIE, type SessionUser } from '../auth/google-login.ts';
-import { genreKey, isGenreKey } from '../blog-genre-vocabulary.ts';
-import { readBlogGenres } from './store.ts';
+import { genreKey, genreLabel, isBlogGenre, isGenreKey } from '../blog-genre-vocabulary.ts';
+import { genreItems } from './resolve.ts';
+import { rememberDomainTags } from './store.ts';
+import { TagServiceError, type TagWrite, tagClient, tagDomain } from './traffic.ts';
 
 type Options = {
   pool: Pool;
   requireUser(request: FastifyRequest, reply: FastifyReply): Promise<SessionUser | null>;
-  adminEmails: Set<string>;
   publicOrigin: string;
   sessionSecret: string;
 };
 export const genreCsrfToken = (session: string, secret: string) =>
   createHmac('sha256', secret).update(`blog-genres-csrf-v1\0${session}`).digest('base64url');
-const fail = (statusCode: number, message: string) => Object.assign(Error(message), { statusCode });
 
+/** What a reader typed, as traffic should store it: a starting genre by its name (food → 美食), else the typed text. */
+const typedTag = (text: string, key: string) =>
+  isBlogGenre(key)
+    ? genreLabel(key)
+    : text
+        .normalize('NFKC')
+        .replace(/\s+/g, ' ')
+        .trim()
+        .replace(/^#+\s*/, '');
+
+/**
+ * The same routes, CSRF, Origin and login rules as before, proxied to traffic.observe.tw (traffic.ts) with the
+ * reader's Google email as the voter. traffic decides who is an admin and limits each voter to 30 writes a minute;
+ * blog keeps its own per-account limit in front so a reader cannot make it hammer traffic.
+ */
 export function registerBlogGenreRoutes(app: FastifyInstance, options: Options) {
   const { pool } = options;
   const limits = new Map<number, { start: number; count: number }>();
   const privateHeaders = (reply: FastifyReply) => reply.header('cache-control', 'private, no-store');
+  const blogDomain = async (slug: string) => {
+    const [[blog]] = await pool.query<RowDataPacket[]>(
+      "SET STATEMENT max_statement_time=1 FOR SELECT id,canonical_host host FROM blogs WHERE slug=? AND status='verified' LIMIT 1",
+      [slug],
+    );
+    return blog ? { id: Number(blog.id), domain: tagDomain(blog.host) } : null;
+  };
+  const unavailable = (reply: FastifyReply) => reply.code(503).send({ error: 'tags_unavailable' });
   app.get('/api/me/blog-genres/:slug', async (request, reply) => {
     privateHeaders(reply);
     const user = await options.requireUser(request, reply);
@@ -28,16 +51,21 @@ export function registerBlogGenreRoutes(app: FastifyInstance, options: Options) 
     const session = readCookie(request, SESSION_COOKIE);
     if (!session || session.length > 128 || options.sessionSecret.length < 32) return reply.code(401).send({ error: 'session required' });
     const slug = (request.params as { slug: string }).slug;
-    const [votes] = await pool.query<RowDataPacket[]>(
-      `SET STATEMENT max_statement_time=1 FOR SELECT v.genre,v.vote FROM blog_genre_votes v JOIN blogs b ON b.id=v.blog_id
-       WHERE b.slug=? AND b.status='verified' AND v.user_id=? LIMIT 200`,
-      [slug, user.id],
-    );
-    return {
-      votes: Object.fromEntries(votes.filter((v) => isGenreKey(v.genre)).map((v) => [v.genre, Number(v.vote)])),
-      admin: await isAdmin(pool, user, options.adminEmails),
-      csrfToken: genreCsrfToken(session, options.sessionSecret),
-    };
+    const blog = /^[\w.-]{1,255}$/.test(slug) ? await blogDomain(slug) : null;
+    let read: Awaited<ReturnType<ReturnType<typeof tagClient>['read']>>;
+    try {
+      read = await tagClient().read(blog?.domain ? [blog.domain] : [], user.email);
+    } catch (error) {
+      if (!(error instanceof TagServiceError)) throw error;
+      request.log.warn({ operation: 'blog.genres.me', reason: error.message }, 'tag service unavailable');
+      return unavailable(reply);
+    }
+    const votes: Record<string, number> = {};
+    for (const [tag, vote] of Object.entries((blog?.domain && read.voter?.votes[blog.domain]) || {})) {
+      const key = genreKey(tag);
+      if (key && (vote === 1 || vote === -1) && !(key in votes)) votes[key] = vote;
+    }
+    return { votes, admin: read.voter?.admin === true, csrfToken: genreCsrfToken(session, options.sessionSecret) };
   });
   for (const kind of ['vote', 'propose', 'admin'] as const) {
     app.route({
@@ -73,7 +101,7 @@ export function registerBlogGenreRoutes(app: FastifyInstance, options: Options) 
         const params = request.params as { slug: string; genre?: string };
         const body = request.body as Record<string, unknown> | null;
         const key = kind === 'propose' ? 'genre' : kind === 'vote' ? 'vote' : 'action';
-        // A proposal is whatever the reader typed, folded to its key; votes and admin actions name an existing key.
+        // A proposal is whatever the reader typed; votes and admin actions name an existing key.
         const genre = kind === 'propose' ? genreKey(body?.genre) : isGenreKey(params.genre) ? params.genre : null;
         if (
           !body ||
@@ -86,71 +114,62 @@ export function registerBlogGenreRoutes(app: FastifyInstance, options: Options) 
           (kind === 'admin' && !['set', 'hide', 'release'].includes(body.action as string))
         )
           return reply.code(400).send({ error: 'invalid_genre_action' });
-        const c = await pool.getConnection();
+        const blog = await blogDomain(params.slug);
+        if (!blog) return reply.code(404).send({ error: 'blog not found' });
+        // A blog newer than traffic's list of domains cannot carry tags yet.
+        if (!blog.domain) return reply.code(404).send({ error: 'unknown_domain' });
+        const voter = user.email;
+        let result: Awaited<ReturnType<ReturnType<typeof tagClient>['write']>>;
         try {
-          await c.beginTransaction();
-          if (kind === 'admin') await requireAdminTransaction(c, user, options.adminEmails);
-          const [[blog]] = await c.query<RowDataPacket[]>("SELECT id FROM blogs WHERE slug=? AND status='verified' LIMIT 1 FOR UPDATE", [
-            params.slug,
-          ]);
-          if (!blog) throw fail(404, 'blog not found');
-          if (kind === 'admin') {
-            const [before] = await c.query<RowDataPacket[]>(
-              'SELECT source,status FROM blog_genre_assignments WHERE blog_id=? AND genre=?',
-              [blog.id, genre],
-            );
-            // Keep a candidate even for admin-introduced genres so release immediately restores voting.
-            await c.execute(
-              `INSERT IGNORE INTO blog_genre_assignments (blog_id,genre,source,status,actor_user_id,created_at,updated_at)
-               VALUES (?,?,'community','candidate',?,UTC_TIMESTAMP(),UTC_TIMESTAMP())`,
-              [blog.id, genre, user.id],
-            );
-            if (body.action === 'release') {
-              await c.execute("DELETE FROM blog_genre_assignments WHERE blog_id=? AND genre=? AND source='admin'", [blog.id, genre]);
-            } else {
-              await c.execute(
-                `INSERT INTO blog_genre_assignments (blog_id,genre,source,status,actor_user_id,created_at,updated_at)
-                 VALUES (?,?,'admin',?,?,UTC_TIMESTAMP(),UTC_TIMESTAMP())
-                 ON DUPLICATE KEY UPDATE status=VALUES(status),actor_user_id=VALUES(actor_user_id),updated_at=UTC_TIMESTAMP()`,
-                [blog.id, genre, body.action === 'set' ? 'active' : 'hidden', user.id],
-              );
-            }
-            await writeAudit(c, user.id, `genre.${body.action}`, 'blog', String(blog.id), before, { genre, action: body.action });
-          } else {
-            if (kind === 'propose') {
-              await c.execute(
-                `INSERT IGNORE INTO blog_genre_assignments (blog_id,genre,source,status,actor_user_id,created_at,updated_at)
-                 VALUES (?,?,'community','candidate',?,UTC_TIMESTAMP(),UTC_TIMESTAMP())`,
-                [blog.id, genre, user.id],
-              );
-            } else {
-              const [[candidate]] = await c.query<RowDataPacket[]>(
-                'SELECT genre FROM blog_genre_assignments WHERE blog_id=? AND genre=? LIMIT 1',
-                [blog.id, genre],
-              );
-              if (!candidate) throw fail(404, 'genre not proposed');
-            }
-            if (body.vote === 0) {
-              await c.execute('DELETE FROM blog_genre_votes WHERE blog_id=? AND genre=? AND user_id=?', [blog.id, genre, user.id]);
-            } else {
-              await c.execute(
-                `INSERT INTO blog_genre_votes (blog_id,genre,user_id,vote,at) VALUES (?,?,?,?,UTC_TIMESTAMP())
-                 ON DUPLICATE KEY UPDATE vote=VALUES(vote),at=UTC_TIMESTAMP()`,
-                [blog.id, genre, user.id, kind === 'propose' ? 1 : body.vote],
-              );
-            }
+          let tag: string;
+          if (kind === 'propose') tag = typedTag(String(body.genre), genre);
+          else {
+            // The URL names the key (food); traffic needs the site's spelling of it (美食, 3C, Coffee).
+            const tags = (await tagClient().read([blog.domain])).domains[blog.domain];
+            if (!tags) return reply.code(404).send({ error: 'unknown_domain' });
+            const found = tags.find((t) => genreKey(t.tag) === genre)?.tag;
+            if (!found && kind === 'vote') return reply.code(404).send({ error: 'genre not proposed' });
+            tag = found ?? genreLabel(genre);
           }
-          await c.commit();
+          const change: TagWrite =
+            kind === 'vote'
+              ? { kind, voter, domain: blog.domain, tag, vote: body.vote as 1 | -1 | 0 }
+              : kind === 'propose'
+                ? { kind, voter, domain: blog.domain, tag }
+                : { kind, voter, domain: blog.domain, tag, action: body.action as 'set' | 'hide' | 'release' };
+          result = await tagClient().write(change);
         } catch (error) {
-          await c.rollback();
-          throw error;
-        } finally {
-          c.release();
+          if (!(error instanceof TagServiceError)) throw error;
+          request.log.warn({ operation: `blog.genres.${kind}`, reason: error.message }, 'tag service unavailable');
+          return unavailable(reply);
         }
-        const resolved = await readBlogGenres(pool, [params.slug], () =>
-          request.log.warn({ operation: 'blog.genres' }, 'blog genres unavailable'),
-        );
-        return { ok: true, genreState: resolved.blogs.get(params.slug) ?? { status: 'unavailable', items: [] } };
+        if (!('ok' in result)) {
+          if (result.status === 429) {
+            reply.header('retry-after', 60);
+            return reply.code(429).send({ error: 'genre_rate_limit' });
+          }
+          if (result.status === 403) return reply.code(403).send({ error: result.error });
+          if (result.status === 404) return reply.code(404).send({ error: result.error });
+          return reply.code(400).send({ error: 'invalid_genre_action', message: result.message });
+        }
+        rememberDomainTags(result.domain, result.tags);
+        if (kind === 'admin') {
+          // traffic keeps the tag log; the audit row keeps blog's admin activity counts (admin/accounts.ts).
+          const c = await pool.getConnection();
+          try {
+            await writeAudit(c, user.id, `genre.${body.action}`, 'blog', String(blog.id), null, {
+              genre,
+              tag: result.tag,
+              domain: result.domain,
+              action: body.action,
+            });
+          } catch (error) {
+            request.log.warn({ operation: 'blog.genres.audit', err: error }, 'genre audit not written');
+          } finally {
+            c.release();
+          }
+        }
+        return { ok: true, genreState: { status: 'ready', items: genreItems(result.tags) } };
       },
     });
   }

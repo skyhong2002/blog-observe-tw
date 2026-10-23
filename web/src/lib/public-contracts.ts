@@ -139,7 +139,7 @@ const genreState = (value: unknown) =>
       rows(items, {
         genre: isGenreKey,
         label: text,
-        source: (v) => v === 'ai' || v === 'admin' || v === 'community',
+        source: (v) => v === 'editor' || v === 'ai' || v === 'admin' || v === 'community',
         visible: boolean,
         agrees: count,
         disagrees: count,

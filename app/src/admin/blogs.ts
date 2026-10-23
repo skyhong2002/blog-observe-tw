@@ -1,6 +1,6 @@
 import type { Pool, RowDataPacket } from 'mysql2/promise';
-import { isGenreKey } from '../blog-genre-vocabulary.ts';
-import { resolveGenre } from '../blog-genres/resolve.ts';
+import type { GenreItem } from '../blog-genres/resolve.ts';
+import { loadAllGenres } from '../blog-genres/store.ts';
 import { type RobotsStatus, robotsFor, robotsStatuses } from '../crawl/robots-observations.ts';
 
 // Every blog row for the 部落格 tab of /admin/ (after tag.observe.tw 66d76690
@@ -31,8 +31,8 @@ export type AdminBlog = {
   scraper: boolean;
   posts: number | null;
   posts7d: number | null;
-  /** Genres readers see, with the ones an admin set or hid marked. */
-  genres: Array<{ genre: string; source: 'ai' | 'admin' | 'community'; visible: boolean }>;
+  /** traffic.observe.tw's tags for the blog's domain, with the ones an admin set or hid marked. */
+  genres: Array<Pick<GenreItem, 'genre' | 'label' | 'source' | 'visible'>>;
   manualTags: string[];
   robots: RobotsStatus | null;
   edits: number;
@@ -68,7 +68,7 @@ export async function adminBlogs(pool: Pool) {
       ([r]) => new Map(r.map((x) => [Number(x.blogId), Number(x.n)])),
       () => null,
     );
-  const [blogs, posts, posts7d, feeds, scrapers, genres, votes, tags, audits] = await Promise.all([
+  const [blogs, posts, posts7d, feeds, scrapers, genres, tags, audits] = await Promise.all([
     pool
       .query<RowDataPacket[]>(
         `SELECT id,slug,name,url,category,status,status_label statusLabel,last_crawl_success_at lastCrawlSuccessAt,
@@ -89,17 +89,8 @@ export async function adminBlogs(pool: Pool) {
     pool
       .query<RowDataPacket[]>("SELECT DISTINCT blog_id blogId FROM blog_scrapers WHERE status='active' AND blog_id IS NOT NULL")
       .then(rows),
-    pool
-      .query<RowDataPacket[]>(
-        `SELECT blog_id blogId,genre,MAX(source='ai' AND status='active') ai,MAX(source='admin' AND status='active') adminSet,
-           MAX(source='admin' AND status='hidden') adminHide FROM blog_genre_assignments GROUP BY blog_id,genre`,
-      )
-      .then(rows),
-    pool
-      .query<RowDataPacket[]>(
-        'SELECT blog_id blogId,genre,SUM(vote=1) agrees,SUM(vote=-1) disagrees FROM blog_genre_votes GROUP BY blog_id,genre',
-      )
-      .then(rows),
+    // The table still loads when traffic does not answer; the tag column is then empty and `genresUnavailable` set.
+    loadAllGenres(pool).catch(() => null),
     pool
       .query<RowDataPacket[]>(
         "SELECT bt.blog_id blogId,t.label FROM blog_tags bt JOIN tags t ON t.id=bt.tag_id WHERE bt.source_type='manual' AND bt.status='active' ORDER BY t.label",
@@ -118,22 +109,6 @@ export async function adminBlogs(pool: Pool) {
   ).catch(() => new Map<string, RobotsStatus>());
   const feedOf = new Map(feeds.map((f) => [Number(f.blogId), f]));
   const scraperOf = new Set(scrapers.map((s) => Number(s.blogId)));
-  const voteOf = new Map(votes.map((v) => [`${v.blogId}:${v.genre}`, v]));
-  const genresOf = new Map<number, AdminBlog['genres']>();
-  for (const g of genres) {
-    if (!isGenreKey(g.genre)) continue;
-    const vote = voteOf.get(`${g.blogId}:${g.genre}`);
-    const item = resolveGenre({
-      genre: g.genre,
-      ai: Boolean(Number(g.ai)),
-      admin: Number(g.adminHide) ? 'hide' : Number(g.adminSet) ? 'set' : null,
-      agrees: Number(vote?.agrees ?? 0),
-      disagrees: Number(vote?.disagrees ?? 0),
-    });
-    const list = genresOf.get(Number(g.blogId)) ?? [];
-    list.push({ genre: item.genre, source: item.source, visible: item.visible });
-    genresOf.set(Number(g.blogId), list);
-  }
   const tagsOf = new Map<number, string[]>();
   for (const t of tags) tagsOf.set(Number(t.blogId), [...(tagsOf.get(Number(t.blogId)) ?? []), String(t.label)]);
   const editsOf = new Map<number, { n: number; last: AdminBlog['lastEdit'] }>();
@@ -149,6 +124,7 @@ export async function adminBlogs(pool: Pool) {
   const now = Date.now();
   return {
     partial: !posts || !posts7d,
+    genresUnavailable: !genres,
     blogs: blogs.map((b): AdminBlog => {
       const id = Number(b.id);
       const feed = feedOf.get(id);
@@ -167,7 +143,7 @@ export async function adminBlogs(pool: Pool) {
         scraper: scraperOf.has(id),
         posts: posts ? (posts.get(id) ?? 0) : null,
         posts7d: posts7d ? (posts7d.get(id) ?? 0) : null,
-        genres: genresOf.get(id) ?? [],
+        genres: (genres?.get(id) ?? []).map(({ genre, label, source, visible }) => ({ genre, label, source, visible })),
         manualTags: tagsOf.get(id) ?? [],
         robots: robotsFor(robots, b.url),
         edits: editsOf.get(id)?.n ?? 0,

@@ -50,7 +50,7 @@ describe('latest article preferences: server rendering', () => {
         .get(),
     ).toEqual(['Other latest', 'Gadget latest']);
     expect($('[role="status"]').text()).toContain('最近收錄 4 篇，顯示 2 篇');
-    expect($('[role="status"]').text()).toContain('類型隱藏 1、每站上限隱藏 1');
+    expect($('[role="status"]').text()).toContain('標籤隱藏 1、每站上限隱藏 1');
     const current = $('[aria-label="最新文章篩選"] a[aria-current="page"]');
     expect(current.map((_, el) => $(el).text()).get()).toEqual(['1 篇', '✕ 美食']);
     // Clicking a hidden genre shows it again; other choices are kept.
@@ -112,8 +112,8 @@ describe('latest article preferences: server rendering', () => {
         .map((_, el) => $(el).text())
         .get(),
     ).toEqual(['Food latest', 'Other latest', 'Gadget latest']);
-    expect($('nav[aria-label="隱藏類型"]')).toHaveLength(0);
-    expect($.text()).toContain('類型篩選暫時無法使用，本次未套用。');
+    expect($('nav[aria-label="隱藏標籤"]')).toHaveLength(0);
+    expect($.text()).toContain('標籤篩選暫時無法使用，本次未套用。');
     expect($.text()).toContain('每站上限隱藏 1');
     // The cap chips keep the genre choice in the URL for when genres come back.
     expect(

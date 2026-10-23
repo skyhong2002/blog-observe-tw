@@ -231,7 +231,7 @@ function LatestFilters({ filters, genresReady }: { filters: ArticleFilters; genr
       />
       {genresReady && (
         <FilterChips
-          label="隱藏類型"
+          label="隱藏標籤"
           showLabel
           items={[
             { href: articleFiltersHref({ ...filters, exclude: [] }), label: '不隱藏', current: !filters.exclude.length },
@@ -241,7 +241,7 @@ function LatestFilters({ filters, genresReady }: { filters: ArticleFilters; genr
                 href: toggle(genre as BlogGenre),
                 label: hidden ? `✕ ${label}` : label,
                 current: hidden,
-                title: hidden ? `再按一次顯示「${label}」` : `隱藏「${label}」類部落格的文章`,
+                title: hidden ? `再按一次顯示「${label}」` : `隱藏有「${label}」標籤的部落格的文章`,
               };
             }),
           ]}
@@ -313,12 +313,12 @@ export default function ArticlesView({
           <LatestFilters filters={filters} genresReady={genresReady} />
           {!genresReady && (
             <p role="status" className="text-sm">
-              類型篩選暫時無法使用，本次未套用。
+              標籤篩選暫時無法使用，本次未套用。
             </p>
           )}
           <p role="status" className="text-xs leading-5 text-zinc-500 dark:text-zinc-400">
             最近收錄 {latest.length} 篇，顯示 {filtered.items.length} 篇
-            {filtered.hiddenGenre + filtered.hiddenCap > 0 && `（類型隱藏 ${filtered.hiddenGenre}、每站上限隱藏 ${filtered.hiddenCap}）`}
+            {filtered.hiddenGenre + filtered.hiddenCap > 0 && `（標籤隱藏 ${filtered.hiddenGenre}、每站上限隱藏 ${filtered.hiddenCap}）`}
             {filters.maxPerBlog || effective.exclude.length ? (
               <>
                 {' · '}
@@ -347,10 +347,10 @@ export default function ArticlesView({
           <>
             <h3 className={methodHeading}>最新文章</h3>
             <p>從各站公開訂閱來源收錄，按發文時間排列，只顯示標題、摘要與短片段；完整文章請至作者原站閱讀。</p>
-            <p>「每站最多」與「隱藏類型」只篩選最近收錄的 {latest.length} 篇，不會補入更早的文章；搜尋結果不套用這兩項篩選。</p>
+            <p>「每站最多」與「隱藏標籤」只篩選最近收錄的 {latest.length} 篇，不會補入更早的文章；搜尋結果不套用這兩項篩選。</p>
             <p>
-              部落格類型依 AI
-              初判、讀者投票與管理員覆核整理，可能有誤。一個部落格可以有多個類型，只要符合任一隱藏類型，整站文章就會隱藏；這不是單篇文章的標籤篩選。尚未分類或目前沒有顯示類型的部落格一律保留
+              這裡的標籤是部落格的標籤（與 traffic.observe.tw 共用），依編輯清單、AI
+              初判、讀者投票與管理員覆核整理，可能有誤。一個部落格可以有多個標籤，只要符合任一隱藏標籤，整站文章就會隱藏；這不是單篇文章作者寫的標籤。目前沒有顯示標籤的部落格一律保留
               {genresReady ? `（這批中有 ${filtered.unclassified} 篇）` : ''}。
             </p>
             {search?.status === 'ready' && <Coverage result={search.data} />}

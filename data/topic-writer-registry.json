@@ -58,13 +58,6 @@
       "occurrences": 1
     },
     {
-      "path": "app/src/blog-genres/routes.ts",
-      "digest": "674d8cefb9df699a04f37fd828f22e6228f07d47e1ab538d148549f5caad0b93",
-      "tables": [],
-      "dynamic": true,
-      "occurrences": 1
-    },
-    {
       "path": "app/src/content/store.ts",
       "digest": "62b8848123f51d5fa2a0c068f8181a61b0e7cd64454a9f797cf79eca2d57412f",
       "tables": [],
@@ -1436,20 +1429,6 @@
     {
       "path": "tools/admin-role.ts",
       "digest": "6ddf70cae30e110d83f026ad7d977765823416e021c2d7ee74d49c93663aacbf",
-      "tables": [],
-      "dynamic": true,
-      "occurrences": 1
-    },
-    {
-      "path": "tools/apply-blog-genres.ts",
-      "digest": "674d8cefb9df699a04f37fd828f22e6228f07d47e1ab538d148549f5caad0b93",
-      "tables": [],
-      "dynamic": true,
-      "occurrences": 1
-    },
-    {
-      "path": "tools/apply-blog-genres.ts",
-      "digest": "81e590c07a19fd2e03fde5e51036598b870562969fd84d04bcc3f2e08be2af7d",
       "tables": [],
       "dynamic": true,
       "occurrences": 1

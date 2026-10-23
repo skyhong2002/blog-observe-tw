@@ -173,7 +173,7 @@ export default function BlogCatalogView({
 }) {
   const { q, sort, dir, genre, status: blogStatus, kind = '', limit } = filters;
   const query = { q, sort, dir, genre, status: statusCodeOf(blogStatus), kind, ...(limit !== 50 ? { limit: String(limit) } : {}) };
-  const { genres = [], ungenred = 0, statuses, kinds = [], blogs: rows } = data;
+  const { genres = [], statuses, kinds = [], blogs: rows } = data;
   const { page, pages, total } = data.pagination;
   const ready = status === 'ready';
   const words = q ? [...new Set(fold(q).split(' ').filter(Boolean))] : [];
@@ -250,17 +250,16 @@ export default function BlogCatalogView({
             })),
           ]}
         />
-        {/* Reader and AI genres, several per blog (部落格類型 on each blog page), not the imported category. */}
+        {/* traffic.observe.tw's tags, several per blog (標籤 on each blog page), not the imported category. */}
         <FilterChips
-          label="類型"
+          label="標籤"
           items={[
-            { href: href({ genre: null }), label: '全部類型', current: !query.genre },
+            { href: href({ genre: null }), label: '全部標籤', current: !query.genre },
             ...genres.map(({ value, label, count }) => ({
               href: href({ genre: value }),
               label: `${label} ${count}`,
               current: query.genre === value,
             })),
-            ...(ungenred ? [{ href: href({ genre: '-' }), label: `未分類 ${ungenred}`, current: query.genre === '-' }] : []),
           ]}
         />
         {/* Who runs the blog, from the homepage and the named authors (catalog.js siteKind); absent from an older gateway. */}
@@ -312,7 +311,7 @@ export default function BlogCatalogView({
                 <tr>
                   <Th col="name" label="部落格" className={table.leadHead} />
                   <th scope="col" className={table.cell}>
-                    類型
+                    標籤
                   </th>
                   <Th col="posts" label="已收錄文章" className="text-right" />
                   <Th col="authors" label="作者" className="text-right" />

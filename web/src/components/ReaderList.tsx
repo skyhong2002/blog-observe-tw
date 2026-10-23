@@ -69,7 +69,7 @@ export default function ReaderList() {
                   <BlogIcon media={blog.slug} iconUrl={blog.iconUrl} title={blog.name} />
                   {blog.name}
                 </strong>
-                <span className="text-xs text-zinc-500">{blog.category ?? '未分類'}</span>
+                <span className="text-xs text-zinc-500">{blog.category === '待分類' ? '' : (blog.category ?? '')}</span>
               </Link>
             </li>
           ))}

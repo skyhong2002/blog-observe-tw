@@ -1,33 +1,26 @@
-import Fastify from 'fastify';
+import Fastify, { type InjectOptions } from 'fastify';
 import { describe, expect, it } from 'vitest';
+import { fakeTagClient, tag } from '../../test/tag-client.ts';
 import { SESSION_COOKIE } from '../auth/google-login.ts';
 import { genreCsrfToken, registerBlogGenreRoutes } from './routes.ts';
+import { setTagClient, type TagClient, TagServiceError } from './traffic.ts';
 
 const secret = 'x'.repeat(32);
 const headers = { origin: 'https://blog.test', cookie: `${SESSION_COOKIE}=session`, 'x-blog-csrf': genreCsrfToken('session', secret) };
-async function fixture({ signedIn = true, admin = false } = {}) {
-  const writes: { sql: string; args: unknown[] }[] = [];
-  let committed = 0,
-    rolledBack = 0;
+async function fixture({
+  signedIn = true,
+  traffic = fakeTagClient({ 'a.blog.tw': [tag('美食'), tag('Coffee', { source: 'community' })] }),
+} = {}) {
+  const audits: unknown[][] = [];
   const query = async (sql: string) => {
-    if (sql.includes('admin_google_identities'))
-      return [[{ role: admin ? 'admin' : 'reader', google_sub: 'sub', pinned_sub: 'sub', pinned_email: 'a@test' }]];
-    if (sql.includes('SELECT id FROM blogs')) return [[{ id: 1 }]];
-    if (sql.includes('SELECT genre FROM blog_genre_assignments')) return [[{ genre: 'food' }]];
+    if (sql.includes('FROM blogs')) return [[{ id: 1, host: 'www.a.blog.tw' }]];
     return [[]];
   };
   const c = {
     query,
     execute: async (sql: string, args: unknown[]) => {
-      writes.push({ sql, args });
+      if (sql.includes('INSERT INTO admin_audits')) audits.push(args);
       return [{ affectedRows: 1 }];
-    },
-    beginTransaction: async () => {},
-    commit: async () => {
-      committed++;
-    },
-    rollback: async () => {
-      rolledBack++;
     },
     release() {},
   };
@@ -36,17 +29,22 @@ async function fixture({ signedIn = true, admin = false } = {}) {
     pool: { query, getConnection: async () => c } as never,
     publicOrigin: 'https://blog.test',
     sessionSecret: secret,
-    adminEmails: new Set(['a@test']),
     requireUser: async (_request, reply) => {
       if (!signedIn) {
         reply.code(401).send({ error: 'login required' });
         return null;
       }
-      return { id: Number(_request.headers['x-test-user'] ?? 7), sub: 'sub', email: 'a@test', name: 'reader', picture: null };
+      const id = Number(_request.headers['x-test-user'] ?? 7);
+      return { id, sub: 'sub', email: `reader${id}@test`, name: 'reader', picture: null };
     },
   });
   await app.ready();
-  return { app, writes, committed: () => committed, rolledBack: () => rolledBack };
+  // Each fixture's requests go to its own traffic stand-in, also when a test holds two.
+  const inject = (options: InjectOptions | string) => {
+    setTagClient(traffic.client);
+    return app.inject(options);
+  };
+  return { app: { inject, close: () => app.close() }, writes: traffic.writes, reads: traffic.reads, audits };
 }
 const request = (kind: string, payload: Record<string, unknown>, extra = {}) => ({
   method: kind === 'propose' ? ('POST' as const) : ('PUT' as const),
@@ -55,7 +53,7 @@ const request = (kind: string, payload: Record<string, unknown>, extra = {}) => 
   payload,
   ...extra,
 });
-describe('blog genre write routes', () => {
+describe('blog tag routes proxied to traffic.observe.tw', () => {
   it('requires login for private reads and every write, and marks errors private', async () => {
     const f = await fixture({ signedIn: false });
     try {
@@ -66,11 +64,12 @@ describe('blog genre write routes', () => {
       }
       expect((await f.app.inject('/api/me/blog-genres/a')).statusCode).toBe(401);
       expect(f.writes).toHaveLength(0);
+      expect(f.reads).toHaveLength(0);
     } finally {
       await f.app.close();
     }
   });
-  it('rejects cross-origin, missing or mismatched CSRF tokens before writing', async () => {
+  it('rejects cross-origin, missing or mismatched CSRF tokens before calling traffic', async () => {
     const f = await fixture();
     try {
       for (const patch of [{ origin: 'https://evil.test' }, { 'x-blog-csrf': '' }, { cookie: `${SESSION_COOKIE}=other` }]) {
@@ -81,13 +80,13 @@ describe('blog genre write routes', () => {
       await f.app.close();
     }
   });
-  it('rejects invalid genres, votes, actions and extra fields', async () => {
+  it('rejects invalid tags, votes, actions and extra fields', async () => {
     const f = await fixture();
     try {
       for (const req of [
         request('propose', { genre: '旅遊, 生活' }),
         request('propose', { genre: '###' }),
-        request('propose', { genre: '字'.repeat(21) }),
+        request('propose', { genre: '字'.repeat(33) }),
         request('vote', { vote: 2 }),
         request('admin', { action: 'erase' }),
         request('vote', { vote: 1, userId: 99 }),
@@ -101,40 +100,80 @@ describe('blog genre write routes', () => {
       await f.app.close();
     }
   });
-  it('proposes and agrees in one transaction; vote changes upsert and withdrawal deletes', async () => {
+  it('votes and proposes as the reader, by the tag names traffic uses, and answers with the new tags', async () => {
     const f = await fixture();
     try {
+      const voted = await f.app.inject(request('vote', { vote: -1 }));
+      expect(voted.statusCode).toBe(200);
+      expect(voted.json().genreState.items[0]).toMatchObject({ genre: 'food', label: '美食', source: 'ai' });
+      expect((await f.app.inject(request('vote', { vote: 0 }, { url: '/api/blogs/a/genres/coffee/vote' }))).statusCode).toBe(200);
+      // The starting names go by name (food → 美食); anything else as typed, NFKC-folded without the leading #.
       expect((await f.app.inject(request('propose', { genre: 'food' }))).statusCode).toBe(200);
-      expect(f.writes[0].sql).toContain('INSERT IGNORE INTO blog_genre_assignments');
-      expect(f.writes[1].args).toEqual([1, 'food', 7, 1]);
-      expect((await f.app.inject(request('vote', { vote: -1 }))).statusCode).toBe(200);
-      expect(f.writes[2].args).toEqual([1, 'food', 7, -1]);
-      expect((await f.app.inject(request('vote', { vote: 0 }))).statusCode).toBe(200);
-      expect(f.writes[3].sql).toContain('DELETE FROM blog_genre_votes');
-      expect(f.committed()).toBe(3);
-      // Any genre a reader types: the starting names fold to their keys, everything else to its own folded text.
-      expect((await f.app.inject(request('propose', { genre: '美食' }))).statusCode).toBe(200);
-      expect(f.writes.at(-1)?.args).toEqual([1, 'food', 7, 1]);
       expect((await f.app.inject(request('propose', { genre: '  ＃Single   Origin  ' }))).statusCode).toBe(200);
-      expect(f.writes.at(-1)?.args).toEqual([1, 'single origin', 7, 1]);
+      expect(f.writes).toEqual([
+        { kind: 'vote', voter: 'reader7@test', domain: 'a.blog.tw', tag: '美食', vote: -1 },
+        { kind: 'vote', voter: 'reader7@test', domain: 'a.blog.tw', tag: 'Coffee', vote: 0 },
+        { kind: 'propose', voter: 'reader7@test', domain: 'a.blog.tw', tag: '美食' },
+        { kind: 'propose', voter: 'reader7@test', domain: 'a.blog.tw', tag: 'Single Origin' },
+      ]);
+      // A vote on a tag the blog does not have never reaches traffic.
+      expect((await f.app.inject(request('vote', { vote: 1 }, { url: '/api/blogs/a/genres/travel/vote' }))).statusCode).toBe(404);
+      expect(f.writes).toHaveLength(4);
     } finally {
       await f.app.close();
     }
   });
-  it('rechecks pinned admin identity in the transaction, and audits set/hide/release without deleting votes', async () => {
-    const reader = await fixture();
-    const admin = await fixture({ admin: true });
+  it('lets traffic decide who is an admin, and audits the overrides it accepted', async () => {
+    const refused = await fixture({
+      traffic: fakeTagClient({ 'a.blog.tw': [tag('美食')] }, { answer: () => ({ status: 403, error: 'not_admin' }) }),
+    });
+    const admin = await fixture();
     try {
-      expect((await reader.app.inject(request('admin', { action: 'set' }))).statusCode).toBe(403);
-      expect(reader.writes).toHaveLength(0);
-      expect(reader.rolledBack()).toBe(1);
+      const response = await refused.app.inject(request('admin', { action: 'set' }));
+      expect(response.statusCode).toBe(403);
+      expect(response.json()).toEqual({ error: 'not_admin' });
+      expect(refused.audits).toHaveLength(0);
       for (const action of ['set', 'hide', 'release']) expect((await admin.app.inject(request('admin', { action }))).statusCode).toBe(200);
-      expect(admin.writes.filter((w) => w.sql.includes('INSERT INTO admin_audits'))).toHaveLength(3);
-      expect(admin.writes.filter((w) => w.sql.includes("'community','candidate'"))).toHaveLength(3);
-      expect(admin.writes.some((w) => w.sql.includes('DELETE FROM blog_genre_votes'))).toBe(false);
+      // An override may name a tag the blog does not have yet.
+      expect((await admin.app.inject(request('admin', { action: 'set' }, { url: '/api/blogs/a/genres/travel/admin' }))).statusCode).toBe(
+        200,
+      );
+      expect(admin.writes.map((w) => [w.tag, 'action' in w && w.action])).toEqual([
+        ['美食', 'set'],
+        ['美食', 'hide'],
+        ['美食', 'release'],
+        ['旅遊', 'set'],
+      ]);
+      expect(admin.audits.map((a) => a[1])).toEqual(['genre.set', 'genre.hide', 'genre.release', 'genre.set']);
     } finally {
-      await reader.app.close();
+      await refused.app.close();
       await admin.app.close();
+    }
+  });
+  it('answers 503 when traffic is down and passes its refusals on', async () => {
+    const down: TagClient = {
+      read: async () => {
+        throw new TagServiceError('down');
+      },
+      write: async () => {
+        throw new TagServiceError('down');
+      },
+      putAi: async () => ({ ok: true, sites: 0, changed: 0, skipped: [] }),
+    };
+    const f = await fixture({ traffic: { client: down, reads: [], writes: [] } });
+    const limited = await fixture({
+      traffic: fakeTagClient({ 'a.blog.tw': [tag('美食')] }, { answer: () => ({ status: 429, error: 'rate_limited' }) }),
+    });
+    try {
+      expect((await f.app.inject(request('vote', { vote: 1 }))).statusCode).toBe(503);
+      expect((await f.app.inject(request('propose', { genre: '咖啡' }))).statusCode).toBe(503);
+      expect((await f.app.inject({ url: '/api/me/blog-genres/a', headers })).statusCode).toBe(503);
+      const response = await limited.app.inject(request('vote', { vote: 1 }));
+      expect(response.statusCode).toBe(429);
+      expect(response.headers['retry-after']).toBe('60');
+    } finally {
+      await f.app.close();
+      await limited.app.close();
     }
   });
   it('limits a signed-in user to 30 writes per minute across endpoints', async () => {
@@ -144,19 +183,22 @@ describe('blog genre write routes', () => {
       const response = await f.app.inject(request('propose', { genre: 'food' }));
       expect(response.statusCode).toBe(429);
       expect(Number(response.headers['retry-after'])).toBeGreaterThan(0);
-      expect(f.committed()).toBe(30);
+      expect(f.writes).toHaveLength(30);
       expect((await f.app.inject(request('vote', { vote: 1 }, { headers: { ...headers, 'x-test-user': '8' } }))).statusCode).toBe(200);
     } finally {
       await f.app.close();
     }
   });
-  it('returns session-bound CSRF and private user votes', async () => {
-    const f = await fixture();
+  it("returns session-bound CSRF, the reader's own votes by key and traffic's admin flag", async () => {
+    const f = await fixture({
+      traffic: fakeTagClient({ 'a.blog.tw': [tag('美食')] }, { voter: { admin: true, votes: { 'a.blog.tw': { 美食: -1, Coffee: 1 } } } }),
+    });
     try {
       const response = await f.app.inject({ url: '/api/me/blog-genres/a', headers });
       expect(response.statusCode).toBe(200);
-      expect(response.json()).toEqual({ votes: {}, admin: false, csrfToken: headers['x-blog-csrf'] });
+      expect(response.json()).toEqual({ votes: { food: -1, coffee: 1 }, admin: true, csrfToken: headers['x-blog-csrf'] });
       expect(response.headers['cache-control']).toBe('private, no-store');
+      expect(f.reads).toEqual([{ domains: ['a.blog.tw'], voter: 'reader7@test' }]);
     } finally {
       await f.app.close();
     }

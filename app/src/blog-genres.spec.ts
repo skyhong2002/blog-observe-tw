@@ -1,6 +1,9 @@
 import { readFile } from 'node:fs/promises';
 import { describe, expect, it } from 'vitest';
 import { type GenreReview, genreMap, proposeGenres } from '../../tools/lib/blog-genres.ts';
+import { fakeTagClient, offlineTagClient, tag } from '../test/tag-client.ts';
+import { forgetTagSnapshot } from './blog-genres/store.ts';
+import { setTagClient } from './blog-genres/traffic.ts';
 import { loadOverview } from './overview.js';
 import { publicPost } from './public-post.ts';
 
@@ -24,7 +27,9 @@ describe('reviewable reader genres', () => {
     expect(Object.hasOwn(reserved, '__proto__')).toBe(true);
     expect(Object.getPrototypeOf(reserved)).toBe(Object.prototype);
   });
-  it('attaches resolved database genres in one bounded read, with failure fallback', async () => {
+  it("attaches traffic's shown tags from the directory snapshot, with failure fallback", async () => {
+    const traffic = fakeTagClient({ 'kocpc.com.tw': [tag('3C'), tag('露營', { source: 'community', visible: false })] });
+    setTagClient(traffic.client);
     const statements: string[] = [];
     const pool = {
       query: async (sql: string) => {
@@ -37,8 +42,13 @@ describe('reviewable reader genres', () => {
               { id: 3, title: 'reserved', blogSlug: '__proto__' },
             ],
           ];
-        if (sql.includes('FROM blogs b JOIN blog_genre_assignments'))
-          return [[{ slug: 'kocpc', genre: 'gadgets', ai: 1, agrees: 0, disagrees: 0 }]];
+        if (sql.includes('canonical_host host'))
+          return [
+            [
+              { id: 9, slug: 'kocpc', host: 'www.kocpc.com.tw' },
+              { id: 10, slug: 'other', host: 'other.blog.tw' },
+            ],
+          ];
         if (sql.includes('AS blogs,')) return [[{ blogs: 2, posts: 2 }]];
         return [[]];
       },
@@ -46,13 +56,11 @@ describe('reviewable reader genres', () => {
     const data = await loadOverview(pool);
     expect(data.posts.map((post: Record<string, unknown>) => post.blogGenres)).toEqual([['gadgets'], [], []]);
     expect(statements).toHaveLength(8);
+    expect(traffic.reads).toEqual([{ domains: ['kocpc.com.tw', 'other.blog.tw'] }]);
     expect(data.genreStatus).toBe('ready');
-    const unavailable = await loadOverview({
-      query: async (sql: string) => {
-        if (sql.includes('blog_genre_assignments')) throw Error('DB unavailable');
-        return pool.query(sql);
-      },
-    });
+    forgetTagSnapshot();
+    setTagClient(offlineTagClient);
+    const unavailable = await loadOverview(pool);
     expect(unavailable.genreStatus).toBe('unavailable');
     expect(unavailable.posts).toHaveLength(3);
     expect(unavailable.posts[0].blogGenres).toBeUndefined();

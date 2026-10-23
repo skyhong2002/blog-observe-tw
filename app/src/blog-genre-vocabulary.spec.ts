@@ -10,10 +10,10 @@ describe('reader-written genres', () => {
     expect(genreLabel('food')).toBe('美食');
     expect(genreLabel('咖啡')).toBe('咖啡');
   });
-  it('refuses empty, overlong, punctuation-only, list-separated and control text, so `-` is never a genre', () => {
-    for (const text of ['', '   ', '-', '###', '字'.repeat(21), '旅遊, 生活', '旅遊、生活', 'a/b', 'a\u0000b', '<b>', 7, null])
+  it('refuses empty, overlong (over 32, traffic TAG_LIMIT), punctuation-only, list-separated and control text', () => {
+    for (const text of ['', '   ', '-', '###', '字'.repeat(33), '旅遊, 生活', '旅遊、生活', 'a/b', 'a\u0000b', '<b>', 7, null])
       expect(genreKey(text), String(text)).toBeNull();
-    expect(genreKey('字'.repeat(20))).toBe('字'.repeat(20));
+    expect(genreKey('字'.repeat(32))).toBe('字'.repeat(32));
   });
   it('a stored key is one genreKey could have made', () => {
     expect(isGenreKey('food')).toBe(true);

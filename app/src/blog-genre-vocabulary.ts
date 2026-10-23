@@ -26,14 +26,14 @@ export const BLOG_GENRES = {
 export type BlogGenre = keyof typeof BLOG_GENRES;
 export const isBlogGenre = (value: string): value is BlogGenre => Object.hasOwn(BLOG_GENRES, value);
 
-/** Longest reader-written genre, in characters (the column holds 32). */
-export const GENRE_TEXT_LIMIT = 20;
+/** Longest tag, in characters: traffic.observe.tw's TAG_LIMIT (src/crowd.ts), where the tags live since 2026-10-24. */
+export const GENRE_TEXT_LIMIT = 32;
 const LABEL_KEYS = new Map(Object.entries(BLOG_GENRES).map(([key, label]) => [label.toLowerCase(), key as BlogGenre]));
 /**
  * The stored key for what a reader typed (2026-10-19: readers may add any genre, shown at once). The starting
  * vocabulary keeps its keys, so 美食, food and ＦＯＯＤ are one genre; anything else is its own folded text
  * (NFKC, lower case, single spaces, no leading #). null without a letter or digit, too long, separators or control
- * characters, so the directory's `genre=-` (no genre yet) can never be a genre.
+ * characters.
  */
 export function genreKey(text: unknown): string | null {
   if (typeof text !== 'string') return null;

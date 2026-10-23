@@ -22,7 +22,7 @@ export type CatalogSort = (typeof catalogSorts)[number] | 'relevance';
 export type CatalogFilters = {
   q: string;
   category: string;
-  /** A genre key, or '-' for blogs no genre is shown for yet (app/src/catalog.js). */
+  /** A tag key (app/src/catalog.js; blog-genre-vocabulary.ts genreKey). */
   genre: string;
   status: string;
   /** Who runs the blog (app/src/catalog.js SITE_KINDS), or '' for all. */

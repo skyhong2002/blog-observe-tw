@@ -1,4 +1,3 @@
-import type { BlogGenre } from '../../../app/src/blog-genre-vocabulary.ts';
 import type { GenreState } from '../../../app/src/blog-genres/resolve.ts';
 import type { RobotsStatus } from './robots';
 
@@ -72,8 +71,8 @@ export type Post = {
   blogCanonicalPath?: string;
   blogName?: string;
   imageUrl?: string | null;
-  /** Resolved database genres; absent on older gateways, empty when unclassified. */
-  blogGenres?: BlogGenre[];
+  /** The blog's shown tag keys (traffic.observe.tw); absent when tags are unavailable, empty when it has none. */
+  blogGenres?: string[];
   /** The author's feed categories, at most a few (app/src/post-tags.ts); absent when none or not sent. */
   tags?: Tag[];
   /** The post's full tag count, for "+N" beside the shown `tags`. */
@@ -164,11 +163,9 @@ export type Catalog = {
   blogs: Blog[];
   totals: { blogs: number; posts: number; withUrls: number; authors: number };
   categories: Array<{ value: string; count: number }>;
-  /** Reader and AI genres with how many blogs show each (whole directory); absent from an older gateway. */
+  /** Shown tags with how many blogs show each (whole directory); absent from an older gateway. */
   genres?: Array<{ value: string; label: string; count: number }>;
   genreStatus?: 'ready' | 'unavailable';
-  /** Blogs no genre is shown for yet. */
-  ungenred?: number;
   statuses: Array<{ value: string; count: number }>;
   /** Blogs per site kind, whole directory, fixed order; absent from an older gateway. */
   kinds?: Array<{ value: SiteKind; count: number }>;

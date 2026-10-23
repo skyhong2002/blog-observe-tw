@@ -36,7 +36,7 @@ export function filterLatestPosts(posts: Post[], filters: ArticleFilters) {
   let hiddenGenre = 0;
   let hiddenCap = 0;
   const items = posts.filter((post) => {
-    if (post.blogGenres?.some((genre) => filters.exclude.includes(genre))) {
+    if (post.blogGenres?.some((genre) => (filters.exclude as string[]).includes(genre))) {
       hiddenGenre++;
       return false;
     }

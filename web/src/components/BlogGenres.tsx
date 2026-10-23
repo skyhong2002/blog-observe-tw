@@ -10,21 +10,30 @@ type PrivateState = { votes: Record<string, number>; admin: boolean; csrfToken: 
 const control = 'min-h-8 min-w-0 flex-1 rounded-md border border-zinc-300 bg-white px-2 text-xs dark:border-zinc-700 dark:bg-zinc-900';
 const button =
   'min-h-8 shrink-0 rounded-md border border-zinc-300 px-2.5 text-xs hover:border-brand-600 hover:text-brand-700 disabled:opacity-50 dark:border-zinc-700 dark:hover:text-brand-400';
-const SOURCE = { ai: 'AI 初判', community: '讀者', admin: '管理員' };
+// editor: traffic.observe.tw's editors' list, shown whatever the votes (votes are still counted there).
+const SOURCE = { editor: '編輯', ai: 'AI 初判', community: '讀者', admin: '管理員' };
 const unavailable: GenreState = { status: 'unavailable', items: [] };
+const WRITE_ERRORS: Record<number, string> = {
+  403: '只有管理員可以覆寫標籤。',
+  404: '找不到這個部落格的標籤資料或這個標籤，請重新整理後再試。',
+  429: '操作太頻繁，請稍候一分鐘再試。',
+  503: '標籤資料暫時無法使用，請稍後再試。',
+};
 type Action = (genre: string, kind: 'vote' | 'propose' | 'admin', value: number | string) => void;
 
-/** What a reader typed, as genre keys: commas and 、 separate several; text no genre can be is dropped. */
-export const typedGenres = (text: string) => [
-  ...new Set(
-    text
-      .split(/[,，、;；]/)
-      .map(genreKey)
-      .filter((key): key is string => key !== null),
-  ),
-];
+/** What a reader typed, as tag keys: commas and 、 separate several; text no tag can be is dropped. */
+export const typedGenres = (text: string) => typedTags(text).map((t) => t.key);
+/** The same, each with the reader's own spelling (Single Origin), which a new tag keeps on traffic.observe.tw. */
+export const typedTags = (text: string) => {
+  const out: Array<{ key: string; text: string }> = [];
+  for (const part of text.split(/[,，、;；]/)) {
+    const key = genreKey(part);
+    if (key && !out.some((t) => t.key === key)) out.push({ key, text: part.trim() });
+  }
+  return out;
+};
 
-/** A free-text genre box with suggestions and its buttons on one line: reader 新增, or the admin's overrides. */
+/** A free-text tag box with suggestions and its buttons on one line: reader 新增, or the admin's overrides. */
 function GenreInput({
   id,
   placeholder,
@@ -36,10 +45,10 @@ function GenreInput({
   placeholder: string;
   suggestions: string[];
   pending: boolean;
-  actions: Array<{ label: string; run: (genres: string[]) => void }>;
+  actions: Array<{ label: string; run: (genres: Array<{ key: string; text: string }>) => void }>;
 }) {
   const [text, setText] = useState('');
-  const genres = typedGenres(text);
+  const genres = typedTags(text);
   const run = (action: (typeof actions)[number]) => {
     if (!genres.length) return;
     action.run(genres);
@@ -103,16 +112,16 @@ export function BlogGenresView({
   loginUrl: string;
 }) {
   const listed = new Set(state.items.map((item) => item.genre));
-  // The starting genres not on this blog yet; readers may also type any other.
+  // The starting tags not on this blog yet; readers may also type any other.
   const suggestions = Object.entries(BLOG_GENRES)
     .filter(([key]) => !listed.has(key))
     .map(([, label]) => label);
   return (
-    <section className="rounded-lg border border-zinc-200 p-3 text-xs dark:border-zinc-800" aria-label="部落格類型">
-      <h2 className="mb-3 text-sm font-semibold">部落格類型</h2>
+    <section className="rounded-lg border border-zinc-200 p-3 text-xs dark:border-zinc-800" aria-label="標籤">
+      <h2 className="mb-3 text-sm font-semibold">標籤</h2>
       {state.status === 'unavailable' ? (
         <p role="status" className="text-zinc-500 dark:text-zinc-400">
-          類型資料暫時無法使用，請稍後再試。
+          標籤資料暫時無法使用，請稍後再試。
         </p>
       ) : (
         <div className="space-y-3">
@@ -157,14 +166,14 @@ export function BlogGenresView({
           {signedIn && (
             <GenreInput
               id="genre-add"
-              placeholder="新增類型，例如：咖啡"
+              placeholder="新增標籤，例如：咖啡"
               suggestions={suggestions}
               pending={pending}
               actions={[
                 {
                   label: '新增',
                   run: (genres) => {
-                    for (const genre of genres) onAction?.(genre, 'propose', 1);
+                    for (const genre of genres) onAction?.(genre.text, 'propose', 1);
                   },
                 },
               ]}
@@ -176,26 +185,26 @@ export function BlogGenresView({
               <div className="mt-2">
                 <GenreInput
                   id="genre-admin"
-                  placeholder="類型"
+                  placeholder="標籤"
                   suggestions={[...state.items.map((item) => item.label), ...suggestions]}
                   pending={pending}
                   actions={[
                     {
                       label: '指定顯示',
                       run: (genres) => {
-                        for (const genre of genres) onAction?.(genre, 'admin', 'set');
+                        for (const genre of genres) onAction?.(genre.key, 'admin', 'set');
                       },
                     },
                     {
                       label: '隱藏',
                       run: (genres) => {
-                        for (const genre of genres) onAction?.(genre, 'admin', 'hide');
+                        for (const genre of genres) onAction?.(genre.key, 'admin', 'hide');
                       },
                     },
                     {
                       label: '解除覆寫',
                       run: (genres) => {
-                        for (const genre of genres) onAction?.(genre, 'admin', 'release');
+                        for (const genre of genres) onAction?.(genre.key, 'admin', 'release');
                       },
                     },
                   ]}
@@ -208,7 +217,7 @@ export function BlogGenresView({
       {!signedIn && (
         <p className={state.items.length ? 'mt-3' : ''}>
           <a className="text-brand-700 hover:underline dark:text-brand-400" href={loginUrl}>
-            登入後投票或新增類型 →
+            登入後投票或新增標籤 →
           </a>
         </p>
       )}
@@ -263,18 +272,21 @@ export default function BlogGenres({ slug, initialState }: { slug: string; initi
           body: JSON.stringify(kind === 'propose' ? { genre } : kind === 'vote' ? { vote: value } : { action: value }),
         },
       );
-      if (!response.ok) throw Error(response.status === 429 ? '操作太頻繁，請稍候一分鐘再試。' : '儲存失敗，請重新整理後再試。');
+      if (!response.ok) throw Error(WRITE_ERRORS[response.status] ?? '儲存失敗，請重新整理後再試。');
       const result = await response.json();
       setState(result.genreState ?? unavailable);
       if (kind !== 'admin')
-        setOwn((current) => current && { ...current, votes: { ...current.votes, [genre]: kind === 'propose' ? 1 : Number(value) } });
+        setOwn(
+          (current) =>
+            current && { ...current, votes: { ...current.votes, [genreKey(genre) ?? genre]: kind === 'propose' ? 1 : Number(value) } },
+        );
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : '儲存失敗');
     } finally {
       setPending(false);
     }
   };
-  // Several typed genres run one after another, each on the state the previous one returned.
+  // Several typed tags run one after another, each on the state the previous one returned.
   const act: Action = (genre, kind, value) => {
     queue.current = queue.current.then(() => send(genre, kind, value));
   };

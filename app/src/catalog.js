@@ -34,7 +34,6 @@ const sortColumns = {
 };
 /** The directory opens on the most recently updated blogs; a search opens on the best matches. */
 const DEFAULT_SORT = 'latest';
-export const NO_GENRE = '-';
 const SEARCH_SORT = 'relevance';
 /** Search text as tag.observe.tw folds it: NFKC (full-width ＡＢ → AB), lower case, single spaces. */
 export const searchText = (value) => value.normalize('NFKC').toLowerCase().replace(/\s+/gu, ' ').trim();
@@ -70,8 +69,8 @@ export function catalogFilters(query = {}) {
   return {
     q,
     category: text(query.category, 255),
-    // A genre key (blog-genre-vocabulary.ts genreKey), or '-' for blogs no genre is shown for yet.
-    genre: query.genre === NO_GENRE ? NO_GENRE : (genreKey(query.genre) ?? ''),
+    // A tag's key (blog-genre-vocabulary.ts genreKey): ?genre=food and ?genre=美食 are one tag.
+    genre: genreKey(query.genre) ?? '',
     status: statusOf(text(query.status, 64)),
     kind: SITE_KINDS.includes(query.kind) ? query.kind : '',
     sort,
@@ -84,7 +83,7 @@ export function catalogFilters(query = {}) {
 async function catalogCondition(pool, filters, { onGenreFailure } = {}) {
   const where = ["b.status='verified'"];
   const parameters = [];
-  // Reader and AI genres, several per blog: the directory's 類型 chips and filter (replacing the imported category).
+  // traffic.observe.tw's tags, several per blog: the directory's 標籤 chips and filter (replacing the imported category).
   let genreStatus = 'ready';
   const shown = await loadShownGenres(pool).catch((error) => {
     genreStatus = 'unavailable';
@@ -92,17 +91,9 @@ async function catalogCondition(pool, filters, { onGenreFailure } = {}) {
     return new Map();
   });
   if (filters.genre && genreStatus === 'ready') {
-    const tagged = [...shown.keys()];
-    if (filters.genre === NO_GENRE) {
-      if (tagged.length) {
-        where.push('b.id NOT IN (?)');
-        parameters.push(tagged);
-      }
-    } else {
-      const ids = tagged.filter((id) => shown.get(id).some((item) => item.genre === filters.genre));
-      where.push(ids.length ? 'b.id IN (?)' : '0=1');
-      if (ids.length) parameters.push(ids);
-    }
+    const ids = [...shown.keys()].filter((id) => shown.get(id).some((item) => item.genre === filters.genre));
+    where.push(ids.length ? 'b.id IN (?)' : '0=1');
+    if (ids.length) parameters.push(ids);
   }
   const words = filters.q ? searchWords(filters.q) : [];
   for (const word of words) {
@@ -203,7 +194,6 @@ export async function loadCatalog(pool, query = {}, options = {}) {
     categories: facets(categoriesResult[0]),
     genreStatus,
     genres,
-    ungenred: Number(totals.blogs) - shown.size,
     statuses: facets(statusesResult[0]),
     // Fixed order, so the chips do not move as counts change.
     kinds: SITE_KINDS.map((value) => ({ value, count: Number(kindsResult[0].find((row) => row.value === value)?.count ?? 0) })),
@@ -217,11 +207,8 @@ export const OPML_LIMIT = 1000;
 export async function loadCatalogFeeds(pool, query = {}) {
   const filters = catalogFilters(query);
   const { condition, parameters, shown } = await catalogCondition(pool, filters);
-  // The chip text of the asked genre, for the file's title ('-' is 未分類).
-  const genreLabel =
-    filters.genre === NO_GENRE
-      ? '未分類'
-      : ([...shown.values()].flat().find((item) => item.genre === filters.genre)?.label ?? filters.genre);
+  // The chip text of the asked tag, for the file's title.
+  const genreLabel = [...shown.values()].flat().find((item) => item.genre === filters.genre)?.label ?? filters.genre;
   // The newest feed that last worked, as /me/opml picks it; blogs without one are left out.
   const [rows] = await pool.query(
     `SELECT b.name,b.url,f.url AS feedUrl,f.type FROM blogs b

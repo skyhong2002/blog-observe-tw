@@ -306,7 +306,6 @@ export async function buildApp(config, { logger = false, store = null } = {}) {
   registerBlogGenreRoutes(app, {
     pool,
     requireUser,
-    adminEmails: config.adminEmails,
     publicOrigin: config.publicOrigin,
     sessionSecret: config.login?.sessionSecret || '',
   });

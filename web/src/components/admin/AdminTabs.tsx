@@ -6,7 +6,7 @@ export const ADMIN_SECTIONS = {
   blogs: {
     href: '/admin/blogs/',
     label: '部落格',
-    intro: '所有部落格的類型、收錄狀態與修改次數；點名稱可設定這個部落格的簡介與標籤。',
+    intro: '所有部落格的標籤、收錄狀態與修改次數；點名稱可設定這個部落格的簡介與人工標籤。',
   },
   overrides: { href: '/admin/overrides/', label: '簡介與標籤', intro: '修正一個部落格在站上的簡介、標籤與文章主題。' },
   accounts: { href: '/admin/accounts/', label: '帳號', intro: '登入過的帳號，以及各自在站上的互動與貢獻。' },
