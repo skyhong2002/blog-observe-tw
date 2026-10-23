@@ -22,7 +22,12 @@ export const relationObservations = mysqlTable(
     externalLinks: int('external_links').notNull().default(0),
     errorCode: varchar('error_code', { length: 64 }),
   },
-  (t) => [index('relation_observations_due').on(t.nextAttemptAt), index('relation_observations_blog').on(t.blogId)],
+  (t) => [
+    index('relation_observations_due').on(t.nextAttemptAt),
+    index('relation_observations_blog').on(t.blogId),
+    // Body freshness reads only status/hash (topicBodyHash), index-only.
+    index('relation_observations_hash').on(t.postId, t.blogId, t.status, t.contentHash),
+  ],
 );
 
 export const relationLinks = mysqlTable(

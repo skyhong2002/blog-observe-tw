@@ -185,7 +185,7 @@ export async function runRelationVisibilityIntegration(pool: Pool) {
     await registerRelationRoutes(app, pool, { refreshMs: 0 });
     const baseline = (await app.inject('/api/relations?days=90')).json();
     check(edge(baseline, a, b)?.count === 2 && edge(baseline, a, b)?.share === 2 / 3 && edge(baseline, a, b)?.mutual);
-    // Pause live SQL after its aggregation; the revision fence must recheck a concurrent hide.
+    // Pause live SQL after its pair read; the revision fence must recheck a concurrent hide.
     let release!: () => void, arrived!: () => void;
     const blocked = new Promise<void>((r) => (release = r)),
       reached = new Promise<void>((r) => (arrived = r));
@@ -195,7 +195,7 @@ export async function runRelationVisibilityIntegration(pool: Pool) {
         if (key === 'query')
           return async (...args: unknown[]) => {
             const result = await Reflect.apply(target.query, target, args);
-            if (!intercepted && String(args[0]).startsWith('SELECT l.source_blog_id sourceBlogId')) {
+            if (!intercepted && String(args[0]).startsWith('SELECT DISTINCT l.source_blog_id sourceBlogId')) {
               intercepted = true;
               arrived();
               await blocked;
@@ -208,9 +208,19 @@ export async function runRelationVisibilityIntegration(pool: Pool) {
     }) as Pool;
     await pool.query('DELETE FROM relation_snapshots');
     const racing = readRelationSnapshot(racingPool, 90);
-    await reached;
-    await override(postIds[0], bUrl + 'one', 'body', true);
-    release();
+    try {
+      // A read that settles without passing the pair query means the barrier no longer matches the SQL: fail, never hang.
+      await Promise.race([
+        reached,
+        racing.then(
+          () => Promise.reject(Error('barrier_not_reached')),
+          () => Promise.reject(Error('barrier_not_reached')),
+        ),
+      ]);
+      await override(postIds[0], bUrl + 'one', 'body', true);
+    } finally {
+      release();
+    }
     check(edge(await racing, a, b)?.count === 1);
     const [[currentSnapshot]] = await pool.query<RowDataPacket[]>('SELECT COUNT(*) count FROM relation_snapshots WHERE days=90');
     check(Number(currentSnapshot.count) === 0); // Public reads no longer write/cache worker DTOs.

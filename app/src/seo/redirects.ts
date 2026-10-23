@@ -32,19 +32,17 @@ export function createPublicPageRedirect(pool: Pool, { legacyUiPaths = false } =
     const route = publicPageRequest(String(request.raw.url ?? request.url));
     if (!route) return false;
     const durable = route.kind === 'topic' && historyReadsEnabled();
-    if (durable) {
-      const state = await topicHistoryDisposition(pool, route.key);
-      if (state.status !== 'available') {
-        reply
-          .code(state.status === 'gone' ? 410 : 404)
-          .header('cache-control', 'no-store')
-          .type('text/plain; charset=utf-8')
-          .send(state.status === 'gone' ? '此話題的公開證據已撤銷。' : '找不到此話題。');
-        return true;
-      }
+    const state = durable ? await topicHistoryDisposition(pool, route.key) : undefined;
+    if (state && state.status !== 'available') {
+      reply
+        .code(state.status === 'gone' ? 410 : 404)
+        .header('cache-control', 'no-store')
+        .type('text/plain; charset=utf-8')
+        .send(state.status === 'gone' ? '此話題的公開證據已撤銷。' : '找不到此話題。');
+      return true;
     }
     const page = durable
-      ? await resolvePublicPage(pool, route.kind, route.key)
+      ? await resolvePublicPage(pool, route.kind, route.key, state)
       : await cache.get(`${route.kind}:${route.key}`, () => resolvePublicPage(pool, route.kind, route.key));
     if (!page) return false;
     if (page.canonicalPath === route.path) {

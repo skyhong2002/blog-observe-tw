@@ -1,7 +1,12 @@
 import type { Pool, RowDataPacket } from 'mysql2/promise';
 import { TopicResponseCache } from '../topics/cache.ts';
 import { historyReadsEnabled } from '../topics/history-contracts.ts';
-import { historyEvidenceSql, historyPublicTopicSql, topicHistoryDisposition } from '../topics/history-read.ts';
+import {
+  historyPublicEvidenceSql,
+  historyPublicTopicSql,
+  type TopicHistoryDisposition,
+  topicHistoryDisposition,
+} from '../topics/history-read.ts';
 import { exclusionReason, POLICY_VERSION } from '../topics/policy.ts';
 import { publicationExclusionReason } from '../topics/publication-noise.ts';
 import { evidence } from '../topics/routes.ts';
@@ -173,20 +178,29 @@ function store(pool: Pool) {
   }
   return value;
 }
+/**
+ * Public history counts per topic: one row per public article, as historyEvidenceSql groups them. posts, blogs and
+ * lastmod never depend on its body freshness, so the body tables are not joined (one cold page read per article).
+ */
 async function cumulativeTopics(pool: Pool, ids?: string[]) {
   const [rows] = await pool.query<RowDataPacket[]>(
-    `WITH ${historyEvidenceSql(ids ? 'many' : false)}
- SELECT h.canonical_id entity_id,t.label,COUNT(*) posts,COUNT(DISTINCT h.blog_id) blogs,MAX(h.published_at) lastmod
- FROM historical h JOIN topic_pages t ON t.canonical_id=h.canonical_id
- WHERE t.state IN ('active','pending') AND ${historyPublicTopicSql('t')}
- GROUP BY h.canonical_id,t.label`,
+    `SELECT e.canonical_id entity_id,t.label,COUNT(DISTINCT p.id) posts,COUNT(DISTINCT p.blog_id) blogs,MAX(p.published_at) lastmod
+ FROM topic_article_evidence e JOIN posts p ON p.id=e.post_id JOIN blogs b ON b.id=p.blog_id JOIN topic_pages t ON t.canonical_id=e.canonical_id
+ WHERE ${ids ? 'e.canonical_id IN (?) AND ' : ''}${historyPublicEvidenceSql} AND t.state IN ('active','pending') AND ${historyPublicTopicSql('t')}
+ GROUP BY e.canonical_id,t.label`,
     ids ? [ids] : [],
   );
   return rows.filter((row) => !exclusionReason(row.label));
 }
-export async function getPageIndexability(pool: Pool, kind: PublicPageKind, entityId: string): Promise<PageIndexability> {
+/** `disposition` is this request's own read of the same entity; it is never kept between requests. */
+export async function getPageIndexability(
+  pool: Pool,
+  kind: PublicPageKind,
+  entityId: string,
+  disposition?: TopicHistoryDisposition,
+): Promise<PageIndexability> {
   if (kind !== 'topic' || !historyReadsEnabled()) return store(pool).page(kind, entityId);
-  const disposition = await topicHistoryDisposition(pool, entityId);
+  disposition ??= await topicHistoryDisposition(pool, entityId);
   const [counts] = disposition.status === 'available' ? await cumulativeTopics(pool, [disposition.canonicalId]) : [];
   return {
     indexable: disposition.status === 'available',

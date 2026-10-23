@@ -4,7 +4,7 @@ import type { Pool, PoolConnection, RowDataPacket } from 'mysql2/promise';
 import { withJobLease } from '../jobs/lease.ts';
 import { publicationHome } from '../relations/identity.ts';
 import { historyReadsEnabled } from '../topics/history-contracts.ts';
-import { historyPublicTopicSql, topicHistoryDisposition } from '../topics/history-read.ts';
+import { historyPublicTopicSql, type TopicHistoryDisposition, topicHistoryDisposition } from '../topics/history-read.ts';
 import { exclusionReason } from '../topics/policy.ts';
 import { publicationLabelSql } from '../topics/publication-noise.ts';
 import { SOURCE } from '../topics/snapshot-client.ts';
@@ -105,10 +105,16 @@ export async function getPublicPages(pool: Pool, kind: PublicPageKind, entityIds
   );
   return new Map(rows.filter((r) => isPublicRouteKey(kind, r.canonical_key)).map((r) => [String(r.entity_id), publicPage(kind, r)]));
 }
-export async function resolvePublicPage(pool: Pool, kind: PublicPageKind, key: string): Promise<PublicPage | null> {
+/** `disposition` is the caller's read of this same key in this request; it is never kept between requests. */
+export async function resolvePublicPage(
+  pool: Pool,
+  kind: PublicPageKind,
+  key: string,
+  disposition?: TopicHistoryDisposition,
+): Promise<PublicPage | null> {
   if (!isPublicRouteKey(kind, key)) return null;
   if (kind === 'topic' && historyReadsEnabled()) {
-    const result = await topicHistoryDisposition(pool, key);
+    const result = disposition ?? (await topicHistoryDisposition(pool, key));
     if (result.status !== 'available') return null;
     return (await getPublicPages(pool, kind, [result.canonicalId])).get(result.canonicalId) ?? null;
   }

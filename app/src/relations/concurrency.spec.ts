@@ -19,7 +19,7 @@ function fixture(hold: 'last-query-once' | 'all-edge-reads' = 'last-query-once')
         throw Error('synthetic_query_failure');
       }
       if (sql.startsWith('SELECT revision')) return [[{ revision }]];
-      if (sql.startsWith('SELECT e.*') || sql.startsWith('SELECT l.source_blog_id')) {
+      if (sql.startsWith('SELECT e.*') || sql.startsWith('SELECT DISTINCT l.source_blog_id')) {
         if (hold === 'all-edge-reads') {
           entered.resolve();
           await release.promise;

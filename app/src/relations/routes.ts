@@ -217,28 +217,75 @@ export async function loadRelationCoverage(
   };
 }
 
-export async function loadRelations(pool: Pool, days = 90, now = new Date()): Promise<RelationDTO> {
+/** One public body link from an article to another collected blog: the unit the relation map counts. */
+export type RelationPair = { sourceBlogId: number; targetBlogId: number; postId: number; publishedAt: unknown };
+/**
+ * Every public (article, target blog) pair in the window, or only those of `postIds`. Re-reading a stored map's
+ * articles drops every pair that is no longer public: a blog that left verified, a deleted or re-dated article,
+ * a link gone from the re-read body, an observation pending reparse, an admin hide.
+ */
+export async function loadRelationPairs(pool: Pool, days: number, now: Date, postIds?: number[]): Promise<RelationPair[]> {
+  if (postIds && !postIds.length) return [];
   const cutoff = new Date(now.getTime() - days * 86400000);
-  // Window functions run before LIMIT: a capped graph never changes the share denominator.
-  const [rawEdges] = await pool.query<RowDataPacket[]>(
-    `SELECT l.source_blog_id sourceBlogId,l.target_blog_id targetBlogId,COUNT(DISTINCT l.source_post_id) count,
-    SUM(COUNT(DISTINCT l.source_post_id)) OVER (PARTITION BY l.source_blog_id) denominator,
-    MIN(p.published_at) firstMentionAt,MAX(p.published_at) lastMentionAt
+  const [rows] = await pool.query<RowDataPacket[]>(
+    `SELECT DISTINCT l.source_blog_id sourceBlogId,l.target_blog_id targetBlogId,l.source_post_id postId,p.published_at publishedAt
     FROM relation_links l JOIN posts p ON p.id=l.source_post_id JOIN blogs a ON a.id=l.source_blog_id JOIN blogs b ON b.id=l.target_blog_id
     JOIN relation_observations o ON o.post_id=l.source_post_id
     WHERE ${PUBLIC_RELATION} AND l.location='body' AND l.target_blog_id IS NOT NULL AND l.source_blog_id<>l.target_blog_id
     AND a.status='verified' AND b.status='verified' AND o.last_success_at IS NOT NULL AND p.published_at>=? AND p.published_at<=?
-    GROUP BY l.source_blog_id,l.target_blog_id ORDER BY count DESC,l.source_blog_id,l.target_blog_id LIMIT 10001`,
-    [cutoff, now],
+    ${postIds ? 'AND l.source_post_id IN (?)' : ''}`,
+    postIds ? [cutoff, now, postIds] : [cutoff, now],
+  );
+  return rows.map((r) => ({
+    sourceBlogId: Number(r.sourceBlogId),
+    targetBlogId: Number(r.targetBlogId),
+    postId: Number(r.postId),
+    publishedAt: r.publishedAt,
+  }));
+}
+export async function loadRelations(pool: Pool, days = 90, now = new Date()): Promise<RelationDTO> {
+  const pairs = await loadRelationPairs(pool, days, now);
+  return projectRelationMap(pool, days, now, pairs, await loadRelationCoverage(pool));
+}
+/** The relation map of a set of public pairs; blog names are read now, verified only. */
+export async function projectRelationMap(
+  pool: Pool,
+  days: number,
+  generatedAt: Date,
+  publicPairs: RelationPair[],
+  coverage: Awaited<ReturnType<typeof loadRelationCoverage>>,
+): Promise<RelationDTO> {
+  // Per edge: distinct articles, first/last article date. The share denominator counts every edge of the source
+  // blog before the 10,000-edge cap, so a capped graph never changes it.
+  const grouped = new Map<string, { sourceBlogId: number; targetBlogId: number; posts: Set<number>; first: number; last: number }>();
+  for (const pair of publicPairs) {
+    const key = `${pair.sourceBlogId}:${pair.targetBlogId}`;
+    const at = new Date(pair.publishedAt as Date).getTime();
+    const edge = grouped.get(key) ?? {
+      sourceBlogId: pair.sourceBlogId,
+      targetBlogId: pair.targetBlogId,
+      posts: new Set(),
+      first: at,
+      last: at,
+    };
+    edge.posts.add(pair.postId);
+    edge.first = Math.min(edge.first, at);
+    edge.last = Math.max(edge.last, at);
+    grouped.set(key, edge);
+  }
+  const denominators = new Map<number, number>();
+  for (const edge of grouped.values()) denominators.set(edge.sourceBlogId, (denominators.get(edge.sourceBlogId) ?? 0) + edge.posts.size);
+  const rawEdges = [...grouped.values()].sort(
+    (a, b) => b.posts.size - a.posts.size || a.sourceBlogId - b.sourceBlogId || a.targetBlogId - b.targetBlogId,
   );
   const allEdges = projectRelations(
     rawEdges.slice(0, 10000).map((r) => ({
-      sourceBlogId: Number(r.sourceBlogId),
-      targetBlogId: Number(r.targetBlogId),
-      count: Number(r.count),
-      denominator: Number(r.denominator),
-      firstMentionAt: r.firstMentionAt,
-      lastMentionAt: r.lastMentionAt,
+      sourceBlogId: r.sourceBlogId,
+      targetBlogId: r.targetBlogId,
+      count: r.posts.size,
+      denominator: denominators.get(r.sourceBlogId),
+      firstMentionAt: new Date(r.first),
+      lastMentionAt: new Date(r.last),
     })),
   );
   const ranks = new Map<number, { blogId: number; mentions: number; incomingBlogs: number }>();
@@ -282,10 +329,9 @@ export async function loadRelations(pool: Pool, days = 90, now = new Date()): Pr
     ? await pool.query<RowDataPacket[]>("SELECT id,slug,name FROM blogs WHERE id IN (?) AND status='verified'", [[...nodeIds]])
     : [[]];
   const icons = await iconManifest();
-  const coverage = await loadRelationCoverage(pool);
   return {
     days,
-    generatedAt: now.toISOString(),
+    generatedAt: generatedAt.toISOString(),
     nodes: nodes.map((r) => ({ id: Number(r.id), slug: r.slug, name: r.name, iconUrl: iconUrl(r.slug, icons) })),
     edges,
     mostMentioned,
@@ -312,8 +358,18 @@ export async function registerRelationRoutes(app: FastifyInstance, pool: Pool, {
   app.addHook('onClose', async () => {
     snapshots.delete(snapshot);
   });
-  // The relation map: one live read per period every few minutes, shared by every visitor (shared-snapshot.ts).
-  const read = (days: number) => snapshot.get(`relations:${days}`, () => readPublicRelations(pool, days));
+  // The relation map: its pairs and the site-wide coverage counts are read once per period every few minutes and
+  // shared by every visitor (shared-snapshot.ts). Each request re-reads those pairs' articles and draws the map from
+  // the ones still public, so a withdrawn blog, article or link is gone from the next response; only additions wait
+  // for the next read.
+  const read = async (days: number) => {
+    const basis = (await snapshot.get(`relations:${days}`, () => readRelationBasis(pool, days))) as RelationBasis;
+    return cachedProjection(pool, `live:${days}`, 0, async () => {
+      const now = new Date();
+      const pairs = await loadRelationPairs(pool, days, now, [...new Set(basis.pairs.map((p) => p.postId))]);
+      return projectRelationMap(pool, days, basis.generatedAt, pairs, basis.coverage);
+    });
+  };
   app.get('/api/relations', async (request, reply) => {
     const days = relationDays((request.query as { days?: unknown }).days);
     if (days === null) return reply.code(400).send({ error: 'invalid_days' });
@@ -473,6 +529,21 @@ export function readBlogRelations(pool: Pool, blog: { id: number }, days: number
   });
 }
 
+type RelationBasis = { generatedAt: Date; pairs: RelationPair[]; coverage: Awaited<ReturnType<typeof loadRelationCoverage>> };
+/** The shared part of the map, read under the same admin-revision fence as readRelationSnapshot. */
+function readRelationBasis(pool: Pool, days: number): Promise<RelationBasis> {
+  return cachedProjection(pool, `basis:${days}`, 300000, async () => {
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const [[before]] = await pool.query<RowDataPacket[]>('SELECT revision FROM relation_projection_state WHERE id=1');
+      const generatedAt = new Date();
+      const pairs = await loadRelationPairs(pool, days, generatedAt);
+      const coverage = await loadRelationCoverage(pool);
+      const [[after]] = await pool.query<RowDataPacket[]>('SELECT revision FROM relation_projection_state WHERE id=1');
+      if (Number(before?.revision ?? 0) === Number(after?.revision ?? 0)) return { generatedAt, pairs, coverage };
+    }
+    throw Error('relation_projection_changed');
+  });
+}
 export function readPublicRelations(pool: Pool, days: number) {
   return cachedProjection(pool, `global:${days}`, 300000, () => readRelationSnapshot(pool, days));
 }

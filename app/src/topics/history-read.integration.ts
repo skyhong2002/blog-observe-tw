@@ -7,7 +7,7 @@ import { registerPageApi } from '../seo/page-api.ts';
 import { getPublicPages, resolvePublicPage } from '../seo/page-routes.ts';
 import { createPublicPageRedirect } from '../seo/redirects.ts';
 import { sitemapBlogs, sitemapTopics } from '../seo/sitemap-entries.ts';
-import { durableTopicDetail, readTopicHistory, topicHistoryDisposition } from './history-read.ts';
+import { durableTopicDetail, historyEvidenceSql, readTopicHistory, topicHistoryDisposition } from './history-read.ts';
 import { digest, MATCHER_VERSION } from './policy.ts';
 
 export async function runTopicHistoryReadIntegration(pool: Pool) {
@@ -79,6 +79,7 @@ export async function runTopicHistoryReadIntegration(pool: Pool) {
           [ids[i], post, 'title', i === 1 ? 'revoked' : 'confirmed', snapshot, postHash, MATCHER_VERSION, now, now, now, oldDate],
         );
     }
+    await countsMatchEvidenceDefinition(pool, app, run, now);
     // No current-snapshot term exists for these IDs. One old article on one blog is enough.
     assert.equal((await topicHistoryDisposition(pool, ids[0])).status, 'available');
     const detail = await durableTopicDetail(pool, `tag:${ids[0]}`, 30, now);
@@ -157,5 +158,98 @@ export async function runTopicHistoryReadIntegration(pool: Pool) {
     if (blog) await pool.query('DELETE FROM blogs WHERE id=?', [blog]);
     if (oldFlag === undefined) delete process.env.BLOG_TOPIC_HISTORY_READ_ENABLED;
     else process.env.BLOG_TOPIC_HISTORY_READ_ENABLED = oldFlag;
+  }
+}
+
+/**
+ * Topic page counts read without the body tables equal the historyEvidenceSql definition (which joins them for
+ * freshness): one row per public article, pending included, duplicates/unverified/future/revoked out; a withdrawal
+ * answers 410 on the next metadata request.
+ */
+async function countsMatchEvidenceDefinition(pool: Pool, app: ReturnType<typeof Fastify>, run: string, now: Date) {
+  const key = `history-counts-${run.slice(0, 8)}`,
+    id = digest(key),
+    hash = digest(`${run}-counts`),
+    day = (n: number) => new Date(now.getTime() + n * 86400_000);
+  const blogs: number[] = [],
+    posts: number[] = [];
+  try {
+    for (const status of ['verified', 'verified', 'seed']) {
+      const [b] = await pool.execute<ResultSetHeader>('INSERT INTO blogs(slug,name,url,status,discovered_at) VALUES(?,?,?,?,?)', [
+        `history-counts-${blogs.length}-${run}`,
+        run,
+        `https://counts-${blogs.length}.example/`,
+        status,
+        now,
+      ]);
+      blogs.push(b.insertId);
+    }
+    // [blog, published offset in days, evidence rows]
+    const fixture: [number, number, [string, string][]][] = [
+      [
+        0,
+        -30,
+        [
+          ['title', 'confirmed'],
+          ['body', 'confirmed'],
+        ],
+      ],
+      [0, -20, [['body', 'pending']]],
+      [1, -10, [['title', 'confirmed']]],
+      [2, -5, [['title', 'confirmed']]],
+      [0, 3, [['title', 'confirmed']]],
+      [1, -1, [['body', 'revoked']]],
+    ];
+    for (const [i, [blog, offset, evidence]] of fixture.entries()) {
+      const [p] = await pool.execute<ResultSetHeader>(
+        'INSERT INTO posts(blog_id,guid,url,title,content_hash,published_at,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?)',
+        [blogs[blog], `${run}-counts-${i}`, `https://counts.example/${run}/${i}`, `計數文章${i}`, hash, day(offset), now, now],
+      );
+      posts.push(p.insertId);
+      for (const [source, state] of evidence)
+        await pool.execute(
+          'INSERT INTO topic_article_evidence(canonical_id,post_id,source,state,source_snapshot_id,post_hash,body_hash,matcher_version,first_observed_at,last_observed_at,checked_at,published_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)',
+          [id, p.insertId, source, state, run, hash, hash, MATCHER_VERSION, now, now, now, day(offset)],
+        );
+    }
+    await pool.execute(
+      "INSERT INTO content_post_bodies(post_id,blog_id,body_text,content_hash,completeness,status,source_kind,source_url,article_url,adapter_id,adapter_version,rule_revision,obtained_at,next_attempt_at,last_attempt_at,coverage) VALUES(?,?,'正文',?,'full','ok','feed','u','u','a','1',1,?,?,?,'full')",
+      [posts[0], blogs[0], hash, now, now, now],
+    );
+    await pool.execute(
+      'INSERT INTO topic_pages(canonical_id,label,normalized_label,state,merged_into,first_snapshot_id,last_snapshot_id,first_observed_at,last_observed_at,last_article_at,updated_at) VALUES(?,?,?,?,NULL,?,?,?,?,?,?)',
+      [id, key, key, 'active', run, run, now, now, now, now],
+    );
+    await pool.execute("INSERT INTO public_route_keys(kind,route_key,entity_id,created_at) VALUES('topic',?,?,?)", [key, id, now]);
+    await pool.execute("INSERT INTO public_page_routes(kind,entity_id,canonical_key,created_at) VALUES('topic',?,?,?)", [id, key, now]);
+
+    const [[definition]] = await pool.query<RowDataPacket[]>(
+      `WITH ${historyEvidenceSql()} SELECT COUNT(*) posts,COUNT(DISTINCT blog_id) blogs,MAX(published_at) lastmod,SUM(fresh=1) fresh FROM historical`,
+      [id],
+    );
+    assert.deepEqual([Number(definition.posts), Number(definition.blogs), Number(definition.fresh)], [3, 2, 2]);
+    const counts = await getPageIndexability(pool, 'topic', id);
+    assert.deepEqual([counts.posts, counts.blogs, counts.indexable], [3, 2, true]);
+    const listed = (await getPageMetadata(pool, 'topic', [id])).get(id);
+    assert.deepEqual([listed?.posts, listed?.blogs], [3, 2]);
+    const site = (await getIndexablePages(pool, 'topic')).find((p) => p.entityId === id);
+    assert.equal(new Date(site?.lastmod as Date).toISOString(), new Date(definition.lastmod).toISOString());
+    const api = await app.inject(`/api/pages/topics/${key}`);
+    assert.equal(api.statusCode, 200);
+    assert.deepEqual([api.json().page.posts, api.json().page.blogs, api.json().page.entityId], [3, 2, id]);
+
+    await pool.execute("UPDATE topic_article_evidence SET state='revoked' WHERE canonical_id=?", [id]);
+    const withdrawn = await app.inject(`/api/pages/topics/${key}`);
+    assert.equal(withdrawn.statusCode, 410, 'a withdrawal is visible on the next metadata request');
+    assert.equal(withdrawn.headers['cache-control'], 'no-store');
+    assert.equal((await getPageIndexability(pool, 'topic', id)).posts, 0);
+  } finally {
+    for (const table of ['public_page_routes', 'public_route_keys'])
+      await pool.query(`DELETE FROM ${table} WHERE kind='topic' AND entity_id=?`, [id]);
+    await pool.query('DELETE FROM topic_article_evidence WHERE canonical_id=?', [id]);
+    await pool.query('DELETE FROM topic_pages WHERE canonical_id=?', [id]);
+    if (posts.length) await pool.query('DELETE FROM content_post_bodies WHERE post_id IN (?)', [posts]);
+    if (posts.length) await pool.query('DELETE FROM posts WHERE id IN (?)', [posts]);
+    if (blogs.length) await pool.query('DELETE FROM blogs WHERE id IN (?)', [blogs]);
   }
 }

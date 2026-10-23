@@ -1492,6 +1492,56 @@
       "tables": [],
       "dynamic": true,
       "occurrences": 1
+    },
+    {
+      "path": "tools/rehearse-migration-0035.mjs",
+      "digest": "50373148350b72eb265ae2105407214cf2e1a65e343d0d899e21eef3649cfdbb",
+      "tables": [
+        "relation_observations"
+      ],
+      "dynamic": false,
+      "occurrences": 1
+    },
+    {
+      "path": "tools/rehearse-migration-0035.mjs",
+      "digest": "61deda78370b49f1e916bbb2f941b7d41326b3ddbe4c2e3577b318593cbf1519",
+      "tables": [
+        "content_post_bodies"
+      ],
+      "dynamic": false,
+      "occurrences": 1
+    },
+    {
+      "path": "tools/rehearse-migration-0035.mjs",
+      "digest": "e3a97d0993e527225fb2d3430368ef881966573dee26f0452f3ce66d9496f7b9",
+      "tables": [],
+      "dynamic": true,
+      "occurrences": 2
+    },
+    {
+      "path": "tools/rehearse-migration-0035.mjs",
+      "digest": "fdbfab6799c0c35cf71d1de2aba9c8076ed507009c1806b8813b31ca494deabb",
+      "tables": [
+        "posts"
+      ],
+      "dynamic": false,
+      "occurrences": 1
+    },
+    {
+      "path": "tools/rehearse-migration-0035.mjs",
+      "digest": "ff69a7f63b9b98a92dafdfd6c6e2a72b19cb53263cad73eb01586f2dbfd870ce",
+      "tables": [
+        "blogs"
+      ],
+      "dynamic": false,
+      "occurrences": 1
+    },
+    {
+      "path": "tools/seo/measure-topic-metadata.ts",
+      "digest": "f4d831a5f2559a32676ce82e7ce29a0fd0ee467d61d06d60944af208e6fa7469",
+      "tables": [],
+      "dynamic": true,
+      "occurrences": 1
     }
   ],
   "canPublish": false,

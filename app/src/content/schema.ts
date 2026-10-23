@@ -52,6 +52,8 @@ export const contentPostBodies = mysqlTable(
     index('content_bodies_due').on(t.nextAttemptAt, t.postId),
     index('content_bodies_blog').on(t.blogId, t.status),
     index('content_bodies_schedule').on(t.postId, t.adapterVersion, t.sourceKind, t.status),
+    // Body freshness reads only status/hash: index-only instead of one wide clustered row per article.
+    index('content_bodies_hash').on(t.postId, t.blogId, t.status, t.contentHash),
   ],
 );
 export const contentAttempts = mysqlTable(

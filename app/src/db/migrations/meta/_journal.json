@@ -246,6 +246,13 @@
       "when": 1792529145659,
       "tag": "0034_blog_site_observations",
       "breakpoints": true
+    },
+    {
+      "idx": 35,
+      "version": "5",
+      "when": 1792756266204,
+      "tag": "0035_body_hash_covering_indexes",
+      "breakpoints": true
     }
   ]
 }
