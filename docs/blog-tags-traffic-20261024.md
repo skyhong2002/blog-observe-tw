@@ -23,7 +23,7 @@
 
 ## 上線紀錄
 
-2026-10-24 06:4x（台北時間）gen102 blue `46a2cd7`，前一版 gen101 green `e40f2b2` 保留為回滾。worker 沒有移動（這版沒有改 worker 會跑的程式），仍在 `98-release-e40f2b2.conf`。
+2026-10-24 06:24（台北時間）gen102 blue `46a2cd7`，前一版 gen101 green `e40f2b2` 保留為回滾。worker 沒有移動（這版沒有改 worker 會跑的程式），仍在 `98-release-e40f2b2.conf`。
 
 - 上線前在乾淨 source worktree 跑完整 vitest（157 檔 1573 項）、web node test 249 項、render spec 208 項、兩個 tsc 全過；改到的檔案 biome 無錯（HEAD 本來就有 40 個檔案 lint 錯，與這次無關）。
 - 切換前重跑 traffic `tools/import-blog-tags.ts`：876 筆 AI 初判、3 票，沒有新列（舊表最後異動 2026-10-19 22:41 UTC，917 筆 assignment、3 票）。
