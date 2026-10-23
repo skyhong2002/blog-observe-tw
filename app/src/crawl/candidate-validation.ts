@@ -1,6 +1,6 @@
 import * as cheerio from 'cheerio';
 import { XMLParser, XMLValidator } from 'fast-xml-parser';
-import { type PersonalEvidence, personalHomepage } from '../ai/personal.ts';
+import { type PersonalEvidence, personalAboutPage, personalHomepage } from '../ai/personal.ts';
 import { type SitemapArticleEvidence, verifyArticleSitemap } from '../ai/publication-sitemap.ts';
 import { identityKey, publicationDecision } from '../relations/identity.ts';
 import { CHINESE_ONLY_LISTINGS, chineseContent, listingOf } from './directory-listing.ts';
@@ -144,6 +144,29 @@ export function candidateIdentityConfirmed(
     normalized(feedTitle).includes(identity)
   );
 }
+const ABOUT_PATH = /^\/(?:about(?:[-_]?me)?|關於(?:我)?)\/?$/i;
+const ABOUT_TEXT = /^(?:about(?: me)?|關於(?:我|本站)?)$/i;
+/** The home's own about page: a same-publication link at /about/, /about-me/, /關於我/ or labelled About / 關於我. */
+export function aboutPageUrl(html: string, home: string): string | null {
+  const $ = cheerio.load(html);
+  for (const el of $('a[href]').toArray()) {
+    try {
+      const url = new URL($(el).attr('href') || '', home);
+      url.hash = '';
+      let path = url.pathname;
+      try {
+        path = decodeURIComponent(path);
+      } catch {}
+      const named = ABOUT_PATH.test(path) || ABOUT_TEXT.test($(el).text().replace(/\s+/g, ' ').trim());
+      if (named && !url.search && url.href !== new URL(home).href && publicationContains(url.href, home)) return url.href;
+    } catch {}
+  }
+  return null;
+}
+/** The homepage itself named this source (head link or RSS button), as recorded by validateSeedUrl. */
+export function advertisedSource(verification: Pick<SeedUrlValidation, 'evidence'>, url: string): boolean {
+  return verification.evidence.sourceChecks.some((c) => c.advertised === true && (c.finalUrl || c.url) === url);
+}
 export function publicationContains(value: string, home: string): boolean {
   try {
     if (!isAllowedCrawlUrl(value)) return false;
@@ -174,6 +197,24 @@ export async function validateCandidate(candidate: DiscoveryCandidate, options: 
   const mayEnrich = ['article-link', 'blogroll', 'reader-suggestion'].includes(candidate.source_type) || Boolean(listed);
   const personal = () => result.personalEvidence?.personal === true || Boolean(listed);
   const personalReason = (verified: string) => (result.personalEvidence?.personal === true ? verified : `${verified}_directory_listed`);
+  // A homepage that proves nothing (Blowfish's profile home: a name and a one-line title) may introduce its owner on
+  // its own about page: one more same-publication request, made only once a feed or article sitemap is found.
+  let aboutUrl: string | null = null;
+  const aboutProof = async (home: string) => {
+    if (personal() || result.personalEvidence?.reason !== 'personal_identity_uncertain' || !aboutUrl) return;
+    if (!publicationContains(aboutUrl, home)) return;
+    try {
+      const page = await politeFetch(aboutUrl, {}, options);
+      if (!page.ok) {
+        await page.body?.cancel();
+        return;
+      }
+      const about = personalAboutPage(await readFeedBody(page));
+      if (about.personal) result.personalEvidence = { ...about, page: aboutUrl };
+    } catch {
+      // The homepage evidence stands; the about page is only a second chance.
+    }
+  };
   if (result.reason !== 'unverified' && !(mayEnrich && result.reason === 'missing_identity_name')) return result;
   try {
     const home = await politeFetch(candidate.url, {}, options);
@@ -195,6 +236,7 @@ export async function validateCandidate(candidate: DiscoveryCandidate, options: 
     }
     const observed = personalHomepage(html);
     result.personalEvidence = observed.evidence;
+    aboutUrl = aboutPageUrl(html, home.url || candidate.url);
     if (mayEnrich && !observed.siteName) {
       result.reason = 'missing_identity_name';
       return result;
@@ -245,6 +287,7 @@ export async function validateCandidate(candidate: DiscoveryCandidate, options: 
         return result;
       }
       result.sitemapArticles = articles;
+      await aboutProof(verification.finalUrl);
       result.feed = {
         url: source.url,
         type: 'sitemap',
@@ -291,14 +334,16 @@ export async function validateCandidate(candidate: DiscoveryCandidate, options: 
           ? [String(object(l)['@_href'])]
           : [],
     );
-    // The feed names the publication home. For a home listed by BlogBlog.Club, a blog section of that same home
-    // (wiwi.blog's feed names https://wiwi.blog/blog) also counts; any other home's category feed still does not.
+    // The feed names the publication home. A blog section of that same home (wiwi.blog's feed names
+    // https://wiwi.blog/blog, a Hugo /posts/index.xml names /posts/) also counts when BlogBlog.Club lists the home or
+    // the homepage itself links that feed; a category feed the homepage never names still does not.
+    const sectionAllowed = Boolean(listed) || advertisedSource(verification, source.url);
     const identity = identities.find((u) => {
       try {
         const href = new URL(u, source.url).href;
         return (
           seedIdentityKey(href) === seedIdentityKey(verification.finalUrl!) ||
-          (Boolean(listed) && publicationContains(href, verification.finalUrl!))
+          (sectionAllowed && publicationContains(href, verification.finalUrl!))
         );
       } catch {
         return false;
@@ -338,6 +383,7 @@ export async function validateCandidate(candidate: DiscoveryCandidate, options: 
       entries: entries.length,
       sample: entries.slice(0, 3).map((e) => e.url),
     };
+    await aboutProof(verification.finalUrl);
     result.eligible = personal();
     result.reason = result.eligible
       ? personalReason('verified_homepage_and_rss')

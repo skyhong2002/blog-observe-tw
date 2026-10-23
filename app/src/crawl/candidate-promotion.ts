@@ -6,6 +6,7 @@ import { aiPersonalProof, deterministicPersonalProof } from '../ai/personal.ts';
 import { reserveBudgetOnConnection } from '../jobs/budget.ts';
 import { activateScraperOnConnection } from '../scrapers/store.ts';
 import {
+  advertisedSource,
   CANDIDATE_POLICY,
   type CandidateCheck,
   candidateIdentityConfirmed,
@@ -174,8 +175,10 @@ export async function recordCandidateCheck(
         check.feed.entries < 1 ||
         !check.feed.sample.length ||
         check.feed.sample.some((u) => !publicationContains(u, v.finalUrl!)) ||
-        // A BlogBlog.Club-listed home may name its blog section (wiwi.blog/blog) as the feed's home; see validateCandidate.
-        (safeKey(check.feed.identityUrl) !== safeKey(v.finalUrl) && !(listed && publicationContains(check.feed.identityUrl, v.finalUrl)))
+        // A blog section (wiwi.blog/blog, Hugo /posts/) may stand for the home when BlogBlog.Club lists the home or the
+        // homepage links that feed; see validateCandidate.
+        (safeKey(check.feed.identityUrl) !== safeKey(v.finalUrl) &&
+          !((listed || advertisedSource(v, check.feed.url)) && publicationContains(check.feed.identityUrl, v.finalUrl)))
       ) {
         decline('publication_rss_evidence_invalid');
         break admission;

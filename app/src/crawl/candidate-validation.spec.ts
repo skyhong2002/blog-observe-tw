@@ -1,5 +1,11 @@
 import { describe, expect, it, vi } from 'vitest';
-import { candidatePreflight, type DiscoveryCandidate, publicationContains, validateCandidate } from './candidate-validation.ts';
+import {
+  aboutPageUrl,
+  candidatePreflight,
+  type DiscoveryCandidate,
+  publicationContains,
+  validateCandidate,
+} from './candidate-validation.ts';
 
 const home = 'https://quill.test/',
   feed = home + 'feed/';
@@ -86,7 +92,9 @@ describe('automatic discovery verification', () => {
     expect(opts.fetcher).not.toHaveBeenCalled();
   });
   it('requires feed home identity and matching feed name', async () => {
-    expect((await validateCandidate(candidate, options(rss(home + 'category')))).reason).toBe('feed_home_identity_mismatch');
+    // A category feed the homepage never links (found at the guessed /feed/) does not stand for the home.
+    const unlinked = homepage.replace(/<link[^>]*>/, '');
+    expect((await validateCandidate(candidate, options(rss(home + 'category'), unlinked))).reason).toBe('feed_home_identity_mismatch');
     expect((await validateCandidate(candidate, options(rss(home, 'Another publication')))).reason).toBe('feed_name_identity_mismatch');
   });
   it('does not approve a syndicated or mixed-author feed', async () => {
@@ -153,8 +161,9 @@ describe('automatic discovery verification', () => {
       reason: 'verified_homepage_and_rss_directory_listed',
       feed: { identityUrl: `${home}blog` },
     });
-    // Not listed: a section or category feed still does not stand for the home.
-    expect((await validateCandidate({ ...candidate, name: 'Quill.Test' }, options(section, plain))).reason).toBe(
+    // Not listed and not linked from the homepage: a section or category feed still does not stand for the home.
+    const unlinked = plain.replace(/<link[^>]*>/, '');
+    expect((await validateCandidate({ ...candidate, name: 'Quill.Test' }, options(section, unlinked))).reason).toBe(
       'feed_home_identity_mismatch',
     );
     // A section on another host never counts, nor a feed that does not name the domain.
@@ -204,4 +213,74 @@ it('admits exact personal platform homes without collapsing owners or accepting 
   expect(
     publicationContains('https://home.gamer.com.tw/creation.php?owner=bob', 'https://home.gamer.com.tw/homeindex.php?owner=alice'),
   ).toBe(false);
+});
+
+describe('a Hugo Blowfish profile home (april-aries.github.io)', () => {
+  const site = 'https://aries.test/';
+  const empty = `<rss version="2.0"><channel><title>Aries Blog</title><link>${site}</link></channel></rss>`;
+  const posts = `<rss version="2.0"><channel><title>Blog Posts on Aries Blog</title><link>${site}posts/</link><item><title>CTF notes</title><link>${site}posts/ctf/</link><guid>${site}posts/ctf/</guid><pubDate>Mon, 26 Jan 2026 00:00:00 GMT</pubDate></item></channel></rss>`;
+  // The head advertises the empty home feed; the real feed is only an RSS button; the bio is a title, not first person.
+  const profile = `<html><head><title>Aries Blog</title><link rel="alternate" type="application/rss+xml" href="/index.xml"></head><body><nav><a href="/about/">About</a><a href="/posts/">Posts</a><a href="${site}posts/index.xml">RSS</a></nav><article><h1>Aries</h1><h2>A master student, passionate educator and future hacker</h2></article></body></html>`;
+  const about = (intro: string) =>
+    `<html><head><title>About Me · Aries Blog</title></head><body><article><header><h1>About Me</h1><p>Currently a master student</p></header><div class="article-content"><p>${intro}</p><h2>學歷</h2><p>我在某某公司實習，我們團隊很好</p></div></article></body></html>`;
+  const firstPerson = '歡迎來到這個小世界，我是 Aries，因為我是四月生的牡羊。這個網站會放上一些個人生活紀錄，歡迎對我有興趣的人來看看。';
+  const siteOptions = (routes: Record<string, string>) => ({
+    delayMs: 250,
+    resolveHost: async () => ['93.184.216.34'],
+    fetcher: vi.fn(async (input: Parameters<typeof fetch>[0]) => {
+      const u = String(input);
+      if (u.endsWith('/robots.txt')) return new Response('User-agent: *\nAllow: /');
+      const body = routes[u];
+      if (body === undefined) return new Response(null, { status: 404 });
+      return new Response(body, { headers: { 'content-type': body.startsWith('<html') ? 'text/html' : 'application/rss+xml' } });
+    }),
+  });
+  const suggested: DiscoveryCandidate = { id: 7, url: site, name: null, status: 'candidate', source_type: 'reader-suggestion' };
+  const routes = { [site]: profile, [`${site}index.xml`]: empty, [`${site}posts/index.xml`]: posts };
+
+  it('skips the empty home feed for the linked section feed and proves the owner on the about page', async () => {
+    const check = await validateCandidate(suggested, siteOptions({ ...routes, [`${site}about/`]: about(firstPerson) }));
+    expect(check).toMatchObject({
+      eligible: true,
+      reason: 'verified_homepage_and_rss',
+      feed: { url: `${site}posts/index.xml`, identityUrl: `${site}posts/`, entries: 1 },
+      personalEvidence: { method: 'deterministic', personal: true, reason: 'about_page_first_person_introduction', page: `${site}about/` },
+    });
+    // The snippet is the opening introduction only, never the résumé after the first heading.
+    expect(check.personalEvidence?.identitySnippet).toContain('我是 Aries');
+    expect(check.personalEvidence?.identitySnippet).not.toContain('實習');
+    expect(check.verification?.evidence.sourceChecks.map((c) => [c.url, c.reason, c.advertised])).toEqual([
+      [`${site}index.xml`, 'empty_feed', true],
+      [`${site}posts/index.xml`, 'valid_xml_source', true],
+    ]);
+  }, 20_000);
+
+  it('still refuses an about page without a first-person owner, and one written as 我們', async () => {
+    for (const intro of ['A blog about security and teaching, updated sometimes.', '我們是三個人，我和我的朋友一起寫我喜歡的東西。']) {
+      const check = await validateCandidate(suggested, siteOptions({ ...routes, [`${site}about/`]: about(intro) }));
+      expect(check.feed?.url).toBe(`${site}posts/index.xml`);
+      expect(check.eligible).toBe(false);
+      expect(check.personalEvidence?.page).toBeUndefined();
+    }
+  }, 20_000);
+
+  it('does not read the about page before a feed is found', async () => {
+    const opts = siteOptions({ [site]: profile, [`${site}index.xml`]: empty, [`${site}about/`]: about(firstPerson) });
+    const check = await validateCandidate(suggested, opts);
+    expect(check.reason).toBe('empty_feed');
+    expect(opts.fetcher.mock.calls.some(([u]) => String(u) === `${site}about/`)).toBe(false);
+  }, 20_000);
+});
+
+describe('aboutPageUrl', () => {
+  it('finds the same-publication about link by path or label, never another site', () => {
+    expect(aboutPageUrl('<a href="/about/">x</a>', 'https://a.test/')).toBe('https://a.test/about/');
+    expect(aboutPageUrl('<a href="/%E9%97%9C%E6%96%BC%E6%88%91/">x</a>', 'https://a.test/')).toBe(
+      'https://a.test/%E9%97%9C%E6%96%BC%E6%88%91/',
+    );
+    expect(aboutPageUrl('<a href="/me">關於我</a>', 'https://a.test/')).toBe('https://a.test/me');
+    expect(aboutPageUrl('<a href="https://b.test/about/">About</a>', 'https://a.test/')).toBeNull();
+    expect(aboutPageUrl('<a href="https://medium.com/@two/about">About</a>', 'https://medium.com/@one')).toBeNull();
+    expect(aboutPageUrl('<a href="/about/?ref=nav">About</a><a href="/posts/">Posts</a>', 'https://a.test/')).toBeNull();
+  });
 });

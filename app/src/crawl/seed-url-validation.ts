@@ -21,7 +21,15 @@ export type SeedUrlInput = {
   aliases?: string[];
   researchEvidence?: SeedResearchEvidence[];
 };
-export type SeedSourceCheck = { url: string; finalUrl?: string; status?: number; type?: FeedLink['type']; reason: string };
+export type SeedSourceCheck = {
+  url: string;
+  finalUrl?: string;
+  status?: number;
+  type?: FeedLink['type'];
+  reason: string;
+  /** Named by the homepage itself: a head <link> or a same-site RSS button. */
+  advertised?: true;
+};
 export type SeedUrlValidation = {
   id: number;
   inputUrl: string;
@@ -222,7 +230,10 @@ function absolute(value: string, base: string): string | null {
   }
 }
 
-function candidates(html: string, base: string): string[] {
+const FEED_BUTTON_PATH = /(?:^|\/)(?:index|feed|rss|atom)\.xml$|\/(?:feed|rss)\/?$/i;
+
+/** Sources in fetch order; `advertised` are the ones the homepage itself names (head links and RSS buttons). */
+function candidates(html: string, base: string): { urls: string[]; advertised: Set<string> } {
   const $ = cheerio.load(html);
   const result: string[] = [];
   const add = (value: string) => {
@@ -233,6 +244,15 @@ function candidates(html: string, base: string): string[] {
     const type = ($(element).attr('type') || '').toLowerCase();
     if (/rss|atom|xml/.test(type) || $(element).attr('rel') === 'sitemap') add($(element).attr('href') || '');
   });
+  // A same-site RSS button: Hugo's Blowfish theme advertises an empty home /index.xml in the head and links the real
+  // /posts/index.xml only from an <a> (april-aries.github.io).
+  $('a[href]')
+    .toArray()
+    .map((element) => absolute($(element).attr('href') || '', base))
+    .filter((href): href is string => Boolean(href && sameHost(href, base) && FEED_BUTTON_PATH.test(new URL(href).pathname)))
+    .slice(0, 4)
+    .forEach(add);
+  const advertised = new Set(result);
   // Publication paths on shared platforms must not fall back to the platform's feeds.
   const url = new URL(base);
   const rootPlatform = platformHosts.has(url.hostname.replace(/^www\./, ''));
@@ -251,13 +271,13 @@ function candidates(html: string, base: string): string[] {
     'feeds/posts/default',
   ])
     add(`${prefix}${path}`);
-  return result;
+  return { urls: result, advertised };
 }
 
 const record = (value: unknown): Record<string, unknown> | null =>
   value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : null;
 const array = (value: unknown): unknown[] => (value === undefined ? [] : Array.isArray(value) ? value : [value]);
-type SourceInfo = { type: FeedLink['type']; indexUrls?: string[]; identityUrls: string[]; comments?: boolean };
+type SourceInfo = { type: FeedLink['type']; indexUrls?: string[]; identityUrls: string[]; comments?: boolean; items?: number };
 function sourceInfo(xml: string, finalUrl: string): SourceInfo | null {
   if (/<!DOCTYPE|<!ENTITY/i.test(xml) || XMLValidator.validate(xml) !== true) return null;
   const root = record(parser.parse(xml));
@@ -274,6 +294,7 @@ function sourceInfo(xml: string, finalUrl: string): SourceInfo | null {
           : [];
       }),
       comments: /^(?:comments? (?:on|for)\b)|comments? feed|(?:留言|評論)(?:摘要|訂閱|回應|feed)/i.test(channel.title),
+      items: array(channel.item).length,
     };
   }
   const feed = record(root.feed);
@@ -286,7 +307,11 @@ function sourceInfo(xml: string, finalUrl: string): SourceInfo | null {
     const links = array(feed.link)
       .map(record)
       .filter((link) => link && (!link['@_rel'] || link['@_rel'] === 'alternate'));
-    return { type: 'atom', identityUrls: links.map((link) => String(link?.['@_href'] || '')).filter(Boolean) };
+    return {
+      type: 'atom',
+      identityUrls: links.map((link) => String(link?.['@_href'] || '')).filter(Boolean),
+      items: array(feed.entry).length,
+    };
   }
   const sitemap = record(root.urlset ?? root.sitemapindex);
   if (!sitemap) return null;
@@ -418,13 +443,23 @@ export async function validateSeedUrl(input: SeedUrlInput, options: SeedValidati
   const limit = Math.max(1, Math.min(12, Math.trunc(options.maxSourceRequests ?? 8)));
   // Research hints are only priorities, never evidence: validate their scope and XML below.
   const hints = (input.sourceUrls ?? []).slice(0, 4).filter((url) => isAllowedCrawlUrl(url) && inPublication(url, result.finalUrl!));
-  const queue = [...hints, ...candidates(html, result.finalUrl)];
+  const found = candidates(html, result.finalUrl);
+  const queue = [...hints, ...found.urls];
   const seen = new Set<string>();
+  // An item-less RSS/Atom (a Hugo theme's home feed) is used only when nothing later has articles.
+  let empty: SeedSourceCheck | null = null;
+  const accept = (check: SeedSourceCheck) => {
+    check.reason = 'valid_xml_source';
+    result.feedSources.push({ url: check.finalUrl!, type: check.type! });
+    result.validated = true;
+    result.reason = 'verified_identity_and_source';
+    return result;
+  };
   for (let index = 0; index < queue.length && seen.size < limit; index += 1) {
     const url = queue[index];
     if (seen.has(url)) continue;
     seen.add(url);
-    const check: SeedSourceCheck = { url, reason: 'fetch_failed' };
+    const check: SeedSourceCheck = { url, reason: 'fetch_failed', ...(found.advertised.has(url) ? { advertised: true } : {}) };
     result.evidence.sourceChecks.push(check);
     try {
       const response = await politeFetch(url, { accept: 'application/rss+xml,application/atom+xml,application/xml,text/xml' }, options);
@@ -461,15 +496,17 @@ export async function validateSeedUrl(input: SeedUrlInput, options: SeedValidati
         continue;
       }
       check.type = info.type;
-      check.reason = 'valid_xml_source';
-      result.feedSources.push({ url: check.finalUrl, type: info.type });
-      result.validated = true;
-      result.reason = 'verified_identity_and_source';
-      return result;
+      if (info.items === 0) {
+        check.reason = 'empty_feed';
+        empty ??= check;
+        continue;
+      }
+      return accept(check);
     } catch (error) {
       check.reason = errorCode(error);
     }
   }
+  if (empty) return accept(empty);
   result.reason = 'no_verified_feed_or_sitemap';
   return result;
 }

@@ -19,6 +19,8 @@ export type PersonalEvidence = {
   personal: boolean;
   reason: string;
   cacheKey?: string;
+  /** The home's own about page the snippet was read from; absent when it came from the homepage. */
+  page?: string;
 };
 /** Deterministic evidence must come from a site-level introduction, not a post teaching blogging. */
 export function personalHomepage(html: string) {
@@ -115,6 +117,44 @@ export function personalHomepage(html: string) {
               : 'first_person_site_introduction'
             : 'personal_identity_uncertain',
     } as PersonalEvidence,
+  };
+}
+/**
+ * A home's own about page (Hugo Blowfish's profile home shows only a name and a title; 「我是 Luke……」 is on /about/):
+ * the paragraphs of its content before the first section heading, read as one site introduction under the same
+ * first-person and organization rules. Résumé sections, comments and a page without a content region never count.
+ */
+export function personalAboutPage(html: string): PersonalEvidence {
+  const $ = cheerio.load(html);
+  $('script,style,noscript,nav,footer,header,aside,form,details').remove();
+  const root = $('[itemprop="articleBody"],.article-content,.entry-content,.post-content,article,main').first();
+  const paragraphs: string[] = [];
+  for (const el of root.find('p,h1,h2,h3,h4,h5,h6').toArray()) {
+    if (el.tagName !== 'p') {
+      if (paragraphs.length) break;
+      continue;
+    }
+    const text = $(el).text().replace(/\s+/g, ' ').trim();
+    if (text) paragraphs.push(text);
+  }
+  const intro = normalizeInput(paragraphs.join(' ')).slice(0, 1000);
+  const excluded = organizationEvidence(intro);
+  const input = ownershipInput(intro && !excluded ? [intro] : []);
+  const identitySnippet = ownershipSegments(input)!.find(ownerIntroduction);
+  const personal = Boolean(identitySnippet);
+  return {
+    method: personal ? 'deterministic' : 'unresolved',
+    input,
+    ownershipVersion: OWNERSHIP_VERSION,
+    identitySnippet,
+    personal,
+    reason: excluded
+      ? 'organization_media_or_shop_evidence'
+      : personal
+        ? selfDescription(identitySnippet!)
+          ? 'about_page_personal_self_description'
+          : 'about_page_first_person_introduction'
+        : 'personal_identity_uncertain',
   };
 }
 export function deterministicPersonalProof(e: PersonalEvidence) {

@@ -95,6 +95,28 @@ describe('seed official URL validation', () => {
     expect(result.feedSources).toEqual([{ url: `${home}index.xml`, type: 'rss' }]);
   }, 20_000);
 
+  it('passes an item-less advertised feed for a same-site RSS button, keeping the empty one as the last resort', async () => {
+    const home = 'https://blowfish-seed.example/';
+    const withItem = `<rss version="2.0"><channel><title>小林筆記</title><link>${home}posts/</link><item><title>一篇</title><link>${home}posts/a/</link></item></channel></rss>`;
+    const head = `<html><head><title>小林筆記</title><link rel="alternate" type="application/rss+xml" href="/index.xml"></head><body><a href="https://other.example/index.xml">RSS</a><a href="${home}posts/index.xml">RSS</a></body></html>`;
+    const options = {
+      ...fixture({ [home]: head, [`${home}index.xml`]: rss(home), [`${home}posts/index.xml`]: withItem }),
+      maxSourceRequests: 8,
+    };
+    const result = await validateSeedUrl({ id: 35, name: '小林筆記', url: home }, options);
+    expect(result.feedSources).toEqual([{ url: `${home}posts/index.xml`, type: 'rss' }]);
+    expect(result.evidence.sourceChecks.slice(0, 2)).toMatchObject([
+      { url: `${home}index.xml`, reason: 'empty_feed', advertised: true },
+      { url: `${home}posts/index.xml`, reason: 'valid_xml_source', advertised: true },
+    ]);
+    expect(options.fetcher.mock.calls.some(([url]) => String(url).startsWith('https://other.example/'))).toBe(false);
+    // Nothing better: the empty feed is still the verified source, as before.
+    const only = { ...fixture({ [home]: head, [`${home}index.xml`]: rss(home) }), maxSourceRequests: 8 };
+    const fallback = await validateSeedUrl({ id: 36, name: '小林筆記', url: home }, only);
+    expect(fallback.feedSources).toEqual([{ url: `${home}index.xml`, type: 'rss' }]);
+    expect(fallback.evidence.sourceChecks[0]).toMatchObject({ reason: 'valid_xml_source', type: 'rss' });
+  }, 30_000);
+
   it('accepts independently researched aliases with provenance and first-party confirmation', async () => {
     const home = 'https://researched-seed.example/';
     const result = await validateSeedUrl(
