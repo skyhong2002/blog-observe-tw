@@ -111,6 +111,14 @@ export const EMPTY: Record<PublicKind, unknown> = {
     generatedAt: '2026-10-21T00:00:00.000Z',
     items: [],
   },
+  blogMentionFeed: {
+    evidenceType: 'direct-link',
+    location: 'body',
+    limit: 20,
+    generatedAt: '2026-10-21T00:00:00.000Z',
+    items: [],
+    nextCursor: null,
+  },
   blogContent: {
     blog: { slug: 'a', name: '甲', platform: null, lastMethod: null, status: null },
     sources: [],
@@ -223,6 +231,7 @@ export const PATHS: Record<PublicKind, string> = {
   blogInference: '/api/blogs/a/inference',
   blogContent: '/api/blogs/a/content',
   blogMentions: '/api/blogs/a/mentions',
+  blogMentionFeed: '/api/blogs/a/mentions/all?cursor=2026-10-20T14%3A57%3A00.000Z_123',
   tech: '/api/tech?technology=wp-plugin%3Aelementor&status=detected&cursor=12',
   blogTech: '/api/blogs/a/tech',
   blogPage: '/api/pages/blogs/example.com',

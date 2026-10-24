@@ -2,29 +2,12 @@
 // other collected blogs that write about this blog in a sentence, as on the homepage. Body links only; nothing found
 // leaves the section out, and what blank means is said once in the footer's 引用與交流 (FooterMethod.tsx).
 import ReloadButton from '@/components/public/ReloadButton';
-import { displayTitle, taipei } from '@/lib/api';
-import { blogLink } from '@/lib/page-links';
 import { publicJsonOrNull } from '@/lib/public-api';
+import { mentionRssPath } from '@/lib/public-query';
 import { PublicGatewayError } from '@/lib/public-read';
-import { externalHref } from '@/lib/relations';
-import BlogIcon from './BlogIcon';
+import { blogPath } from '@/lib/seo';
 import Link from './NoPrefetchLink';
-
-export type ProfileMentions = {
-  days: number;
-  truncated: boolean;
-  items: Array<{
-    postId: number;
-    postTitle: string;
-    postUrl: string | null;
-    publishedAt: string | null;
-    sourceBlogSlug: string;
-    sourceBlogName: string;
-    sourceIconUrl?: string | null;
-    anchor?: string;
-    quote: string;
-  }>;
-};
+import { MentionList, type ProfileMentions } from './ProfileMentionList';
 
 const muted = 'text-zinc-500 dark:text-zinc-400';
 
@@ -57,34 +40,24 @@ export default async function BlogMentions({ slug }: { slug: string }) {
   if (!data?.items.length) return null;
   return (
     <Section>
-      <ul className="divide-y divide-zinc-200 rounded-xl border border-zinc-300 dark:divide-zinc-800 dark:border-zinc-800">
-        {data.items.map((item) => {
-          const url = externalHref(item.postUrl);
-          const title = displayTitle(item.postTitle) || '未命名文章';
-          return (
-            <li key={item.postId} className="space-y-1 px-4 py-3">
-              <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1 text-sm">
-                <Link
-                  {...blogLink(item.sourceBlogSlug)}
-                  className="inline-flex items-center gap-1.5 font-medium text-brand-700 hover:underline dark:text-brand-400"
-                >
-                  <BlogIcon media={item.sourceBlogSlug} iconUrl={item.sourceIconUrl} title={item.sourceBlogName} size={18} />
-                  {item.sourceBlogName}
-                </Link>
-                {url ? (
-                  <a href={url} target="_blank" rel="noopener noreferrer" className="min-w-0 hover:underline">
-                    〈{title}〉
-                  </a>
-                ) : (
-                  <span className="min-w-0">〈{title}〉</span>
-                )}
-                {item.publishedAt && <span className={`text-xs tabular-nums ${muted}`}>{taipei(item.publishedAt)}</span>}
-              </div>
-              {item.quote && <p className={`line-clamp-2 text-sm ${muted}`}>{item.quote}</p>}
-            </li>
-          );
-        })}
-      </ul>
+      <MentionList items={data.items} />
+      <MentionLinks slug={slug} more={data.truncated} />
     </Section>
+  );
+}
+
+/** 看全部 (when the section was cut at 10) and the RSS an author can subscribe to (app/src/relations/mention-rss.ts). */
+export function MentionLinks({ slug, more }: { slug: string; more: boolean }) {
+  return (
+    <p className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
+      {more && (
+        <Link href={`${blogPath(slug)}mentions/`} className="text-brand-700 hover:underline dark:text-brand-400">
+          看全部提到這個部落格的文章
+        </Link>
+      )}
+      <a href={mentionRssPath(slug)} className="text-brand-700 hover:underline dark:text-brand-400">
+        用 RSS 訂閱誰提到這個部落格
+      </a>
+    </p>
   );
 }

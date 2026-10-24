@@ -29,6 +29,7 @@ export const PUBLIC_KINDS = [
   'blog',
   'blogRelations',
   'blogMentions',
+  'blogMentionFeed',
   'blogTopics',
   'blogInference',
   'blogContent',
@@ -66,6 +67,8 @@ const RULES: readonly Rule[] = [
   { kind: 'blog', path: blogPath(''), query: [] },
   { kind: 'blogRelations', path: blogPath('/relations'), query: ['days'] },
   { kind: 'blogMentions', path: blogPath('/mentions'), query: [] },
+  // /blogs/<key>/mentions/: every article citing the blog, older pages by cursor (home-feed.ts loadProfileMentionFeed).
+  { kind: 'blogMentionFeed', path: blogPath('/mentions/all'), query: ['cursor'] },
   { kind: 'blogTopics', path: blogPath('/topics'), query: ['days'] },
   { kind: 'blogInference', path: blogPath('/inference'), query: [] },
   { kind: 'blogContent', path: blogPath('/content'), query: [] },

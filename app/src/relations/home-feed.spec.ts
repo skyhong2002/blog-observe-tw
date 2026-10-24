@@ -4,13 +4,20 @@ import {
   HOME_MENTIONS_SQL,
   loadHomeMentions,
   loadMentionFeed,
+  loadProfileMentionFeed,
+  loadProfileMentions,
   MENTION_FEED_AFTER_SQL,
   MENTION_FEED_PAGE,
   MENTION_FEED_SQL,
   mentionPublicUrl,
   mentionQuote,
+  PROFILE_FEED_AFTER_SQL,
+  PROFILE_FEED_PAGE,
+  PROFILE_FEED_SQL,
+  PROFILE_MENTIONS_SQL,
   parseMentionCursor,
 } from './home-feed.ts';
+import { profileMentionRss } from './mention-rss.ts';
 import { PUBLIC_RELATION } from './public-relation.ts';
 
 vi.mock('../v1/favicon-routes.ts', () => ({ iconManifest: async () => ({}) }));
@@ -185,5 +192,81 @@ describe('/mentions/ feed pages by source article', () => {
   it('rejects anything but its own cursor shape', () => {
     for (const bad of ['', '89', '2026-10-09_89', '2026-10-09T01:00:00.000Z_0', '2026-10-09T01:00:00.000Z_-1', 'x_1', 42, null])
       expect(parseMentionCursor(bad)).toBeNull();
+  });
+});
+
+describe("a blog's whole list of citing articles (/blogs/<key>/mentions/ and its RSS)", () => {
+  const at = (postId: number, publishedAt: string) => ({ ...row, postId, publishedAt });
+  const now = new Date('2026-10-21T00:00:00Z');
+  it('reads one blog with no date bound, PROFILE_FEED_PAGE articles a page, cursor at the last one', async () => {
+    const rows = Array.from({ length: PROFILE_FEED_PAGE + 1 }, (_, i) =>
+      at(100 - i, `2026-09-${String(30 - i).padStart(2, '0')}T01:00:00Z`),
+    );
+    const query = vi.fn(async () => [rows]);
+    const data = await loadProfileMentionFeed({ query } as unknown as Pool, 7, null, now);
+    expect(query).toHaveBeenCalledWith(PROFILE_FEED_SQL, [7, now, now]);
+    expect(PROFILE_FEED_SQL).toContain('l.target_blog_id=? AND p.published_at<=? AND');
+    expect(data.items).toHaveLength(PROFILE_FEED_PAGE);
+    expect(data.nextCursor).toBe(`2026-09-11T01:00:00.000Z_${100 - PROFILE_FEED_PAGE + 1}`);
+    expect(Object.keys(data.items[0])).not.toContain('context');
+  });
+  it('reads after a cursor with the same keyset as /mentions/; the last page has no cursor', async () => {
+    const query = vi.fn(async () => [[at(5, '2026-01-01T00:00:00Z')]]);
+    const cursor = parseMentionCursor('2026-09-11T01:00:00.000Z_81');
+    const data = await loadProfileMentionFeed({ query } as unknown as Pool, 7, cursor, now);
+    expect(query).toHaveBeenCalledWith(PROFILE_FEED_AFTER_SQL, [7, now, cursor?.publishedAt, cursor?.publishedAt, 81, now]);
+    expect(PROFILE_FEED_AFTER_SQL).toContain(PUBLIC_RELATION);
+    expect(data.nextCursor).toBeNull();
+  });
+  it('the blog page section keeps its year and its 10 rows', async () => {
+    const query = vi.fn(async () => [[row]]);
+    const data = await loadProfileMentions({ query } as unknown as Pool, 7, now);
+    expect(query).toHaveBeenCalledWith(PROFILE_MENTIONS_SQL, [7, new Date('2025-10-21T00:00:00Z'), now, now]);
+    expect(PROFILE_MENTIONS_SQL).toContain('LIMIT 11');
+    expect(data.items[0]).toMatchObject({ postId: 10, sourceBlogSlug: 'a', postUrl: 'https://a.example/post/' });
+  });
+  it('the RSS lists each citing article once, escaped, linked to the original, with a per-article guid', () => {
+    const feed = {
+      evidenceType: 'direct-link' as const,
+      location: 'body' as const,
+      limit: PROFILE_FEED_PAGE,
+      generatedAt: now.toISOString(),
+      nextCursor: null,
+      items: [
+        {
+          postId: 10,
+          postTitle: 'A & <B>',
+          postUrl: 'https://a.example/post/',
+          publishedAt: '2026-10-14T01:00:00.000Z',
+          sourceBlogSlug: 'a',
+          sourceBlogName: 'A 站',
+          sourceIconUrl: null,
+          targetUrl: null,
+          anchor: 'B',
+          quote: '我讀了 B 的文章。',
+        },
+        {
+          postId: 11,
+          postTitle: '',
+          postUrl: null,
+          publishedAt: null,
+          sourceBlogSlug: 'c d',
+          sourceBlogName: 'C',
+          sourceIconUrl: null,
+          targetUrl: null,
+          anchor: '',
+          quote: '',
+        },
+      ],
+    };
+    const xml = profileMentionRss(feed, { slug: 'b', name: 'B "部落格"' }, 'https://blog.observe.tw');
+    expect(xml).toContain('<title>誰提到了「B &quot;部落格&quot;」 · 部落格觀察</title>');
+    expect(xml).toContain('<link>https://blog.observe.tw/blogs/b/mentions/</link>');
+    expect(xml).toContain('href="https://blog.observe.tw/api/blogs/b/mentions.xml" rel="self"');
+    expect(xml).toContain(
+      '<item><title>A 站：A &amp; &lt;B&gt;</title><link>https://a.example/post/</link><guid isPermaLink="false">blog.observe.tw:mention:10</guid><pubDate>Wed, 14 Oct 2026 01:00:00 GMT</pubDate><description>我讀了 B 的文章。</description></item>',
+    );
+    expect(xml).toContain('<title>C：未命名文章</title><link>https://blog.observe.tw/blogs/c%20d/</link>');
+    expect(xml.match(/<item>/g)).toHaveLength(2);
   });
 });

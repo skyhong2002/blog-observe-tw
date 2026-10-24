@@ -32,7 +32,7 @@ const PRIVATE_ROUTES = [
 ];
 // Retired pages kept only as permanent redirects (/authors/ → /blogs/).
 const REDIRECT_ROUTES = ['/admin/discovery/', '/authors/'];
-const DYNAMIC_PUBLIC = ['/blogs/[slug]/', '/topics/[id]/'];
+const DYNAMIC_PUBLIC = ['/blogs/[slug]/', '/blogs/[slug]/mentions/', '/topics/[id]/'];
 
 test('every static public page has a unique title, description and trailing-slash self canonical', () => {
   const titles = new Set<string>();
@@ -62,8 +62,9 @@ test('every page route is either a known public page or a noindexed private one'
   }
   for (const route of DYNAMIC_PUBLIC) {
     const text = source(join(APP, route.slice(1), 'page.tsx'));
-    // The registry's canonicalPath (readable URL), resolved through the page API, with ordinary public metadata.
-    assert.match(text, /generateMetadata[\s\S]*pageMetadata\(\s*page\.canonicalPath,/, route);
+    // The registry's canonicalPath (readable URL), or a fixed subpage of it, resolved through the page API, with
+    // ordinary public metadata.
+    assert.match(text, /generateMetadata[\s\S]*pageMetadata\(\s*(?:page\.canonicalPath|`\$\{page\.canonicalPath\}[a-z]+\/`),/, route);
     assert.match(text, /getPublicPage\('(blog|topic)', \(await params\)\.(slug|id)\)/, route);
     assert.ok(!/decodeParam|decodeURIComponent/.test(text), `${route} never decodes the param a second time`);
     assert.ok(!/(blogPath|topicPath)\(/.test(text), `${route} uses canonicalPath, not the legacy URL`);

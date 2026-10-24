@@ -151,6 +151,11 @@ export const homeTopicsApiPath = (days: Period) => `/api/topics?days=${days}&vie
 export const relationsApiPath = (days: Period) => `/api/relations?days=${days}`;
 /** /mentions/: the newest page, or the page after `cursor` (the gateway's opaque nextCursor). */
 export const mentionsApiPath = (cursor?: string) => (cursor ? `/api/mentions?cursor=${encodeURIComponent(cursor)}` : '/api/mentions');
+/** /blogs/<key>/mentions/: the newest page of one blog's citing articles, or the page after `cursor`. */
+export const blogMentionFeedApiPath = (slug: string, cursor?: string) =>
+  `/api/blogs/${encodeURIComponent(slug)}/mentions/all${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ''}`;
+/** The RSS of the same list, for the blog's author (a file, not a page; not a public JSON read). */
+export const mentionRssPath = (slug: string) => `/api/blogs/${encodeURIComponent(slug)}/mentions.xml`;
 /** `id` is always the stable topic id (never the readable canonical path); `historyCursor` asks for the next history page. */
 export function topicApiPath(id: string, days: Period, historyCursor?: string) {
   const path = `/api/topics/${encodeURIComponent(id)}?days=${days}`;

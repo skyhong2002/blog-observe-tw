@@ -110,7 +110,7 @@ export async function buildApp(config, { logger = false, store = null } = {}) {
   });
   registerFavicons(app);
   registerSimilarwebTraffic(app, pool);
-  registerRelationRoutes(app, pool);
+  registerRelationRoutes(app, pool, { publicOrigin: config.publicOrigin });
   registerAiRoutes(app, pool);
   registerTopicRoutes(app, pool);
   registerSearchRoutes(

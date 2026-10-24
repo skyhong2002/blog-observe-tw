@@ -210,19 +210,21 @@ export async function loadMentionFeed(pool: Pool, cursor: MentionCursor | null =
 
 export const PROFILE_MENTION_LIMIT = 10;
 export const PROFILE_MENTION_DAYS = 365;
+/** Citing articles per page of a blog's whole list (/blogs/<key>/mentions/ and its RSS). */
+export const PROFILE_FEED_PAGE = 20;
 /**
- * A blog page's 最近被這些部落格提到: the newest articles of other collected blogs that write about this blog in a
- * sentence, one row per article (its first such link). The homepage's predicates (ELIGIBLE_LINK, QUOTED_LINK) over a
- * year, since most blogs are cited rarely; found through relation_links_target, so only this blog's links are read.
+ * A blog's citing articles: the newest articles of other collected blogs that write about this blog in a sentence,
+ * one row per article (its first such link). The homepage's predicates (ELIGIBLE_LINK, QUOTED_LINK); found through
+ * relation_links_target, so only this blog's links are read. `range` binds after the blog id, then ELIGIBLE_LINK's.
  */
-export const PROFILE_MENTIONS_SQL = `SET STATEMENT max_statement_time=1 FOR WITH picked AS (
+const profileMentionsSql = (range: string, rows: number) => `SET STATEMENT max_statement_time=1 FOR WITH picked AS (
  SELECT p.id postId,p.blog_id sourceBlogId,p.published_at publishedAt,MIN(l.ordinal) ordinal
  FROM relation_links l FORCE INDEX (relation_links_target)
  STRAIGHT_JOIN posts p ON p.id=l.source_post_id AND p.blog_id=l.source_blog_id
  STRAIGHT_JOIN blogs a ON a.id=l.source_blog_id STRAIGHT_JOIN blogs b ON b.id=l.target_blog_id
  STRAIGHT_JOIN relation_observations o ON o.post_id=p.id
- WHERE l.target_blog_id=? AND p.published_at>=? AND p.published_at<=? AND ${ELIGIBLE_LINK}
- GROUP BY p.id,p.blog_id,p.published_at ORDER BY p.published_at DESC,p.id DESC LIMIT ${PROFILE_MENTION_LIMIT + 1}
+ WHERE l.target_blog_id=? AND ${range} AND ${ELIGIBLE_LINK}
+ GROUP BY p.id,p.blog_id,p.published_at ORDER BY p.published_at DESC,p.id DESC LIMIT ${rows}
 )
  SELECT p.id postId,p.title postTitle,p.url postUrl,p.published_at publishedAt,
  a.id sourceBlogId,a.slug sourceBlogSlug,a.name sourceBlogName,
@@ -232,6 +234,29 @@ export const PROFILE_MENTIONS_SQL = `SET STATEMENT max_statement_time=1 FOR WITH
  STRAIGHT_JOIN relation_links l ON l.source_post_id=k.postId AND l.source_blog_id=k.sourceBlogId AND l.ordinal=k.ordinal
  STRAIGHT_JOIN blogs a ON a.id=l.source_blog_id
  ORDER BY k.publishedAt DESC,k.postId DESC`;
+/** The blog page's 最近被這些部落格提到: a year, since most blogs are cited rarely. */
+export const PROFILE_MENTIONS_SQL = profileMentionsSql('p.published_at>=? AND p.published_at<=?', PROFILE_MENTION_LIMIT + 1);
+/** The whole list, no date bound, a page at a time after a keyset cursor as on /mentions/. */
+export const PROFILE_FEED_SQL = profileMentionsSql('p.published_at<=?', PROFILE_FEED_PAGE + 1);
+export const PROFILE_FEED_AFTER_SQL = profileMentionsSql(
+  'p.published_at<=? AND (p.published_at<? OR (p.published_at=? AND p.id<?))',
+  PROFILE_FEED_PAGE + 1,
+);
+
+function profileMentionRow(r: RowDataPacket, icons: Awaited<ReturnType<typeof iconManifest>>) {
+  return {
+    postId: Number(r.postId),
+    postTitle: String(r.postTitle ?? ''),
+    postUrl: mentionPublicUrl(r.postUrl),
+    publishedAt: iso(r.publishedAt),
+    sourceBlogSlug: String(r.sourceBlogSlug),
+    sourceBlogName: String(r.sourceBlogName),
+    sourceIconUrl: iconUrl(r.sourceBlogSlug, icons),
+    targetUrl: mentionPublicUrl(r.targetUrl),
+    anchor: String(r.anchor ?? '').slice(0, 255),
+    quote: mentionQuote(String(r.context ?? ''), String(r.anchor ?? '')),
+  };
+}
 
 export async function loadProfileMentions(pool: Pool, blogId: number, now = new Date()) {
   const from = new Date(now.getTime() - PROFILE_MENTION_DAYS * 86400_000);
@@ -244,17 +269,25 @@ export async function loadProfileMentions(pool: Pool, blogId: number, now = new 
     limit: PROFILE_MENTION_LIMIT,
     truncated: rows.length > PROFILE_MENTION_LIMIT,
     generatedAt: now.toISOString(),
-    items: rows.slice(0, PROFILE_MENTION_LIMIT).map((r) => ({
-      postId: Number(r.postId),
-      postTitle: String(r.postTitle ?? ''),
-      postUrl: mentionPublicUrl(r.postUrl),
-      publishedAt: iso(r.publishedAt),
-      sourceBlogSlug: String(r.sourceBlogSlug),
-      sourceBlogName: String(r.sourceBlogName),
-      sourceIconUrl: iconUrl(r.sourceBlogSlug, icons),
-      targetUrl: mentionPublicUrl(r.targetUrl),
-      anchor: String(r.anchor ?? '').slice(0, 255),
-      quote: mentionQuote(String(r.context ?? ''), String(r.anchor ?? '')),
-    })),
+    items: rows.slice(0, PROFILE_MENTION_LIMIT).map((r) => profileMentionRow(r, icons)),
+  };
+}
+
+/** Every article that writes about this blog, newest first, PROFILE_FEED_PAGE at a time; the cursor is /mentions/'s. */
+export async function loadProfileMentionFeed(pool: Pool, blogId: number, cursor: MentionCursor | null = null, now = new Date()) {
+  const [rows] = cursor
+    ? await pool.query<RowDataPacket[]>(PROFILE_FEED_AFTER_SQL, [blogId, now, cursor.publishedAt, cursor.publishedAt, cursor.postId, now])
+    : await pool.query<RowDataPacket[]>(PROFILE_FEED_SQL, [blogId, now, now]);
+  const kept = rows.slice(0, PROFILE_FEED_PAGE);
+  const last = kept.at(-1);
+  const lastAt = last ? iso(last.publishedAt) : null;
+  const icons = await iconManifest();
+  return {
+    evidenceType: 'direct-link' as const,
+    location: 'body' as const,
+    limit: PROFILE_FEED_PAGE,
+    generatedAt: now.toISOString(),
+    items: kept.map((r) => profileMentionRow(r, icons)),
+    nextCursor: rows.length > PROFILE_FEED_PAGE && last && lastAt ? `${lastAt}_${Number(last.postId)}` : null,
   };
 }

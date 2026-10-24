@@ -470,6 +470,23 @@ export const PUBLIC_CONTRACTS: Record<PublicKind, (raw: unknown) => boolean> = {
           quote: text,
         }),
     }),
+  // app/src/relations/home-feed.ts loadProfileMentionFeed: the same rows, a page at a time after a cursor.
+  blogMentionFeed: (raw) =>
+    shape(raw, {
+      evidenceType: (v) => v === 'direct-link',
+      location: (v) => v === 'body',
+      items: (items) =>
+        rows(items, {
+          postId: count,
+          postTitle: text,
+          postUrl: nullable(text),
+          publishedAt: nullable(text),
+          sourceBlogSlug: text,
+          sourceBlogName: text,
+          quote: text,
+        }),
+      nextCursor: nullable(text),
+    }),
   // app/src/blog-suggestions.ts loadBlogQueue: the view reads every one of these keys.
   blogQueue: (raw) =>
     shape(raw, {

@@ -270,6 +270,7 @@ const PUBLIC_DATA_PAGES = [
   'app/tech/page.tsx',
   'app/blogs/page.tsx',
   'app/blogs/[slug]/page.tsx',
+  'app/blogs/[slug]/mentions/page.tsx',
   'app/articles/page.tsx',
   'app/topics/page.tsx',
   'app/topics/trending/page.tsx',

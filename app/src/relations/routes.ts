@@ -7,7 +7,8 @@ import { publicSummary } from '../public-post.ts';
 import { SharedSnapshot, SNAPSHOT_REFRESH_MS } from '../shared-snapshot.ts';
 import { iconManifest } from '../v1/favicon-routes.ts';
 import { iconUrl } from '../v1/icons.ts';
-import { loadMentionFeed, loadProfileMentions, parseMentionCursor } from './home-feed.ts';
+import { loadMentionFeed, loadProfileMentionFeed, loadProfileMentions, parseMentionCursor } from './home-feed.ts';
+import { profileMentionRss } from './mention-rss.ts';
 import { PUBLIC_RELATION } from './public-relation.ts';
 import { loadSharedTags } from './shared-tags.ts';
 import { loadProfileTextSimilarity } from './text-similarity-profile.ts';
@@ -349,7 +350,11 @@ async function projectionResponse(reply: FastifyReply, build: () => Promise<unkn
     throw error;
   }
 }
-export async function registerRelationRoutes(app: FastifyInstance, pool: Pool, { refreshMs = SNAPSHOT_REFRESH_MS } = {}) {
+export async function registerRelationRoutes(
+  app: FastifyInstance,
+  pool: Pool,
+  { refreshMs = SNAPSHOT_REFRESH_MS, publicOrigin = 'https://blog.observe.tw' } = {},
+) {
   registerTextSimilarityRoute(app, pool);
   const snapshot = new SharedSnapshot<unknown>(refreshMs);
   const snapshots = relationSnapshots.get(pool) ?? new Set<SharedSnapshot<unknown>>();
@@ -419,6 +424,36 @@ export async function registerRelationRoutes(app: FastifyInstance, pool: Pool, {
     if (!blog) return reply.code(404).send({ error: 'blog_not_found' });
     try {
       return await loadProfileMentions(pool, Number(blog.id));
+    } catch {
+      return reply.header('retry-after', '2').code(503).send({ error: 'mentions_unavailable' });
+    }
+  });
+  // /blogs/<key>/mentions/: every article that writes about this blog, older pages by /mentions/'s cursor.
+  app.get('/api/blogs/:slug/mentions/all', async (request, reply) => {
+    reply.header('cache-control', 'no-store');
+    const raw = (request.query as { cursor?: unknown }).cursor;
+    const cursor = raw === undefined ? null : parseMentionCursor(raw);
+    if (raw !== undefined && !cursor) return reply.code(400).send({ error: 'invalid_cursor' });
+    const { slug } = request.params as { slug: string };
+    const [[blog]] = await pool.query<RowDataPacket[]>("SELECT id FROM blogs WHERE slug=? AND status='verified'", [slug]);
+    if (!blog) return reply.code(404).send({ error: 'blog_not_found' });
+    try {
+      return await loadProfileMentionFeed(pool, Number(blog.id), cursor);
+    } catch {
+      return reply.header('retry-after', '2').code(503).send({ error: 'mentions_unavailable' });
+    }
+  });
+  // The same newest page as RSS, for the blog's author to subscribe to (mention-rss.ts). Fresh, like the page.
+  app.get('/api/blogs/:slug/mentions.xml', async (request, reply) => {
+    reply.header('cache-control', 'no-store');
+    const { slug } = request.params as { slug: string };
+    const [[blog]] = await pool.query<RowDataPacket[]>("SELECT id,slug,name FROM blogs WHERE slug=? AND status='verified'", [slug]);
+    if (!blog) return reply.code(404).send({ error: 'blog_not_found' });
+    try {
+      const feed = await loadProfileMentionFeed(pool, Number(blog.id));
+      return reply
+        .type('application/rss+xml; charset=utf-8')
+        .send(profileMentionRss(feed, { slug: String(blog.slug), name: String(blog.name) }, publicOrigin));
     } catch {
       return reply.header('retry-after', '2').code(503).send({ error: 'mentions_unavailable' });
     }
