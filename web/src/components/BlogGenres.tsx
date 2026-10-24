@@ -144,6 +144,8 @@ export function BlogGenresView({
                     {item.visible ? '' : ' · 未顯示'}
                     {item.adminOverride ? '（管理員覆寫）' : ''} · 同意 {item.agrees} · 不同意 {item.disagrees}
                   </span>
+                  {/* An admin's agree and disagree are overrides on traffic.observe.tw (0ea2840): set, hide, or release
+                      on a second press; `votes` then holds the overrides, so the pressed state is the same. */}
                   {signedIn && (
                     <span className="ml-auto flex gap-1.5">
                       <button
@@ -153,7 +155,13 @@ export function BlogGenresView({
                         className={filterChipClass(votes[item.genre] === 1)}
                         onClick={() => onAction?.(item.genre, 'vote', votes[item.genre] === 1 ? 0 : 1)}
                       >
-                        {votes[item.genre] === 1 ? '已同意（收回）' : '同意'}
+                        {admin
+                          ? votes[item.genre] === 1
+                            ? '已指定顯示（解除）'
+                            : '顯示'
+                          : votes[item.genre] === 1
+                            ? '已同意（收回）'
+                            : '同意'}
                       </button>
                       <button
                         type="button"
@@ -162,7 +170,13 @@ export function BlogGenresView({
                         className={filterChipClass(votes[item.genre] === -1)}
                         onClick={() => onAction?.(item.genre, 'vote', votes[item.genre] === -1 ? 0 : -1)}
                       >
-                        {votes[item.genre] === -1 ? '已不同意（收回）' : '不同意'}
+                        {admin
+                          ? votes[item.genre] === -1
+                            ? '已隱藏（解除）'
+                            : '隱藏'
+                          : votes[item.genre] === -1
+                            ? '已不同意（收回）'
+                            : '不同意'}
                       </button>
                     </span>
                   )}
@@ -173,7 +187,8 @@ export function BlogGenresView({
           {signedIn && (
             <GenreInput
               id="genre-add"
-              placeholder="新增標籤，例如：咖啡"
+              // An admin's new tag is shown at once (traffic sets it), so the box says so.
+              placeholder={admin ? '新增標籤並指定顯示，例如：咖啡' : '新增標籤，例如：咖啡'}
               suggestions={suggestions}
               pending={pending}
               actions={[
@@ -185,39 +200,6 @@ export function BlogGenresView({
                 },
               ]}
             />
-          )}
-          {signedIn && admin && (
-            <details className="border-t border-zinc-200 pt-2 dark:border-zinc-800">
-              <summary className="cursor-pointer text-zinc-500 dark:text-zinc-400">管理員覆寫</summary>
-              <div className="mt-2">
-                <GenreInput
-                  id="genre-admin"
-                  placeholder="標籤"
-                  suggestions={[...state.items.map((item) => item.label), ...suggestions]}
-                  pending={pending}
-                  actions={[
-                    {
-                      label: '指定顯示',
-                      run: (genres) => {
-                        for (const genre of genres) onAction?.(genre.key, 'admin', 'set', genre.text);
-                      },
-                    },
-                    {
-                      label: '隱藏',
-                      run: (genres) => {
-                        for (const genre of genres) onAction?.(genre.key, 'admin', 'hide', genre.text);
-                      },
-                    },
-                    {
-                      label: '解除覆寫',
-                      run: (genres) => {
-                        for (const genre of genres) onAction?.(genre.key, 'admin', 'release', genre.text);
-                      },
-                    },
-                  ]}
-                />
-              </div>
-            </details>
           )}
         </div>
       )}

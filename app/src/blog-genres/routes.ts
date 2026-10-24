@@ -121,13 +121,21 @@ export function registerBlogGenreRoutes(app: FastifyInstance, options: Options) 
         if (!blog.domain) return reply.code(404).send({ error: 'unknown_domain' });
         const voter = user.email;
         let result: Awaited<ReturnType<ReturnType<typeof tagClient>['write']>>;
+        // The action as traffic applies it for an admin, who does not vote (2026-10-24, traffic 0ea2840): agree sets
+        // the tag, disagree hides it, withdrawing releases it, adding sets it. null for a reader's vote.
+        let override: 'set' | 'hide' | 'release' | null = null;
         try {
+          // With the voter, traffic also says whether this reader is an admin.
+          const read = await tagClient().read([blog.domain], voter);
+          const tags = read.domains[blog.domain];
+          // An accepted admin action is an override whatever this read says (traffic refuses it for readers).
+          if (kind === 'admin') override = body.action as 'set' | 'hide' | 'release';
+          else if (read.voter?.admin) override = kind === 'propose' || body.vote === 1 ? 'set' : body.vote === -1 ? 'hide' : 'release';
           let tag: string;
           if (kind === 'propose') tag = typedTag(String(body.genre), genre);
           else {
             // The URL names the key (food); traffic needs its spelling of it (美食, 3C, iPhone): this site's, then any
             // blog's, then what the admin typed. A blog newer than traffic's list of domains is not known there yet.
-            const tags = (await tagClient().read([blog.domain])).domains[blog.domain];
             if (!tags) return reply.code(404).send({ error: 'unknown_domain' });
             const found = tags.find((t) => genreKey(t.tag) === genre)?.tag;
             if (!found && kind === 'vote') return reply.code(404).send({ error: 'genre not proposed' });
@@ -156,15 +164,16 @@ export function registerBlogGenreRoutes(app: FastifyInstance, options: Options) 
           return reply.code(400).send({ error: 'invalid_genre_action', message: result.message });
         }
         rememberDomainTags(result.domain, result.tags);
-        if (kind === 'admin') {
+        if (override) {
           // traffic keeps the tag log; the audit row keeps blog's admin activity counts (admin/accounts.ts).
           const c = await pool.getConnection();
           try {
-            await writeAudit(c, user.id, `genre.${body.action}`, 'blog', String(blog.id), null, {
+            await writeAudit(c, user.id, `genre.${override}`, 'blog', String(blog.id), null, {
               genre,
               tag: result.tag,
               domain: result.domain,
-              action: body.action,
+              action: override,
+              via: kind,
             });
           } catch (error) {
             request.log.warn({ operation: 'blog.genres.audit', err: error }, 'genre audit not written');

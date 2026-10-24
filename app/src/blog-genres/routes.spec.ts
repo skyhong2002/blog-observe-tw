@@ -182,6 +182,22 @@ describe('blog tag routes proxied to traffic.observe.tw', () => {
       await unknown.app.close();
     }
   });
+  it("audits an admin's agree, disagree, withdrawal and new tag as the overrides traffic makes of them", async () => {
+    const f = await fixture({ traffic: fakeTagClient({ 'a.blog.tw': [tag('美食')] }, { voter: { admin: true, votes: {} } }) });
+    const reader = await fixture();
+    try {
+      for (const vote of [1, -1, 0]) expect((await f.app.inject(request('vote', { vote }))).statusCode).toBe(200);
+      expect((await f.app.inject(request('propose', { genre: '咖啡' }))).statusCode).toBe(200);
+      expect(f.audits.map((a) => a[1])).toEqual(['genre.set', 'genre.hide', 'genre.release', 'genre.set']);
+      // The writes go to traffic as they were made; traffic turns them into overrides.
+      expect(f.writes.map((w) => w.kind)).toEqual(['vote', 'vote', 'vote', 'propose']);
+      expect((await reader.app.inject(request('vote', { vote: 1 }))).statusCode).toBe(200);
+      expect(reader.audits).toHaveLength(0);
+    } finally {
+      await f.app.close();
+      await reader.app.close();
+    }
+  });
   it('answers 503 when traffic is down and passes its refusals on', async () => {
     const down: TagClient = {
       read: async () => {

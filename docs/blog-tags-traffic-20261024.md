@@ -18,6 +18,7 @@
 - AI 初判：`tools/apply-blog-genres.ts --apply [--slug <slug>]` 呼叫 `PUT /internal/v1/tags/ai`（每 500 個網域一次），只取代 blog 自己的 AI 初判；gen103 起每個標籤帶自己的理由（`{ tag, reason }`）。
 - 政治傾向（藍、綠、藍營…）是 traffic 的保留字：新增或指定顯示時 traffic 回 400 `reserved_tag`，blog 照碼轉回，畫面顯示「政治傾向不是標籤，不能新增或指定顯示。」
 - traffic 還不認得的新部落格（blog worker 同步 watches 有時間差）：寫入回 404 `unknown_domain`，畫面顯示「這個部落格的標籤資料還在準備中，請稍後再試。」
+- 管理員不投票（gen104，traffic 0ea2840）：管理員按的同意／不同意／收回與新增，traffic 直接轉成指定顯示／隱藏／解除覆寫／新增並指定顯示，`voter.votes` 回的是覆寫狀態。部落格頁對管理員顯示「顯示」「隱藏」（按下後「已指定顯示（解除）」「已隱藏（解除）」），新增框寫「新增標籤並指定顯示」；原本的「管理員覆寫」輸入框功能重複，已拿掉（`/genres/:genre/admin` 路由保留）。blog 在寫入前帶 voter 讀一次，管理員的每個動作都記一筆 `genre.set|hide|release` 稽核。
 - 管理員覆寫時標籤的寫法：先用這個網站在 traffic 的寫法，其次任何部落格快照裡的寫法（iPhone），再其次管理員輸入的原文（body `tag`，須與網址的代碼相同），最後才是代碼本身。
 
 ## 介面文字

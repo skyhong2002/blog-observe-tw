@@ -43,19 +43,28 @@ describe('blog genre SSR block', () => {
     expect($('button[type=submit]').text()).toBe('新增');
     expect($('section').text()).not.toContain('管理員覆寫');
   });
-  it('keeps admin set/hide/release apart, in its own collapsed block, while hidden candidates and their counts stay visible', () => {
-    const hidden: GenreState = { status: 'ready', items: [{ ...state.items[0], source: 'admin', visible: false, adminOverride: 'hide' }] };
-    const $ = load(renderToString(<BlogGenresView state={hidden} signedIn admin loginUrl="/auth/google" />));
-    expect($('li').text()).toContain('未顯示（管理員覆寫）');
-    const block = $('details');
-    expect(block.find('summary').text()).toBe('管理員覆寫');
-    expect(block.find('input[name=genre]').length).toBe(1);
-    expect(
-      block
+  it("gives admins override buttons, not votes, with the override's own pressed state", () => {
+    const hidden: GenreState = {
+      status: 'ready',
+      items: [
+        { ...state.items[0], source: 'admin', visible: false, adminOverride: 'hide' },
+        { ...state.items[0], genre: 'travel', label: '旅遊' },
+      ],
+    };
+    const $ = load(renderToString(<BlogGenresView state={hidden} signedIn admin votes={{ food: -1 }} loginUrl="/auth/google" />));
+    expect($('li').first().text()).toContain('未顯示（管理員覆寫）');
+    const buttons = (li: number) =>
+      $('li')
+        .eq(li)
         .find('button')
         .map((_, el) => $(el).text())
-        .get(),
-    ).toEqual(['指定顯示', '隱藏', '解除覆寫']);
+        .get();
+    expect(buttons(0)).toEqual(['顯示', '已隱藏（解除）']);
+    expect(buttons(1)).toEqual(['顯示', '隱藏']);
+    // One box: an admin's new tag is set at once; the separate override form is gone.
+    expect($('details').length).toBe(0);
+    expect($('input[name=genre]').attr('placeholder')).toBe('新增標籤並指定顯示，例如：咖啡');
+    expect($('section').text()).not.toContain('同意（收回）');
   });
   it('an empty classification says nothing: signed out it offers sign-in, signed in the picker', () => {
     const empty: GenreState = { status: 'ready', items: [] };
