@@ -33,7 +33,16 @@
 - 正式站匿名：`/blogs/`、`/blogs/?genre=food`、`/blogs/kocpc/`、`/articles/` 200，頁面有「標籤」、沒有「類型」「未分類」；`/api/catalog` 48 個標籤，`?genre=food` 與 `?genre=美食` 同為 68 個部落格（gen101 為 66：traffic 編輯清單的「美食」也算進來）；匿名投票與 `/api/me/blog-genres/kocpc` 回 401。
 - 正式站登入（擁有者帳號，臨時 session 用完即刪）：`/api/me` 回 `admin: true`（traffic 判斷）；跨來源投票 403；對 kocpc「3C」投同意後 traffic `/api/v1/tags/kocpc.com.tw` 同意 0 → 1，收回後回到 0。
 
+### gen103（2026-10-24 14:39，green `e41eac1`）
+
+帳號頁投票數、每個標籤的 AI 理由、`reserved_tag` 與「還在準備中」的訊息、管理員覆寫保留 traffic 的寫法。前一版 gen102 blue `46a2cd7` 保留為回滾。乾淨 worktree 完整 vitest 1577 項中 2 項是已知的負載逾時（snapshot-full-caller、runtime-icons），單獨重跑通過；web 249、render 208、tsc 通過。
+
+- 帳號頁（臨時 session，用完即刪）：擁有者「標籤投票」0 → 投一票後 1 → 收回後 0，與 traffic `/internal/v1/tags/voters`（via blog）一致；`votesUnavailable: false`。
+- 對 kocpc 新增「藍營」→ 400 `reserved_tag`，traffic 沒有留下這個標籤。
+- april-aries.github.io（blog 519）：traffic 已認得，讀取 200（目前沒有標籤）；對它不存在的標籤投票回 `genre not proposed`，不再是 `unknown_domain`。
+- `tools/apply-blog-genres.ts --apply --slug kocpc`（在 release 目錄執行）：3C、軟體介紹、新聞三筆 AI 初判各自保留自己的理由，`updated_at` 更新為 06:40:21 UTC，`changed: 0`（標籤組合不變）。
+
 ## 回滾
 
-1. `tools/deploy-blue-green.sh switch <前一個 slot>`，回到 e40f2b2（gen101）。舊程式讀寫兩張舊表，那裡停在切換當下：這段期間在 traffic 投的票、新增的標籤不會出現在舊版。
+1. gen103 有問題時 `tools/deploy-blue-green.sh switch blue` 回到 gen102 `46a2cd7`（標籤仍在 traffic，只少了這次的調整）。要完全回到舊表，再切回 e40f2b2（gen101，需重新 prepare）。舊程式讀寫兩張舊表，那裡停在切換當下：這段期間在 traffic 投的票、新增的標籤不會出現在舊版。
 2. 需要保留的話，從 traffic 的 `tag_votes`／`tag_assignments`（`via='blog'` 或 `actor='service:blog'` 以外的）手動補回；traffic 端的資料不用動，下次再切過來時 traffic 仍是最新。
