@@ -13,7 +13,6 @@ vi.mock('../relations/worker.ts', () => ({
   relationBudgetAvailable: async () => true,
   relationFailureCode: () => 'fetch-failed',
 }));
-vi.mock('../tech/observer.ts', () => ({ createTechObserver: () => undefined }));
 vi.mock('./store.ts', () => ({
   ingestContentEvidence: mocks.ingest,
   initializeContentRules: async () => {},

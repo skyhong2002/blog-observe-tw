@@ -5,7 +5,6 @@ import { politeFetch } from '../crawl/feed.ts';
 import { reserveBudget } from '../jobs/budget.ts';
 import type { BatchOptions, BatchResult } from '../jobs/contracts.ts';
 import { withJobLease } from '../jobs/lease.ts';
-import { createTechObserver } from '../tech/observer.ts';
 import { identityKey, normalizeLink, type PublicationAlias, publicationDecision, publicationHome, resolvePublication } from './identity.ts';
 import type { ParsedLink } from './parser.ts';
 import { invalidateRelationCache } from './routes.ts';
@@ -237,7 +236,6 @@ export async function runPublicationDiscoveryBatch(pool: Pool, options: BatchOpt
             ...options,
             fetcher,
             timeoutMs: 15000,
-            observer: createTechObserver(pool, { blogId: blog.id, blogUrl: blog.url }),
           });
           let finalHome = home.url || blog.url;
           if (resolvePublication(finalHome, aliases) !== blog.id) throw Error('publication_redirect_mismatch');
@@ -249,11 +247,7 @@ export async function runPublicationDiscoveryBatch(pool: Pool, options: BatchOpt
               [blog.id, finalHome],
             );
             if (otherHome) {
-              home = await politeFetch(
-                blog.url,
-                { accept: headers.accept },
-                { ...options, fetcher, timeoutMs: 15000, observer: createTechObserver(pool, { blogId: blog.id, blogUrl: blog.url }) },
-              );
+              home = await politeFetch(blog.url, { accept: headers.accept }, { ...options, fetcher, timeoutMs: 15000 });
               finalHome = home.url || blog.url;
             }
           }

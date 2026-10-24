@@ -929,50 +929,8 @@
       "occurrences": 1
     },
     {
-      "path": "app/src/tech/backfill.ts",
-      "digest": "40337583e50ef5fee30b13d2546705bcb87d1d9b52c8e76c85f1fb9e6a817650",
-      "tables": [],
-      "dynamic": true,
-      "occurrences": 1
-    },
-    {
-      "path": "app/src/tech/backfill.ts",
-      "digest": "bda6afe48befe0ca5800bd53d38c7cc04aa5a37e0094a5e82762b9e77c1afd88",
-      "tables": [],
-      "dynamic": true,
-      "occurrences": 1
-    },
-    {
-      "path": "app/src/tech/fetch-batch.ts",
-      "digest": "59590082f6beca0527478dba0ddee9e1f77160459b54aca6bfef44c083b82095",
-      "tables": [],
-      "dynamic": true,
-      "occurrences": 1
-    },
-    {
       "path": "app/src/tech/read-resource.ts",
       "digest": "115695b2277ffe3564b841331b913cf203f9169c669393226228ee60e2f0260b",
-      "tables": [],
-      "dynamic": true,
-      "occurrences": 1
-    },
-    {
-      "path": "app/src/tech/store.ts",
-      "digest": "03cf403e171a92183fe4c096c00b410a8f00ca0589236241dea76941a179ee44",
-      "tables": [],
-      "dynamic": true,
-      "occurrences": 1
-    },
-    {
-      "path": "app/src/tech/store.ts",
-      "digest": "8fe25d0550d214374e757ae584e8754bfea3ea414263d70582898cbe056edc3f",
-      "tables": [],
-      "dynamic": true,
-      "occurrences": 1
-    },
-    {
-      "path": "app/src/tech/store.ts",
-      "digest": "b5c3738525f99dda2bb5725c97fcff24c5e221762813ce3ae69a0695d33680bc",
       "tables": [],
       "dynamic": true,
       "occurrences": 1

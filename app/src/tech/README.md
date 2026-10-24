@@ -1,43 +1,18 @@
-# Passive technology observations
+# 使用的技術
 
-This module inspects only responses already obtained by existing polite crawlers, or HTML already stored in `content_post_bodies`. It does not issue HTTP, DNS, browser or external lookup requests. `BLOG_TECH_ENABLED` (passive collection) and `BLOG_TECH_PUBLIC_ENABLED` (API publication) both default to false and require the exact value `true`. Collection and publication can be enabled independently; deployment and any manual backfill remain separate release decisions.
+`/api/tech` 與 `/api/blogs/:slug/tech` 只讀 traffic.observe.tw，不再偵測或寫入技術結果。
 
-## Evidence and limits
+- 先讀最多 2,000 個已驗證部落格，以 `canonical_host` 一次 POST 到 `http://127.0.0.1:18150/internal/v1/tech`，再用小寫、去掉 `www.` 的網域對回各部落格與 slug。可讀網址別名仍由公開頁面 registry 解析。
+- 認證沿用 `blog-genres/traffic.ts` 的 `readTagSimilarwebToken`；不新增憑證或外部可設定的 endpoint。
+- 成功回應快取 60 秒，同一批並行請求共用讀取；失敗不快取、不回退舊資料。traffic 請求上限 2 秒，API 保留整體 2.5 秒期限與 503 `technology_unavailable`。
+- `status` 是最近嘗試；`observedAt`、首頁來源與 detections 是最近成功。失敗／阻擋仍保留舊結果並計入技術排行；`notChecked`／沒有紀錄對應 `not-observed`。
+- 公開欄位沿用原 API；method 改成 `traffic-homepage-wappalyzer`。coverage 只宣告首頁及部分覆蓋，不捏造 traffic 沒有提供的節點數或截斷狀態。
+- traffic 每 30 天重新抓取成功站點首頁，先檢查 robots.txt、限制公開位址和 512 KiB，以釘選的 Wappalyzer 規則比對。失敗按 1、2、4…天重試，上限 30 天。細節見 https://traffic.observe.tw/tech/ 。
 
-`detectTechnology(input)` is a pure parser. It inspects at most 512 KiB of HTML and 2,000 selected meta/script/link nodes, retains at most 24 fixed-vocabulary detections and three sanitized evidence items per detection. Versions require an explicit generator declaration. Asset query parameters, filenames and infrastructure headers never establish versions; contradictory declarations return `version: "unknown"`. Hosting/CDN signals have low confidence. User content mentioning a product and a site's hostname alone do not establish its technology.
+blog 的 observer、fetch batch、detector、store 和 backfill 已移除，`BLOG_TECH_ENABLED` 不再有作用；`BLOG_TECH_PUBLIC_ENABLED=true` 仍控制公開頁面與 API。
 
-Only allowlisted products and short evidence markers are persisted. Raw HTML, script contents, cookies, response header values, analytics account identifiers and arbitrary plugin/theme directory names are excluded. Source URLs are sanitized; credentials, query strings, fragments and sensitive path segments are not published.
+`blog_tech_scans` 資料已匯入 traffic。本次沿用先停用、保留舊表以便回滾的方式，不做 migration；schema 與歷史 migration 保留。人工 `content/platform-repair.ts` 尚可讀取舊快照作歷史參考，不再更新該表。
 
-Statuses describe the latest attempt: `detected`, `unknown`, `failed`, or `blocked`. Unknown means inspected without a recognized signal, not absence of technology. Failures retain a prior successful snapshot only while its original source remains publicly visible. `observedAt` belongs to that snapshot; `lastAttemptAt` belongs to the latest attempt. Backfill preserves the original `obtained_at` timestamp and never pretends an old body fragment was freshly fetched.
+`platform.ts`、Wappalyzer input/matcher/rules 和 `tools/fetch-wappalyzer-rules.ts` 保留：`content/registry.ts` 在爬文章時仍需辨識部落格平台，與公開技術統計的資料來源無關。
 
-The observation queue holds one writer plus at most 31 pending sanitized DTOs. Optional observations must not delay or fail normal crawling. The writer has a 2.5-second response deadline and locks the blog and source post before committing. Per pool, at most one acquisition may remain unresolved; a timed-out acquisition keeps this slot until it settles, so later queue items return unavailable without adding pool waiters. A late connection is released without writing. An acquired timed-out connection is destroyed. `unavailable` means the outcome was not confirmed: if the deadline races with an already-sent COMMIT, the write may have committed. It is not a guarantee of rollback or zero writes; the monotonic attempt guard protects retries. Backfill defaults to dry run and a maximum of ten blogs per invocation; source HTML is byte-bounded by SQL before transfer.
-
-## Wappalyzer rules
-
-Detection of whole responses (`sourceType` `html` or `header`) runs the pinned Wappalyzer technology rules, limited to the products listed in `wappalyzer/rules.ts` (`WAPPALYZER_NAMES`): the same 16 products and WordPress themes/plugins /tech/ always published. A stored post body (`body-fragment`) is the author's text without the page head, so it keeps the built-in detection.
-
-- **Data, not code.** The rules are the community fork enthec/webappanalyzer (GPL-3.0). They are not in this repository, which stays MIT: `data/wappalyzer-pin.json` holds the commit and a SHA-256 per file, `tools/fetch-wappalyzer-rules.ts` downloads exactly those files into `~/.local/share/blog-observe/wappalyzer/<commit>/` (override with `BLOG_WAPPALYZER_RULES_DIR`), and the loader refuses a file that differs from the pin. `--check` lists mapped products the data no longer has; `--update` fetches the newest commit and prints a new pin to review.
-- **Our own matcher.** `wappalyzer/matcher.ts` is written from the public rule format, not from wappalyzer-core. It evaluates url, html, scriptSrc, scripts, meta, headers and dom (exists/attributes). It does not evaluate js, css, cookies, xhr, dns, `implies`/`excludes`, or a dom `text` pattern (what a post says is not what the site runs). Products found only through those rules are therefore not detected.
-- **Evidence and versions keep the old contract.** A version comes only from an explicit `meta generator`; conflicting declarations give `unknown`. Evidence is a fixed phrase per rule kind (`script URL rule`, `page markup rule`, `inline script rule`, `meta tag rule`, `URL rule`, `response header rule`), never the page's text. CDN/hosting confidence stays at most 0.4. `ruleVersion` is `wappalyzer-<first 12 of the commit>` and `ruleId` is `wappalyzer:<product>`; observations from the built-in detection keep `passive-tech-v1` and `passive:<product>`.
-- **Untrusted pages, third-party patterns.** Some real rules backtrack quadratically (`<link rel="stylesheet" [^>]+/wp-…` took 15 s on 512 KiB of repeated `<link `; the Nuxt `<script [^>]*>` rule 26 s). Long texts are matched in 4 KiB overlapping windows (anchored patterns only where the anchor can hold) and a page gets a 250 ms budget; `pinned-rules.spec.ts` runs every compiled rule against hostile input. No RE2 binding is used: it needs a native build.
-- **Not installed → built-in detection.** Without the data (development, tests) detection falls back to the earlier conservative parser and the observation says so in its rule version. Tests are hermetic: the installed rules load only when `BLOG_WAPPALYZER_RULES_DIR` is set.
-- **Blog platform of the content adapters** (`content/registry.ts inferPlatform`) uses the same rules through `platform.ts documentPlatform`, on a whole article page only, never on a feed's content: another site's `wp-content` image in a post must not make a Hugo blog WordPress. An inferred platform is replaced when the page names another one; `tools/repair-content-platforms.ts` repairs rows guessed earlier.
-
-## Public read contract
-
-`registerTechRoutes(app, pool, { enabled, publicOrigin? })` adds GET/HEAD routes. Disabled routes return 404 without accessing the database. All responses use `private, no-store`; no result or in-flight promise is shared across requests. Optional API storage/registry failures return a fixed 503 `{ "error": "technology_unavailable" }`, without driver messages; unrelated routes retain their own error policy.
-
-- `/api/tech?q=&technology=&status=&limit=50&cursor=` returns `generatedAt`, `method`, `coverage`, `technologies`, `items`, `pagination` and `filters`. Limits are 1–100, cursor is the last stable numeric blog ID, and technology IDs include controlled `wp-theme:<slug>` / `wp-plugin:<slug>` forms. Public search inspects only the displayed name/slug/sanitized source URL.
-- `/api/blogs/:slug/tech` returns `generatedAt`, `method` and `blog`. Stable slugs and readable aliases resolve through the existing public page registry.
-- Blog DTOs contain stable `id`, `slug`, `name`, registry-derived `url` (null when no public registry URL exists), sanitized `sourceUrl`, `iconUrl`, `status`, `observedAt`, `lastAttemptAt`, `errorCode`, `evidenceSourceUrl`, partial `coverage`, and `detections`.
-- Detection DTOs contain `id`, `name`, `category`, `version` (explicit `unknown` when unproven), `confidence`, `ruleId`, `ruleVersion`, `observedAt`, and sanitized `evidence`.
-
-Coverage denominator `totalBlogs` is all verified blogs. Reads scan at most 2,000 blog snapshots in ID order; `scannedBlogs` and `truncated` disclose that bound. Status counts sum to scanned blogs, not an unobserved assumption about the rest. Technology/version aggregates use valid successful snapshots, including retained snapshots whose latest attempt failed. Therefore a technology aggregate need not equal the latest-attempt `detected` status count. Pagination and filters apply to the scanned cohort only. The method states partial passive observations and `additionalRequests: false`.
-
-Public reads admit at most two operations per pool, including pending acquisitions. They use an owned connection, MariaDB `SET STATEMENT max_statement_time=0.25 FOR SELECT`, a 500 ms driver query timeout, and a 2.5-second response deadline. A Promise deadline does not cancel pool acquisition or SQL: pending acquisitions keep their admission slot until settlement; late connections are released without SQL. Acquired connections are destroyed on deadline/query failure instead of returning possibly running work to the pool. The query wrapper destroys immediately on rejection, before returning the error to its caller. Even if a loader catches that error, further queries are rejected and a fallback return cannot count as success. Only normal, unpoisoned completion releases the connection. No pending-work queue is added for excess HTTP requests; they receive the same fixed 503. These limits are per process/pool, not a cross-service or host-wide budget. Server timeout behavior still requires the isolated SQL acceptance test before enabling publication.
-
-Every read reapplies `publicTechSourceSql` in the observation join: blog must be verified, successful source and latest-attempt source posts must still exist, belong to that blog, and not be future-dated. An invalid source makes its observation `not-observed`; hidden/rejected/moved blogs are excluded. No persisted result cache or previous response may bypass these checks.
-
-## Validation
-
-Unit suites cover detector/privacy/version rules, ownership and writer deadlines, queue admission, dry-run backfill, projection validation and feature-off routes. Disposable database suites cover monotonic observations, failed-snapshot retention, public-source removal, flag/filter/pagination behavior and backfill timestamps. Integration testing must use the guarded random database on loopback port 18169; never the production database. The root release runner owns migration selection and public wiring.
+驗證：`npm run typecheck`、`npm run lint`、`npm test`、`npm run test:web`、`npm run test:topic-ui`。新增 traffic client／route 測試涵蓋批次網域對應、快取、失敗、別名與歷史結果。

@@ -1,7 +1,7 @@
 import { datetime, index, int, json, mysqlTable, varchar } from 'drizzle-orm/mysql-core';
 import type { TechCoverage, TechDetection } from './contracts.ts';
 
-/** One bounded latest-success snapshot per blog. Failure attempts do not destroy successful evidence. */
+/** Legacy read-only schema retained for rollback; public technology data now comes from traffic. */
 export const blogTechScans = mysqlTable(
   'blog_tech_scans',
   {

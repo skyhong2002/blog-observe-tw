@@ -1,7 +1,5 @@
 import type { Pool } from 'mysql2/promise';
 import { describe, expect, it, vi } from 'vitest';
-import { createTechFetchBatch } from '../tech/fetch-batch.ts';
-import { TechObservationQueue } from '../tech/observer.ts';
 import { crawlBlog, type FeedFetcher, type FeedLink, parseSitemap, parseSitemapArticle } from './feed.ts';
 
 function setup(sources: FeedLink[], pages: Record<string, string>) {
@@ -84,80 +82,6 @@ describe('sitemap article evidence', () => {
 });
 
 describe('crawl integration', () => {
-  it.each([false, true])(
-    'existing sitemap HTML observation enabled=%s has identical requests and follows transaction commit',
-    async (enabled) => {
-      const host = `https://crawl-passive-${enabled}.test`;
-      const f = setup([{ url: `${host}/sitemap.xml`, type: 'sitemap' }], {
-        [`${host}/sitemap.xml`]: `<urlset><url><loc>${host}/post</loc></url></urlset>`,
-        [`${host}/post`]:
-          '<html><meta name="generator" content="WordPress"><meta property="og:type" content="article"><title>Post</title></html>',
-      });
-      let committed = false;
-      const connection = {
-        beginTransaction: vi.fn(),
-        commit: vi.fn(async () => {
-          committed = true;
-        }),
-        rollback: vi.fn(),
-        release: vi.fn(),
-        execute: vi.fn(async (sql: string) =>
-          sql.startsWith('SELECT id,url,status FROM blogs') ? [[{ id: 1, url: `${host}/`, status: 'verified' }], []] : f.execute(sql),
-        ),
-      };
-      const query = vi.fn(async () => {
-        expect(committed).toBe(true);
-        expect(connection.release).toHaveBeenCalled();
-        return [[{ id: 12, url: `${host}/post` }]];
-      });
-      const pool = { ...f.pool, query, getConnection: vi.fn(async () => connection) } as unknown as Pool;
-      const writer = vi.fn(async () => {
-        expect(committed).toBe(true);
-        return { written: true, reason: 'stored' as const };
-      });
-      const queue = new TechObservationQueue(writer);
-      const passiveBatch = createTechFetchBatch(pool, { blogId: 1, blogUrl: `${host}/` }, { enabled, queue });
-      expect(await crawlBlog({ pool }, { id: 1, slug: 'passive', url: `${host}/` }, { ...f.options, passiveBatch })).toMatchObject({
-        posts: 1,
-      });
-      await queue.idle();
-      expect(f.fetcher.mock.calls.map(([url]) => String(url))).toEqual([`${host}/robots.txt`, `${host}/sitemap.xml`, `${host}/post`]);
-      expect(writer).toHaveBeenCalledTimes(Number(enabled));
-      expect(query).toHaveBeenCalledTimes(Number(enabled));
-    },
-  );
-  it('failed feed commit rolls back and discards HTML DTOs', async () => {
-    const host = 'https://crawl-passive-rollback.test';
-    const f = setup([{ url: `${host}/sitemap.xml`, type: 'sitemap' }], {
-      [`${host}/sitemap.xml`]: `<urlset><url><loc>${host}/post</loc></url></urlset>`,
-      [`${host}/post`]:
-        '<html><meta name="generator" content="WordPress"><meta property="og:type" content="article"><title>Post</title></html>',
-    });
-    const connection = {
-      beginTransaction: vi.fn(),
-      commit: vi.fn(async () => {
-        throw Error('commit-failed');
-      }),
-      rollback: vi.fn(),
-      release: vi.fn(),
-      execute: vi.fn(async (sql: string) =>
-        sql.startsWith('SELECT id,url,status FROM blogs') ? [[{ id: 1, url: `${host}/`, status: 'verified' }], []] : f.execute(sql),
-      ),
-    };
-    const query = vi.fn(),
-      writer = vi.fn(),
-      queue = new TechObservationQueue(writer);
-    const pool = { ...f.pool, query, getConnection: vi.fn(async () => connection) } as unknown as Pool;
-    const passiveBatch = createTechFetchBatch(pool, { blogId: 1, blogUrl: `${host}/` }, { enabled: true, queue })!;
-    await expect(crawlBlog({ pool }, { id: 1, slug: 'rollback', url: `${host}/` }, { ...f.options, passiveBatch })).rejects.toThrow(
-      'commit-failed',
-    );
-    await passiveBatch.commit([`${host}/post`]);
-    await queue.idle();
-    expect(connection.rollback).toHaveBeenCalledOnce();
-    expect(query).not.toHaveBeenCalled();
-    expect(writer).not.toHaveBeenCalled();
-  });
   it('uses registered publication feed without discovering a shared platform homepage or root feed', async () => {
     const feed = 'https://medium.com/feed/@registered-author';
     const fixture = setup([{ url: feed, type: 'rss' }], {

@@ -57,7 +57,10 @@ export const STATIC_PAGES = {
   '/topics/trending/': ['正在升溫的話題', '台灣部落格最近明顯變多的話題：和每個詞過去一年的平常比例相比，近期突然有很多部落格在寫的詞。'],
   '/traffic/': ['部落格流量與排名', '對照已核准部落格的網域流量估算、排名與資料時間；估算不代表文章品質。'],
   // Served only while BLOG_TECH_PUBLIC_ENABLED is on (lib/tech-flag.ts); otherwise the page is a 404.
-  '/tech/': ['部落格使用的技術', '從既有公開回應被動辨識部落格使用的 CMS、框架、主題、外掛與分析工具；部分證據，不是完整清單。'],
+  '/tech/': [
+    '部落格使用的技術',
+    '由 traffic.observe.tw 每月抓取首頁，以 Wappalyzer 規則辨識部落格使用的 CMS、框架、主題、外掛與分析工具；部分證據，不是完整清單。',
+  ],
 } as const satisfies Record<string, readonly [string | null, string]>;
 
 export function staticPageMetadata(path: keyof typeof STATIC_PAGES) {

@@ -279,16 +279,32 @@ const homeTopics = (raw: unknown) => {
 };
 
 const techStatus = oneOf('detected', 'unknown', 'failed', 'blocked', 'not-observed');
-const techCategory = oneOf('cms', 'framework', 'theme', 'plugin', 'analytics', 'hosting', 'cdn');
-const techErrorCode = oneOf('robots', 'waf', 'rate-limit', 'http-error', 'timeout', 'network', 'invalid-response');
+const techCategory = oneOf(
+  'cms',
+  'framework',
+  'theme',
+  'plugin',
+  'analytics',
+  'hosting',
+  'cdn',
+  'library',
+  'server',
+  'ads',
+  'consent',
+  'media',
+  'social',
+  'security',
+  'other',
+);
+const techErrorCode = oneOf('robots', 'waf', 'rate-limit', 'http-error', 'timeout', 'network', 'invalid-response', 'not-html', 'address');
 /** app/src/tech/contracts.ts TechCoverage, as projectTechScan copies it: the views read sourceType and htmlTruncated. */
 const techScanCoverage = (value: unknown) =>
   shape(value, {
     partial: (v) => v === true,
-    method: (v) => v === 'passive-existing-response',
+    method: oneOf('passive-existing-response', 'traffic-homepage-wappalyzer'),
     sourceType: oneOf('html', 'body-fragment', 'header'),
-    htmlTruncated: boolean,
-    inspectedNodes: count,
+    htmlTruncated: optional(boolean),
+    inspectedNodes: optional(count),
   });
 const techDetections = (value: unknown) =>
   rows(value, {
@@ -345,7 +361,8 @@ const techBlog = (value: unknown) => {
 };
 // The page says no extra request is made and the result is partial; a gateway saying otherwise is not this method.
 const techMethod = (value: unknown) =>
-  shape(value, { id: text, partial: (v) => v === true, additionalRequests: (v) => v === false, description: text });
+  shape(value, { id: text, partial: (v) => v === true, additionalRequests: boolean, description: text }) &&
+  value.additionalRequests === (value.id === 'traffic-homepage-wappalyzer');
 /**
  * Status counts are of the scanned blogs (they sum to scannedBlogs), scanned is
  * at most the public total, and `truncated` says exactly whether some were left

@@ -129,10 +129,6 @@ try {
     ['text-similarity', '../app/src/relations/text-similarity.integration.ts', 'runTextSimilarityIntegration'],
     ['shared-label-selection', '../app/src/topics/shared-label-selection.integration.ts', 'runSharedLabelSelectionIntegration'],
     ['shared-label-store', '../app/src/topics/shared-label-store.integration.ts', 'runSharedLabelStoreIntegration'],
-    ['tech-store', '../app/src/tech/store.integration.ts', 'runTechStoreIntegration'],
-    ['tech-routes', '../app/src/tech/routes.integration.ts', 'runTechRoutesIntegration'],
-    ['tech-backfill', '../app/src/tech/backfill.integration.ts', 'runTechBackfillIntegration'],
-    ['tech-fetch-batch', '../app/src/tech/fetch-batch.integration.ts', 'runTechFetchBatchIntegration'],
   ];
   const selected =
     process.argv[5] === 'public-api'

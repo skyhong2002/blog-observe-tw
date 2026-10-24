@@ -170,6 +170,17 @@ export default async function BlogTech({ slug }: { slug: string }) {
           </>
         )}
       </dl>
+      {blog.sourceUrl && (
+        <p className="mt-3">
+          <a
+            className={link}
+            href={`https://traffic.observe.tw/tech/${encodeURIComponent(new URL(blog.sourceUrl).hostname.toLowerCase().replace(/^www\./, ''))}/`}
+            rel="noopener noreferrer"
+          >
+            在 traffic 查看詳細結果 ↗
+          </a>
+        </p>
+      )}
       {software.length > 0 && (
         <>
           <h3 className={`mt-3 mb-1.5 border-t border-zinc-200 pt-3 dark:border-zinc-800 ${muted}`}>

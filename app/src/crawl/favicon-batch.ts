@@ -1,7 +1,6 @@
 import { mkdir, open, stat, unlink } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import type { Pool, RowDataPacket } from 'mysql2/promise';
-import { createTechFetchBatch } from '../tech/fetch-batch.ts';
 import { type FaviconTarget, loadFaviconState, refreshFavicon } from './favicons.ts';
 import type { FeedCrawlerOptions } from './feed.ts';
 
@@ -62,22 +61,10 @@ export async function refreshMissingBlogFavicons(pool: Pick<Pool, 'query'>, opti
     for (const { target } of selected) {
       const remaining = deadline - Date.now();
       if (remaining <= 0) break;
-      const passiveBatch = createTechFetchBatch(pool as Pool, { blogId: target.id, blogUrl: target.url! });
-      const observer: FeedCrawlerOptions['observer'] = passiveBatch
-        ? (event) => {
-            passiveBatch.observer(event);
-            try {
-              const pending = options.observer?.(event);
-              if (pending && typeof pending.catch === 'function') void pending.catch(() => undefined);
-            } catch {
-              /* Match politeFetch's failure-isolated, non-awaited callback contract. */
-            }
-          }
-        : options.observer;
       results.push(
         await refreshFavicon(target, {
           ...options,
-          observer,
+          observer: options.observer,
           root,
           state,
           batchCache,
@@ -86,7 +73,6 @@ export async function refreshMissingBlogFavicons(pool: Pick<Pool, 'query'>, opti
           maxTargetMs: Math.min(30_000, remaining),
         }),
       );
-      await passiveBatch?.commit([]);
     }
     return { selected: selected.length, processed: results.length, results };
   } finally {

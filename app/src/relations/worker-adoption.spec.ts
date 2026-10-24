@@ -10,7 +10,6 @@ vi.mock('../jobs/budget.ts', () => ({ reserveBudget: async () => true }));
 vi.mock('../jobs/lease.ts', () => ({
   withJobLease: async (_p: unknown, _n: string, fn: (assert: () => Promise<void>) => unknown) => fn(m.assert),
 }));
-vi.mock('../tech/observer.ts', () => ({ createTechObserver: () => undefined }));
 vi.mock('./routes.ts', () => ({ invalidateRelationCache: vi.fn() }));
 vi.mock('./store.ts', () => ({
   loadAliases: async () => [],

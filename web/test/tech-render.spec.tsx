@@ -340,7 +340,7 @@ describe('/tech/ baseline', () => {
     expect(techs.children('span').attr('title')).toBe('WordPress 6.4、Elementor、Cloudflare（低信心）');
     expect(techs.text()).toBe('WordPress6.4、Elementor·主機／CDN（低信心）Cloudflare');
     expect(techs.find('a[href="/tech/?technology=wp-plugin%3Aelementor"]').length).toBe(1);
-    expect(detected.find('td').eq(4).text()).toBe('公開 HTML（首頁或文章）');
+    expect(detected.find('td').eq(4).text()).toBe('首頁 HTML');
     // One time column: the success; the last attempt is its title (and shown only when it failed).
     expect(detected.find('td').eq(5).text()).toBe(taipei(OBSERVED));
     expect(detected.find('td').eq(5).attr('title')).toBe(`最後嘗試：${taipei(OBSERVED)}`);
@@ -377,17 +377,10 @@ describe('/tech/ baseline', () => {
     const $ = render(<TechStatsView data={stats()} filters={baselineFilters} status="ready" />);
     const block = expectOneBlock($);
     const inside = block.text();
-    for (const text of [
-      '技術觀測方式',
-      '本次統計範圍',
-      '公開部落格共 2,400 個；本次讀取 2,000 個',
-      '合成方法說明',
-      '不為了辨識技術對部落格增加任何請求',
-    ])
+    for (const text of ['技術觀測方式', '本次統計範圍', '公開部落格共 2,400 個；本次讀取 2,000 個', '合成方法說明', '每月抓取一次首頁'])
       expect(inside, text).toContain(text);
     const outside = outsideText($);
-    for (const text of ['技術觀測方式', '本次統計範圍', '合成方法說明', '不為了辨識技術對部落格增加任何請求'])
-      expect(outside, text).not.toContain(text);
+    for (const text of ['技術觀測方式', '本次統計範圍', '合成方法說明', '每月抓取一次首頁']) expect(outside, text).not.toContain(text);
     expect($('main header a').attr('href')).toBe('#method');
     const tablePosition = ($('*').toArray() as unknown[]).indexOf($('table').get(0));
     expect(tablePosition).toBeLessThan(($('*').toArray() as unknown[]).indexOf(block.get(0)));

@@ -214,7 +214,7 @@ test('coverage: a body fragment is never the whole site; shares need a denominat
   assert.match(coverageNote({ ...base, sourceType: 'html', htmlTruncated: true }), /只看了前段/);
   // An html snapshot may be an article page the crawler read, so it is never called the home page alone.
   assert.equal(coverageNote({ ...base, sourceType: 'html' }), '檢查既有的公開 HTML 回應（首頁或文章）。');
-  assert.equal(sourceTypeText.html, '公開 HTML（首頁或文章）');
+  assert.equal(sourceTypeText.html, '首頁 HTML');
   assert.equal(coverageNote(null), '沒有觀測範圍紀錄。');
   assert.equal(share(1, 4), '25.0%');
   assert.equal(share(1, 3), '33.3%');
@@ -358,7 +358,7 @@ test('contracts: a malformed coverage, detection, evidence or impossible state i
     'coverage not partial': { ...observed, coverage: { ...coverage, partial: false } },
     'detection without version': { ...observed, detections: [without(detection, 'version')] },
     'detection without observedAt': { ...observed, detections: [without(detection, 'observedAt')] },
-    'detection with an unknown category': { ...observed, detections: [{ ...detection, category: 'other' }] },
+    'detection with an unknown category': { ...observed, detections: [{ ...detection, category: 'unrecognized-category' }] },
     'evidence [{}]': { ...observed, detections: [{ ...detection, evidence: [{}] }] },
     'evidence with an unknown kind': { ...observed, detections: [{ ...detection, evidence: [{ kind: 'html', value: '<html>' }] }] },
     'blog without id': without(observed, 'id'),
@@ -400,4 +400,34 @@ test('profile read: 5xx, network and a wrong shape are PublicGatewayError; only 
   for (const [name, fetcher] of failures)
     await assert.rejects(readPublic('http://gateway.test', path, fetcher, noWait), PublicGatewayError, name);
   assert.deepEqual(await readPublic('http://gateway.test', path, answer(404, { error: 'not_found' }), noWait), { found: false });
+});
+
+test('traffic homepage results accept every category and preserve a failed success snapshot', () => {
+  const method = { id: 'traffic-homepage-wappalyzer', partial: true, additionalRequests: true, description: 'traffic' };
+  for (const category of [
+    'cms',
+    'framework',
+    'library',
+    'server',
+    'cdn',
+    'hosting',
+    'analytics',
+    'ads',
+    'consent',
+    'media',
+    'social',
+    'security',
+    'other',
+    'theme',
+    'plugin',
+  ]) {
+    const blog = {
+      ...observed,
+      status: 'failed',
+      errorCode: 'not-html',
+      coverage: { partial: true, method: method.id, sourceType: 'html' },
+      detections: [{ ...detection, category }],
+    };
+    assert.equal(validPublicPayload('blogTech', blogTech(blog, method)), true, category);
+  }
 });

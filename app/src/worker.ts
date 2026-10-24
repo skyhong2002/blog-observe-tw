@@ -23,7 +23,6 @@ import { runScraperRepairJob } from './scrapers/repair.ts';
 import { indexFulltextPosts, indexMissingFulltextPosts, runFulltextBatch } from './search-fulltext.ts';
 import { createIndexJobClaim, createIndexJobEnqueue, runSearchIndexJob, SEARCH_INDEX_JOB } from './search-index-job.ts';
 import { backfillPublicRoutes, backfillTopicRouteAliases } from './seo/page-routes.ts';
-import { createTechFetchBatch } from './tech/fetch-batch.ts';
 import { runTopicsBatch } from './topics/batch.ts';
 import { refreshTopicFrequencies } from './topics/frequency.ts';
 import { backfillTopicHistory } from './topics/history-backfill.ts';
@@ -199,7 +198,6 @@ const worker = new Worker(
         if (closing) break;
         try {
           const result = await runHistoryBatch(history, blog, {
-            passiveBatch: createTechFetchBatch(store.pool, { blogId: blog.id, blogUrl: blog.url }),
             userAgent: config.crawlUserAgent,
             delayMs: config.crawlDelayMs,
             timeoutMs: 10000,
@@ -275,7 +273,6 @@ const worker = new Worker(
             ...indexOptions,
             userAgent: config.crawlUserAgent,
             delayMs: config.crawlDelayMs,
-            passiveBatch: createTechFetchBatch(store.pool, { blogId: blog.id, blogUrl: blog.url }),
           }),
         );
       } catch (error) {

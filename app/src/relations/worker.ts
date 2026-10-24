@@ -7,7 +7,6 @@ import { reserveBudget } from '../jobs/budget.ts';
 import type { BatchOptions, BatchResult } from '../jobs/contracts.ts';
 import { withJobLease } from '../jobs/lease.ts';
 import { createBodyIndexStages } from '../search-index-staging.ts';
-import { createTechObserver } from '../tech/observer.ts';
 import { PARSER_VERSION } from './parser.ts';
 import { invalidateRelationCache } from './routes.ts';
 import {
@@ -185,7 +184,6 @@ export async function runRelationBatch(
               ...options,
               timeoutMs: Math.min(options.timeoutMs ?? 15000, 20000),
               fetcher,
-              observer: createTechObserver(pool, { blogId: post.blog_id, blogUrl: post.blog_url, sourcePostId: post.id }),
             });
             if (response.status === 304 && post.status && post.parser_version === PARSER_VERSION && (post.etag || post.last_modified)) {
               await pool.query(

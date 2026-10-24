@@ -16,7 +16,22 @@
 import { isCanonicalPagePath } from './page-links.ts';
 import type { QueryReader } from './public-query.ts';
 
-export type TechCategory = 'cms' | 'framework' | 'theme' | 'plugin' | 'analytics' | 'hosting' | 'cdn';
+export type TechCategory =
+  | 'cms'
+  | 'framework'
+  | 'theme'
+  | 'plugin'
+  | 'analytics'
+  | 'hosting'
+  | 'cdn'
+  | 'library'
+  | 'server'
+  | 'ads'
+  | 'consent'
+  | 'media'
+  | 'social'
+  | 'security'
+  | 'other';
 export type TechStatus = 'detected' | 'unknown' | 'failed' | 'blocked' | 'not-observed';
 export type TechEvidence = { kind: 'generator' | 'asset' | 'marker' | 'header'; value: string };
 export type TechDetection = {
@@ -32,10 +47,10 @@ export type TechDetection = {
 };
 export type TechCoverageOfBlog = {
   partial: true;
-  method: 'passive-existing-response';
+  method: 'passive-existing-response' | 'traffic-homepage-wappalyzer';
   sourceType: 'html' | 'body-fragment' | 'header';
-  htmlTruncated: boolean;
-  inspectedNodes: number;
+  htmlTruncated?: boolean;
+  inspectedNodes?: number;
 };
 export type TechBlog = {
   id: number;
@@ -54,7 +69,7 @@ export type TechBlog = {
   coverage: TechCoverageOfBlog | null;
   detections: TechDetection[];
 };
-export type TechMethod = { id: string; partial: true; additionalRequests: false; description: string };
+export type TechMethod = { id: string; partial: true; additionalRequests: boolean; description: string };
 export type TechCoverage = {
   totalBlogs: number;
   scannedBlogs: number;
@@ -131,10 +146,20 @@ export const errorText: Record<string, string> = {
   timeout: '連線逾時',
   network: '連線失敗',
   'invalid-response': '回應無法辨識',
+  'not-html': '來源不是 HTML',
+  address: '來源位址無法存取',
 };
 export const errorLabel = (code: string | null) => (code ? (errorText[code] ?? '原因未記錄') : '原因未記錄');
 
 export const categoryText: Record<TechCategory, string> = {
+  library: '程式庫',
+  server: '伺服器',
+  ads: '廣告',
+  consent: '同意管理',
+  media: '影音',
+  social: '社群',
+  security: '安全',
+  other: '其他',
   cms: 'CMS／平台',
   framework: '網站框架',
   theme: '佈景主題',
@@ -144,20 +169,35 @@ export const categoryText: Record<TechCategory, string> = {
   cdn: 'CDN',
 };
 /** Site software, ranked apart from the infrastructure hints below. */
-export const SOFTWARE_CATEGORIES: TechCategory[] = ['cms', 'framework', 'theme', 'plugin', 'analytics'];
+export const SOFTWARE_CATEGORIES: TechCategory[] = [
+  'cms',
+  'framework',
+  'theme',
+  'plugin',
+  'analytics',
+  'library',
+  'server',
+  'ads',
+  'consent',
+  'media',
+  'social',
+  'security',
+  'other',
+];
 /** Low-confidence header hints: where the site is served from, never what it is built with. */
 export const INFRA_CATEGORIES: TechCategory[] = ['hosting', 'cdn'];
 export const isInfra = (category: string) => (INFRA_CATEGORIES as string[]).includes(category);
 
 export const sourceTypeText: Record<TechCoverageOfBlog['sourceType'], string> = {
   // A success snapshot's HTML may be the home page or an article page the crawler already read; never assume the home page.
-  html: '公開 HTML（首頁或文章）',
+  html: '首頁 HTML',
   'body-fragment': '文章內文片段',
   header: '回應標頭',
 };
 /** What one observation looked at; a body fragment is never the whole site. */
 export function coverageNote(coverage: TechCoverageOfBlog | null): string {
   if (!coverage) return '沒有觀測範圍紀錄。';
+  if (coverage.method === 'traffic-homepage-wappalyzer') return '由 traffic.observe.tw 檢查首頁，屬部分覆蓋，不代表已掃描全站。';
   const parts = [
     coverage.sourceType === 'body-fragment'
       ? '只檢查 RSS／文章內文片段，屬部分覆蓋，不代表已掃描全站'
