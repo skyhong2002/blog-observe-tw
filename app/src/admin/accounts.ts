@@ -1,5 +1,4 @@
 import type { Pool, RowDataPacket } from 'mysql2/promise';
-import { tagClient, VOTERS_LIMIT } from '../blog-genres/traffic.ts';
 
 // What each signed-in account has done, for /admin/accounts/ (adapted from
 // tag.observe.tw 1d711372 app/src/admin/user-activity.ts). A reader's own use
@@ -12,7 +11,6 @@ export type AccountMetric = { key: string; label: string; group: Group };
 export const ACCOUNT_METRICS: AccountMetric[] = [
   { key: 'follows', label: '追蹤', group: 'use' },
   { key: 'apiKeys', label: 'API 金鑰', group: 'use' },
-  { key: 'votes', label: '標籤投票', group: 'contribute' },
   { key: 'candidates', label: '審核候選', group: 'admin' },
   { key: 'profiles', label: '簡介與主題', group: 'admin' },
   { key: 'tags', label: '部落格標籤', group: 'admin' },
@@ -105,18 +103,6 @@ export async function adminAccounts(pool: Pool, adminEmails: Set<string>) {
         for (const row of rows) add(row.who, auditMetric(String(row.action)), row.n, row.last);
       }),
   ]);
-  // Tag votes live on traffic.observe.tw since 2026-10-24, counted there for the votes cast through blog
-  // (blog_genre_votes is frozen). The table still loads without them; `votesUnavailable` says so.
-  let votesUnavailable = false;
-  const byEmail = new Map([...out.values()].map((a) => [a.email.toLowerCase(), a.id]));
-  const emails = [...byEmail.keys()].filter((e) => e.includes('@'));
-  try {
-    for (let i = 0; i < emails.length; i += VOTERS_LIMIT) {
-      const stats = await tagClient().voters(emails.slice(i, i + VOTERS_LIMIT));
-      for (const [email, s] of Object.entries(stats)) if (s.votes) add(byEmail.get(email), 'votes', s.votes, s.lastAt);
-    }
-  } catch {
-    votesUnavailable = true;
-  }
-  return { metrics: ACCOUNT_METRICS, accounts: [...out.values()], votesUnavailable };
+  // Tag votes are cast on traffic.observe.tw itself since gen106 (blog_genre_votes is frozen), so none are counted here.
+  return { metrics: ACCOUNT_METRICS, accounts: [...out.values()] };
 }

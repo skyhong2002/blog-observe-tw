@@ -9,6 +9,18 @@
 - 標籤 → 網址參數：traffic 的標籤名稱經 `genreKey` 轉成代碼，起始 20 個仍是 `food`、`travel`…（「美食」→ `food`、「3C」→ `gadgets`），所以舊的 `/blogs/?genre=food`、`/articles/?exclude=food` 照舊有效。其他標籤用自己的折疊文字（「個人」→ `?genre=個人`）。標籤長度上限改為 traffic 的 32 字。
 - traffic 編輯清單（`site_metadata` 或試算表）的標籤，例如「個人」「科技」，來源顯示「編輯」，一律顯示，可以投票但票數不影響顯示（traffic 規則）；在目錄可以篩選，也列入目錄的標籤 chip。
 
+## gen106 起：blog 不投票，導流到 traffic
+
+比照 tag.observe.tw（/media/<media>/），部落格頁不再提供投票：
+
+- 標題下第一行只有收錄說明（收錄狀態・資料來源與計算方式）。第二行是「標籤」、每個顯示中的標籤一個 chip（同 /blogs/ 目錄的標籤 chip，連到 `/blogs/?genre=<key>`），最後是「編輯標籤」，連到 `https://traffic.observe.tw/site/<domain>/#tags`（gateway 的 `tagsUrl`，網域同上）。連結只寫這四個字；網域只放在 title。沒有顯示中的標籤時寫「尚無標籤」；從來沒讀到過標籤時只顯示連結，不顯示錯誤。
+- 右側的「標籤」卡片、同意／不同意、新增框、管理員覆寫與 `/api/me/blog-genres` 的前端呼叫都拿掉（「無法載入投票功能」不會再出現）。`/api/me/blog-genres/:slug`、`/genres/propose`、`/genres/:genre/vote|admin` 一律回 410 `{ error: 'tags_moved', url }`，url 是這個部落格在 traffic 的標籤區。帳號頁不再計標籤投票，也不再呼叫 `/internal/v1/tags/voters`。
+- 讀取：部落格頁也讀目錄那份快照。有快照後沒有請求會等 traffic：過期的快照立即回答、背後重讀，重讀失敗就繼續用上一份；只有服務啟動後第一次讀取會等（失敗則 `unavailable`，頁面只顯示連結）。
+- 部署檢查（`tools/deploy-blue-green.ts`）：`/blogs/kocpc/` 必須有「編輯標籤」；kocpc 的標籤在冷啟動時可能還沒讀到，最多等 30 秒，等不到只記 `slot_tags_pending` 警告、不判失敗。
+- 右側「部落格標籤」卡片（作者在 RSS 用的標籤，連到 /tags/）是另一種資料，保留。
+
+以下「讀與寫」中關於投票、新增、管理員覆寫與投票數的段落是 gen102–105 的行為，留作紀錄。
+
 ## 讀與寫
 
 - 部落格頁：每次讀這一個網域（新鮮）。目錄、最新文章（overview）與管理頁的部落格表共用一份「所有已驗證部落格」的快照，1 分鐘內不重讀；traffic 沒回應時沿用 10 分鐘內的上一份，再久就顯示「標籤資料暫時無法使用」（`unavailable`）。投票、新增、覆寫成功後，回傳的新標籤會直接寫進快照。

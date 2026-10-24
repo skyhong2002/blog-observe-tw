@@ -4,7 +4,7 @@ import { validateGenreSeed } from '../../../tools/lib/genre-seed.ts';
 import { fakeTagClient, tag } from '../../test/tag-client.ts';
 import { genreItems } from './resolve.ts';
 import { loadBlogGenres, loadShownGenres, readBlogGenres } from './store.ts';
-import { setTagClient, TagServiceError, tagDomain, trafficTagClient } from './traffic.ts';
+import { setTagClient, TagServiceError, tagDomain, trafficTagClient, trafficTagsUrl } from './traffic.ts';
 
 const blogRows = (rows: Record<string, unknown>[]) => ({
   calls: [] as { sql: string; args: unknown }[],
@@ -34,7 +34,8 @@ describe('blog tags from traffic.observe.tw', () => {
       { genre: '咖啡', label: '咖啡', source: 'admin', visible: false, agrees: 0, disagrees: 0, adminOverride: 'hide' },
     ]);
   });
-  it('maps blogs to the domain traffic uses', () => {
+  it('maps blogs to the domain traffic uses and links its tag block there', () => {
+    expect(trafficTagsUrl('wiwi.blog')).toBe('https://traffic.observe.tw/site/wiwi.blog/#tags');
     expect(tagDomain('www.KOCPC.com.tw')).toBe('kocpc.com.tw');
     expect(tagDomain('blog.example.com')).toBe('blog.example.com');
     expect(tagDomain('localhost')).toBeNull();
@@ -50,7 +51,7 @@ describe('blog tags from traffic.observe.tw', () => {
     expect(result.blogs.size).toBe(0);
     expect(failures).toBe(1);
   });
-  it('bounds one read to requested verified slugs; a domain traffic does not know has no tags', async () => {
+  it('answers requested slugs from the snapshot of every verified blog; a domain traffic does not know has no tags', async () => {
     const traffic = fakeTagClient({ 'a.blog.tw': [tag('美食', { source: 'admin', visible: false, adminOverride: 'hide', agrees: 20 })] });
     setTagClient(traffic.client);
     const pool = blogRows([
@@ -59,10 +60,11 @@ describe('blog tags from traffic.observe.tw', () => {
     ]);
     const result = await loadBlogGenres(pool as never, ['a', 'a', 'b', 'c']);
     expect(pool.calls).toHaveLength(1);
-    expect(pool.calls[0].sql).toContain('SET STATEMENT max_statement_time=1 FOR');
     expect(pool.calls[0].sql).toContain("status='verified'");
-    expect(pool.calls[0].args).toEqual([['a', 'b', 'c']]);
     expect(traffic.reads).toEqual([{ domains: ['a.blog.tw', 'b.blog.tw'] }]);
+    // A second blog page reads the same snapshot, not traffic.
+    await loadBlogGenres(pool as never, ['b']);
+    expect(traffic.reads).toHaveLength(1);
     expect(result.get('a')?.items).toEqual([
       { genre: 'food', label: '美食', source: 'admin', visible: false, agrees: 20, disagrees: 0, adminOverride: 'hide' },
     ]);
@@ -75,7 +77,7 @@ describe('blog tags from traffic.observe.tw', () => {
       ),
     ).rejects.toThrow('genre-read-bound');
   });
-  it('reads the directory once a minute and serves the last answer while traffic is down', async () => {
+  it('reads traffic once a minute, never makes a reader wait once it has answered, and keeps the last answer while it is down', async () => {
     const traffic = fakeTagClient({ 'a.blog.tw': [tag('旅遊'), tag('露營', { source: 'community', visible: false })] });
     setTagClient(traffic.client);
     const pool = blogRows([
@@ -94,16 +96,25 @@ describe('blog tags from traffic.observe.tw', () => {
     });
     const now = Date.now();
     const clock = Date.now;
-    Date.now = () => now + 2 * 60_000;
     try {
+      Date.now = () => now + 2 * 60_000;
       expect((await loadShownGenres(pool as never)).get(1)?.[0].genre).toBe('travel');
-      Date.now = () => now + 11 * 60_000;
-      await expect(loadShownGenres(pool as never)).rejects.toThrow('down');
+      Date.now = () => now + 60 * 60_000;
+      expect((await loadShownGenres(pool as never)).get(1)?.[0].genre).toBe('travel');
+      // A slow traffic is read behind the answer: the request does not wait for it.
+      let release = () => {};
+      const slow = fakeTagClient({ 'a.blog.tw': [tag('露營')] });
+      setTagClient({ ...slow.client, read: (list) => new Promise((r) => (release = () => r(slow.client.read(list)))) });
+      expect((await loadShownGenres(pool as never)).get(1)?.[0].genre).toBe('travel');
+      release();
+      await new Promise((r) => setTimeout(r, 0));
+      await new Promise((r) => setTimeout(r, 0));
+      expect((await loadShownGenres(pool as never)).get(1)?.[0].label).toBe('露營');
     } finally {
       Date.now = clock;
     }
   });
-  it('sends the token only to the loopback service and treats a refusal of the caller as unavailable', async () => {
+  it('sends the token only to the loopback service and treats a refusal or a bad answer as unavailable', async () => {
     const sent: { url: string; init: RequestInit }[] = [];
     const answer = (status: number, body: unknown) => new Response(JSON.stringify(body), { status });
     let next = answer(404, { error: 'not found' });
@@ -114,13 +125,10 @@ describe('blog tags from traffic.observe.tw', () => {
         return next;
       },
     });
-    const vote = { kind: 'vote', voter: 'a@test', domain: 'a.blog.tw', tag: '美食', vote: 1 } as const;
-    await expect(client.write(vote)).rejects.toThrow(TagServiceError);
-    expect(sent[0].url).toBe('http://127.0.0.1:18150/internal/v1/tags/vote');
+    await expect(client.read(['a.blog.tw'])).rejects.toThrow(TagServiceError);
+    expect(sent[0].url).toBe('http://127.0.0.1:18150/internal/v1/tags');
     expect((sent[0].init.headers as Record<string, string>).authorization).toBe(`Bearer ${'t'.repeat(40)}`);
-    expect(JSON.parse(String(sent[0].init.body))).toEqual({ voter: 'a@test', domain: 'a.blog.tw', tag: '美食', vote: 1 });
-    next = answer(404, { error: 'unknown_tag', message: '這個網站沒有這個標籤。' });
-    expect(await client.write(vote)).toEqual({ status: 404, error: 'unknown_tag', message: '這個網站沒有這個標籤。' });
+    expect(JSON.parse(String(sent[0].init.body))).toEqual({ domains: ['a.blog.tw'] });
     next = answer(200, { domains: { 'a.blog.tw': [{ tag: 'x', source: 'nope' }] } });
     await expect(client.read(['a.blog.tw'])).rejects.toThrow('tag-service-shape');
     await expect(trafficTagClient({ readToken: async () => null }).read([])).rejects.toThrow('tag-service-token');

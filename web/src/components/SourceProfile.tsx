@@ -2,6 +2,7 @@
 
 import { type ReactNode, Suspense } from 'react';
 import BlogIcon from '@/components/BlogIcon';
+import BlogTagLine from '@/components/BlogTagLine';
 import Link from '@/components/NoPrefetchLink';
 import ProfilePostsView, { ProfilePostsFromUrl } from '@/components/public/ProfilePosts';
 import { type Blog, taipei } from '@/lib/api';
@@ -42,7 +43,6 @@ export default function SourceProfile({ blog, sidebar, cloud }: { blog: Blog; si
   const allPosts = blog.posts ?? [];
   const authors = blog.authors ?? [];
   const tags = blog.tags ?? [];
-  const genres = (blog.genreState?.items ?? []).filter((item) => item.visible).map((item) => item.label);
   const owner = { slug: blog.slug, name: blog.name, canonicalPath: blog.canonicalPath };
   return (
     <div className="pb-4">
@@ -63,17 +63,12 @@ export default function SourceProfile({ blog, sidebar, cloud }: { blog: Blog; si
             <FollowButton slug={blog.slug} />
           </div>
           <p className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-zinc-500 dark:text-zinc-400">
-            {/* Shown tags (標籤 below, from traffic.observe.tw), not the imported category; none leaves the place empty. */}
-            {genres.length > 0 && (
-              <>
-                <span>{genres.join('、')}</span>
-                <span>·</span>
-              </>
-            )}
+            {/* How the blog was collected only; its tags have their own line below (tag.observe.tw's layout). */}
             <span>{blog.statusLabel ?? '待核對'}</span>
             <span>·</span>
             <MethodLink />
           </p>
+          <BlogTagLine state={blog.genreState} tagsUrl={blog.tagsUrl} />
         </div>
         <dl className="flex gap-5 text-right sm:gap-7">
           <div>

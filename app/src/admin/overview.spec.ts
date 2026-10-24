@@ -1,6 +1,4 @@
 import { describe, expect, it } from 'vitest';
-import { fakeTagClient } from '../../test/tag-client.ts';
-import { setTagClient } from '../blog-genres/traffic.ts';
 import { ACCOUNT_METRICS, adminAccounts, auditMetric } from './accounts.ts';
 import { crawlState } from './blogs.ts';
 
@@ -53,7 +51,7 @@ describe('crawlState', () => {
   });
 });
 
-describe('adminAccounts tag votes', () => {
+describe('adminAccounts without tag votes', () => {
   const pool = {
     query: async (sql: string) =>
       sql.includes('FROM users u')
@@ -65,17 +63,9 @@ describe('adminAccounts tag votes', () => {
           ]
         : [[]],
   };
-  it("counts each account's votes cast through blog on traffic.observe.tw", async () => {
-    setTagClient(fakeTagClient({}, { voterStats: { 'reader@test': { votes: 3, lastAt: '2026-10-24T01:00:00.000Z' } } }).client);
+  it('counts no tag votes and never asks traffic: tags are voted on there since gen106', async () => {
     const data = await adminAccounts(pool as never, new Set());
-    expect(data.votesUnavailable).toBe(false);
-    expect(data.accounts.find((a) => a.id === 1)).toMatchObject({ counts: { votes: 3 }, lastActiveAt: '2026-10-24T01:00:00.000Z' });
-    expect(data.accounts.find((a) => a.id === 2)?.counts).toEqual({});
-    expect(ACCOUNT_METRICS.find((m) => m.key === 'votes')).toEqual({ key: 'votes', label: '標籤投票', group: 'contribute' });
-  });
-  it('still answers, marked, when traffic does not', async () => {
-    const data = await adminAccounts(pool as never, new Set());
-    expect(data.votesUnavailable).toBe(true);
-    expect(data.accounts).toHaveLength(2);
+    expect(data.accounts.map((a) => a.counts)).toEqual([{}, {}]);
+    expect(ACCOUNT_METRICS.some((m) => m.key === 'votes')).toBe(false);
   });
 });

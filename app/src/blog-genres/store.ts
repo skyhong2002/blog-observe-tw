@@ -1,13 +1,13 @@
 import type { Pool, RowDataPacket } from 'mysql2/promise';
-import { genreKey } from '../blog-genre-vocabulary.ts';
 import { type GenreItem, type GenreState, genreItems } from './resolve.ts';
 import { type TrafficTagItem, tagClient, tagDomain } from './traffic.ts';
 
 // Tags come from traffic.observe.tw (traffic.ts); blog only maps its blogs to their domains. The directory, the
-// overview and the admin table read one snapshot of every verified blog's tags, refreshed at most once a minute
-// and served up to ten minutes stale when traffic does not answer; a blog page reads its own blog fresh.
+// overview, the admin table and every blog page read one snapshot of every verified blog's tags, refreshed at most
+// once a minute. Once there is a snapshot no reader waits for traffic: an older one is answered at once while a
+// fresh read runs behind it, and stays when that read fails (gen106: the blog page's tag line was the reader's wait
+// on a loaded host). Only before the first answer does a request wait, and then it fails as unavailable.
 const SNAPSHOT_TTL_MS = 60_000;
-const SNAPSHOT_STALE_MS = 10 * 60_000;
 type Snapshot = { key: string; at: number; domains: Record<string, TrafficTagItem[]> };
 let snapshot: Snapshot | null = null;
 let pending: { key: string; read: Promise<Snapshot> } | null = null;
@@ -17,21 +17,30 @@ export function forgetTagSnapshot() {
   snapshot = null;
   pending = null;
 }
-/** A write's answer is the domain's new tags: the directory shows them at once instead of after the minute. */
-export function rememberDomainTags(domain: string, tags: TrafficTagItem[]) {
-  if (snapshot) snapshot.domains[domain] = tags;
-}
-
-/** traffic's spelling of a key on any blog in the snapshot (iPhone for iphone), for an admin naming a tag by key. */
-export function knownSpelling(key: string): string | null {
-  for (const tags of Object.values(snapshot?.domains ?? {})) for (const t of tags) if (genreKey(t.tag) === key) return t.tag;
-  return null;
-}
 
 type BlogDomain = { id: number; slug: string; domain: string | null };
 const blogDomains = (rows: RowDataPacket[]): BlogDomain[] =>
   rows.map((row) => ({ id: Number(row.id), slug: String(row.slug), domain: tagDomain(row.host) }));
 const domainsOf = (blogs: BlogDomain[]) => [...new Set(blogs.flatMap((b) => (b.domain ? [b.domain] : [])))].sort();
+
+/** One read of all these domains' tags, shared by every request that needs it while it runs. */
+function refresh(key: string, domains: string[]) {
+  if (pending?.key === key) return pending.read;
+  const read = (async () => {
+    const tags: Snapshot['domains'] = {};
+    // traffic reads at most 2000 domains at a time.
+    for (let i = 0; i < domains.length; i += 2000) Object.assign(tags, (await tagClient().read(domains.slice(i, i + 2000))).domains);
+    const next = { key, at: Date.now(), domains: tags };
+    snapshot = next;
+    return next;
+  })();
+  pending = { key, read };
+  const settle = () => {
+    if (pending?.read === read) pending = null;
+  };
+  read.then(settle, settle);
+  return read;
+}
 
 /** Every verified blog with its domain, and traffic's tags for all of them (the snapshot). */
 async function everyBlogTags(pool: Pick<Pool, 'query'>) {
@@ -42,58 +51,26 @@ async function everyBlogTags(pool: Pick<Pool, 'query'>) {
   const blogs = blogDomains(rows);
   const domains = domainsOf(blogs);
   const key = domains.join(' ');
-  const now = Date.now();
-  if (snapshot && snapshot.key === key && now - snapshot.at < SNAPSHOT_TTL_MS) return { blogs, tags: snapshot.domains };
-  if (!pending || pending.key !== key) {
-    const read = (async () => {
-      const tags: Snapshot['domains'] = {};
-      // traffic reads at most 2000 domains at a time.
-      for (let i = 0; i < domains.length; i += 2000) Object.assign(tags, (await tagClient().read(domains.slice(i, i + 2000))).domains);
-      return { key, at: Date.now(), domains: tags };
-    })();
-    pending = { key, read };
-    const settle = () => {
-      if (pending?.read === read) pending = null;
-    };
-    read.then(settle, settle);
+  const fresh = snapshot && snapshot.key === key && Date.now() - snapshot.at < SNAPSHOT_TTL_MS;
+  if (snapshot && !fresh) {
+    // Answer the last snapshot now; a blog added since then just has no tags until the read behind it lands.
+    refresh(key, domains).catch(() => undefined);
+    return { blogs, tags: snapshot.domains };
   }
-  try {
-    snapshot = await pending.read;
-  } catch (error) {
-    // While traffic is down the last answer stands for a while; a blog added since then just has no tags yet.
-    if (snapshot && now - snapshot.at < SNAPSHOT_STALE_MS) return { blogs, tags: snapshot.domains };
-    throw error;
-  }
-  return { blogs, tags: snapshot.domains };
+  if (snapshot) return { blogs, tags: snapshot.domains };
+  return { blogs, tags: (await refresh(key, domains)).domains };
 }
 
-/** Each verified blog's tags (shown or not), by slug, from a fresh read (≤200 slugs: one traffic request). */
-export async function loadBlogGenres(
-  pool: Pick<Pool, 'query'>,
-  slugs: string[],
-  { cached = false }: { cached?: boolean } = {},
-): Promise<Map<string, GenreState>> {
+/** Each verified blog's tags (shown or not), by slug, from the snapshot (≤200 slugs). */
+export async function loadBlogGenres(pool: Pick<Pool, 'query'>, slugs: string[]): Promise<Map<string, GenreState>> {
   const keys = [...new Set(slugs.filter((slug) => typeof slug === 'string' && slug.length > 0))];
   if (keys.length > 200) throw Error('genre-read-bound');
   const result = new Map<string, GenreState>(keys.map((key) => [key, { status: 'ready', items: [] }]));
   if (!keys.length) return result;
-  let blogs: BlogDomain[];
-  let tags: Record<string, TrafficTagItem[]>;
-  if (cached) {
-    ({ blogs, tags } = await everyBlogTags(pool));
-    blogs = blogs.filter((b) => result.has(b.slug));
-  } else {
-    const [rows] = await pool.query<RowDataPacket[]>(
-      "SET STATEMENT max_statement_time=1 FOR SELECT id,slug,canonical_host host FROM blogs WHERE status='verified' AND slug IN (?)",
-      [keys],
-    );
-    blogs = blogDomains(rows);
-    const domains = domainsOf(blogs);
-    tags = domains.length ? (await tagClient().read(domains)).domains : {};
-    for (const [domain, list] of Object.entries(tags)) rememberDomainTags(domain, list);
-  }
+  const { blogs, tags } = await everyBlogTags(pool);
   // A domain traffic does not know (a blog newer than its list) has no tags yet.
-  for (const blog of blogs) result.set(blog.slug, { status: 'ready', items: genreItems((blog.domain && tags[blog.domain]) || []) });
+  for (const blog of blogs)
+    if (result.has(blog.slug)) result.set(blog.slug, { status: 'ready', items: genreItems((blog.domain && tags[blog.domain]) || []) });
   return result;
 }
 
@@ -119,14 +96,9 @@ export async function loadAllGenres(pool: Pick<Pool, 'query'>): Promise<Map<numb
   return result;
 }
 
-export async function readBlogGenres(
-  pool: Pick<Pool, 'query'>,
-  slugs: string[],
-  onFailure: (error: unknown) => void,
-  options: { cached?: boolean } = {},
-) {
+export async function readBlogGenres(pool: Pick<Pool, 'query'>, slugs: string[], onFailure: (error: unknown) => void) {
   try {
-    return { status: 'ready' as const, blogs: await loadBlogGenres(pool, slugs, options) };
+    return { status: 'ready' as const, blogs: await loadBlogGenres(pool, slugs) };
   } catch (error) {
     onFailure(error);
     return { status: 'unavailable' as const, blogs: new Map<string, GenreState>() };

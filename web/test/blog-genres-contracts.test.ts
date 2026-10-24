@@ -49,3 +49,10 @@ test('unavailable genre reads remain valid public responses', () => {
   assert.equal(PUBLIC_CONTRACTS.overview({ ...overview, genreStatus: 'unavailable' }), true);
   assert.equal(PUBLIC_CONTRACTS.overview({ ...overview, genreStatus: 'missing' }), false);
 });
+test('the 編輯標籤 address is accepted only as a traffic.observe.tw site page', () => {
+  const withUrl = (tagsUrl: unknown) => PUBLIC_CONTRACTS.blog({ ...blog, blog: { ...blog.blog, tagsUrl } });
+  assert.equal(withUrl('https://traffic.observe.tw/site/wiwi.blog/#tags'), true);
+  assert.equal(withUrl(null), true);
+  for (const bad of ['javascript:alert(1)', 'https://evil.example/site/a/#tags', 'https://traffic.observe.tw/site/a b/#tags', 7])
+    assert.equal(withUrl(bad), false);
+});

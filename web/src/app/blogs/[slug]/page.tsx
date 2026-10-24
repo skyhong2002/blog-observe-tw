@@ -2,7 +2,6 @@ import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { Suspense } from 'react';
 import BlogContentSources from '@/components/BlogContentSources';
-import BlogGenres from '@/components/BlogGenres';
 import BlogInference from '@/components/BlogInference';
 import BlogMentions from '@/components/BlogMentions';
 import BlogRelations from '@/components/BlogRelations';
@@ -60,7 +59,6 @@ export default async function BlogDetailPage({ params }: Props) {
         }
         sidebar={
           <>
-            <BlogGenres key={blog.slug} slug={blog.slug} initialState={blog.genreState} />
             <BlogContentSources slug={blog.slug} />
             {/* Off unless BLOG_TECH_PUBLIC_ENABLED is 'true': no request, no section. Optional: streamed on its own. */}
             {techPublicEnabled() && (

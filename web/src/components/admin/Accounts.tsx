@@ -21,7 +21,7 @@ type Account = {
   counts: Record<string, number>;
   lastActiveAt: string | null;
 };
-type Data = { metrics: Array<{ key: string; label: string; group: Group }>; accounts: Account[]; votesUnavailable?: boolean };
+type Data = { metrics: Array<{ key: string; label: string; group: Group }>; accounts: Account[] };
 type Row = Account & { use: number; contribute: number; edits: number };
 type SortKey = 'name' | 'role' | 'use' | 'contribute' | 'edits' | 'lastActiveAt' | 'lastLoginAt' | `m:${string}`;
 
@@ -147,7 +147,7 @@ export default function Accounts() {
               <th colSpan={of('use').length} className={groupHead} title="讀者自己的使用">
                 互動
               </th>
-              <th colSpan={of('contribute').length + 1} className={groupHead} title="標籤投票與管理修改">
+              <th colSpan={of('contribute').length + 1} className={groupHead} title="管理修改">
                 貢獻
               </th>
               <th colSpan={2} className={groupHead}>
@@ -156,7 +156,7 @@ export default function Accounts() {
             </tr>
             <tr className="bg-(--table-head-bg)">
               {th('use', '互動', table.num, '追蹤與 API 金鑰的數量')}
-              {th('contribute', '貢獻', table.num, '標籤投票與管理修改的次數')}
+              {th('contribute', '貢獻', table.num, '管理修改的次數')}
               {of('use').map((m) => th(`m:${m.key}`, m.label, table.num, m.key === 'apiKeys' ? '建立過的金鑰，含已撤銷的' : undefined))}
               {of('contribute').map((m) => th(`m:${m.key}`, m.label, table.num))}
               {th(
@@ -207,10 +207,9 @@ export default function Accounts() {
         </table>
       </TableScroller>
       <p className="text-xs text-zinc-500 dark:text-zinc-400">
-        互動是讀者自己的使用：追蹤的部落格、建立的 API 金鑰。貢獻是標籤投票與管理修改；標籤投票由 traffic.observe.tw 記錄，只算經本站投的票
-        {data.votesUnavailable ? '（這次沒讀到，暫時不列出）' : ''}
-        ；管理修改依稽核紀錄計算，游標移到（手機點一下）數字上可看細項。最近活動是以上任一項的最後時間；游標移到名字上可看 Email
-        和加入時間。管理員只能由伺服器設定 BLOG_ADMIN_EMAILS 加入，對方用 Google 登入一次後生效，這裡不能新增或取消。
+        互動是讀者自己的使用：追蹤的部落格、建立的 API 金鑰。貢獻是管理修改（標籤改在 traffic.observe.tw
+        投票與編輯，不在這裡計數）；管理修改依稽核紀錄計算，游標移到（手機點一下）數字上可看細項。最近活動是以上任一項的最後時間；游標移到名字上可看
+        Email 和加入時間。管理員只能由伺服器設定 BLOG_ADMIN_EMAILS 加入，對方用 Google 登入一次後生效，這裡不能新增或取消。
       </p>
     </section>
   );

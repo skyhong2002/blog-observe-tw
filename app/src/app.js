@@ -8,6 +8,7 @@ import { registerLogin } from './auth/google-login.ts';
 import { dbLoginStore } from './auth/store.ts';
 import { registerBlogGenreRoutes } from './blog-genres/routes.ts';
 import { readBlogGenres } from './blog-genres/store.ts';
+import { tagDomain, trafficTagsUrl } from './blog-genres/traffic.ts';
 import { registerBlogSuggestionRoutes } from './blog-suggestions.ts';
 import { installPrivateCachePolicy } from './cache-policy.ts';
 import { loadCatalog, loadCatalogFeeds } from './catalog.js';
@@ -274,9 +275,12 @@ export async function buildApp(config, { logger = false, store = null } = {}) {
     return {
       blog: {
         ...blogs[0],
+        // The shared snapshot's tags (blog-genres/store.ts); unavailable only before traffic first answered.
         genreState: await readBlogGenres(pool, [blogs[0].slug], () =>
           request.log.warn({ operation: 'blog.genres' }, 'blog genres unavailable'),
         ).then((result) => result.blogs.get(blogs[0].slug) ?? { status: 'unavailable', items: [] }),
+        // 編輯標籤 on the blog page: tags are voted on and added on traffic.observe.tw (gen106).
+        tagsUrl: tagDomain(blogs[0].canonicalHost) ? trafficTagsUrl(tagDomain(blogs[0].canonicalHost)) : null,
         iconUrl: iconUrl(blogs[0].slug, await iconManifest()),
         authors,
         tags,
@@ -303,12 +307,7 @@ export async function buildApp(config, { logger = false, store = null } = {}) {
     }
     return user;
   };
-  registerBlogGenreRoutes(app, {
-    pool,
-    requireUser,
-    publicOrigin: config.publicOrigin,
-    sessionSecret: config.login?.sessionSecret || '',
-  });
+  registerBlogGenreRoutes(app, { pool });
   registerBlogSuggestionRoutes(app, { pool, requireUser, publicOrigin: config.publicOrigin });
   app.get('/api/me/follows', async (request, reply) => {
     const user = await requireUser(request, reply);

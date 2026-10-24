@@ -425,7 +425,16 @@ export const PUBLIC_CONTRACTS: Record<PublicKind, (raw: unknown) => boolean> = {
   blog: (raw) =>
     shape(raw, {
       blog: (value) =>
-        shape(value, { slug: text, name: text, authors: optional(rows), tags: optional(rows), genreState: optional(genreState) }),
+        shape(value, {
+          slug: text,
+          name: text,
+          authors: optional(rows),
+          tags: optional(rows),
+          genreState: optional(genreState),
+          // A link the page renders: only a traffic.observe.tw site page.
+          tagsUrl: (v) =>
+            v === undefined || v === null || (typeof v === 'string' && /^https:\/\/traffic\.observe\.tw\/site\/[^/\s"<>]+\/#tags$/.test(v)),
+        }),
       posts: rows,
     }),
   // The evidence, shared-tag and text-similarity keys are newer than some gateways: absent is "not provided" in the view.

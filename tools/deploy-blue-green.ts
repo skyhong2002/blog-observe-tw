@@ -80,6 +80,11 @@ async function ready(slot: Slot) {
       throw new ReadinessFailure(`slot_probe_failed:${path}`, [502, 503, 504].includes(response.status));
     if (!path.startsWith('/api/') && !/<(?:html|!DOCTYPE)/i.test(text)) throw Error('slot_html_failed');
   }
+  // A blog page always links 編輯標籤 (traffic.observe.tw), whatever traffic answers; its tags are checked apart.
+  const blogPage = await probe(TAG_PROBE.page, SLOTS[slot].gateway, 'text/html');
+  const blogHtml = await blogPage.text();
+  if (blogPage.status !== 200) throw new ReadinessFailure(`slot_probe_failed:${TAG_PROBE.page}`, [502, 503, 504].includes(blogPage.status));
+  if (!blogHtml.includes('編輯標籤')) throw Error('slot_blog_tag_line_missing');
   const auth = await probe('/auth/google', SLOTS[slot].gateway);
   await auth.body?.cancel();
   const location = new URL(auth.headers.get('location') ?? 'http://invalid');
@@ -90,6 +95,27 @@ async function ready(slot: Slot) {
     location.searchParams.get('code_challenge_method') !== 'S256'
   )
     throw Error('slot_oauth_failed');
+}
+/** A verified blog with tags on traffic.observe.tw, for the readiness checks. */
+const TAG_PROBE = { page: '/blogs/kocpc/', api: '/api/blogs/kocpc' };
+/**
+ * A cold slot's first tag read from traffic.observe.tw can still be running (tag.observe.tw rolled a deploy back on
+ * exactly that, 2026-10-24): wait up to 30 s for the probe blog's tags, then go on with a warning rather than fail,
+ * since a tag-less page is degraded, not broken.
+ */
+async function waitTags(slot: Slot) {
+  for (let i = 0; i < 15; i++) {
+    try {
+      const response = await probe(TAG_PROBE.api, SLOTS[slot].gateway);
+      const body = (await response.json()) as { blog?: { genreState?: { status?: string; items?: unknown[] } } };
+      const state = body.blog?.genreState;
+      if (response.ok && state?.status === 'ready' && (state.items?.length ?? 0) > 0) return;
+    } catch {
+      // Retried below like a missing answer.
+    }
+    await wait(2000);
+  }
+  console.warn(JSON.stringify({ warning: 'slot_tags_pending', slot, probe: TAG_PROBE.api }));
 }
 // Up to 60 s: on the shared host under swap pressure a cold gateway takes 12–25 s before it even listens.
 async function waitHealth(slot: Slot) {
@@ -201,6 +227,7 @@ async function prepare(slot: Slot, directory: string, sourceDirectory: string, p
   // A small startup allowance for transport/502/503/504 only. A bad route,
   // OAuth contract, wrong HTML, or exhausted retries keeps its real error.
   await pollReadiness(() => ready(slot));
+  await waitTags(slot);
   await atomicJson(join(root, 'ready', `${slot}.json`), {
     ...descriptor,
     source,

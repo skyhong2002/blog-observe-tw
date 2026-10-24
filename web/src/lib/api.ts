@@ -5,6 +5,8 @@ import type { RobotsStatus } from './robots';
 // stable slug/id they never replace (links: page-links.ts; absent = legacy URL).
 export type Blog = {
   genreState?: GenreState;
+  /** 編輯標籤: the blog's page on traffic.observe.tw (gen106); null when its host has no public domain. */
+  tagsUrl?: string | null;
   id?: number;
   slug: string;
   canonicalPath?: string;
