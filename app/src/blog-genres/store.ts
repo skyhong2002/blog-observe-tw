@@ -1,4 +1,5 @@
 import type { Pool, RowDataPacket } from 'mysql2/promise';
+import { genreKey } from '../blog-genre-vocabulary.ts';
 import { type GenreItem, type GenreState, genreItems } from './resolve.ts';
 import { type TrafficTagItem, tagClient, tagDomain } from './traffic.ts';
 
@@ -19,6 +20,12 @@ export function forgetTagSnapshot() {
 /** A write's answer is the domain's new tags: the directory shows them at once instead of after the minute. */
 export function rememberDomainTags(domain: string, tags: TrafficTagItem[]) {
   if (snapshot) snapshot.domains[domain] = tags;
+}
+
+/** traffic's spelling of a key on any blog in the snapshot (iPhone for iphone), for an admin naming a tag by key. */
+export function knownSpelling(key: string): string | null {
+  for (const tags of Object.values(snapshot?.domains ?? {})) for (const t of tags) if (genreKey(t.tag) === key) return t.tag;
+  return null;
 }
 
 type BlogDomain = { id: number; slug: string; domain: string | null };

@@ -150,6 +150,38 @@ describe('blog tag routes proxied to traffic.observe.tw', () => {
       await admin.app.close();
     }
   });
+  it("keeps traffic's spelling for an admin override, then the typed one, never the lowered key", async () => {
+    const f = await fixture({ traffic: fakeTagClient({ 'a.blog.tw': [tag('iPhone')] }) });
+    try {
+      const admin = (genre: string, payload: Record<string, unknown>) =>
+        f.app.inject(request('admin', payload, { url: `/api/blogs/a/genres/${encodeURIComponent(genre)}/admin` }));
+      expect((await admin('iphone', { action: 'hide' })).statusCode).toBe(200);
+      expect((await admin('single origin', { action: 'set', tag: '＃Single  Origin' })).statusCode).toBe(200);
+      // The typed spelling must be the same tag as the URL.
+      expect((await admin('coffee', { action: 'set', tag: 'Tea' })).statusCode).toBe(400);
+      expect(f.writes.map((w) => w.tag)).toEqual(['iPhone', 'Single Origin']);
+    } finally {
+      await f.app.close();
+    }
+  });
+  it('names reserved political tags and blogs traffic does not know yet', async () => {
+    const reserved = await fixture({
+      traffic: fakeTagClient({ 'a.blog.tw': [] }, { answer: () => ({ status: 400, error: 'reserved_tag', message: '政治傾向不是標籤' }) }),
+    });
+    const unknown = await fixture({ traffic: fakeTagClient({}, { answer: () => ({ status: 404, error: 'unknown_domain' }) }) });
+    try {
+      const refused = await reserved.app.inject(request('propose', { genre: '藍營' }));
+      expect(refused.statusCode).toBe(400);
+      expect(refused.json()).toEqual({ error: 'reserved_tag' });
+      const pending = await unknown.app.inject(request('propose', { genre: '咖啡' }));
+      expect(pending.statusCode).toBe(404);
+      expect(pending.json()).toEqual({ error: 'unknown_domain' });
+      expect((await unknown.app.inject(request('vote', { vote: 1 }))).json()).toEqual({ error: 'unknown_domain' });
+    } finally {
+      await reserved.app.close();
+      await unknown.app.close();
+    }
+  });
   it('answers 503 when traffic is down and passes its refusals on', async () => {
     const down: TagClient = {
       read: async () => {
@@ -159,6 +191,7 @@ describe('blog tag routes proxied to traffic.observe.tw', () => {
         throw new TagServiceError('down');
       },
       putAi: async () => ({ ok: true, sites: 0, changed: 0, skipped: [] }),
+      voters: async () => ({}),
     };
     const f = await fixture({ traffic: { client: down, reads: [], writes: [] } });
     const limited = await fixture({

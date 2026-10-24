@@ -5,7 +5,7 @@ import { writeAudit } from '../admin/identity.ts';
 import { readCookie, SESSION_COOKIE, type SessionUser } from '../auth/google-login.ts';
 import { genreKey, genreLabel, isBlogGenre, isGenreKey } from '../blog-genre-vocabulary.ts';
 import { genreItems } from './resolve.ts';
-import { rememberDomainTags } from './store.ts';
+import { knownSpelling, rememberDomainTags } from './store.ts';
 import { TagServiceError, type TagWrite, tagClient, tagDomain } from './traffic.ts';
 
 type Options = {
@@ -100,14 +100,16 @@ export function registerBlogGenreRoutes(app: FastifyInstance, options: Options) 
         limits.set(user.id, limit);
         const params = request.params as { slug: string; genre?: string };
         const body = request.body as Record<string, unknown> | null;
-        const key = kind === 'propose' ? 'genre' : kind === 'vote' ? 'vote' : 'action';
-        // A proposal is whatever the reader typed; votes and admin actions name an existing key.
+        const keys = kind === 'propose' ? ['genre'] : kind === 'vote' ? ['vote'] : ['action', 'tag'];
+        // A proposal is whatever the reader typed; votes and admin actions name an existing key. An admin may also
+        // send the typed spelling (`tag`, same key), used when traffic has no spelling of its own for that key.
         const genre = kind === 'propose' ? genreKey(body?.genre) : isGenreKey(params.genre) ? params.genre : null;
         if (
           !body ||
           typeof body !== 'object' ||
           Array.isArray(body) ||
-          Object.keys(body).some((k) => k !== key) ||
+          Object.keys(body).some((k) => !keys.includes(k)) ||
+          (body.tag !== undefined && (typeof body.tag !== 'string' || genreKey(body.tag) !== genre)) ||
           typeof genre !== 'string' ||
           !/^[\w.-]{1,255}$/.test(params.slug) ||
           (kind === 'vote' && ![1, -1, 0].includes(body.vote as number)) ||
@@ -116,7 +118,6 @@ export function registerBlogGenreRoutes(app: FastifyInstance, options: Options) 
           return reply.code(400).send({ error: 'invalid_genre_action' });
         const blog = await blogDomain(params.slug);
         if (!blog) return reply.code(404).send({ error: 'blog not found' });
-        // A blog newer than traffic's list of domains cannot carry tags yet.
         if (!blog.domain) return reply.code(404).send({ error: 'unknown_domain' });
         const voter = user.email;
         let result: Awaited<ReturnType<ReturnType<typeof tagClient>['write']>>;
@@ -124,12 +125,13 @@ export function registerBlogGenreRoutes(app: FastifyInstance, options: Options) 
           let tag: string;
           if (kind === 'propose') tag = typedTag(String(body.genre), genre);
           else {
-            // The URL names the key (food); traffic needs the site's spelling of it (美食, 3C, Coffee).
+            // The URL names the key (food); traffic needs its spelling of it (美食, 3C, iPhone): this site's, then any
+            // blog's, then what the admin typed. A blog newer than traffic's list of domains is not known there yet.
             const tags = (await tagClient().read([blog.domain])).domains[blog.domain];
             if (!tags) return reply.code(404).send({ error: 'unknown_domain' });
             const found = tags.find((t) => genreKey(t.tag) === genre)?.tag;
             if (!found && kind === 'vote') return reply.code(404).send({ error: 'genre not proposed' });
-            tag = found ?? genreLabel(genre);
+            tag = found ?? knownSpelling(genre) ?? (typeof body.tag === 'string' ? typedTag(body.tag, genre) : null) ?? genreLabel(genre);
           }
           const change: TagWrite =
             kind === 'vote'
@@ -150,6 +152,7 @@ export function registerBlogGenreRoutes(app: FastifyInstance, options: Options) 
           }
           if (result.status === 403) return reply.code(403).send({ error: result.error });
           if (result.status === 404) return reply.code(404).send({ error: result.error });
+          if (result.error === 'reserved_tag') return reply.code(400).send({ error: 'reserved_tag' });
           return reply.code(400).send({ error: 'invalid_genre_action', message: result.message });
         }
         rememberDomainTags(result.domain, result.tags);

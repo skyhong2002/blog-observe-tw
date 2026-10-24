@@ -11,6 +11,9 @@ export const offlineTagClient: TagClient = {
   putAi: async () => {
     throw new TagServiceError('tag-service-test');
   },
+  voters: async () => {
+    throw new TagServiceError('tag-service-test');
+  },
 };
 
 export const tag = (name: string, patch: Partial<TrafficTagItem> = {}): TrafficTagItem => ({
@@ -29,8 +32,10 @@ export function fakeTagClient(
   {
     voter,
     answer,
+    voterStats,
   }: {
     voter?: { admin: boolean; votes: Record<string, Record<string, number>> };
+    voterStats?: Record<string, { votes: number; lastAt: string | null }>;
     answer?: (change: TagWrite) => Awaited<ReturnType<TagClient['write']>>;
   } = {},
 ) {
@@ -49,6 +54,7 @@ export function fakeTagClient(
       return answer ? answer(change) : { ok: true, domain: change.domain, tag: change.tag, tags: domains[change.domain] ?? [] };
     },
     putAi: async (sites) => ({ ok: true, sites: sites.length, changed: 0, skipped: [] }),
+    voters: async (emails) => Object.fromEntries(emails.map((e) => [e, voterStats?.[e] ?? { votes: 0, lastAt: null }])),
   };
   return { client, reads, writes };
 }

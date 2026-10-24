@@ -19,7 +19,14 @@ const WRITE_ERRORS: Record<number, string> = {
   429: '操作太頻繁，請稍候一分鐘再試。',
   503: '標籤資料暫時無法使用，請稍後再試。',
 };
-type Action = (genre: string, kind: 'vote' | 'propose' | 'admin', value: number | string) => void;
+/** Refusals the status alone does not explain (app/src/blog-genres/routes.ts). */
+const ERROR_CODES: Record<string, string> = {
+  reserved_tag: '政治傾向不是標籤，不能新增或指定顯示。',
+  // A blog traffic.observe.tw has not synced yet (its list follows blog's with a delay).
+  unknown_domain: '這個部落格的標籤資料還在準備中，請稍後再試。',
+};
+/** `text`: an admin's typed spelling, kept when traffic has none of its own for that tag. */
+type Action = (genre: string, kind: 'vote' | 'propose' | 'admin', value: number | string, text?: string) => void;
 
 /** What a reader typed, as tag keys: commas and 、 separate several; text no tag can be is dropped. */
 export const typedGenres = (text: string) => typedTags(text).map((t) => t.key);
@@ -192,19 +199,19 @@ export function BlogGenresView({
                     {
                       label: '指定顯示',
                       run: (genres) => {
-                        for (const genre of genres) onAction?.(genre.key, 'admin', 'set');
+                        for (const genre of genres) onAction?.(genre.key, 'admin', 'set', genre.text);
                       },
                     },
                     {
                       label: '隱藏',
                       run: (genres) => {
-                        for (const genre of genres) onAction?.(genre.key, 'admin', 'hide');
+                        for (const genre of genres) onAction?.(genre.key, 'admin', 'hide', genre.text);
                       },
                     },
                     {
                       label: '解除覆寫',
                       run: (genres) => {
-                        for (const genre of genres) onAction?.(genre.key, 'admin', 'release');
+                        for (const genre of genres) onAction?.(genre.key, 'admin', 'release', genre.text);
                       },
                     },
                   ]}
@@ -255,7 +262,7 @@ export default function BlogGenres({ slug, initialState }: { slug: string; initi
     return () => controller.abort();
   }, [slug, session?.user]);
   const queue = useRef(Promise.resolve());
-  const send = async (genre: string, kind: 'vote' | 'propose' | 'admin', value: number | string) => {
+  const send = async (genre: string, kind: 'vote' | 'propose' | 'admin', value: number | string, text?: string) => {
     if (!own) return;
     setPending(true);
     setError('');
@@ -269,10 +276,18 @@ export default function BlogGenres({ slug, initialState }: { slug: string; initi
           credentials: 'same-origin',
           cache: 'no-store',
           headers: { 'content-type': 'application/json', 'x-blog-csrf': own.csrfToken },
-          body: JSON.stringify(kind === 'propose' ? { genre } : kind === 'vote' ? { vote: value } : { action: value }),
+          body: JSON.stringify(
+            kind === 'propose' ? { genre } : kind === 'vote' ? { vote: value } : { action: value, ...(text ? { tag: text } : {}) },
+          ),
         },
       );
-      if (!response.ok) throw Error(WRITE_ERRORS[response.status] ?? '儲存失敗，請重新整理後再試。');
+      if (!response.ok) {
+        const code = await response
+          .json()
+          .then((body) => (typeof body?.error === 'string' && Object.hasOwn(ERROR_CODES, body.error) ? body.error : ''))
+          .catch(() => '');
+        throw Error(ERROR_CODES[code] ?? WRITE_ERRORS[response.status] ?? '儲存失敗，請重新整理後再試。');
+      }
       const result = await response.json();
       setState(result.genreState ?? unavailable);
       if (kind !== 'admin')
@@ -287,8 +302,8 @@ export default function BlogGenres({ slug, initialState }: { slug: string; initi
     }
   };
   // Several typed tags run one after another, each on the state the previous one returned.
-  const act: Action = (genre, kind, value) => {
-    queue.current = queue.current.then(() => send(genre, kind, value));
+  const act: Action = (genre, kind, value, text) => {
+    queue.current = queue.current.then(() => send(genre, kind, value, text));
   };
   return (
     <div className="space-y-2">

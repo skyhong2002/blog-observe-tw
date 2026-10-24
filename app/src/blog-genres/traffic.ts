@@ -32,7 +32,11 @@ export type TagWrite =
   | { kind: 'vote'; voter: string; domain: string; tag: string; vote: 1 | -1 | 0 }
   | { kind: 'propose'; voter: string; domain: string; tag: string }
   | { kind: 'admin'; voter: string; domain: string; tag: string; action: 'set' | 'hide' | 'release' };
-export type AiSite = { domain: string; tags: string[]; reason?: string };
+/** Each tag may carry its own reason (traffic 2cb1a66); `reason` is the fallback for tags without one. */
+export type AiSite = { domain: string; tags: Array<string | { tag: string; reason?: string }>; reason?: string };
+export type VoterStats = Record<string, { votes: number; lastAt: string | null }>;
+/** traffic's bound on voters per count request. */
+export const VOTERS_LIMIT = 500;
 
 export interface TagClient {
   /** Every tag (shown or not) of the domains traffic knows; with `voter`, that reader's votes and admin flag. */
@@ -40,6 +44,8 @@ export interface TagClient {
   write(change: TagWrite): Promise<TagWriteResult>;
   /** Replaces blog's AI suggestions for the listed domains. */
   putAi(sites: AiSite[]): Promise<{ ok: true; sites: number; changed: number; skipped: unknown[] }>;
+  /** How many tag votes each email cast through blog, and when last. */
+  voters(emails: string[]): Promise<VoterStats>;
 }
 
 /** The domain traffic keys a blog by: its canonical host, lower case, without www. (traffic publicDomain). */
@@ -71,6 +77,8 @@ const REFUSALS = new Set([
   'unknown_domain',
   'unknown_tag',
   'rate_limited',
+  // Political leaning (藍、綠、藍營…) is kept out of tags since traffic 2cb1a66.
+  'reserved_tag',
 ]);
 
 type Fetcher = (url: string, init: RequestInit) => Promise<Response>;
@@ -136,6 +144,15 @@ export function trafficTagClient({
       const { status, json } = await call('PUT', '/ai', { sites }, 30_000);
       if (status !== 200 || !object(json) || json.ok !== true) throw new TagServiceError(`tag-service-${status}`);
       return json as { ok: true; sites: number; changed: number; skipped: unknown[] };
+    },
+    async voters(emails) {
+      if (emails.length > VOTERS_LIMIT) throw new TagServiceError('tag-voters-bound');
+      const { status, json } = await call('POST', '/voters', { voters: emails, via: 'blog' }, READ_TIMEOUT_MS);
+      if (status !== 200 || !object(json) || !object(json.voters)) throw new TagServiceError(`tag-service-${status}`);
+      const out: VoterStats = {};
+      for (const [email, v] of Object.entries(json.voters))
+        if (object(v) && count(v.votes)) out[email] = { votes: v.votes as number, lastAt: typeof v.lastAt === 'string' ? v.lastAt : null };
+      return out;
     },
   };
 }

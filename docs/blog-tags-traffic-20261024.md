@@ -14,8 +14,11 @@
 - 部落格頁：每次讀這一個網域（新鮮）。目錄、最新文章（overview）與管理頁的部落格表共用一份「所有已驗證部落格」的快照，1 分鐘內不重讀；traffic 沒回應時沿用 10 分鐘內的上一份，再久就顯示「標籤資料暫時無法使用」（`unavailable`）。投票、新增、覆寫成功後，回傳的新標籤會直接寫進快照。
 - 寫入：路由、CSRF、Origin 檢查、登入要求與每人每分鐘 30 次不變，代理到 traffic；投票者是登入者的 Google email。管理員只看 traffic 回的 `voter.admin`（`TRAFFIC_ADMIN_EMAILS`），不再用 blog 的 isAdmin。traffic 無法連線回 503；traffic 拒絕時照狀態碼回 400／403／404／429。
 - 管理員覆寫仍寫一筆 `admin_audits`（`genre.set|hide|release`），讓帳號頁的「標籤裁定」計數繼續有效；traffic 的 `tag_log` 才是完整紀錄。
-- 帳號頁拿掉「類型投票」計數：traffic 沒有給服務查每個投票者票數的 API，舊表又已凍結。
-- AI 初判：`tools/apply-blog-genres.ts --apply` 改為呼叫 `PUT /internal/v1/tags/ai`（每 500 個網域一次），只取代 blog 自己的 AI 初判。traffic 每個網站只存一個理由，所以各標籤的理由以換行併成一段。
+- 帳號頁「標籤投票」計數（gen103 起）：`POST /internal/v1/tags/voters { voters, via: 'blog' }`，只算經 blog 投的票；traffic 沒回應時表格照常顯示，說明裡註明這次沒讀到。
+- AI 初判：`tools/apply-blog-genres.ts --apply [--slug <slug>]` 呼叫 `PUT /internal/v1/tags/ai`（每 500 個網域一次），只取代 blog 自己的 AI 初判；gen103 起每個標籤帶自己的理由（`{ tag, reason }`）。
+- 政治傾向（藍、綠、藍營…）是 traffic 的保留字：新增或指定顯示時 traffic 回 400 `reserved_tag`，blog 照碼轉回，畫面顯示「政治傾向不是標籤，不能新增或指定顯示。」
+- traffic 還不認得的新部落格（blog worker 同步 watches 有時間差）：寫入回 404 `unknown_domain`，畫面顯示「這個部落格的標籤資料還在準備中，請稍後再試。」
+- 管理員覆寫時標籤的寫法：先用這個網站在 traffic 的寫法，其次任何部落格快照裡的寫法（iPhone），再其次管理員輸入的原文（body `tag`，須與網址的代碼相同），最後才是代碼本身。
 
 ## 介面文字
 
