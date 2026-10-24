@@ -62,7 +62,14 @@
 - 正式站管理員（擁有者帳號，臨時 session 用完即刪）：`/api/me` 回 `admin: true`、`votes: { news: -1 }`（kocpc 已轉換的「新聞」隱藏）。對 kocpc「3C」按隱藏（vote −1）→ traffic `/api/v1/tags/kocpc.com.tw` 的 3C 為 `source: admin`、`adminOverride: "hide"`、同意／不同意仍是 0／0（沒有留下一般票）；`/api/me` 多了 `gadgets: -1`。按解除（vote 0）→ 回到 `source: ai`、`adminOverride: null`、顯示。稽核多兩筆 `genre.hide`、`genre.release`。
 - kocpc、tech-girlz、soft4fun 的「新聞」隱藏前後完全相同（top1health 不在 blog 的已驗證部落格裡）。
 
+### gen106（2026-10-24 21:16，blue `0c2892e`）
+
+blog 不投票、導流到 traffic（見上方「gen106 起」）。前一版 gen105 green `0e6620d`（另一個 session 的「誰提到了」）保留為回滾。乾淨 worktree 完整 vitest 1571 項、render 203 項、web 250 項、tsc 全過。prepare 沒有出現 `slot_tags_pending`（冷啟動第一次就讀到標籤）。
+
+- 正式站（headless Chromium，等 6 秒讓前端載完）：wiwi.blog「標籤 個人 生活 日記 技術 編輯標籤」、kocpc「標籤 個人 科技 3C 軟體介紹 編輯標籤」、april-aries.github.io「標籤 尚無標籤 編輯標籤」；三頁桌面 1280 與手機 390 都沒有橫向溢出，沒有「無法載入投票功能」，沒有同意／不同意。「編輯標籤」連到 `traffic.observe.tw/site/<domain>/#tags`，三個 traffic 頁都是 200 且有 `id="tags"`。截圖：`~/.cache/blog-observe-shots/gen106-tag-line/{wiwi,kocpc,april-aries}-{desktop,mobile}.png`。
+- `/api/blogs/kocpc/genres/gadgets/vote` 與 `/api/me/blog-genres/kocpc` 回 410 `{ error: 'tags_moved', url: 'https://traffic.observe.tw/site/kocpc.com.tw/#tags' }`；目錄 `?genre=food` 68 個、49 個標籤照舊。
+
 ## 回滾
 
-1. gen104 有問題時 `tools/deploy-blue-green.sh switch green` 回到 gen103 `e41eac1`（管理員又會看到同意／不同意，但 traffic 仍會把管理員的票轉成覆寫）。再往前的 gen102 `46a2cd7` 已不在 slot 上，需重新 prepare。要完全回到舊表，再切回 e40f2b2（gen101，需重新 prepare）。舊程式讀寫兩張舊表，那裡停在切換當下：這段期間在 traffic 投的票、新增的標籤不會出現在舊版。
+1. gen106 有問題時 `tools/deploy-blue-green.sh switch green` 回到 gen105 `0e6620d`（同時保留「誰提到了」；投票介面與右側標籤卡片會回來）。gen104 以前：`switch green` 原本回到 gen103 `e41eac1`（管理員又會看到同意／不同意，但 traffic 仍會把管理員的票轉成覆寫）。再往前的 gen102 `46a2cd7` 已不在 slot 上，需重新 prepare。要完全回到舊表，再切回 e40f2b2（gen101，需重新 prepare）。舊程式讀寫兩張舊表，那裡停在切換當下：這段期間在 traffic 投的票、新增的標籤不會出現在舊版。
 2. 需要保留的話，從 traffic 的 `tag_votes`／`tag_assignments`（`via='blog'` 或 `actor='service:blog'` 以外的）手動補回；traffic 端的資料不用動，下次再切過來時 traffic 仍是最新。
