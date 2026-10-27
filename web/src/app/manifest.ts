@@ -1,5 +1,8 @@
 import type { MetadataRoute } from 'next';
 
+// Keep runtime route-cache writes outside immutable release artifacts; this tiny manifest is cheap to render.
+export const dynamic = 'force-dynamic';
+
 // Makes the site installable as a Web App (icons from tools/gen-pwa-icons.py).
 export default function manifest(): MetadataRoute.Manifest {
   return {
