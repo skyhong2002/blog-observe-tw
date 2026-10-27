@@ -99,4 +99,9 @@ systemctl --user start blog-observe-worker.service
 
 這個回滾是恢復 `blog.observe.tw` 的服務與登入；若還要把使用者從 weblog.tw 導回舊站，須由使用者協調 Cloudflare 新 zone 的臨時 307（只能在舊站 308 已關閉後啟用，避免 loop），並按實際回滾狀態處理 GSC。production 不擅自撤回使用者已確認的 GSC 網址變更。
 
-確實尚待：由本人在 weblog.tw 完成一次 Google 真實登入，確認原帳號／追蹤／角色或管理權限，然後登出。其餘上述程式、部署與公開 HTTP 驗收已完成。
+確實尚待：
+
+1. 由本人在 weblog.tw 完成一次 Google 真實登入，確認原帳號／追蹤／角色或管理權限，然後登出。
+2. Production 本機上游 `192.168.88.1` 的 DNS 負快取仍需刷新／到期。最終直查該上游為 ENODATA；直接以 DNS 查 `1.1.1.1`／`8.8.8.8` 都正確回 `104.21.69.174`、`172.67.210.176`。`resolvectl flush-caches` 後本機一般 lookup／curl 仍失敗，所以不能宣稱本機一般 resolver 已正常。未改全機 DNS、hosts、路由器或 Cloudflare DNS，未關閉 TLS 驗證。worker 的全文／adoption 探針旗標目前未啟用；若要在負快取到期前執行依賴公開 origin 的手動健康工具或開啟這些索引工作，須先由主機／網路管理者處理上游 DNS，不可拿 loopback 替代公開健康閘門。
+
+其餘上述程式、部署與公開 HTTP 驗收已完成。最終 edge socket/service、blue／green 四個 slot units、唯一 worker、獨立 connector 及 favicon timer 均 active；worker PID 3611249、connector PID 3590714 均 NRestarts=0。最終 connector 為 4 條 HA 連線；累積 request_errors 1（非零累計），不能寫成整段觀察期零錯誤，目前 readiness 與公網請求正常。
