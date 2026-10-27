@@ -171,10 +171,10 @@ export async function runContentTopicsIntegration(pool: Pool) {
     gateway = await buildApp(
       {
         port: 18165,
-        publicOrigin: 'https://blog.observe.tw',
+        publicOrigin: 'https://weblog.tw',
         uiOrigin: 'http://127.0.0.1:1',
         adminEmails: new Set(),
-        login: { clientId: 'fixture', clientSecret: 'fixture', sessionSecret: secret, origin: 'https://blog.observe.tw' },
+        login: { clientId: 'fixture', clientSecret: 'fixture', sessionSecret: secret, origin: 'https://weblog.tw' },
       },
       // @ts-expect-error JS gateway's injected store default is inferred as null.
       { store: { pool, db: drizzle(pool, { schema, mode: 'default' }) } },

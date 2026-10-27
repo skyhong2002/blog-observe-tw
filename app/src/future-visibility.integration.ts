@@ -21,7 +21,7 @@ export async function runFutureVisibilityIntegration(pool: Pool) {
     tagId = 0;
   const posts: number[] = [];
   const app = await buildApp(
-    { login: null, uiOrigin: 'http://127.0.0.1:1', port: 18165, publicOrigin: 'https://blog.observe.tw' },
+    { login: null, uiOrigin: 'http://127.0.0.1:1', port: 18165, publicOrigin: 'https://weblog.tw' },
     // @ts-expect-error JS gateway supports an injected fixture pool.
     { store: { pool } },
   );

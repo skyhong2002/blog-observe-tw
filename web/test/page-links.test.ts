@@ -72,7 +72,7 @@ test('canonical paths: one /blogs|topics/ segment, encoded exactly once, no quer
     ['blog', '/blogs/a%2Fb/'],
     ['blog', '/blogs//evil.example/'],
     ['blog', '//evil.example/blogs/a/'],
-    ['blog', 'https://blog.observe.tw/blogs/a/'],
+    ['blog', 'https://weblog.tw/blogs/a/'],
     ['blog', '/blogs/%E0%A4%A/'],
     ['blog', '/blogs/../'],
     ['blog', '/blogs/'],
@@ -262,8 +262,8 @@ test('page API reads: unknown is a 404 (null), a wrong-shaped 200 throws, no coo
 
 test('metadata: canonical, OG and JSON-LD use canonicalPath; every registered page is a normal indexable page', () => {
   const meta = pageMetadata(`/topics/${TRAVEL}/`, '「旅行」話題', 'd');
-  assert.equal(meta.alternates.canonical, `https://blog.observe.tw/topics/${TRAVEL}/`);
-  assert.equal(meta.openGraph.url, `https://blog.observe.tw/topics/${TRAVEL}/`);
+  assert.equal(meta.alternates.canonical, `https://weblog.tw/topics/${TRAVEL}/`);
+  assert.equal(meta.openGraph.url, `https://weblog.tw/topics/${TRAVEL}/`);
   assert.equal((meta as { robots?: unknown }).robots, undefined);
   for (const file of ['app/blogs/[slug]/page.tsx', 'app/topics/[id]/page.tsx']) {
     const text = source(file);

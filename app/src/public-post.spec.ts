@@ -27,7 +27,7 @@ describe('public article boundary', () => {
     const dto = publicPost(row);
     expect(Object.keys(dto)).toEqual(['id', 'title', 'url', 'summary']);
     expect(Array.from(dto.summary as string).length).toBeLessThanOrEqual(500);
-    const feed = publicRss([row], '我的閱讀', 'https://blog.observe.tw');
+    const feed = publicRss([row], '我的閱讀', 'https://weblog.tw');
     expect(feed).not.toContain('PRIVATE_BODY_TAIL');
     expect(feed).not.toContain('secret');
     expect(feed).toContain('<description>');

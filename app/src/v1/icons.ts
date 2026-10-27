@@ -5,7 +5,7 @@ import type { IconManifest } from './favicon-routes.ts';
 // tools/fetch-favicons.ts) because many original URLs 404, refuse foreign
 // requests or are .ico files the image optimizer rejects. Outlets without a
 // stored copy fall back to the catalog URL.
-export const FAVICON_BASE = 'https://blog.observe.tw/favicons/';
+export const FAVICON_BASE = 'https://weblog.tw/favicons/';
 const original = catalog as unknown as Record<string, { icon: string | null; verified?: boolean }>;
 
 export function iconUrl(media: string, current: IconManifest): string | null {

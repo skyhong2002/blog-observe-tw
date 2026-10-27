@@ -5,7 +5,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { type AdminOptions, adminPath, csrfToken, installAdminGuard, validCsrf } from './guard.ts';
 import { bootstrapAdmin, isAdmin } from './identity.ts';
 
-const origin = 'https://blog.observe.tw',
+const origin = 'https://weblog.tw',
   secret = 'test-only-secret'.repeat(4);
 describe('admin identity and path boundary', () => {
   it('rejects encoded/double encoded/case/dot ambiguous admin paths, not adminx', () => {

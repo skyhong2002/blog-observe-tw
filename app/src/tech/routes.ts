@@ -52,7 +52,7 @@ export function techFilters(raw: Record<string, unknown>): Filters | null {
 }
 
 export function registerTechRoutes(app: FastifyInstance, pool: Pool, options: { enabled: boolean; publicOrigin?: string }) {
-  const origin = new URL(options.publicOrigin ?? 'https://blog.observe.tw').origin;
+  const origin = new URL(options.publicOrigin ?? 'https://weblog.tw').origin;
   // Optional metadata failures must not expose database errors or change other routes.
   const routeOptions = {
     errorHandler: (_error: unknown, _request: FastifyRequest, reply: FastifyReply) =>

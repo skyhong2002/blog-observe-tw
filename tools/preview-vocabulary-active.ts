@@ -63,7 +63,7 @@ export class PreviewTransport {
       await this.wait(Math.max(0, this.last + spacing - this.now()));
       const headers: Record<string, string> = {
         accept: 'application/json',
-        'user-agent': 'BlogObserveVocabularyPreview/1.0 (+https://blog.observe.tw/about/)',
+        'user-agent': 'BlogObserveVocabularyPreview/1.0 (+https://weblog.tw/about/)',
       };
       if (this.origin === PUBLIC) {
         const token = await this.token();

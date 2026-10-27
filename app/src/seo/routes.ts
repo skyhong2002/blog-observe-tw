@@ -12,7 +12,7 @@ import {
   type TopicRange,
 } from './sitemap-entries.ts';
 
-export const SEO_ORIGIN = 'https://blog.observe.tw';
+export const SEO_ORIGIN = 'https://weblog.tw';
 export const SITEMAP_PAGE_SIZE = 10_000;
 /** Topic files split the uniform SHA-256 ID space; each holds at most about this many routes, far below the per-file cap. */
 export const SITEMAP_TOPIC_BUCKET = 1_000;

@@ -353,7 +353,7 @@ async function projectionResponse(reply: FastifyReply, build: () => Promise<unkn
 export async function registerRelationRoutes(
   app: FastifyInstance,
   pool: Pool,
-  { refreshMs = SNAPSHOT_REFRESH_MS, publicOrigin = 'https://blog.observe.tw' } = {},
+  { refreshMs = SNAPSHOT_REFRESH_MS, publicOrigin = 'https://weblog.tw' } = {},
 ) {
   registerTextSimilarityRoute(app, pool);
   const snapshot = new SharedSnapshot<unknown>(refreshMs);

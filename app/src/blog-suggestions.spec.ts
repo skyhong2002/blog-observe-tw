@@ -34,7 +34,7 @@ async function app(pool: Pool, user: { id: number } | null = { id: 7 }) {
   const server = Fastify();
   registerBlogSuggestionRoutes(server, {
     pool,
-    publicOrigin: 'https://blog.observe.tw',
+    publicOrigin: 'https://weblog.tw',
     requireUser: async (_request, reply) => {
       if (!user) reply.code(401).send({ error: 'login required' });
       return user as never;
@@ -43,7 +43,7 @@ async function app(pool: Pool, user: { id: number } | null = { id: 7 }) {
   });
   return server;
 }
-const post = (server: Awaited<ReturnType<typeof app>>, url: string, origin = 'https://blog.observe.tw') =>
+const post = (server: Awaited<ReturnType<typeof app>>, url: string, origin = 'https://weblog.tw') =>
   server.inject({ method: 'POST', url: '/api/me/blog-suggestions', headers: { origin }, payload: { url } });
 
 it('says a collected blog is listed, and a queued one is queued with its last check', async () => {

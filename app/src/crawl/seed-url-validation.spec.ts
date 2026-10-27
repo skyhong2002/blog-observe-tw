@@ -10,7 +10,7 @@ function fixture(routes: Record<string, string | { status: number; location?: st
   const fetcher = vi.fn<FeedFetcher>(async (input, init) => {
     expect(init?.redirect).toBe('manual');
     expect(init?.dispatcher).toBeDefined();
-    expect(((init?.headers ?? {}) as Record<string, string>)['user-agent']).toContain('blog.observe.tw');
+    expect(((init?.headers ?? {}) as Record<string, string>)['user-agent']).toContain('weblog.tw');
     const url = String(input);
     const route = routes[url];
     if (!route) return new Response(null, { status: 404 });

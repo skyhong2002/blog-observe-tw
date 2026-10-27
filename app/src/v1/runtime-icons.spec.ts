@@ -19,7 +19,7 @@ afterAll(async () => {
   vi.unstubAllEnvs();
   await rm(root, { recursive: true, force: true });
 });
-const expected = 'https://blog.observe.tw/favicons/kocpc.png?v=abcdef1234567890';
+const expected = 'https://weblog.tw/favicons/kocpc.png?v=abcdef1234567890';
 const blog = { id: 1, slug: 'kocpc', name: '電腦王阿達', postCount: '2' };
 
 describe('runtime favicon projection with an empty bundled manifest', () => {
@@ -70,13 +70,13 @@ describe('runtime favicon projection with an empty bundled manifest', () => {
       {
         port: 18165,
         uiOrigin: 'http://127.0.0.1:1',
-        publicOrigin: 'https://blog.observe.tw',
+        publicOrigin: 'https://weblog.tw',
         adminEmails: new Set(),
         login: {
           clientId: 'fixture',
           clientSecret: 'fixture',
           sessionSecret: 'fixture-only-secret-01234567890123456789',
-          origin: 'https://blog.observe.tw',
+          origin: 'https://weblog.tw',
         },
       },
       // @ts-expect-error Narrow fixture only implements session and follow reads.
@@ -99,7 +99,7 @@ describe('runtime favicon projection with an empty bundled manifest', () => {
     await writeFile(manifestPath, JSON.stringify({ kocpc: { revision: '12345678abcdef00' }, unsafe: { revision: 'bad-revision' } }));
     vi.spyOn(Date, 'now').mockReturnValue(now + 6000);
     let icons = await iconManifest();
-    expect(iconUrl('kocpc', icons)).toBe('https://blog.observe.tw/favicons/kocpc.png?v=12345678abcdef00');
+    expect(iconUrl('kocpc', icons)).toBe('https://weblog.tw/favicons/kocpc.png?v=12345678abcdef00');
     expect(iconUrl('missing', icons)).toBeNull();
     expect(icons).not.toHaveProperty('unsafe');
     await rm(manifestPath);

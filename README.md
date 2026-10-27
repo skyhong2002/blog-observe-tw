@@ -1,16 +1,16 @@
 <img src="assets/icon.svg" width="64" height="64" alt="">
 
-# blog.observe.tw
+# weblog.tw
 
 Created in [T3 Code](https://t3.codes).
 
 ## 目前版本
 
-目前服務使用 Steam Machine 上分離的 edge、gateway、web、worker user services：edge 對外監聽 `127.0.0.1:18160`，指向 active blue/green slot；最後確認的 gen12 blue（43d17900）為 gateway `18174`、Next web `18172`，green 18175／18173 保留在線回滾，由 Cloudflare Tunnel 提供 `https://blog.observe.tw`。舊 `18162` blog web 已停用，不能當成部署來源。實際切換以 active.json／部署 receipt 為準。目前版本提供：
+目前服務使用 Steam Machine 上分離的 edge、gateway、web、worker user services：edge 監聽 `127.0.0.1:18160`，由 active blue/green slot 提供服務（blue gateway/web `18174/18172`、green `18175/18173`）。正式網址為 `https://weblog.tw`，搬家流程及舊網域永久轉址狀態見 [部署文件](docs/weblog-migration-20261027.md)；實際版本以 active.json 與部署 receipt 為準。目前版本提供：
 
 - 前端直接移植新文易數的 Tailwind 4 版面、分組導覽、來源頁、文章列表、手機選單、深淺色與 PWA 元件；首頁顯示收錄排行、標籤與文章，詳見 [`docs/frontend-parity.md`](docs/frontend-parity.md)。
 - 135 個原始 seed 與通過 RSS 自動驗證的新收錄部落格，網址核對與收錄統計見 [種子處理紀錄](docs/seed-resolution-2026-10-12.md)；支援分類搜尋、個別網站頁與原站連結。
-- `/healthz`、`/auth/me` 與 Google OAuth PKCE 登入流程；callback 固定為 `https://blog.observe.tw/auth/google/callback`。
+- `/healthz`、`/auth/me` 與 Google OAuth PKCE 登入流程；callback 固定為 `https://weblog.tw/auth/google/callback`。
 - 私有 OAuth 設定檔 `/home/deck/.config/blog-observe.env`，不提交到 Git，也不與 tag.observe.tw 共用服務設定。
 - 獨立 MariaDB `blog_observe` schema、Drizzle schema 與持久化 session；seed 匯入器保留原始列、來源 SHA-256、分類與未換算的流量原值。
 - 登入後可追蹤部落格，透過 `/me/feed.xml` 匯出個人 RSS，並以 `/me/opml` 匯出、`POST /api/me/opml` 匯入 OPML；未知 OPML 網址只進候選清單，不會自動公開收錄。

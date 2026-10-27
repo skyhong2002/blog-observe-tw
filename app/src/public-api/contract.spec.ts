@@ -6,7 +6,7 @@ import { PUBLIC_PATHS } from './contract.ts';
 describe('deployed API contract registration', () => {
   it('registers every documented GET and automatic HEAD on the real gateway, retains JSON errors and status negotiation', async () => {
     const app = await buildApp(
-      { port: 18160, uiOrigin: 'http://127.0.0.1:1', publicOrigin: 'https://blog.observe.tw', adminEmails: new Set() },
+      { port: 18160, uiOrigin: 'http://127.0.0.1:1', publicOrigin: 'https://weblog.tw', adminEmails: new Set() },
       // @ts-expect-error JavaScript buildApp infers its injected store as null.
       { store: { pool: { query: async () => [[]] } } },
     );
@@ -39,7 +39,7 @@ describe('deployed API contract registration', () => {
   });
   it('reports degraded status without leaking database failure details', async () => {
     const app = await buildApp(
-      { port: 18160, uiOrigin: 'http://127.0.0.1:1', publicOrigin: 'https://blog.observe.tw', adminEmails: new Set() },
+      { port: 18160, uiOrigin: 'http://127.0.0.1:1', publicOrigin: 'https://weblog.tw', adminEmails: new Set() },
       {
         // @ts-expect-error JavaScript fixture injects only the pool interface used here.
         store: {

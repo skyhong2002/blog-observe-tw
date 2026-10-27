@@ -204,13 +204,13 @@ describe('private route cache boundaries', () => {
       {
         port: 18165,
         uiOrigin: 'http://127.0.0.1:1',
-        publicOrigin: 'https://blog.observe.tw',
+        publicOrigin: 'https://weblog.tw',
         adminEmails: new Set(),
         login: {
           clientId: 'fixture',
           clientSecret: 'fixture',
           sessionSecret: 'fixture-only-secret-01234567890123456789',
-          origin: 'https://blog.observe.tw',
+          origin: 'https://weblog.tw',
         },
       },
       // @ts-expect-error Fixed test database adapter implements only the session/read queries used here.

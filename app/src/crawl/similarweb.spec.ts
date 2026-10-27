@@ -290,7 +290,7 @@ describe('tag-only Similarweb client', () => {
     'localhost',
     'http://127.0.0.1/',
     'https://[::1]/',
-    'blog.observe.tw',
+    'weblog.tw',
     'x.ts.net',
     'name.internal',
     'user:pass@evil.com',

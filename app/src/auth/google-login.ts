@@ -1,7 +1,7 @@
 import { createHash, createHmac, randomBytes } from 'node:crypto';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 
-/** The only identity provider used by blog.observe.tw.  Keep these names
+/** The only identity provider used by weblog.tw.  Keep these names
  * separate from the sibling projects so a cookie or client id cannot be
  * accidentally shared between services. */
 export type LoginConfig = {
@@ -42,7 +42,7 @@ export function loginConfig(env: NodeJS.ProcessEnv = process.env): LoginConfig |
   if (!clientId || !clientSecret) throw new Error('Google login needs both BLOG_GOOGLE_CLIENT_ID and BLOG_GOOGLE_CLIENT_SECRET');
   const sessionSecret = env.BLOG_SESSION_SECRET?.trim() ?? '';
   if (sessionSecret.length < 32) throw new Error('BLOG_SESSION_SECRET must be at least 32 characters');
-  const origin = new URL(env.BLOG_PUBLIC_ORIGIN || 'https://blog.observe.tw');
+  const origin = new URL(env.BLOG_PUBLIC_ORIGIN || 'https://weblog.tw');
   if (!['http:', 'https:'].includes(origin.protocol)) throw new Error('BLOG_PUBLIC_ORIGIN must be http(s)');
   return { clientId, clientSecret, sessionSecret, origin: origin.origin };
 }

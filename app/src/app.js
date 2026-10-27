@@ -133,7 +133,7 @@ export async function buildApp(config, { logger = false, store = null } = {}) {
     const [[row]] = await pool.query('SELECT COUNT(*) AS count FROM blogs');
     return {
       ok: true,
-      service: 'blog.observe.tw',
+      service: 'weblog.tw',
       port: config.port,
       startedAt: new Date(startedAt).toISOString(),
       blogs: Number(row.count),
@@ -350,7 +350,7 @@ export async function buildApp(config, { logger = false, store = null } = {}) {
     );
     return reply
       .type('application/rss+xml; charset=utf-8')
-      .send(publicRss(items, '我的 blog.observe.tw 閱讀清單', `${config.publicOrigin}/me/feed.xml`));
+      .send(publicRss(items, '我的 weblog.tw 閱讀清單', `${config.publicOrigin}/me/feed.xml`));
   });
   app.get('/me/opml', async (request, reply) => {
     const user = await requireUser(request, reply);
@@ -362,7 +362,7 @@ export async function buildApp(config, { logger = false, store = null } = {}) {
     return reply
       .type('text/x-opml; charset=utf-8')
       .header('content-disposition', 'attachment; filename=blog-observe.opml')
-      .send(opml('blog.observe.tw subscriptions', follows));
+      .send(opml('weblog.tw subscriptions', follows));
   });
   app.post('/api/me/opml', async (request, reply) => {
     if (!sameOrigin(request, config.publicOrigin)) return reply.code(403).send({ error: 'same-origin requests only' });

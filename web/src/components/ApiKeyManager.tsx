@@ -314,7 +314,7 @@ export default function ApiKeyManager({ example }: { example: string }) {
           <div className="space-y-1">
             <p className="text-sm font-medium">使用方式</p>
             <pre className="overflow-x-auto rounded-md bg-zinc-900 p-3 text-[13px] leading-relaxed text-zinc-100 dark:bg-zinc-900/80">
-              <code>{`curl -s -H 'x-api-key: <你的 API 金鑰>' 'https://blog.observe.tw${example}'`}</code>
+              <code>{`curl -s -H 'x-api-key: <你的 API 金鑰>' 'https://weblog.tw${example}'`}</code>
             </pre>
           </div>
         </>

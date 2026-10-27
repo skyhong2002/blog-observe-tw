@@ -1,6 +1,7 @@
 import type { IncomingHttpHeaders, OutgoingHttpHeaders } from 'node:http';
 import { createServer, request as httpRequest } from 'node:http';
 import { serveAsset } from './assets.ts';
+import { legacyHost, PUBLIC_ORIGIN } from './public-host.ts';
 import { SLOTS, type StateReader } from './state.ts';
 
 const HOP = new Set([
@@ -40,10 +41,12 @@ export function createEdge({
   state,
   assets,
   request = httpRequest,
+  redirectLegacy = async () => false,
 }: {
   state: Pick<StateReader, 'get'>;
   assets: string;
   request?: typeof httpRequest;
+  redirectLegacy?: () => Promise<boolean>;
 }) {
   const server = createServer(async (req, res) => {
     const https = req.headers['x-forwarded-proto'] === 'https';
@@ -67,6 +70,12 @@ export function createEdge({
       const selected = await state.get();
       res.setHeader('x-blog-edge-generation', String(selected.generation));
       res.setHeader('x-blog-release', selected.commit);
+      // Before the static union as well as the gateway: every old public path moves together.
+      if (legacyHost(req.headers.host) && (await redirectLegacy())) {
+        res.writeHead(308, { location: `${PUBLIC_ORIGIN}${req.url}`, 'cache-control': 'private, no-store' });
+        res.end();
+        return;
+      }
       if (await serveAsset(assets, req, res)) return;
       if (req.destroyed || res.destroyed) return;
       // Never parse the request target as a URL, follow redirects, or replay a request.

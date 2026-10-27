@@ -1,13 +1,13 @@
 // Adapted from tag.observe.tw web/src/lib/analytics-consent.mts, MIT, Copyright (c) 2026 Sky Hong.
 // Who sends GA data and what it may say, decided before the Google tag loads
-// (SiteAnalytics / analytics-runtime.mts): only production blog.observe.tw,
+// (SiteAnalytics / analytics-runtime.mts): only production weblog.tw,
 // never automation, DNT/GPC or a browser whose owner chose 不計入統計 on
 // /observe/opt-out/, and only from public pages without a query string.
 // Pure (only the pure public-query.ts): node --test imports this file.
 
 import { isSlug, isTopicId } from './public-query.ts';
 
-export const SITE_HOST = 'blog.observe.tw';
+export const SITE_HOST = 'weblog.tw';
 export const DEFAULT_GA_ID = 'G-VKWGDHDESV';
 export const OPT_OUT_KEY = 'blog-analytics-opt-out';
 /** Fired on window when this browser's choice changes (same tab; other tabs get `storage`). */

@@ -5,7 +5,7 @@ import type { RowDataPacket } from 'mysql2/promise';
 import { createDb } from '../../app/src/db/client.ts';
 import { getIndexablePages } from '../../app/src/seo/indexability.ts';
 
-const origin = 'https://blog.observe.tw';
+const origin = 'https://weblog.tw';
 const base = new URL(process.argv[2] ?? origin);
 assert.ok(base.origin === origin || (base.hostname === '127.0.0.1' && base.protocol === 'http:'), 'verification_origin');
 const store = createDb(undefined, { poolSize: 1 });

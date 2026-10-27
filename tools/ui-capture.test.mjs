@@ -47,7 +47,7 @@ function mocks({ badIdentity = false, quota = true, hotPage = false, closeFails 
   let current, theme = 'light';
   const page = { emulateMedia: async options => { theme = options.colorScheme; }, addInitScript: async (_fn, value) => assert.equal(value, theme), evaluate: async fn => fn === collectSecondaryContrastDOM ? [] : String(fn).includes('globalPrivacyControl') ? {doNotTrack:navigatorDNT,globalPrivacyControl:navigatorGPC} : ({ theme: wrongTheme ? 'unexpected' : theme, darkMedia: theme === 'dark' }), close: async () => {}, on: () => {}, setViewportSize: async () => {}, goto: async url => { current = url; events.push('goto'); return { status: () => 200, allHeaders: async () => headers, request: () => ({headerValue: async name => name === 'dnt' ? documentDNT : documentGPC}) }; }, url: () => current, screenshot: async options => { assert.equal(options.fullPage, false); return Buffer.alloc(64); } };
   const context = { on: () => {}, route: async () => events.push('route'), routeWebSocket: async () => events.push('ws'), addInitScript: async () => {}, newPage: async () => { events.push('newPage'); return page; } };
-  const deps = { now: () => 'mock-clock', gate: async () => { gates++; return { ...gate, load: hotPage && gates === 3 ? 13 : 1 }; }, acquireGlobalQuota: async () => quota ? { assertHeld: async () => true, release: async () => events.push('release') } : null, launch: async () => { events.push('launch'); return { newContext: async opts => { assert.equal(opts.extraHTTPHeaders.DNT, '1'); assert.equal(opts.serviceWorkers, 'block'); return context; }, close: async () => { events.push('close'); if (closeFails) throw Error('fail'); } }; }, sleep: async ms => assert.equal(ms, 5000), saveImage: async name => images.push(name), saveReport: async r => reports.push(r), ttfb: async () => ['blog.observe.tw','tag.observe.tw','youtube.observe.tw'].map(host => ({host, totalSeconds: 0.2, ttfbSeconds: 0.2, status: 200})) };
+  const deps = { now: () => 'mock-clock', gate: async () => { gates++; return { ...gate, load: hotPage && gates === 3 ? 13 : 1 }; }, acquireGlobalQuota: async () => quota ? { assertHeld: async () => true, release: async () => events.push('release') } : null, launch: async () => { events.push('launch'); return { newContext: async opts => { assert.equal(opts.extraHTTPHeaders.DNT, '1'); assert.equal(opts.serviceWorkers, 'block'); return context; }, close: async () => { events.push('close'); if (closeFails) throw Error('fail'); } }; }, sleep: async ms => assert.equal(ms, 5000), saveImage: async name => images.push(name), saveReport: async r => reports.push(r), ttfb: async () => ['weblog.tw','tag.observe.tw','youtube.observe.tw'].map(host => ({host, totalSeconds: 0.2, ttfbSeconds: 0.2, status: 200})) };
   return { deps, events, reports, images, context };
 }
 test('quota cannot be proven: no launch or network; termination is honestly recorded', async () => {
@@ -68,8 +68,8 @@ test('failed close never fabricates browserClosed=true', async () => {
   const m = mocks({ closeFails: true }); const r = await capture(config, m.deps); assert.equal(r.closed, false); assert.equal(r.closeAt, null); assert.equal(r.error, 'browser_close_failed');
 });
 test('formal three-site full-homepage failure blocks launch without any real HTTP', async () => {
-  const m = mocks(); m.deps.ttfb = async () => [{ host: 'blog.observe.tw', totalSeconds: 6.18, ttfbSeconds: 0.01, status: 200 }, { host: 'tag.observe.tw', totalSeconds: 1, ttfbSeconds: 1, status: 200 }, { host: 'youtube.observe.tw', totalSeconds: 1, ttfbSeconds: 1, status: 200 }];
-  const r = await capture({ ...config, targetOrigin: 'https://blog.observe.tw' }, m.deps);
+  const m = mocks(); m.deps.ttfb = async () => [{ host: 'weblog.tw', totalSeconds: 6.18, ttfbSeconds: 0.01, status: 200 }, { host: 'tag.observe.tw', totalSeconds: 1, ttfbSeconds: 1, status: 200 }, { host: 'youtube.observe.tw', totalSeconds: 1, ttfbSeconds: 1, status: 200 }];
+  const r = await capture({ ...config, targetOrigin: 'https://weblog.tw' }, m.deps);
   assert.equal(r.error, 'ttfb_gate'); assert.ok(!m.events.includes('launch')); assert.equal(r.closed, false); assert.equal(r.gates.at(-1).phase, 'after');
 });
 test('false quota receipt remains fail closed', async () => {
@@ -214,7 +214,7 @@ test('a page that does not apply the requested theme is not saved', async () => 
 });
 
 test('relative full-response gates accept blog 6.17s and tag/youtube 2s, reject unknown/duplicate/missing receipts', () => {
-  const rows = [{ host: 'blog.observe.tw', status: 200, ttfbSeconds: 0.1, totalSeconds: 6.17 }, { host: 'tag.observe.tw', status: 200, ttfbSeconds: 0.1, totalSeconds: 2 }, { host: 'youtube.observe.tw', status: 200, ttfbSeconds: 0.1, totalSeconds: 2 }];
+  const rows = [{ host: 'weblog.tw', status: 200, ttfbSeconds: 0.1, totalSeconds: 6.17 }, { host: 'tag.observe.tw', status: 200, ttfbSeconds: 0.1, totalSeconds: 2 }, { host: 'youtube.observe.tw', status: 200, ttfbSeconds: 0.1, totalSeconds: 2 }];
   verifyLatencyGate(rows);
   for (let i=0;i<3;i++) assert.throws(() => verifyLatencyGate(rows.map((row,j)=>({...row, totalSeconds: row.totalSeconds+(i===j?0.001:0)}))), /ttfb_gate/);
   assert.throws(() => verifyLatencyGate([rows[0],rows[0],rows[2]]), /ttfb_gate/);
@@ -228,14 +228,14 @@ test('private artifact directory rejects existing public permissions, wrong owne
 });
 test('after latency failure is preserved and stops completion after honestly closing browser', async () => {
  const m=mocks();let calls=0;
- m.deps.ttfb=async()=>['blog.observe.tw','tag.observe.tw','youtube.observe.tw'].map(host=>({host,status:200,ttfbSeconds:0.2,totalSeconds:++calls>3&&host==='blog.observe.tw'?6.18:0.2}));
+ m.deps.ttfb=async()=>['weblog.tw','tag.observe.tw','youtube.observe.tw'].map(host=>({host,status:200,ttfbSeconds:0.2,totalSeconds:++calls>3&&host==='weblog.tw'?6.18:0.2}));
  const r=await capture(config,m.deps);
  assert.equal(r.afterGateError,'ttfb_gate');assert.equal(r.error,'after_ttfb_gate');assert.equal(r.status,'stopped');assert.equal(r.closed,true);assert.equal(r.pages.length,2);
 });
 
 test('fast TTFB with slow complete body is refused at full-homepage threshold', () => {
- const rows=['blog.observe.tw','tag.observe.tw','youtube.observe.tw'].map(host=>({host,status:200,ttfbSeconds:0.01,totalSeconds:0.2}));
- for(const [host,limit] of [['blog.observe.tw',6.17],['tag.observe.tw',2],['youtube.observe.tw',2]]) assert.throws(()=>verifyLatencyGate(rows.map(row=>({...row,totalSeconds:row.host===host?limit+0.001:0.2}))),/ttfb_gate/);
+ const rows=['weblog.tw','tag.observe.tw','youtube.observe.tw'].map(host=>({host,status:200,ttfbSeconds:0.01,totalSeconds:0.2}));
+ for(const [host,limit] of [['weblog.tw',6.17],['tag.observe.tw',2],['youtube.observe.tw',2]]) assert.throws(()=>verifyLatencyGate(rows.map(row=>({...row,totalSeconds:row.host===host?limit+0.001:0.2}))),/ttfb_gate/);
 });
 
 
@@ -441,7 +441,7 @@ test('private route deny is case-insensitive and checks safe decoded/dot variant
   assert.equal(privateCapturePath('/articles/'),false); assert.equal(privateCapturePath('/assets/my-icon.svg'),false);
 });
 test('candidate and formal captures retain the same required independent Node global HTML gate receipts', async () => {
-  for(const targetOrigin of [config.targetOrigin,'https://blog.observe.tw']){
+  for(const targetOrigin of [config.targetOrigin,'https://weblog.tw']){
     const m=mocks();const r=await capture({...config,targetOrigin},m.deps);
     assert.equal(r.globalHomepageProbes.length,2);
     for(const receipt of r.globalHomepageProbes){assert.equal(receipt.status,'passed');assert.equal(receipt.configuredDNT,'1');assert.equal(receipt.observedRequestDNT,null);assert.equal(receipt.browserNetworkIncluded,false);assert.equal(receipt.eventsSource,'dependency-result-only');assert.equal(receipt.attempts.length,3);assert.ok(receipt.attempts.every(x=>x.attempted&&x.httpStatus===200));}
@@ -450,8 +450,8 @@ test('candidate and formal captures retain the same required independent Node gl
 });
 test('failed global probe retains mask-safe attempted/failed/not-attempted statuses separately from browser network',async()=>{
   const report={};const deps={now:()=> '2026-10-13T10:00:00.000Z',ttfb:async observe=>{
-    observe({host:'blog.observe.tw',status:'started',utc:'2026-10-13T10:00:00.000Z',cookie:'never-log',url:'https://secret.invalid/?token=never-log'});
-    observe({host:'blog.observe.tw',status:'failed',httpStatus:503,utc:'2026-10-13T10:00:00.001Z',message:'never-log'});
+    observe({host:'weblog.tw',status:'started',utc:'2026-10-13T10:00:00.000Z',cookie:'never-log',url:'https://secret.invalid/?token=never-log'});
+    observe({host:'weblog.tw',status:'failed',httpStatus:503,utc:'2026-10-13T10:00:00.001Z',message:'never-log'});
     throw Error('never-log');
   }};
   await assert.rejects(globalHomepageProbe(report,'before',deps),/ttfb_gate/);
@@ -477,9 +477,9 @@ test('reader routes are denied for case and encoded variants before navigation o
 await test('homepage gate uses three-sample median but never masks an HTTP error', async () => {
  const {summarizeHomepageSamples}=await import('./ui-capture.mjs');
  const samples=[1,8,2].map(totalSeconds=>({status:200,totalSeconds,ttfbSeconds:0.2}));
- assert.equal(summarizeHomepageSamples('blog.observe.tw',samples).totalSeconds,2);
- assert.throws(()=>summarizeHomepageSamples('blog.observe.tw',[...samples.slice(0,2),{status:500,totalSeconds:1}]),/ttfb_gate/);
- assert.throws(()=>summarizeHomepageSamples('blog.observe.tw',samples.slice(0,2)),/ttfb_gate/);
+ assert.equal(summarizeHomepageSamples('weblog.tw',samples).totalSeconds,2);
+ assert.throws(()=>summarizeHomepageSamples('weblog.tw',[...samples.slice(0,2),{status:500,totalSeconds:1}]),/ttfb_gate/);
+ assert.throws(()=>summarizeHomepageSamples('weblog.tw',samples.slice(0,2)),/ttfb_gate/);
 });
 
 test('formal HTML identity reads actual Flight BUILD_ID and rejects absent/conflicting identities', async () => {

@@ -141,7 +141,7 @@ describe('canonical public page redirects', () => {
     });
     const logs: string[] = [];
     const app = await buildApp(
-      { port: 18165, uiOrigin: 'http://127.0.0.1:1', publicOrigin: 'https://blog.observe.tw', login: null },
+      { port: 18165, uiOrigin: 'http://127.0.0.1:1', publicOrigin: 'https://weblog.tw', login: null },
       {
         // @ts-expect-error JS config accepts a pino stream at runtime.
         logger: {

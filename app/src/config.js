@@ -4,7 +4,7 @@ export function loadConfig(env = process.env) {
   const port = Number(env.PORT || 18160);
   if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error('PORT must be 1–65535');
   if (!env.BLOG_DB_URL) throw new Error('BLOG_DB_URL is required');
-  const publicOrigin = new URL(env.BLOG_PUBLIC_ORIGIN || 'https://blog.observe.tw');
+  const publicOrigin = new URL(env.BLOG_PUBLIC_ORIGIN || 'https://weblog.tw');
   if (!['http:', 'https:'].includes(publicOrigin.protocol)) throw new Error('BLOG_PUBLIC_ORIGIN must be http(s)');
   const uiOrigin = new URL(env.BLOG_UI_ORIGIN || 'http://127.0.0.1:18162');
   if (!['http:', 'https:'].includes(uiOrigin.protocol)) throw new Error('BLOG_UI_ORIGIN must be http(s)');
@@ -26,7 +26,7 @@ export function loadConfig(env = process.env) {
     // complete before passive technology observations become public.
     techPublicEnabled: env.BLOG_TECH_PUBLIC_ENABLED === 'true',
     logLevel: env.LOG_LEVEL || 'info',
-    crawlUserAgent: env.BLOG_CRAWL_USER_AGENT || 'blog.observe.tw/0.3 (+https://blog.observe.tw/about; mailto:b@blog.observe.tw)',
+    crawlUserAgent: env.BLOG_CRAWL_USER_AGENT || 'weblog.tw/0.3 (+https://weblog.tw/about; mailto:b@blog.observe.tw)',
     crawlDelayMs: Math.max(1000, Number(env.BLOG_CRAWL_DELAY_MS || 1200)),
     similarWeb: {
       // Only the fixed loopback tag API may contact the provider.

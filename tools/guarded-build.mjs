@@ -14,7 +14,7 @@ export const BUILD_LIMITS = Object.freeze({ startBytes: 40 * GiB, stopBytes: 30 
 export const BUILD_LOCKS = Object.freeze(['/home/deck/.cache/observe-build-0.lock']);
 export const APPROVAL_ROOT = '/home/deck/.t3/projects/blog-observe-tw/.reviews/guarded-build';
 export const HOMES = Object.freeze([
-  { site: 'blog', url: 'https://blog.observe.tw/', limitMs: HOMEPAGE_LIMIT_SECONDS['blog.observe.tw'] * 1000 },
+  { site: 'blog', url: 'https://weblog.tw/', limitMs: HOMEPAGE_LIMIT_SECONDS['blog.observe.tw'] * 1000 },
   { site: 'tag', url: 'https://tag.observe.tw/', limitMs: HOMEPAGE_LIMIT_SECONDS['tag.observe.tw'] * 1000 },
   { site: 'youtube', url: 'https://youtube.observe.tw/', limitMs: HOMEPAGE_LIMIT_SECONDS['youtube.observe.tw'] * 1000 },
 ]);

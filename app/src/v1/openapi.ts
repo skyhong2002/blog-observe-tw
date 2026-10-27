@@ -16,7 +16,7 @@ const obj = (properties: Record<string, Schema>, description = '', optional: str
   properties,
   required: Object.keys(properties).filter((key) => !optional.includes(key)),
 });
-const ORIGIN = 'https://blog.observe.tw';
+const ORIGIN = 'https://weblog.tw';
 
 export const API_INTRO = {
   title: '部落格觀察 API',
@@ -35,7 +35,7 @@ export const API_INTRO = {
     '路徑參數請 URL 編碼（例如話題 `rss:1` 寫成 `rss%3A1`），路徑結尾不要加 `/`。文章與目錄使用 `limit`、`cursor`／`nextCursor`；游標是不透明字串，請原樣傳回並保持原查詢條件。`nextCursor: null` 表示這個結果已到尾頁。',
     '變更紀錄（2026-10-12，已核准的破壞性變更）：`GET /api/v1/blogs` 的 `items[].url` 與 `GET /api/v1/blogs/{slug}` 的 `blog.url` 改為本站可讀網頁絕對網址；原站首頁移至同物件的 `sourceUrl`（可為 null）。原先使用 blog.url 前往原站的程式請改讀 sourceUrl。`GET /api/v1/topics` 的 `items[].url` 及 `GET /api/v1/topics/{id}` 的 `topic.url` 為新增的本站網頁網址。ID／slug／favicon 識別碼不變，文章 url 仍是原文；內部 /api/* 的原站 url 不改。缺少 registry 時，本站 url 暫用可轉址的舊識別碼路徑；純標點話題不提供網址。不提供 pageUrl 系列欄位。',
     '除上述明列的已核准變更外，`v1` 內只做向後相容的變更（新增欄位、新增端點）；移除或改名會先公告。客戶端應忽略未知的新欄位。既有站內 `/api/*` 介面保留給網站使用，不是本文件的穩定公開契約；本站沒有舊版 PHP API。',
-    '部落格文章、標題與圖片著作權屬原作者。API 只提供標題、原文連結、統計及最多 500 字元的短摘要，不提供全文；私人追蹤、個人 RSS、候選證據、管理及 AI 原始輸入不在公開 API。使用統計請註明「資料來源：部落格觀察 blog.observe.tw」，閱讀文章請連回原站。',
+    '部落格文章、標題與圖片著作權屬原作者。API 只提供標題、原文連結、統計及最多 500 字元的短摘要，不提供全文；私人追蹤、個人 RSS、候選證據、管理及 AI 原始輸入不在公開 API。使用統計請註明「資料來源：部落格觀察 weblog.tw」，閱讀文章請連回原站。',
     '不寫程式也能追：訂閱各部落格原站提供的 RSS／Atom；登入 `/my/` 可管理追蹤與匯出 `/me/opml` 給閱讀器，OPML 只包含已成功抓取的 RSS／Atom，沒有可用 feed 的站會略過，請到原站確認訂閱方式。`/me/feed.xml` 是需要瀏覽器登入 session 的私人摘要 RSS，不是可公開分享或以 API 金鑰讀取的 feed。',
     '變更紀錄（2026-10-13）：話題詳情新增選用 history 累積歷史清單與 historyCursor 分頁。話題曾有有效比對證據就保留，不因退出每日詞庫窗口消失；只公開標題、原文連結及觀測狀態，絕不提供全文。全部證據明確撤銷時回 410，合併網頁一次 301 到最終話題。',
     '正文提及是交流訊號，不是抄襲或背書判斷。引用占比的分母為來源站在窗口內所有已解析、指向已收錄目標的「文章—目標部落格」提及數；一篇提及三站會計三筆，不是占全站文章的百分比。覆蓋與截斷欄位應與排行一起閱讀。',

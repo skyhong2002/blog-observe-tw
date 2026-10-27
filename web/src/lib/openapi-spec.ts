@@ -39,7 +39,7 @@ export interface OpenApi {
   components?: { schemas?: Record<string, Schema> };
 }
 
-export const SITE_ORIGIN = 'https://blog.observe.tw';
+export const SITE_ORIGIN = 'https://weblog.tw';
 export const GITHUB_DOC = 'https://github.com/skyhong2002/blog-observe-tw/blob/main/docs/api.md';
 const METHODS = new Set(['get', 'put', 'post', 'delete', 'patch', 'head', 'options']);
 

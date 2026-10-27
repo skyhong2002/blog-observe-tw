@@ -9,7 +9,7 @@ const STATUS: Record<NonNullable<AnalyticsBlock> | 'counted', { label: string; n
   unreadable: { label: '不計入統計', note: '無法讀取這個瀏覽器的網站資料設定，為保險起見不送統計。' },
   privacy: { label: '不計入統計', note: '瀏覽器已要求不要追蹤（Do Not Track 或 Global Privacy Control），不送統計。' },
   automation: { label: '不計入統計', note: '偵測到自動化測試瀏覽器或爬蟲，預設不送統計。' },
-  environment: { label: '不計入統計', note: '這不是正式網站（blog.observe.tw）或統計未啟用，本來就不送統計。' },
+  environment: { label: '不計入統計', note: '這不是正式網站（weblog.tw）或統計未啟用，本來就不送統計。' },
 };
 
 function current() {

@@ -13,7 +13,7 @@ type Node = Record<string, unknown>;
 const keyOf = (ref: Ref) => `${ref.kind}:${ref.value}`;
 const topicId = /^(tag:[a-f0-9]{64}|rss:[1-9]\d{0,9})$/;
 const numericId = /^[1-9]\d{0,14}$/;
-const PAGE_ORIGIN = 'https://blog.observe.tw';
+const PAGE_ORIGIN = 'https://weblog.tw';
 // Route allowlist, not a generic /api hook: never traverse credentials, admin
 // evidence, page-registry responses, OpenAPI, sessions or arbitrary plugin DTOs.
 export function pageLinksEndpoint(path: string): boolean {

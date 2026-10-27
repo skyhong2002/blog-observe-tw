@@ -55,7 +55,7 @@ describe('public crawler discovery routes', () => {
       for (const path of ['/my', '/me', '/auth', '/login', '/admin', '/search', '/api/']) expect(get.body).toContain(`Disallow: ${path}\n`);
       expect(get.body).toContain('Allow: /api/$\n');
       expect(get.body).toContain('Allow: /api/v1/openapi.json$');
-      expect(get.body.trimEnd()).toMatch(/Sitemap: https:\/\/blog\.observe\.tw\/sitemap\.xml$/);
+      expect(get.body.trimEnd()).toMatch(/Sitemap: https:\/\/weblog\.tw\/sitemap\.xml$/);
       const head = await app.inject({ method: 'HEAD', url: '/robots.txt' });
       expect(head.statusCode).toBe(200);
       expect(head.body).toBe('');
@@ -183,7 +183,7 @@ describe('public crawler discovery routes', () => {
     const { app } = fixture(1, '2026-01-01T00:00:00.000Z', count);
     try {
       const index = await app.inject('/sitemap.xml');
-      const files = [...index.body.matchAll(/<loc>https:\/\/blog\.observe\.tw(\/sitemaps\/topics[^<]*)<\/loc>/g)].map((m) => m[1]);
+      const files = [...index.body.matchAll(/<loc>https:\/\/weblog\.tw(\/sitemaps\/topics[^<]*)<\/loc>/g)].map((m) => m[1]);
       expect(files).toEqual(['/sitemaps/topics.xml', '/sitemaps/topics-2.xml', '/sitemaps/topics-3.xml', '/sitemaps/topics-4.xml']);
       const seen: string[] = [];
       for (const file of files) {

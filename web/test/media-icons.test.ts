@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { mediaIconSrc, mediaIcons, suppliedIconUrl } from '../src/lib/media-icons.ts';
 
-const supplied = 'https://blog.observe.tw/favicons/a.png?v=r1';
+const supplied = 'https://weblog.tw/favicons/a.png?v=r1';
 
 test('server render (empty manifest) uses the payload iconUrl, or the glyph when it is null', () => {
   assert.deepEqual(mediaIcons, {});
@@ -52,10 +52,10 @@ test('only https URLs and same-origin paths count as a supplied iconUrl', () => 
     '/favicons/\u0000a.png',
     '/favicons/\u007fa.png',
     '/favicons/\u0085a.png',
-    'http://blog.observe.tw/a.png',
+    'http://weblog.tw/a.png',
     'javascript:alert(1)',
     'data:image/png;base64,AAAA',
-    'https://u:p@blog.observe.tw/a.png',
+    'https://u:p@weblog.tw/a.png',
   ]) {
     assert.equal(suppliedIconUrl(bad), null, String(bad));
     assert.equal(mediaIconSrc('a', mediaIcons, bad), null, String(bad));

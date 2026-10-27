@@ -2,7 +2,7 @@
 """Read-only sitemap/canonical smoke check. Optional origin is a local preview."""
 import json,re,sys,time,urllib.request,xml.etree.ElementTree as ET
 from urllib.parse import urlsplit
-ORIGIN='https://blog.observe.tw'
+ORIGIN='https://weblog.tw'
 base=sys.argv[1].rstrip('/') if len(sys.argv)>1 else ORIGIN
 ns={'s':'http://www.sitemaps.org/schemas/sitemap/0.9'}
 def get(url):

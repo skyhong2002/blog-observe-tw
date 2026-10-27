@@ -132,7 +132,7 @@ export class TagApiTransport {
       const headers: Record<string, string> = {
         DNT: '1',
         Accept: 'application/json',
-        'User-Agent': 'BlogObserve/1.0 (+https://blog.observe.tw/about/; contact https://skyhong.tw/)',
+        'User-Agent': 'BlogObserve/1.0 (+https://weblog.tw/about/; contact https://skyhong.tw/)',
       };
       if (this.activeOrigin === PUBLIC_TAG_ORIGIN) {
         this.serviceToken ??= (this.options.readServiceToken ?? readTagServiceToken)().catch(() => null);

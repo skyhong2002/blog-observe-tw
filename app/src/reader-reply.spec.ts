@@ -22,7 +22,7 @@ import { buildApp } from './app.js';
 describe('anonymous reader reply completion', () => {
   it('sends exactly one 401 through asynchronous hooks, including RSC-prefetched RSS', async () => {
     const app = await buildApp(
-      { login: null, uiOrigin: 'http://127.0.0.1:1', port: 18165, publicOrigin: 'https://blog.observe.tw' },
+      { login: null, uiOrigin: 'http://127.0.0.1:1', port: 18165, publicOrigin: 'https://weblog.tw' },
       // @ts-expect-error JS injected store default is inferred as null.
       { store: { pool: { query: async () => [[]] } } },
     );

@@ -32,7 +32,7 @@ def main():
     payload = {
         'model': 'claude-opus-5-5',
         'messages': [
-            {'role': 'system', 'content': 'You are a code reviewer for a blog.observe.tw migration and crawler service. Review only the supplied evidence. Identify concrete correctness defects, severity, affected locations, fixes and missing tests. Distinguish verified defects from assumptions. Do not claim to run code. Preserve production write gates and data provenance. Reply in Traditional Chinese.'},
+            {'role': 'system', 'content': 'You are a code reviewer for a weblog.tw migration and crawler service. Review only the supplied evidence. Identify concrete correctness defects, severity, affected locations, fixes and missing tests. Distinguish verified defects from assumptions. Do not claim to run code. Preserve production write gates and data provenance. Reply in Traditional Chinese.'},
             {'role': 'user', 'content': packet},
         ],
         'max_tokens': max_tokens,

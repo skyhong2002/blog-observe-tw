@@ -4,11 +4,11 @@
 
 公開取用最新文章、部落格目錄、正文提及關係與話題排行；資料只涵蓋已收錄且驗證的部落格。
 
-網站文件：<https://blog.observe.tw/api/>；機器可讀規格：<https://blog.observe.tw/api/v1/openapi.json>；API 狀態：<https://blog.observe.tw/api/status>。
+網站文件：<https://weblog.tw/api/>；機器可讀規格：<https://weblog.tw/api/v1/openapi.json>；API 狀態：<https://weblog.tw/api/status>。
 
 ## 使用規則
 
-- 基底網址 `https://blog.observe.tw`。公開查詢使用 `GET`（也接受 `HEAD`），回傳 UTF-8 JSON。
+- 基底網址 `https://weblog.tw`。公開查詢使用 `GET`（也接受 `HEAD`），回傳 UTF-8 JSON。
 - API 狀態頁：`/api/status`。瀏覽器以 HTML 顯示；以 `Accept: application/json` 取得 JSON，只顯示 API 狀態與端點用途。狀態包含 `ok` 或 `degraded`，以有界可用性檢查確認公開查詢的資料依賴可連線，最多快取 5 秒；不是每個端點逐筆測試。JSON 欄位為 `status`、`version`、`endpoints`（每項 `path`、`summary`）與 `updatedAt`；這是狀態回應產生時間，不是文章資料更新時間。此回應為 `no-store`，不提供內部主機或爬蟲維運資訊。
 - 公開查詢不需要金鑰。每個 IP 每分鐘最多 60 次，超過回 `429`；回應帶 `x-ratelimit-limit`、`x-ratelimit-remaining`、`x-ratelimit-reset`。登入後可在 `/my/` 建立個人 API 金鑰（每人最多 3 把），以 `x-api-key: blog_…` 傳送，每把每分鐘 1000 次；伺服器只存 SHA-256 摘要，完整金鑰只顯示一次。無效或撤銷的金鑰回 `401`。為防止隨機金鑰探測，首次出現或未快取的金鑰須先通過每 IP 每分鐘 60 次的匿名／驗證桶；若該桶已用完會先回 `429`，請等窗口重設後重試。已快取且有效的金鑰不受此 IP 桶限制，每把每分鐘 1000 次額度不變。金鑰不能用來登入、管理或讀取私人資料，`Authorization` 不是本 API 的金鑰認證方式。
 - 允許跨網域：`Access-Control-Allow-Origin: *`，不接受跨域 cookie 認證。瀏覽器可讀取限流標頭與 `Retry-After`；遇 `429` 請依 `Retry-After` 秒數退避。限流標頭表示產生回應時的額度；來源站對實際到站請求計額。
@@ -20,7 +20,7 @@
 - 路徑參數請 URL 編碼（例如話題 `rss:1` 寫成 `rss%3A1`），路徑結尾不要加 `/`。文章與目錄使用 `limit`、`cursor`／`nextCursor`；游標是不透明字串，請原樣傳回並保持原查詢條件。`nextCursor: null` 表示這個結果已到尾頁。
 - 變更紀錄（2026-10-12，已核准的破壞性變更）：`GET /api/v1/blogs` 的 `items[].url` 與 `GET /api/v1/blogs/{slug}` 的 `blog.url` 改為本站可讀網頁絕對網址；原站首頁移至同物件的 `sourceUrl`（可為 null）。原先使用 blog.url 前往原站的程式請改讀 sourceUrl。`GET /api/v1/topics` 的 `items[].url` 及 `GET /api/v1/topics/{id}` 的 `topic.url` 為新增的本站網頁網址。ID／slug／favicon 識別碼不變，文章 url 仍是原文；內部 /api/* 的原站 url 不改。缺少 registry 時，本站 url 暫用可轉址的舊識別碼路徑；純標點話題不提供網址。不提供 pageUrl 系列欄位。
 - 除上述明列的已核准變更外，`v1` 內只做向後相容的變更（新增欄位、新增端點）；移除或改名會先公告。客戶端應忽略未知的新欄位。既有站內 `/api/*` 介面保留給網站使用，不是本文件的穩定公開契約；本站沒有舊版 PHP API。
-- 部落格文章、標題與圖片著作權屬原作者。API 只提供標題、原文連結、統計及最多 500 字元的短摘要，不提供全文；私人追蹤、個人 RSS、候選證據、管理及 AI 原始輸入不在公開 API。使用統計請註明「資料來源：部落格觀察 blog.observe.tw」，閱讀文章請連回原站。
+- 部落格文章、標題與圖片著作權屬原作者。API 只提供標題、原文連結、統計及最多 500 字元的短摘要，不提供全文；私人追蹤、個人 RSS、候選證據、管理及 AI 原始輸入不在公開 API。使用統計請註明「資料來源：部落格觀察 weblog.tw」，閱讀文章請連回原站。
 - 不寫程式也能追：訂閱各部落格原站提供的 RSS／Atom；登入 `/my/` 可管理追蹤與匯出 `/me/opml` 給閱讀器，OPML 只包含已成功抓取的 RSS／Atom，沒有可用 feed 的站會略過，請到原站確認訂閱方式。`/me/feed.xml` 是需要瀏覽器登入 session 的私人摘要 RSS，不是可公開分享或以 API 金鑰讀取的 feed。
 - 變更紀錄（2026-10-13）：話題詳情新增選用 history 累積歷史清單與 historyCursor 分頁。話題曾有有效比對證據就保留，不因退出每日詞庫窗口消失；只公開標題、原文連結及觀測狀態，絕不提供全文。全部證據明確撤銷時回 410，合併網頁一次 301 到最終話題。
 - 正文提及是交流訊號，不是抄襲或背書判斷。引用占比的分母為來源站在窗口內所有已解析、指向已收錄目標的「文章—目標部落格」提及數；一篇提及三站會計三筆，不是占全站文章的百分比。覆蓋與截斷欄位應與排行一起閱讀。
@@ -34,7 +34,7 @@
 ### 最新文章與游標分頁（curl + jq）
 
 ```sh
-BASE='https://blog.observe.tw'
+BASE='https://weblog.tw'
 page=$(curl --fail-with-body -sS "$BASE/api/v1/articles?hours=720&limit=10")
 printf '%s\n' "$page" | jq '.items[] | {title, url, blogName, publishedAt}'
 cursor=$(printf '%s\n' "$page" | jq -r '.nextCursor // empty')
@@ -46,7 +46,7 @@ fi
 ### 某部落格的文章與提及關係（curl + jq）
 
 ```sh
-BASE='https://blog.observe.tw'
+BASE='https://weblog.tw'
 slug=$(curl --fail-with-body -sS "$BASE/api/v1/blogs?limit=1" | jq -r '.items[0].slug // empty')
 if [ -n "$slug" ]; then
   encoded=$(printf '%s' "$slug" | jq -sRr @uri)
@@ -58,15 +58,15 @@ fi
 ### 誰提到誰、熱門話題與部落格目錄（curl + jq）
 
 ```sh
-curl --fail-with-body -sS 'https://blog.observe.tw/api/v1/relations?hours=720' | jq '.nodes, .edges, .coverage'
-curl --fail-with-body -sS 'https://blog.observe.tw/api/v1/topics?hours=168&limit=10' | jq '.items, .vocabulary'
-curl --fail-with-body -sS -G 'https://blog.observe.tw/api/v1/blogs' --data-urlencode 'q=旅行' --data-urlencode 'limit=20' | jq '.items, .nextCursor'
+curl --fail-with-body -sS 'https://weblog.tw/api/v1/relations?hours=720' | jq '.nodes, .edges, .coverage'
+curl --fail-with-body -sS 'https://weblog.tw/api/v1/topics?hours=168&limit=10' | jq '.items, .vocabulary'
+curl --fail-with-body -sS -G 'https://weblog.tw/api/v1/blogs' --data-urlencode 'q=旅行' --data-urlencode 'limit=20' | jq '.items, .nextCursor'
 ```
 
 ### JavaScript：有上限的文章分頁（瀏覽器或 Node 24）
 
 ```js
-const endpoint = 'https://blog.observe.tw/api/v1/articles';
+const endpoint = 'https://weblog.tw/api/v1/articles';
 let cursor = null;
 for (let page = 0; page < 3; page++) {
   const query = new URLSearchParams({ hours: "720", limit: "50" });
@@ -119,7 +119,7 @@ for (let page = 0; page < 3; page++) {
 範例：
 
 ```sh
-curl --fail-with-body -sS 'https://blog.observe.tw/api/v1/articles'
+curl --fail-with-body -sS 'https://weblog.tw/api/v1/articles'
 ```
 
 回應欄位：
@@ -168,7 +168,7 @@ curl --fail-with-body -sS 'https://blog.observe.tw/api/v1/articles'
 範例：
 
 ```sh
-curl --fail-with-body -sS 'https://blog.observe.tw/api/v1/blogs/skyhong-tw/articles'
+curl --fail-with-body -sS 'https://weblog.tw/api/v1/blogs/skyhong-tw/articles'
 ```
 
 回應欄位：
@@ -217,7 +217,7 @@ curl --fail-with-body -sS 'https://blog.observe.tw/api/v1/blogs/skyhong-tw/artic
 範例：
 
 ```sh
-curl --fail-with-body -sS 'https://blog.observe.tw/api/v1/blogs'
+curl --fail-with-body -sS 'https://weblog.tw/api/v1/blogs'
 ```
 
 回應欄位：
@@ -257,7 +257,7 @@ curl --fail-with-body -sS 'https://blog.observe.tw/api/v1/blogs'
 範例：
 
 ```sh
-curl --fail-with-body -sS 'https://blog.observe.tw/api/v1/blogs/skyhong-tw'
+curl --fail-with-body -sS 'https://weblog.tw/api/v1/blogs/skyhong-tw'
 ```
 
 回應欄位：
@@ -303,7 +303,7 @@ curl --fail-with-body -sS 'https://blog.observe.tw/api/v1/blogs/skyhong-tw'
 範例：
 
 ```sh
-curl --fail-with-body -sS 'https://blog.observe.tw/api/v1/relations'
+curl --fail-with-body -sS 'https://weblog.tw/api/v1/relations'
 ```
 
 回應欄位：
@@ -375,7 +375,7 @@ curl --fail-with-body -sS 'https://blog.observe.tw/api/v1/relations'
 範例：
 
 ```sh
-curl --fail-with-body -sS 'https://blog.observe.tw/api/v1/blogs/skyhong-tw/relations'
+curl --fail-with-body -sS 'https://weblog.tw/api/v1/blogs/skyhong-tw/relations'
 ```
 
 回應欄位：
@@ -481,7 +481,7 @@ curl --fail-with-body -sS 'https://blog.observe.tw/api/v1/blogs/skyhong-tw/relat
 範例：
 
 ```sh
-curl --fail-with-body -sS 'https://blog.observe.tw/api/v1/topics'
+curl --fail-with-body -sS 'https://weblog.tw/api/v1/topics'
 ```
 
 回應欄位：
@@ -589,7 +589,7 @@ curl --fail-with-body -sS 'https://blog.observe.tw/api/v1/topics'
 範例：
 
 ```sh
-curl --fail-with-body -sS 'https://blog.observe.tw/api/v1/topics/rss%3A1'
+curl --fail-with-body -sS 'https://weblog.tw/api/v1/topics/rss%3A1'
 ```
 
 回應欄位：
@@ -720,7 +720,7 @@ curl --fail-with-body -sS 'https://blog.observe.tw/api/v1/topics/rss%3A1'
 範例：
 
 ```sh
-curl --fail-with-body -sS 'https://blog.observe.tw/api/v1/openapi.json'
+curl --fail-with-body -sS 'https://weblog.tw/api/v1/openapi.json'
 ```
 
 回應欄位：

@@ -39,7 +39,7 @@ test('every static public page has a unique title, description and trailing-slas
   const descriptions = new Set<string>();
   for (const path of Object.keys(STATIC_PAGES) as Array<keyof typeof STATIC_PAGES>) {
     const meta = staticPageMetadata(path);
-    assert.equal(meta.alternates.canonical, `https://blog.observe.tw${path}`);
+    assert.equal(meta.alternates.canonical, `https://weblog.tw${path}`);
     assert.match(meta.alternates.canonical, /\/$/);
     assert.ok(!meta.alternates.canonical.includes('?'));
     assert.equal(meta.openGraph.url, meta.alternates.canonical);
@@ -48,7 +48,7 @@ test('every static public page has a unique title, description and trailing-slas
     titles.add(meta.title.absolute);
     descriptions.add(meta.description);
     // Every canonical public page is also measurable by analytics.
-    assert.ok(publicPageType(path, 'https://blog.observe.tw'), path);
+    assert.ok(publicPageType(path, 'https://weblog.tw'), path);
   }
 });
 
@@ -98,7 +98,7 @@ test('the emergency sitemap static pages keep valid canonicals', () => {
   assert.ok(listed.length > 0);
   for (const path of listed) {
     assert.ok(path in STATIC_PAGES, path);
-    assert.equal(staticPageMetadata(path as keyof typeof STATIC_PAGES).alternates.canonical, `https://blog.observe.tw${path}`);
+    assert.equal(staticPageMetadata(path as keyof typeof STATIC_PAGES).alternates.canonical, `https://weblog.tw${path}`);
   }
 });
 
@@ -106,7 +106,7 @@ test('WebSite SearchAction points at the working header search (GET /articles/?q
   const search = source(join(APP, '../components/SiteSearch.tsx'));
   assert.match(search, /action="\/articles\/"/);
   assert.match(search, /name="q"/);
-  assert.equal(SEARCH_URL_TEMPLATE, 'https://blog.observe.tw/articles/?q={search_term_string}');
+  assert.equal(SEARCH_URL_TEMPLATE, 'https://weblog.tw/articles/?q={search_term_string}');
   const site = siteSchema()['@graph'][0] as Record<string, unknown>;
   assert.deepEqual(site.potentialAction, {
     '@type': 'SearchAction',

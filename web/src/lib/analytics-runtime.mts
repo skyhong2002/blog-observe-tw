@@ -1,4 +1,4 @@
-// The browser side of GA4 on blog.observe.tw, written against injected
+// The browser side of GA4 on weblog.tw, written against injected
 // globals so node --test can drive it (SiteAnalytics passes the real ones).
 //
 // Page views: the one `config` sends the landing page_view; later SPA and

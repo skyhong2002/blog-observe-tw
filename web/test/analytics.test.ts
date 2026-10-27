@@ -26,12 +26,12 @@ import { type AnalyticsDeps, installAnalytics } from '../src/lib/analytics-runti
 import { blogLink, topicLink } from '../src/lib/page-links.ts';
 import { isSlug, isTopicId } from '../src/lib/public-query.ts';
 
-const ORIGIN = 'https://blog.observe.tw';
+const ORIGIN = 'https://weblog.tw';
 const HASH = 'ab'.repeat(32);
 const CHROME = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0 Safari/537.36';
 const reader = {
   production: true,
-  hostname: 'blog.observe.tw',
+  hostname: 'weblog.tw',
   measurementId: DEFAULT_GA_ID,
   webdriver: false,
   userAgent: CHROME,
@@ -47,7 +47,7 @@ test('measurement ID: default when unset, off when explicitly empty, refused whe
   for (const bad of [' G-VKWGDHDESV', 'UA-1234-1', 'G-abc', 'G-VKWG"><script>', 'GTM-ABCD']) assert.equal(measurementId(bad), null);
 });
 
-test('only production blog.observe.tw with an ID measures', () => {
+test('only production weblog.tw with an ID measures', () => {
   assert.equal(analyticsBlock(reader), null);
   assert.equal(analyticsBlock({ ...reader, production: false }), 'environment');
   assert.equal(analyticsBlock({ ...reader, hostname: 'localhost' }), 'environment');

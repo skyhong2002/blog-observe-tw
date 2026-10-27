@@ -12,7 +12,7 @@ import { historyEvidenceSql, historyPublicTopicSql } from '../app/src/topics/his
 import { digest, exclusionReason, MATCHER_VERSION, normalizeTerm } from '../app/src/topics/policy.ts';
 import { SOURCE } from '../app/src/topics/snapshot-client.ts';
 
-const ORIGIN = 'https://blog.observe.tw';
+const ORIGIN = 'https://weblog.tw';
 const DEFAULT_SEED = 'blog-topic-history-audit-v1';
 const SPECIAL_LABELS = ['拍照', 'Inside', '預告片'];
 const iso = (value: unknown): string | null => {

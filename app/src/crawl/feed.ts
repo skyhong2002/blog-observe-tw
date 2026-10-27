@@ -86,7 +86,7 @@ export type FeedCrawlerOptions = BodyIndexOptions & {
   obeyRobots?: boolean;
 };
 
-const DEFAULT_USER_AGENT = 'blog.observe.tw/1.0 (+https://blog.observe.tw/about; mailto:b@blog.observe.tw)';
+const DEFAULT_USER_AGENT = 'weblog.tw/1.0 (+https://weblog.tw/about; mailto:b@blog.observe.tw)';
 export const USER_AGENT = process.env.BLOG_CRAWL_USER_AGENT?.trim() || DEFAULT_USER_AGENT;
 const parser = new XMLParser({
   ignoreAttributes: false,

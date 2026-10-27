@@ -7,7 +7,7 @@ import { apiKeyCsrfToken, registerApiKeyRoutes } from './key-routes.ts';
 
 const secret = 'test-api-session-secret-with-32-characters';
 const session = 'test-cookie-token';
-const origin = 'https://blog.observe.tw';
+const origin = 'https://weblog.tw';
 const user: SessionUser = { id: 1, sub: 'google-test-sub', email: 'reader@example.test', name: null, picture: null };
 const apps: ReturnType<typeof Fastify>[] = [];
 afterEach(async () => {

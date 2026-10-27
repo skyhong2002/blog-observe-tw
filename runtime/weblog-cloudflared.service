@@ -1,0 +1,15 @@
+[Unit]
+Description=weblog.tw dedicated Cloudflare Tunnel connector
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=%h/.local/libexec/weblog-cloudflared tunnel --no-autoupdate --loglevel warn run --token-file %h/.config/weblog/cloudflared.token
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+UMask=0077
+
+[Install]
+WantedBy=default.target

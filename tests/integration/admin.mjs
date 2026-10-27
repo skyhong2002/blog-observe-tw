@@ -18,7 +18,7 @@ export async function runAdminIntegration(pool) {
     suffix = Date.now().toString(36),
     emails = new Set([`admin-${suffix}@example.invalid`]),
     secret = 'clone-admin-test-only-secret'.repeat(3),
-    origin = 'https://blog.observe.tw';
+    origin = 'https://weblog.tw';
   const users = [],
     blogs = [],
     posts = [],

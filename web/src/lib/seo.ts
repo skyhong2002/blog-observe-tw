@@ -4,7 +4,7 @@
 // never lends the home page's canonical to a page without one.
 // Pure: node --test imports this file.
 
-export const SITE_ORIGIN = 'https://blog.observe.tw';
+export const SITE_ORIGIN = 'https://weblog.tw';
 export const SITE_NAME = '部落格觀察';
 export const SITE_TITLE = '部落格觀察：每一種生活，各自怎麼寫';
 export const SITE_DESCRIPTION = '每一種生活，各自怎麼寫。台灣部落格文章、作者與標籤，持續閱讀不同的生活';

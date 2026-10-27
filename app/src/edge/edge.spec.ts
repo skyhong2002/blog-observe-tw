@@ -7,6 +7,7 @@ import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { archiveAssets } from './assets.ts';
 import { createEdge, endToEndHeaders, safePath } from './proxy.ts';
+import { legacyHost, legacyRedirectEnabled } from './public-host.ts';
 import { verifyArchive } from './release-integrity.ts';
 import { atomicJson, type EdgeState, parseState, StateReader, socketFd } from './state.ts';
 
@@ -61,12 +62,65 @@ afterEach(async () => {
   await Promise.all(directories.splice(0).map((path) => rm(path, { recursive: true, force: true })));
 });
 
+describe('weblog domain migration', () => {
+  it('keeps the old site available until enabled, then redirects every path before static/proxy access', async () => {
+    const assets = await temp();
+    await writeFile(join(assets, 'fixture.js'), 'retained bytes');
+    const calls: RequestOptions[] = [];
+    const gateway = await listen(createServer((_req, res) => res.end('application')));
+    let enabled = false;
+    const port = await listen(
+      createEdge({
+        state: { get: async () => blue },
+        assets,
+        request: redirectTransport({ 18174: gateway }, calls),
+        redirectLegacy: async () => enabled,
+      }),
+    );
+    expect((await get(port, '/', 'GET', { host: 'blog.observe.tw' })).status).toBe(200);
+    enabled = true;
+    for (const method of ['GET', 'HEAD', 'POST']) {
+      for (const path of [
+        '/',
+        '/topics/%E6%97%85%E8%A1%8C/?a=1&a=2&next=%2Fx',
+        '/_next/static/fixture.js?v=1',
+        '/api/v1/articles?hours=24',
+        '/auth/google',
+      ]) {
+        const response = await get(port, path, method, { host: 'Blog.Observe.Tw:443' });
+        expect(response.status).toBe(308);
+        expect(response.headers.location).toBe(`https://weblog.tw${path}`);
+        expect(response.headers['cache-control']).toContain('no-store');
+        expect(response.headers['set-cookie']).toBeUndefined();
+      }
+    }
+    expect(calls).toHaveLength(1);
+    expect((await get(port, '/', 'GET', { host: 'weblog.tw', 'x-forwarded-host': 'blog.observe.tw' })).status).toBe(200);
+    expect((await get(port, '/_next/static/fixture.js', 'GET', { host: 'weblog.tw' })).text).toBe('retained bytes');
+    expect((await get(port, '//evil.example', 'GET', { host: 'blog.observe.tw' })).status).toBe(400);
+    enabled = false;
+    expect((await get(port, '/', 'GET', { host: 'blog.observe.tw' })).status).toBe(200);
+    for (const host of ['evil.example', 'blog.observe.tw.evil.example', 'weblog.tw', 'blog.observe.tw:1234'])
+      expect(legacyHost(host)).toBe(false);
+  });
+  it('defaults missing state to disabled and rejects malformed operator state', async () => {
+    const path = join(await temp(), 'migration.json');
+    expect(await legacyRedirectEnabled(path)).toBe(false);
+    await writeFile(path, '{"enabled":true}');
+    expect(await legacyRedirectEnabled(path)).toBe(true);
+    await writeFile(path, '{"enabled":"true"}');
+    await expect(legacyRedirectEnabled(path)).rejects.toThrow('invalid_legacy_redirect_state');
+  });
+});
+
 describe('host-only HSTS', () => {
   it('sets exactly one day on HTTPS HTML, API, static and errors, never plain HTTP', async () => {
-    const gateway = await listen(createServer((req, res) => {
-      res.writeHead(req.url === '/missing' ? 404 : 200, { 'strict-transport-security': 'max-age=31536000; includeSubDomains; preload' });
-      res.end('body');
-    }));
+    const gateway = await listen(
+      createServer((req, res) => {
+        res.writeHead(req.url === '/missing' ? 404 : 200, { 'strict-transport-security': 'max-age=31536000; includeSubDomains; preload' });
+        res.end('body');
+      }),
+    );
     const assets = await temp();
     await writeFile(join(assets, 'fixture.js'), 'console.log(1)');
     const port = await listen(createEdge({ state: { get: async () => blue }, assets, request: redirectTransport({ 18174: gateway }) }));
@@ -81,11 +135,19 @@ describe('host-only HSTS', () => {
 
 describe('visibility cache boundary', () => {
   it('does not let gateway/CDN cache headers retain mutable HTML, API or XML', async () => {
-    const gateway = await listen(createServer((_req, res) => {
-      res.writeHead(200, { 'cache-control': 'public, s-maxage=300', 'cdn-cache-control': 'public, max-age=999', expires: 'Wed, 21 Oct 2037 07:28:00 GMT' });
-      res.end('visible content');
-    }));
-    const port = await listen(createEdge({ state: { get: async () => blue }, assets: await temp(), request: redirectTransport({ 18174: gateway }) }));
+    const gateway = await listen(
+      createServer((_req, res) => {
+        res.writeHead(200, {
+          'cache-control': 'public, s-maxage=300',
+          'cdn-cache-control': 'public, max-age=999',
+          expires: 'Wed, 21 Oct 2037 07:28:00 GMT',
+        });
+        res.end('visible content');
+      }),
+    );
+    const port = await listen(
+      createEdge({ state: { get: async () => blue }, assets: await temp(), request: redirectTransport({ 18174: gateway }) }),
+    );
     for (const path of ['/', '/blogs/example/', '/api/v1/articles', '/sitemaps/topics.xml']) {
       const response = await get(port, path);
       expect(response.headers['cache-control']).toBe('private, no-store');
@@ -170,26 +232,26 @@ describe('edge HTTP forwarding', () => {
       createEdge({ state: { get: async () => blue }, assets: await temp(), request: redirectTransport({ 18174: upstream }, calls) }),
     );
     const response = await get(edge, '/auth/me', 'GET', {
-      host: 'blog.observe.tw',
+      host: 'weblog.tw',
       cookie: 'blog_session=opaque',
       authorization: 'Bearer opaque',
       'x-api-key': 'opaque',
       'cf-connecting-ip': '198.51.100.7',
       rsc: '1',
-      origin: 'https://blog.observe.tw',
+      origin: 'https://weblog.tw',
       connection: 'x-hidden',
       'x-hidden': 'drop',
     });
     expect(response.status).toBe(302);
     expect(calls).toHaveLength(1);
     expect(captured).toMatchObject({
-      host: 'blog.observe.tw',
+      host: 'weblog.tw',
       cookie: 'blog_session=opaque',
       authorization: 'Bearer opaque',
       'x-api-key': 'opaque',
       'cf-connecting-ip': '198.51.100.7',
       rsc: '1',
-      origin: 'https://blog.observe.tw',
+      origin: 'https://weblog.tw',
     });
     expect(captured['x-hidden']).toBeUndefined();
     expect(response.headers['x-internal']).toBeUndefined();

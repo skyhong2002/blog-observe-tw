@@ -259,14 +259,14 @@ describe("a blog's whole list of citing articles (/blogs/<key>/mentions/ and its
         },
       ],
     };
-    const xml = profileMentionRss(feed, { slug: 'b', name: 'B "部落格"' }, 'https://blog.observe.tw');
+    const xml = profileMentionRss(feed, { slug: 'b', name: 'B "部落格"' }, 'https://weblog.tw');
     expect(xml).toContain('<title>誰提到了「B &quot;部落格&quot;」 · 部落格觀察</title>');
-    expect(xml).toContain('<link>https://blog.observe.tw/blogs/b/mentions/</link>');
-    expect(xml).toContain('href="https://blog.observe.tw/api/blogs/b/mentions.xml" rel="self"');
+    expect(xml).toContain('<link>https://weblog.tw/blogs/b/mentions/</link>');
+    expect(xml).toContain('href="https://weblog.tw/api/blogs/b/mentions.xml" rel="self"');
     expect(xml).toContain(
-      '<item><title>A 站：A &amp; &lt;B&gt;</title><link>https://a.example/post/</link><guid isPermaLink="false">blog.observe.tw:mention:10</guid><pubDate>Wed, 14 Oct 2026 01:00:00 GMT</pubDate><description>我讀了 B 的文章。</description></item>',
+      '<item><title>A 站：A &amp; &lt;B&gt;</title><link>https://a.example/post/</link><guid isPermaLink="false">weblog.tw:mention:10</guid><pubDate>Wed, 14 Oct 2026 01:00:00 GMT</pubDate><description>我讀了 B 的文章。</description></item>',
     );
-    expect(xml).toContain('<title>C：未命名文章</title><link>https://blog.observe.tw/blogs/c%20d/</link>');
+    expect(xml).toContain('<title>C：未命名文章</title><link>https://weblog.tw/blogs/c%20d/</link>');
     expect(xml.match(/<item>/g)).toHaveLength(2);
   });
 });

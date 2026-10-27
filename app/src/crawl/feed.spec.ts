@@ -262,7 +262,7 @@ describe('crawl request safety', () => {
     const fetcher = async (input: string | Request | URL) => {
       const url = String(input);
       calls.push(url);
-      return url.endsWith('/robots.txt') ? new Response('User-agent: blog.observe.tw\nDisallow: /private\n') : new Response('');
+      return url.endsWith('/robots.txt') ? new Response('User-agent: weblog.tw\nDisallow: /private\n') : new Response('');
     };
     await expect(
       politeFetch(`https://${host}/private/post.xml`, {}, { delayMs: 250, fetcher, resolveHost: async () => ['93.184.216.34'] }),

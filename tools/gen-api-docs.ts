@@ -3,7 +3,7 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { API_INTRO, API_TAGS, buildOpenApi, ENDPOINTS, examplePath, type Schema } from '../app/src/v1/openapi.ts';
 
-const ORIGIN = 'https://blog.observe.tw';
+const ORIGIN = 'https://weblog.tw';
 const cell = (value: string) => value.replace(/\|/g, '\\|').replace(/\n/g, ' ');
 const table = (headers: string[], rows: string[][]) =>
   [

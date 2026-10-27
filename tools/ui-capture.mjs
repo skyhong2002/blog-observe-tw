@@ -508,7 +508,8 @@ export async function verifyArchiveIdentity(config) {
   if (!verifiedFiles) throw Error('source_tree_unverified');
   return { ...receipt, sha: config.expectedSHA, sourceTreeHash, sourceTreeHashAlgorithm: 'git-tree-sha1', verifiedFiles };
 }
-export const TTFB_LIMITS = HOMEPAGE_LIMIT_SECONDS;
+// Carry forward the old site's latency ceiling without rewriting its historical baseline.
+export const TTFB_LIMITS = Object.freeze(Object.fromEntries(Object.entries(HOMEPAGE_LIMIT_SECONDS).map(([host, limit]) => [host === 'blog.observe.tw' ? 'weblog.tw' : host, limit])));
 export function verifyLatencyGate(rows) {
   if (!Array.isArray(rows) || rows.length !== 3 || new Set(rows.map(row => row.host)).size !== 3 || rows.some(row => !Object.hasOwn(TTFB_LIMITS, row.host) || row.status !== 200 || !Number.isFinite(row.totalSeconds) || row.totalSeconds < 0 || row.totalSeconds > TTFB_LIMITS[row.host])) throw Error('ttfb_gate');
 }
@@ -519,7 +520,7 @@ export function summarizeHomepageSamples(host, samples) {
 }
 async function formalTTFB(onAttempt = () => {}) {
   const rows = [];
-  for (const host of ['blog.observe.tw', 'tag.observe.tw', 'youtube.observe.tw']) {
+  for (const host of ['weblog.tw', 'tag.observe.tw', 'youtube.observe.tw']) {
     const samples=[];
     for (let sample=0;sample<3;sample++) {
       const start = performance.now(), startedAt=new Date().toISOString();

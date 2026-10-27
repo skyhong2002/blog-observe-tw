@@ -16,13 +16,14 @@ const env = {
   BLOG_GOOGLE_CLIENT_ID: 'blog-client',
   BLOG_GOOGLE_CLIENT_SECRET: 'secret',
   BLOG_SESSION_SECRET: 's'.repeat(32),
-  BLOG_PUBLIC_ORIGIN: 'https://blog.observe.tw',
+  BLOG_PUBLIC_ORIGIN: 'https://weblog.tw',
 };
 
 describe('blog OAuth contract', () => {
   it('uses the blog namespaced origin and secret', () => {
     const config = loginConfig(env);
-    expect(config?.origin).toBe('https://blog.observe.tw');
+    expect(config?.origin).toBe('https://weblog.tw');
+    expect(loginConfig({ ...env, BLOG_PUBLIC_ORIGIN: undefined })?.origin).toBe('https://weblog.tw');
     expect(hashToken('token', config?.sessionSecret)).toHaveLength(64);
     expect(safeNext('/blogs?category=tech')).toBe('/blogs?category=tech');
     expect(safeNext('//evil.example')).toBe('/');
@@ -128,6 +129,7 @@ describe('successful-login analytics receipt', () => {
   };
   it('issues a readable five-minute boolean only after a persisted successful callback', async () => {
     const { app, store, begin, callback } = await setup();
+    expect(new URL(begin.headers.location!).searchParams.get('redirect_uri')).toBe('https://weblog.tw/auth/google/callback');
     expectCleared(begin);
     const response = await callback();
     expect(response.statusCode).toBe(303);
@@ -139,6 +141,7 @@ describe('successful-login analytics receipt', () => {
       const cookie = headers(response).find((value) => value.startsWith(`${name}=`));
       expect(cookie).toContain('; Path=/;');
       expect(cookie).toContain('; HttpOnly; SameSite=Lax; Secure');
+      expect(cookie).not.toMatch(/;\s*Domain=/i);
     }
     expect(headers(response).find((value) => value.startsWith(`${SESSION_COOKIE}=`))).toContain('; Max-Age=2592000;');
     const me = await app.inject({ url: '/auth/me', headers: { cookie: `${LOGIN_COMPLETED_COOKIE}=1` } });
@@ -182,6 +185,8 @@ describe('successful-login analytics receipt', () => {
     });
     expect(invalid.statusCode).toBe(403);
     expect(store.deleteSession).not.toHaveBeenCalled();
+    const legacyOrigin = await app.inject({ method: 'POST', url: '/auth/logout', headers: { origin: 'https://blog.observe.tw' } });
+    expect(legacyOrigin.statusCode).toBe(403);
     const response = await app.inject({
       method: 'POST',
       url: '/auth/logout',

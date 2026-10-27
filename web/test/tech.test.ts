@@ -226,8 +226,8 @@ test('coverage: a body fragment is never the whole site; shares need a denominat
 });
 
 test('links: the canonical page comes from the payload url, never built from the slug', () => {
-  assert.equal(canonicalBlogPath('https://blog.observe.tw/blogs/example.com/'), '/blogs/example.com/');
-  for (const bad of [null, '', 'javascript:alert(1)', 'https://blog.observe.tw/blogs/a/?x=1', 'https://blog.observe.tw/topics/rss%3A1/'])
+  assert.equal(canonicalBlogPath('https://weblog.tw/blogs/example.com/'), '/blogs/example.com/');
+  for (const bad of [null, '', 'javascript:alert(1)', 'https://weblog.tw/blogs/a/?x=1', 'https://weblog.tw/topics/rss%3A1/'])
     assert.equal(canonicalBlogPath(bad), null, String(bad));
   assert.equal(externalHref('https://a.example/'), 'https://a.example/');
   assert.equal(externalHref('javascript:alert(1)'), null);

@@ -70,7 +70,7 @@ class GateClosed extends Error {
 }
 /** A probe that times out (13s) or cannot connect counts as infinitely slow, not as a failed response. */
 async function homepageProbe() {
-  const probe = await timedGet('https://blog.observe.tw/').catch(() => null);
+  const probe = await timedGet('https://weblog.tw/').catch(() => null);
   console.log(JSON.stringify({ probeUtc: new Date().toISOString(), ...(probe ?? { error: 'timeout-or-network' }) }));
   if (!probe) return Number.POSITIVE_INFINITY;
   if (probe.status !== 200) throw new GateClosed(true);

@@ -38,7 +38,7 @@ def validate(schema):
                 assert isinstance(item['name'],str) and item['name'];absolute(item['item'])
         else:raise AssertionError('Unsupported schema shape: '+str(typ))
     return types
-base=sys.argv[1].rstrip('/') if len(sys.argv)>1 else 'https://blog.observe.tw'
+base=sys.argv[1].rstrip('/') if len(sys.argv)>1 else 'https://weblog.tw'
 # Public API supplies stable IDs plus additive canonical page paths; no private data is queried.
 with urllib.request.urlopen(base+'/api/v1/topics',timeout=30) as r:topics=json.load(r)
 items=topics.get('items',topics.get('data',[]));topic=items[0]['id']
@@ -48,7 +48,7 @@ assert topic_path.startswith('/topics/') and not urlsplit(topic_path).netloc
 paths=['/','/blogs/kocpc/',topic_path];results=[]
 for path in paths:
     with urllib.request.urlopen(base+path,timeout=30) as r:assert r.status==200;body=r.read().decode()
-    p=Page();p.feed(body);url='https://blog.observe.tw'+path
+    p=Page();p.feed(body);url='https://weblog.tw'+path
     assert p.canonical==[url],p.canonical
     assert p.meta['description'] and p.meta['og:title'] and p.meta['og:description']
     assert p.meta['og:url']==url and p.meta['twitter:card']=='summary_large_image'

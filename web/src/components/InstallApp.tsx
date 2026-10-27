@@ -30,7 +30,7 @@ function detect(): Platform {
 const STEPS: Record<Platform, { title: string; steps: string[] }> = {
   ios: {
     title: 'iPhone／iPad',
-    steps: ['用 Safari 開啟 blog.observe.tw', '點畫面下方（iPad 在右上）的「分享」按鈕', '選「加入主畫面」，再點「新增」'],
+    steps: ['用 Safari 開啟 weblog.tw', '點畫面下方（iPad 在右上）的「分享」按鈕', '選「加入主畫面」，再點「新增」'],
   },
   'mac-safari': { title: 'Mac 上的 Safari', steps: ['點選單列的「檔案」', '選「加入 Dock」，再點「加入」'] },
   android: {

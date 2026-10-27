@@ -178,7 +178,7 @@ const blog = (id: number, name: string, patch: Partial<TechBlog>): TechBlog => (
   id,
   slug: `synthetic-${id}`,
   name,
-  url: `https://blog.observe.tw/blogs/s${id}.example/`,
+  url: `https://weblog.tw/blogs/s${id}.example/`,
   sourceUrl: `https://s${id}.example/`,
   iconUrl: null,
   status: 'not-observed',

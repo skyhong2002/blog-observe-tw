@@ -25,7 +25,7 @@ describe('UI proxy path isolation', () => {
       await proxy(
         {
           raw: { url: path },
-          headers: { cookie: 'blog_session=secret', authorization: 'Bearer secret', host: 'blog.observe.tw' },
+          headers: { cookie: 'blog_session=secret', authorization: 'Bearer secret', host: 'weblog.tw' },
           method: 'GET',
           log: { warn: vi.fn() },
         } as any,

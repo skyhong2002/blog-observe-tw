@@ -34,7 +34,7 @@ export const notObservedBlog = {
   id: 1,
   slug: 'a',
   name: '甲',
-  url: 'https://blog.observe.tw/blogs/a/',
+  url: 'https://weblog.tw/blogs/a/',
   sourceUrl: 'https://a.example/',
   iconUrl: null,
   status: 'not-observed',

@@ -54,7 +54,7 @@ const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 async function probe(path: string, port: number, type = 'application/json') {
   try {
     return await fetch(`http://127.0.0.1:${port}${path}`, {
-      headers: { host: 'blog.observe.tw', accept: type },
+      headers: { host: 'weblog.tw', accept: type },
       redirect: 'manual',
       signal: AbortSignal.timeout(20_000),
     });
@@ -72,6 +72,12 @@ async function requireHealth(slot: Slot) {
   if (!response.ok || body.ok !== true || body.port !== SLOTS[slot].gateway) throw Error('slot_health_failed');
 }
 async function ready(slot: Slot) {
+  // Pre-migration ready records have the legacy origin. Keep automatic and manual rollback verifiable.
+  const descriptor = await readSlot(slot);
+  const readyFile = join(root, 'ready', `${slot}.json`);
+  const saved = (await exists(readyFile)) ? JSON.parse(await readFile(readyFile, 'utf8')) : null;
+  const origin = saved?.commit === descriptor.commit ? (saved.publicOrigin ?? 'https://blog.observe.tw') : 'https://weblog.tw';
+  if (!['https://weblog.tw', 'https://blog.observe.tw'].includes(origin)) throw Error('invalid_slot_public_origin');
   await requireHealth(slot);
   for (const path of ['/', '/blogs/', '/articles/', '/api/overview', '/api/v1/openapi.json']) {
     const response = await probe(path, SLOTS[slot].gateway, path.startsWith('/api/') ? 'application/json' : 'text/html');
@@ -91,7 +97,7 @@ async function ready(slot: Slot) {
   if (
     auth.status !== 302 ||
     location.hostname !== 'accounts.google.com' ||
-    location.searchParams.get('redirect_uri') !== 'https://blog.observe.tw/auth/google/callback' ||
+    location.searchParams.get('redirect_uri') !== `${origin}/auth/google/callback` ||
     location.searchParams.get('code_challenge_method') !== 'S256'
   )
     throw Error('slot_oauth_failed');
@@ -232,6 +238,7 @@ async function prepare(slot: Slot, directory: string, sourceDirectory: string, p
     ...descriptor,
     source,
     buildId,
+    publicOrigin: 'https://weblog.tw',
     ...(receipt ? { prebuilt: true, buildObservedAt: receipt.observedAt } : {}),
     checkedAt: new Date().toISOString(),
   });
@@ -239,6 +246,7 @@ async function prepare(slot: Slot, directory: string, sourceDirectory: string, p
     ...descriptor,
     source,
     buildId,
+    publicOrigin: 'https://weblog.tw',
     ...(receipt ? { prebuilt: true, buildObservedAt: receipt.observedAt } : {}),
   });
   console.log(JSON.stringify({ prepared: slot, commit, assets, switched: false }));

@@ -28,6 +28,7 @@ const PRIVATE_SUFFIXES = [
   'onion',
   'ts.net',
   'observe.tw',
+  'weblog.tw',
 ];
 const object = (value: unknown): value is Record<string, unknown> => !!value && typeof value === 'object' && !Array.isArray(value);
 const date = (value: unknown): value is string => typeof value === 'string' && value.length <= 40 && Number.isFinite(Date.parse(value));
