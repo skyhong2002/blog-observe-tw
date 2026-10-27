@@ -207,7 +207,7 @@ export default function Accounts() {
         </table>
       </TableScroller>
       <p className="text-xs text-zinc-500 dark:text-zinc-400">
-        互動是讀者自己的使用：追蹤的部落格、建立的 API 金鑰。貢獻是管理修改（標籤改在 traffic.observe.tw
+        互動是讀者自己的使用：追蹤的部落格、建立的 API 金鑰。貢獻是管理修改（標籤改在網站雷達
         投票與編輯，不在這裡計數）；管理修改依稽核紀錄計算，游標移到（手機點一下）數字上可看細項。最近活動是以上任一項的最後時間；游標移到名字上可看
         Email 和加入時間。管理員只能由伺服器設定 BLOG_ADMIN_EMAILS 加入，對方用 Google 登入一次後生效，這裡不能新增或取消。
       </p>

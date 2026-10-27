@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { registerBlogGenreRoutes } from './routes.ts';
 
 describe('retired blog tag write routes', () => {
-  it("answer 410 with the blog's traffic.observe.tw page, signed in or not, and call nothing else", async () => {
+  it("answer 410 with the blog's site.observe.tw page, signed in or not, and call nothing else", async () => {
     const queries: unknown[] = [];
     const app = Fastify();
     registerBlogGenreRoutes(app, {
@@ -24,10 +24,10 @@ describe('retired blog tag write routes', () => {
       ]) {
         const response = await app.inject(request);
         expect(response.statusCode).toBe(410);
-        expect(response.json()).toEqual({ error: 'tags_moved', url: 'https://traffic.observe.tw/site/a.blog.tw/#tags' });
+        expect(response.json()).toEqual({ error: 'tags_moved', url: 'https://site.observe.tw/site/a.blog.tw/#tags' });
       }
       const unknown = await app.inject({ method: 'PUT', url: '/api/blogs/zz/genres/food/vote', payload: { vote: 1 } });
-      expect(unknown.json()).toEqual({ error: 'tags_moved', url: 'https://traffic.observe.tw/' });
+      expect(unknown.json()).toEqual({ error: 'tags_moved', url: 'https://site.observe.tw/' });
       expect(queries).toHaveLength(5);
     } finally {
       await app.close();

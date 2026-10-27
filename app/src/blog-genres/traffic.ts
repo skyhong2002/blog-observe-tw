@@ -1,13 +1,13 @@
 import { normalizeSimilarDomain, readTagSimilarwebToken } from '../crawl/similarweb-client.ts';
 
-// Since 2026-10-24 a blog's tags live on traffic.observe.tw (traffic src/crowd.ts, docs/README.md 「標籤投票」), keyed
+// Since 2026-10-24 a blog's tags live on site.observe.tw (traffic src/crowd.ts, docs/README.md 「標籤投票」), keyed
 // by the blog's domain and shared by every observe site. Since gen106 blog only reads them (and sends its AI
 // suggestions); readers vote and add tags on traffic itself, which the blog page links as 編輯標籤, like
 // tag.observe.tw. blog_genre_assignments / blog_genre_votes are kept unwritten, for a rollback.
 // Same loopback service and token as the Similarweb client (crawl/similarweb-client.ts); every refusal there is a 404.
 export const TRAFFIC_TAGS_BASE = 'http://127.0.0.1:18150/internal/v1/tags';
-export const TRAFFIC_ORIGIN = 'https://traffic.observe.tw';
-/** Where a reader edits a blog's tags: its page on traffic.observe.tw, at the tag block. */
+export const TRAFFIC_ORIGIN = 'https://site.observe.tw';
+/** Where a reader edits a blog's tags: its page on site.observe.tw, at the tag block. */
 export const trafficTagsUrl = (domain: string) => `${TRAFFIC_ORIGIN}/site/${encodeURIComponent(domain)}/#tags`;
 const READ_TIMEOUT_MS = 5_000;
 const BODY_LIMIT = 4 * 1024 * 1024;

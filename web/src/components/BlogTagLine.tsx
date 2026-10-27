@@ -3,7 +3,7 @@ import Link from '@/components/NoPrefetchLink';
 import type { GenreState } from '../../../app/src/blog-genres/resolve.ts';
 
 // The second line under a blog's title, as on tag.observe.tw /media/<media>/ (2026-10-24): 標籤, a chip for each
-// shown tag (the directory's chips, filtering /blogs/ by it), then 編輯標籤 to the blog's page on traffic.observe.tw,
+// shown tag (the directory's chips, filtering /blogs/ by it), then 編輯標籤 to the blog's page on site.observe.tw,
 // where tags are voted on and added. Nothing else on the line: no sources, counts or sign-in text (user rule).
 export default function BlogTagLine({ state, tagsUrl }: { state?: GenreState; tagsUrl?: string | null }) {
   const shown = state?.status === 'ready' ? state.items.filter((item) => item.visible) : null;
@@ -21,7 +21,7 @@ export default function BlogTagLine({ state, tagsUrl }: { state?: GenreState; ta
       {tagsUrl && (
         <a
           href={tagsUrl}
-          title={domain ? `traffic.observe.tw/site/${decodeURIComponent(domain)}/` : undefined}
+          title={domain ? `site.observe.tw/site/${decodeURIComponent(domain)}/` : undefined}
           className="ml-1 text-xs text-brand-700 hover:underline dark:text-brand-400"
         >
           編輯標籤

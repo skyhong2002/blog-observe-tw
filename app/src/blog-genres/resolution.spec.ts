@@ -14,7 +14,7 @@ const blogRows = (rows: Record<string, unknown>[]) => ({
   },
 });
 
-describe('blog tags from traffic.observe.tw', () => {
+describe('blog tags from site.observe.tw', () => {
   it('keys traffic tags for URLs and keeps their spelling, editors first as traffic sends them', () => {
     expect(
       genreItems([
@@ -35,7 +35,7 @@ describe('blog tags from traffic.observe.tw', () => {
     ]);
   });
   it('maps blogs to the domain traffic uses and links its tag block there', () => {
-    expect(trafficTagsUrl('wiwi.blog')).toBe('https://traffic.observe.tw/site/wiwi.blog/#tags');
+    expect(trafficTagsUrl('wiwi.blog')).toBe('https://site.observe.tw/site/wiwi.blog/#tags');
     expect(tagDomain('www.KOCPC.com.tw')).toBe('kocpc.com.tw');
     expect(tagDomain('blog.example.com')).toBe('blog.example.com');
     expect(tagDomain('localhost')).toBeNull();

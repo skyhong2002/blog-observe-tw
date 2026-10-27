@@ -197,7 +197,7 @@ export const sourceTypeText: Record<TechCoverageOfBlog['sourceType'], string> = 
 /** What one observation looked at; a body fragment is never the whole site. */
 export function coverageNote(coverage: TechCoverageOfBlog | null): string {
   if (!coverage) return '沒有觀測範圍紀錄。';
-  if (coverage.method === 'traffic-homepage-wappalyzer') return '由 traffic.observe.tw 檢查首頁，屬部分覆蓋，不代表已掃描全站。';
+  if (coverage.method === 'traffic-homepage-wappalyzer') return '由 網站雷達（site.observe.tw） 檢查首頁，屬部分覆蓋，不代表已掃描全站。';
   const parts = [
     coverage.sourceType === 'body-fragment'
       ? '只檢查 RSS／文章內文片段，屬部分覆蓋，不代表已掃描全站'

@@ -12,7 +12,7 @@ const METHOD = Object.freeze({
   id: 'traffic-homepage-wappalyzer',
   partial: true,
   additionalRequests: true,
-  description: '由 traffic.observe.tw 每月抓取首頁，以 Wappalyzer 規則比對；未辨識不代表未使用，失敗時保留上次成功結果。',
+  description: '由 網站雷達（site.observe.tw） 每月抓取首頁，以 Wappalyzer 規則比對；未辨識不代表未使用，失敗時保留上次成功結果。',
 });
 const states = ['detected', 'unknown', 'failed', 'blocked', 'not-observed'] as const;
 export const publicTechBlogUrl = (value: unknown): string | null => {

@@ -18,7 +18,7 @@ test('genre public fields are optional for older gateways but validated when pre
     }),
     true,
   );
-  // traffic.observe.tw's editors' tags (個人, 科技) arrive as source editor.
+  // site.observe.tw's editors' tags (個人, 科技) arrive as source editor.
   assert.equal(
     PUBLIC_CONTRACTS.blog({
       ...blog,
@@ -49,10 +49,16 @@ test('unavailable genre reads remain valid public responses', () => {
   assert.equal(PUBLIC_CONTRACTS.overview({ ...overview, genreStatus: 'unavailable' }), true);
   assert.equal(PUBLIC_CONTRACTS.overview({ ...overview, genreStatus: 'missing' }), false);
 });
-test('the 編輯標籤 address is accepted only as a traffic.observe.tw site page', () => {
+test('the 編輯標籤 address is accepted only as a site.observe.tw site page', () => {
   const withUrl = (tagsUrl: unknown) => PUBLIC_CONTRACTS.blog({ ...blog, blog: { ...blog.blog, tagsUrl } });
-  assert.equal(withUrl('https://traffic.observe.tw/site/wiwi.blog/#tags'), true);
+  assert.equal(withUrl('https://site.observe.tw/site/wiwi.blog/#tags'), true);
   assert.equal(withUrl(null), true);
-  for (const bad of ['javascript:alert(1)', 'https://evil.example/site/a/#tags', 'https://traffic.observe.tw/site/a b/#tags', 7])
+  for (const bad of [
+    'https://traffic.observe.tw/site/wiwi.blog/#tags',
+    'javascript:alert(1)',
+    'https://evil.example/site/a/#tags',
+    'https://site.observe.tw/site/a b/#tags',
+    7,
+  ])
     assert.equal(withUrl(bad), false);
 });

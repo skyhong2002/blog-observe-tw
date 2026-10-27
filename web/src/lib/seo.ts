@@ -59,7 +59,7 @@ export const STATIC_PAGES = {
   // Served only while BLOG_TECH_PUBLIC_ENABLED is on (lib/tech-flag.ts); otherwise the page is a 404.
   '/tech/': [
     '部落格使用的技術',
-    '由 traffic.observe.tw 每月抓取首頁，以 Wappalyzer 規則辨識部落格使用的 CMS、框架、主題、外掛與分析工具；部分證據，不是完整清單。',
+    '由 網站雷達（site.observe.tw） 每月抓取首頁，以 Wappalyzer 規則辨識部落格使用的 CMS、框架、主題、外掛與分析工具；部分證據，不是完整清單。',
   ],
 } as const satisfies Record<string, readonly [string | null, string]>;
 

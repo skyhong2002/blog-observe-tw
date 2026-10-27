@@ -1,13 +1,13 @@
 # 使用的技術
 
-`/api/tech` 與 `/api/blogs/:slug/tech` 只讀 traffic.observe.tw，不再偵測或寫入技術結果。
+`/api/tech` 與 `/api/blogs/:slug/tech` 只讀 site.observe.tw，不再偵測或寫入技術結果。
 
 - 先讀最多 2,000 個已驗證部落格，以 `canonical_host` 一次 POST 到 `http://127.0.0.1:18150/internal/v1/tech`，再用小寫、去掉 `www.` 的網域對回各部落格與 slug。可讀網址別名仍由公開頁面 registry 解析。
 - 認證沿用 `blog-genres/traffic.ts` 的 `readTagSimilarwebToken`；不新增憑證或外部可設定的 endpoint。
 - 成功回應快取 60 秒，同一批並行請求共用讀取；失敗不快取、不回退舊資料。traffic 請求上限 2 秒，API 保留整體 2.5 秒期限與 503 `technology_unavailable`。
 - `status` 是最近嘗試；`observedAt`、首頁來源與 detections 是最近成功。失敗／阻擋仍保留舊結果並計入技術排行；`notChecked`／沒有紀錄對應 `not-observed`。
 - 公開欄位沿用原 API；method 改成 `traffic-homepage-wappalyzer`。coverage 只宣告首頁及部分覆蓋，不捏造 traffic 沒有提供的節點數或截斷狀態。
-- traffic 每 30 天重新抓取成功站點首頁，先檢查 robots.txt、限制公開位址和 512 KiB，以釘選的 Wappalyzer 規則比對。失敗按 1、2、4…天重試，上限 30 天。細節見 https://traffic.observe.tw/tech/ 。
+- traffic 每 30 天重新抓取成功站點首頁，先檢查 robots.txt、限制公開位址和 512 KiB，以釘選的 Wappalyzer 規則比對。失敗按 1、2、4…天重試，上限 30 天。細節見 https://site.observe.tw/tech/ 。
 
 blog 的 observer、fetch batch、detector、store 和 backfill 已移除，`BLOG_TECH_ENABLED` 不再有作用；`BLOG_TECH_PUBLIC_ENABLED=true` 仍控制公開頁面與 API。
 

@@ -1,7 +1,7 @@
 /**
  * The blog page's tag line under the title (gen106, tag.observe.tw's layout), rendered for real through SourceProfile:
  * first line how it was collected, second line 標籤, the shown tags as directory chips, and 編輯標籤 to
- * traffic.observe.tw. No votes anywhere. Next's links and hooks, the follow button and icons are mocked.
+ * site.observe.tw. No votes anywhere. Next's links and hooks, the follow button and icons are mocked.
  */
 import { load } from 'cheerio';
 import { renderToString } from 'react-dom/server';
@@ -36,7 +36,7 @@ const item = (genre: string, label: string, visible = true) => ({
   disagrees: 0,
   adminOverride: null,
 });
-const page = (genreState: GenreState | undefined, tagsUrl: string | null = 'https://traffic.observe.tw/site/wiwi.blog/#tags') =>
+const page = (genreState: GenreState | undefined, tagsUrl: string | null = 'https://site.observe.tw/site/wiwi.blog/#tags') =>
   load(
     renderToString(
       <SourceProfile
@@ -73,9 +73,9 @@ describe('blog tag line', () => {
       ['/blogs/?genre=%E5%80%8B%E4%BA%BA', '個人'],
       ['/blogs/?genre=diary', '日記'],
     ]);
-    const edit = line.find('a[href^="https://traffic.observe.tw/"]');
+    const edit = line.find('a[href^="https://site.observe.tw/"]');
     expect(edit.text()).toBe('編輯標籤');
-    expect(edit.attr('href')).toBe('https://traffic.observe.tw/site/wiwi.blog/#tags');
+    expect(edit.attr('href')).toBe('https://site.observe.tw/site/wiwi.blog/#tags');
     // The link's text and nothing else on the line: no sources, counts, votes or sign-in prompts.
     expect(line.text()).toBe('標籤個人日記編輯標籤');
     expect($.html()).not.toMatch(/同意|投票|無法載入|登入後|AI 初判/);

@@ -174,10 +174,10 @@ export default async function BlogTech({ slug }: { slug: string }) {
         <p className="mt-3">
           <a
             className={link}
-            href={`https://traffic.observe.tw/tech/${encodeURIComponent(new URL(blog.sourceUrl).hostname.toLowerCase().replace(/^www\./, ''))}/`}
+            href={`https://site.observe.tw/tech/${encodeURIComponent(new URL(blog.sourceUrl).hostname.toLowerCase().replace(/^www\./, ''))}/`}
             rel="noopener noreferrer"
           >
-            在 traffic 查看詳細結果 ↗
+            在網站雷達查看詳細結果 ↗
           </a>
         </p>
       )}

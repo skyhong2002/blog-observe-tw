@@ -448,9 +448,9 @@ export const PUBLIC_CONTRACTS: Record<PublicKind, (raw: unknown) => boolean> = {
           authors: optional(rows),
           tags: optional(rows),
           genreState: optional(genreState),
-          // A link the page renders: only a traffic.observe.tw site page.
+          // A link the page renders: only a site.observe.tw site page.
           tagsUrl: (v) =>
-            v === undefined || v === null || (typeof v === 'string' && /^https:\/\/traffic\.observe\.tw\/site\/[^/\s"<>]+\/#tags$/.test(v)),
+            v === undefined || v === null || (typeof v === 'string' && /^https:\/\/site\.observe\.tw\/site\/[^/\s"<>]+\/#tags$/.test(v)),
         }),
       posts: rows,
     }),

@@ -192,8 +192,8 @@ export function TechMethodNotes({ data }: { data: TechStats }) {
       <h3 className={methodHeading}>技術觀測方式</h3>
       <p>
         由{' '}
-        <a href="https://traffic.observe.tw/tech/" className="underline">
-          traffic.observe.tw
+        <a href="https://site.observe.tw/tech/" className="underline">
+          網站雷達（site.observe.tw）
         </a>{' '}
         每月抓取一次首頁，以 Wappalyzer 規則比對。依據只提供固定的規則類別說明。
       </p>
