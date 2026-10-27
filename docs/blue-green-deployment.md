@@ -1,5 +1,7 @@
 # Blue/green 部署前置（尚未代表正式站已切換）
 
+> 2026-10-28 起公開站為 `https://weblog.tw`，舊 `blog.observe.tw` 由 edge 永久 308 轉址。目前部署與精確回滾操作見 [網域搬家紀錄](weblog-migration-20261027.md)。service 名稱、loopback 埠及資料路徑沿用；下方舊公開網址及 callback 屬歷史操作脈絡。
+
 **目前發版與保留規則（2026-10-14）：**在 SM 建置；技術/B0與主要candidate頁面非作者看圖後，
 用 `record-built`／`prepare-built`／`switch` 部署同一份產物；SM不執行會重建的
 `prepare`。其餘頁面部署後逐頁review、ledger保留pending。備份須先於additive

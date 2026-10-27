@@ -14,7 +14,7 @@ Measurement ID：`G-VKWGDHDESV`（property 558498886、stream 16112932212）。I
 
 ## 程式邊界
 
-沿用新文易數 SiteAnalytics／analytics-consent 的 MIT 實作模式，由 Opus 移植前端，Codex 審查與部署。只有 production、blog.observe.tw、hydration 後才可載入；webdriver／bot、DNT、GPC、opt-out、無法讀取偏好、空 ID 均不載入。
+沿用新文易數 SiteAnalytics／analytics-consent 的 MIT 實作模式，由 Opus 移植前端，Codex 審查與部署。只有 production、weblog.tw、hydration 後才可載入；webdriver／bot、DNT、GPC、opt-out、無法讀取偏好、空 ID 均不載入。
 
 私人、登入、管理、搜尋、退出統計頁與帶 query 的 URL 不計入。（搜尋次數另由 gateway 以每日總數記在 `search_usage_daily`，不含字詞或識別資料，見 docs/historical-fulltext.md。）退出統計頁 `/observe/opt-out/` 設 noindex。已知公開路徑有無結尾斜線皆可計入（`skipTrailingSlashRedirect` 兩者都服務），`page_location` 一律為帶結尾斜線的 canonical。`/blogs/<slug>/` 只接受小寫 ASCII slug（長度上限同 `isSlug`），`/topics/<id>/` 解碼後只接受 `tag:<64 hex>`／`rss:<數字>`（同 `isTopicId`）；其他片段（例如 `/blogs/alice%40example.com/`、`/topics/private-email/`）一律不送。程式只檢查片段形狀，**不判斷該頁是否 404**；落地文件若帶 robots noindex 另外不計，但這只是額外防護，client 切頁時無法讀到新頁 metadata。
 
@@ -50,3 +50,7 @@ OAuth 成功後 gateway 才寫入 `__Host-blog_login_completed=1` 短效布林 c
 ## 驗收與發布
 
 先測空 ID、開發／非正式 hostname、自動化與隱私偏好零 Google 請求；正式一般瀏覽器檢查 gtag/js ID、落地／切頁／上一頁各一次 page_view、open_original 安全欄位，以及 query／私人導覽不送出。每次正式驗收記錄 UTC 時間供 Google 後台 Realtime 對照。未取得後台必要設定確認前以空 ID 建置，不能假稱已送到 GA。
+
+## 2026-10-28 公開網域搬家
+
+正式 hostname guard 改為 `weblog.tw`，沿用 GA4 `G-VKWGDHDESV`（property `558498886`、stream `16112932212`），沒有另設 GTM container。使用者已將 GA4 Web stream URL 更新為 `https://weblog.tw`、property 名稱改為「部落格觀察（weblog.tw）」；Data filter 僅 Internal Traffic Testing，production 未操作 Google UI。不改 DNT、GPC、opt-out、登入收據與敏感頁排除。

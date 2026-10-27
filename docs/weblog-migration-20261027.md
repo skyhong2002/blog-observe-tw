@@ -35,3 +35,68 @@
 ## 驗證與執行 receipt
 
 部署後補記應用 SHA、BUILD_ID、generation、edge/code 前後目標、worker 設定與實際 HTTP 結果。Google 真實帳號互動授權由本人完成，production smoke 不新建 token、臨時 session 或測試帳號。
+
+## 正式上線結果（2026-10-28 00:08–00:16，台北時間）
+
+- 應用：`d507a1fb6e81db21815dcde2ba6695df06ec8f7a`，**green／generation 109**，BUILD_ID `O0iePAwCzsAmdUMfO-Qnc`。主要搬家提交為 `b8b096420c0e37c6b721bd748e1f17a417a16f94`，d507a1f 將 PWA manifest 改成 force-dynamic，避免候選 manifest 請求產生 route cache。b8b0964 的切換曾因衍生快取觸發校驗而被拒絕，沒有對它切流量、覆寫 receipt 或重建已審產物。
+- 部署操作工具：`f26af867a0ecec1eb9b248b68abc0f9729799cc6`。Next 16 正常讀取靜態 `/api/` 頁面也會新增 `standalone/web/.next/server/route-cache`，因此工具只將這個執行期衍生目錄排除於 hash；其目錄不得為 symlink，compiled server/app、primary build、manifest、靜態資產、public 檔案及兩側 dependencies 仍完整比對。8 項工具測試通過，並用原始 receipt 重驗 gen108 與 gen109 皆通過，未重寫 receipt。這筆是操作者工具修正，不是另一個應用部署。
+- `edge/code` 從保留的 `93060cc5e97628f84fa1fb2b8e9eecc41157d462` 指到 d507a1f release；只重啟 edge service、保留 socket。舊 pin 記錄於 `~/.config/weblog/edge-rollback.json`，原 release 保留。
+- 正式外部檢查全部通過後，才原子寫入 `legacy-host-redirect.json` 的 `{ "enabled": true }`。blue／gen108 `f71d7964402c0fb0a11f9f918474d31780972350` 的 gateway/web 仍 active，作為立即回滾點。
+- gateway green 的額外設定：`~/.config/systemd/user/blog-observe-gateway@green.service.d/95-weblog-origin.conf`，追加 `~/.config/weblog/blog-origin.env`，內容僅 `BLOG_PUBLIC_ORIGIN=https://weblog.tw`。全域原 production env 及 blue 設定沒有覆寫。
+- worker 先做同 release Sharp 1×1 PNG smoke，再停止唯一 worker、確認 PID=0，追加 `~/.config/systemd/user/blog-observe-worker.service.d/zz-weblog-release-d507a1f.conf`。WorkingDirectory 與 NODE_PATH 指向 d507a1f，追加同一 origin env，原 drop-ins 全部保留。PID `3611249` 自 00:09:25 起持續 active，觀察超過一分鐘、NRestarts=0，實際 cwd／NODE_PATH／BLOG_PUBLIC_ORIGIN 都已核對。沒有同時啟動第二份 worker。
+- `weblog-cloudflared.service` active，PID `3590714`、NRestarts=0，readiness 200、4 條 HA 連線；舊 connector 未停止。edge、四個 blue/green gateway/web、唯一 worker 及 active-favicons timer 正常。
+
+### 公網驗收證據
+
+新站驗收使用正確 Host/SNI 的 HTTPS（憑證驗證保持開啟）。本機當時有 DNS 負快取，curl 以已確認的 Cloudflare IP `104.21.69.174` 配 `--resolve weblog.tw:443:104.21.69.174`；使用者已獨立確認 1.1.1.1／8.8.8.8 的 DNS 回應及有效 edge cert，並非僅以 loopback 取代正式驗收。
+
+- `/`、`/blogs/kocpc/`、`/articles/?q=WordPress`、`/tech/` 均 200，自我 canonical／OG URL 與本站 JSON-LD 均使用 weblog.tw。本站不託管原作者全文的獨立文章頁；原始文章連結不重寫。
+- 深層話題 `https://weblog.tw/topics/%E5%89%B5%E6%A5%AD%E5%AE%B6/` 回 200；`/sitemaps/topics.xml` 抽查 663 筆全為 weblog.tw。`/sitemap.xml`、`/sitemaps/pages.xml`、`/sitemaps/blogs.xml`、`/robots.txt` 均 200，本站 URL 無舊 origin。
+- `https://weblog.tw/sitemap.xml` 是交付 GSC 的 sitemap index；robots 的 Sitemap 指向同網址。使用者已回報新 sitemap Success、舊 GSC 資源 currently moving to weblog.tw，Confirm Move 由使用者完成，production 未操作 GSC。
+- `/api/blogs/kocpc/mentions.xml` RSS、`/healthz`、`/api/blogs/kocpc`、`/api/v1/articles?limit=1`、`/api/v1/openapi.json` 均 200；OpenAPI server 為 `https://weblog.tw`。公開 v1 OPTIONS 204、ACAO `*`、無 allow-credentials，原 rate limit／權限設計不變。
+- `/manifest.webmanifest`、`/pwa/icon-192.png`、Next JS chunk 均 200；JS 仍有 immutable cache。HTML／API／auth 維持 `private, no-store`、CF DYNAMIC、無 Age，release／generation headers 都是 d507a1f／109。
+- 「編輯標籤」仍指向 `https://site.observe.tw/site/kocpc.com.tw/#tags`，退休 API 回 410 的 url 也相同，保留 f71d796 的結果。
+- Google production client ID 與使用者更新的 `453403068137-vtmr47o8so8edt9o7192q0vnvl7qebq8.apps.googleusercontent.com` 完全相符。OAuth 起始 302、S256、新 callback 正確，cookie 為 host-only／Secure／HttpOnly／SameSite=Lax；錯誤 callback 安全返回登入頁。同源無 session 的登出 POST 回 303 並清 cookie，舊 origin 登出回 403。單測涵蓋成功登入持久化、既有身分、錯誤與取消情境。**本人 Google 真實登入、帳號／追蹤與管理權限的人工驗收尚未完成，不能宣稱已人工驗證。**
+- 32 組 HTTPS 舊 Host GET／HEAD／POST／OPTIONS，覆蓋首頁、深層部落格、文章搜尋、robots、sitemap、JS、API、OAuth，皆 308 到新域同 path/query，無 Set-Cookie；三組跟隨轉址（首頁、重複 query／百分比編碼的部落格頁、既有 JS）均只轉一次後 200，無 loop。
+- 舊 HTTP 目前先由 Cloudflare 308 升級到同 path/query 的 HTTPS 舊站，再 308 到 weblog.tw；兩段都是永久轉址且無 loop。HTTPS 舊站是一段 308。
+- 曾發現不帶 query 的舊 JS 命中 Cloudflare gen3 HIT／200，origin 實際已回 308。使用者於 observe.tw zone 新增 Active rule `blog.observe.tw migration - bypass cache`，ID `78056645924c48218b725352e5d16e79`，精確 `(http.host eq "blog.observe.tw")`、Bypass cache、order 8／Last。重驗 `https://blog.observe.tw/_next/static/chunks/28lretm4o41_m.js` 為 308、CF DYNAMIC、gen109／d507a1f，未用 cache-busting query 規避問題。此 Cache Bypass 不必在回滾時關閉，也不影響其他 Host。
+- tag／youtube 首頁仍 200。未變更 board.tw、其他 repo、Cloudflare DNS 或 GSC。
+
+### 分析設定與跨 repo 盤點
+
+GA4 沿用 measurement `G-VKWGDHDESV`、property `558498886`、stream `16112932212`。使用者已將 stream URL 更新為 `https://weblog.tw`、property 名稱改為「部落格觀察（weblog.tw）」，Data filter 僅 Internal Traffic Testing。沒有另外配置 GTM container；正式 HTML 未發現注入 Cloudflare Web Analytics beacon。原 DNT／GPC／opt-out 與敏感頁排除都保留。
+
+唯讀盤點 tag 正式來源及 urtube，沒有必須同步修改的部落格公開連結或 Host 相依；網站雷達 `src/tech-pages.ts`、`src/api-docs.ts` 的舊網域文字是在描述歷史技術觀測匯入來源，可由該 repo 擁有者日後整理，不是 routing 依賴。服務間仍走原 loopback，沒有跨 repo 改碼或覆蓋其他人的工作。
+
+### 測試
+
+前後端 typecheck 通過；後端 Vitest 150 檔／1,470 項、web 251 項、render 13 檔／203 項、capture 工具 57 項、prebuilt 工具 8 項通過。高負載下後端使用 `--testTimeout=20000`，沒有修改測試本身的 timeout 設定。manifest 修正後再跑 typecheck／251 項 web 測試、正式 build 與完整候選驗收；工具修正後再跑 8 項 prebuilt 測試及 typecheck。
+
+`npm run lint` 有 37 個既有錯誤、9 個警告；異動中的 audit-topic-history／guarded-build／ui-capture 兩檔工具原本就有 7 個錯誤與1個警告，於 fetched 基底相同四檔重跑亦一致。新 edge／OAuth／部署工具程式檢查通過，未為改網域全面格式化既有大型工具。`docs:api:check`、`git diff --check` 通過。
+
+本機機器可讀證據（無 token／Cookie 值）：`/tmp/weblog-production-before-redirect.json`、`/tmp/weblog-candidate-final.json`、`/tmp/weblog-redirect-verification.json`、`/tmp/weblog-deep-topic.json`；測試／建置 log 以 `/tmp/weblog-` 開頭。上方結果已摘要保存於 Git，tmp 不是唯一正式紀錄。
+
+### 精確回滾（恢復舊站為權威 origin）
+
+使用已含衍生快取校驗修正的本次 source 工具，不使用 release 內較舊的部署工具：
+
+```bash
+cd /home/deck/.cache/blog-weblog-migration
+# 先關閉舊 Host 的 308，避免切回舊版後仍導向新域。
+flock --exclusive --nonblock "$HOME/.local/share/blog-observe/edge/deploy.lock" \
+  node --input-type=module -e 'import { atomicJson } from "./app/src/edge/state.ts"; await atomicJson(process.env.HOME+"/.local/share/blog-observe/edge/legacy-host-redirect.json", { enabled: false });'
+bash tools/deploy-blue-green.sh rollback blue
+# 只在 web 已成功回滾後還原唯一 worker；先確認完全停止。
+systemctl --user stop blog-observe-worker.service
+test "$(systemctl --user show blog-observe-worker.service --property=MainPID --value)" = 0
+mv "$HOME/.config/systemd/user/blog-observe-worker.service.d/zz-weblog-release-d507a1f.conf" \
+  "$HOME/.config/weblog/zz-weblog-release-d507a1f.rollback-kept.conf"
+systemctl --user daemon-reload
+systemctl --user start blog-observe-worker.service
+```
+
+工具會先驗 blue ready／BUILD_ID／產物與健康，再增加 generation，不能手動複製舊 active.json。blue 回到 f71d796，worker 由保留的 99-release-1e2ce1a.conf 回到 1e2ce1a 的 origin／NODE_PATH；新 edge 保留、轉址關閉即可，不必再次換 edge/code。確認舊站 HTML／API／OAuth、worker cwd／PID／NRestarts，資料不回復、不刪除；Google 舊 callback 已保留。兩個 Tunnel 與 Cache Bypass 可保持。
+
+這個回滾是恢復 `blog.observe.tw` 的服務與登入；若還要把使用者從 weblog.tw 導回舊站，須由使用者協調 Cloudflare 新 zone 的臨時 307（只能在舊站 308 已關閉後啟用，避免 loop），並按實際回滾狀態處理 GSC。production 不擅自撤回使用者已確認的 GSC 網址變更。
+
+確實尚待：由本人在 weblog.tw 完成一次 Google 真實登入，確認原帳號／追蹤／角色或管理權限，然後登出。其餘上述程式、部署與公開 HTTP 驗收已完成。
