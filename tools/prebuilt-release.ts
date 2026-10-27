@@ -21,7 +21,7 @@ async function fileHash(path: string) {
   for await (const chunk of createReadStream(path)) hash.update(chunk);
   return hash.digest('hex');
 }
-async function treeHash(path: string, internalLinks = false) {
+async function treeHash(path: string, internalLinks = false, runtimeCache?: string) {
   const hash = createHash('sha256');
   let count = 0;
   let files = 0;
@@ -33,6 +33,12 @@ async function treeHash(path: string, internalLinks = false) {
       const relative = `${prefix}${name}`;
       const full = join(directory, name);
       const info = await lstat(full);
+      // Next 16 writes derived route responses after startup. Keep compiled server/app,
+      // manifests, dependencies and assets covered, but not this operator-owned runtime cache.
+      if (relative === runtimeCache) {
+        if (!info.isDirectory() || (await realpath(full)) !== full) throw Error('prebuilt_runtime_cache_directory_required');
+        continue;
+      }
       if (info.isDirectory()) await walk(full, `${relative}/`);
       else {
         files++;
@@ -66,10 +72,10 @@ export async function observePrebuilt(release: string, sourceSHA: string): Promi
   artifacts['standalone/static:tree'] = await treeHash(join(packaged, 'static'));
   if (artifacts['primary/static:tree'] !== artifacts['standalone/static:tree']) throw Error('prebuilt_artifact_pair_mismatch');
   artifacts['standalone/public:tree'] = await treeHash(join(primary, 'standalone/web/public'));
-  artifacts['standalone/server:tree'] = await treeHash(join(packaged, 'server'));
+  artifacts['standalone/server:tree'] = await treeHash(join(packaged, 'server'), false, 'route-cache');
   artifacts['standalone/server.js'] = await fileHash(join(primary, 'standalone/web/server.js'));
   // Include all runtime manifests and traced dependencies, but no primary build cache.
-  artifacts['standalone:tree'] = await treeHash(join(primary, 'standalone'), true);
+  artifacts['standalone:tree'] = await treeHash(join(primary, 'standalone'), true, 'web/.next/server/route-cache');
   artifacts['release/node_modules:tree'] = await treeHash(join(release, 'node_modules'), true);
   return { version: 1, sourceSHA, buildId, observedAt: new Date().toISOString(), artifacts };
 }

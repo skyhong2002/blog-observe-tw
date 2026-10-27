@@ -107,3 +107,19 @@ test('hashes internal .bin links but rejects external dependency links and exter
     await symlink('/tmp', join(root, 'node_modules'));
     await assert.rejects(verifyPrebuilt(root, sha), /regular_artifact/);
   }));
+
+test('runtime route responses do not invalidate a receipt, but compiled pages and cache symlinks still fail', async () =>
+  fixture(async (root) => {
+    await recordPrebuilt(root, sha);
+    const cache = join(root, 'web/.next/standalone/web/.next/server/route-cache');
+    await mkdir(join(cache, 'APP_PAGE', 'fixture'), { recursive: true });
+    await writeFile(join(cache, 'APP_PAGE', 'fixture', 'api.html'), 'generated response');
+    await verifyPrebuilt(root, sha);
+    const page = join(root, 'web/.next/standalone/web/.next/server/app/api.html');
+    await writeFile(page, 'tampered compiled page');
+    await assert.rejects(verifyPrebuilt(root, sha), /pair_mismatch/);
+    await writeFile(page, 'fixture html');
+    await rm(cache, { recursive: true });
+    await symlink('/tmp', cache);
+    await assert.rejects(verifyPrebuilt(root, sha), /runtime_cache_directory_required/);
+  }));
