@@ -56,7 +56,7 @@
 - `/api/blogs/kocpc/mentions.xml` RSS、`/healthz`、`/api/blogs/kocpc`、`/api/v1/articles?limit=1`、`/api/v1/openapi.json` 均 200；OpenAPI server 為 `https://weblog.tw`。公開 v1 OPTIONS 204、ACAO `*`、無 allow-credentials，原 rate limit／權限設計不變。
 - `/manifest.webmanifest`、`/pwa/icon-192.png`、Next JS chunk 均 200；JS 仍有 immutable cache。HTML／API／auth 維持 `private, no-store`、CF DYNAMIC、無 Age，release／generation headers 都是 d507a1f／109。
 - 「編輯標籤」仍指向 `https://site.observe.tw/site/kocpc.com.tw/#tags`，退休 API 回 410 的 url 也相同，保留 f71d796 的結果。
-- Google production client ID 與使用者更新的 `453403068137-vtmr47o8so8edt9o7192q0vnvl7qebq8.apps.googleusercontent.com` 完全相符。OAuth 起始 302、S256、新 callback 正確，cookie 為 host-only／Secure／HttpOnly／SameSite=Lax；錯誤 callback 安全返回登入頁。同源無 session 的登出 POST 回 303 並清 cookie，舊 origin 登出回 403。單測涵蓋成功登入持久化、既有身分、錯誤與取消情境。**本人 Google 真實登入、帳號／追蹤與管理權限的人工驗收尚未完成，不能宣稱已人工驗證。**
+- Google production client ID 與使用者更新的 `453403068137-vtmr47o8so8edt9o7192q0vnvl7qebq8.apps.googleusercontent.com` 完全相符。OAuth 起始 302、S256、新 callback 正確，cookie 為 host-only／Secure／HttpOnly／SameSite=Lax；錯誤 callback 安全返回登入頁。同源無 session 的登出 POST 回 303 並清 cookie，舊 origin 登出回 403。單測涵蓋成功登入持久化、既有身分、錯誤與取消情境。**2026-10-28 使用者確認 weblog.tw 的 Google 真實登入正常；原有追蹤內容與各管理角色尚未逐項人工驗收。**
 - 32 組 HTTPS 舊 Host GET／HEAD／POST／OPTIONS，覆蓋首頁、深層部落格、文章搜尋、robots、sitemap、JS、API、OAuth，皆 308 到新域同 path/query，無 Set-Cookie；三組跟隨轉址（首頁、重複 query／百分比編碼的部落格頁、既有 JS）均只轉一次後 200，無 loop。
 - 舊 HTTP 目前先由 Cloudflare 308 升級到同 path/query 的 HTTPS 舊站，再 308 到 weblog.tw；兩段都是永久轉址且無 loop。HTTPS 舊站是一段 308。
 - 曾發現不帶 query 的舊 JS 命中 Cloudflare gen3 HIT／200，origin 實際已回 308。使用者於 observe.tw zone 新增 Active rule `blog.observe.tw migration - bypass cache`，ID `78056645924c48218b725352e5d16e79`，精確 `(http.host eq "blog.observe.tw")`、Bypass cache、order 8／Last。重驗 `https://blog.observe.tw/_next/static/chunks/28lretm4o41_m.js` 為 308、CF DYNAMIC、gen109／d507a1f，未用 cache-busting query 規避問題。此 Cache Bypass 不必在回滾時關閉，也不影響其他 Host。
@@ -66,7 +66,7 @@
 
 GA4 沿用 measurement `G-VKWGDHDESV`、property `558498886`、stream `16112932212`。使用者已將 stream URL 更新為 `https://weblog.tw`、property 名稱改為「部落格觀察（weblog.tw）」，Data filter 僅 Internal Traffic Testing。沒有另外配置 GTM container；正式 HTML 未發現注入 Cloudflare Web Analytics beacon。原 DNT／GPC／opt-out 與敏感頁排除都保留。
 
-唯讀盤點 tag 正式來源及 urtube，沒有必須同步修改的部落格公開連結或 Host 相依；網站雷達 `src/tech-pages.ts`、`src/api-docs.ts` 的舊網域文字是在描述歷史技術觀測匯入來源，可由該 repo 擁有者日後整理，不是 routing 依賴。服務間仍走原 loopback，沒有跨 repo 改碼或覆蓋其他人的工作。
+唯讀盤點 tag 正式來源及 urtube，沒有必須同步修改的部落格公開連結或 Host 相依；網站雷達 `src/tech-pages.ts`、`src/api-docs.ts` 的舊網域文字是在描述歷史技術觀測匯入來源，可由該 repo 擁有者日後整理，不是 routing 依賴。上述檢查沒有跨 repo 改碼；此時尚未涵蓋 Mint-MBP 上 live.observe.tw 的正式呼叫端，後續發現與修正見下節。不能由 tag／urtube 的結果推論所有服務皆走 loopback。
 
 ### 測試
 
@@ -101,9 +101,22 @@ systemctl --user start blog-observe-worker.service
 
 確實尚待：
 
-1. 由本人在 weblog.tw 完成一次 Google 真實登入，確認原帳號／追蹤／角色或管理權限，然後登出。
+1. 使用者已確認 Google 真實登入正常；原有追蹤內容、各管理角色與登出仍未逐項人工確認。
 DNS 未決項已解除（2026-10-28）：使用者授權並登入 `192.168.88.1` 的 WebFig（RouterOS 7.6）處理。據使用者實測，固定 upstream `45.90.28.20`／`45.90.30.20` 直接查詢均逾時，動態上游 `140.113.1.1` 對 weblog.tw 回 NODATA／舊 SOA，另一動態上游 `140.113.6.2` 正常；清除路由器快取後仍未恢復。因此新增精確 DNS 規則：Name `weblog.tw`、Type `FWD`、Forward To `1.1.1.1`、TTL `00:05:00`，comment 為 `weblog.tw migration DNS fix 2026-10-28: forward to Cloudflare; preserve default upstreams`。其餘 DNS 設定及預設上游保持，未硬寫網站 IP。
 
-使用者已確認路由器 A／AAAA、Mac Tailscale `100.100.100.100` 解析正常，Mac 以系統 DNS、不帶 `--resolve` 的 HTTPS 回 200，Brave 首頁亦已載入。Production 本次僅重驗一次 `curl https://weblog.tw/`：使用系統 DNS、未帶 `--resolve`、TLS 憑證驗證保持開啟，結果 **HTTP 200**，remote IP `172.67.210.176`、TLS verify result `0`。本次只更新此紀錄，不重跑整套測試、不重新部署；Google 真人登入仍未驗證。
+使用者已確認路由器 A／AAAA、Mac Tailscale `100.100.100.100` 解析正常，Mac 以系統 DNS、不帶 `--resolve` 的 HTTPS 回 200，Brave 首頁亦已載入。Production 本次僅重驗一次 `curl https://weblog.tw/`：使用系統 DNS、未帶 `--resolve`、TLS 憑證驗證保持開啟，結果 **HTTP 200**，remote IP `172.67.210.176`、TLS verify result `0`。本次只更新此紀錄，不重跑整套測試、不重新部署；該次 DNS 檢查未驗證 Google 真人登入；使用者其後已確認登入正常。
 
 其餘上述程式、部署與公開 HTTP 驗收已完成。最終 edge socket/service、blue／green 四個 slot units、唯一 worker、獨立 connector 及 favicon timer 均 active；worker PID 3611249、connector PID 3590714 均 NRestarts=0。最終 connector 為 4 條 HA 連線；累積 request_errors 1（非零累計），不能寫成整段觀察期零錯誤，目前 readiness 與公網請求正常。
+
+
+## 跨站相依補查與修復（2026-10-28 00:38，台北時間）
+
+本次發現先前盤點漏掉 Mint-MBP 正式 `live.observe.tw`：文章與話題仍請求 `https://blog.observe.tw/api/v1/articles`／`topics`，且 fetch 設定 `redirect: 'error'`；舊 Host 的 308 因而造成兩個來源 stale。話題 URL 驗證與 UI 首頁也綁定舊 origin。
+
+在 `/home/sky/Projects/live.observe.tw` 更新 server/sources.mjs、server/topics.mjs、public/ui.mjs、test/topics.test.mjs 與 README.md，改用 weblog.tw，保留禁止任意轉址與精確 origin 驗證。提交 `f68b270bd5308d2c37ef5aa5a0fdfc2093997129` 已推送 live.observe.tw 的 main，並重啟 Mint-MBP 的 live-observe.service。既有測試 202 項中 201 通過、1 項略過、0 失敗；npm run check 與 git diff --check 通過。
+
+公網 `/api/feed` 於 2026-10-27T16:38:56Z 驗證：blog articles status=ok、100 筆、lastSuccess=16:38:28Z；blog topics status=ok、40 筆、lastSuccess=16:38:30Z，全部部落格話題 URL 均以 https://weblog.tw/ 開頭。服務 active，工作樹乾淨。
+
+補查 tag 正式 `/home/deck/.local/share/tag-analysis/current` 的 app/src、web/src 沒有 blog.observe.tw 的直接 HTTP 呼叫；SM 相關專案檢索未再找到相同類型的執行期呼叫，歷史匯入來源文字不改寫。部落格向網站雷達的 internal API 使用 127.0.0.1:18150，tag transport 預設使用 127.0.0.1:18130、既有公開 fallback 為 tag.observe.tw，均不因部落格公開網域更名而改變。
+
+舊 HTTPS 的首頁、文章 API、話題 API、mentions RSS、sitemap.xml、robots.txt 實測皆 308 到新域相同 path/query，允許跟隨轉址時一跳後 200。這是轉址相容，不是舊 Host 透明代理；禁止轉址、跨域驗證 header、瀏覽器預檢與登入／寫入流程不能假設完全相容。已知呼叫端應直接使用 https://weblog.tw；舊 DNS、Tunnel 與轉址仍須保留以維持舊連結可用。
