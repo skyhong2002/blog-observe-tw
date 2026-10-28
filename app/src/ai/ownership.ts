@@ -1,7 +1,6 @@
 /** Versioned, label-free site-level excerpts. Article/comment text is never classification evidence. */
-export const OWNERSHIP_VERSION = 'site-ownership-v2';
-const excludedPattern =
-  /新聞(?:媒體|網)|編輯(?:部|團隊)|購物車|加入購物車|企業官方|公司官網|newsroom|add to cart|corporate blog|關於我們|我們是|我們團隊|\b(?:our team|we are|about us)\b/i;
+export const OWNERSHIP_VERSION = 'site-ownership-v3';
+const excludedPattern = /新聞(?:媒體|網)|編輯(?:部|團隊)|購物車|加入購物車|企業官方|公司官網|公司公告|newsroom|add to cart|corporate blog/i;
 export const organizationEvidence = (text: string) => excludedPattern.test(text);
 export function selfDescription(text: string) {
   const personal = /個人(?:的)?部落格|私人(?:的)?部落格|personal blog|個人網站|個人網誌/i.test(text);
@@ -9,17 +8,25 @@ export function selfDescription(text: string) {
   // Keep the proper-name capital separate from case-insensitive matching: "I am going" is not a name.
   const englishIdentity = /\bI(?:'m| am)\s+(?!Going\b|Writing\b|Trying\b|Thinking\b)[A-Z][\p{L}'’-]{1,39}(?:\s|[.,!:;]|$)/u.test(text);
   const explicitAbout = /關於我(?!們)|\babout me\b/i.test(text);
-  return personal && (chineseIdentity || englishIdentity || explicitAbout) && !organizationEvidence(text);
+  return (
+    personal &&
+    (chineseIdentity || englishIdentity || explicitAbout) &&
+    !organizationEvidence(text) &&
+    !/我們|我们|\b(?:we|our|us)\b/i.test(text)
+  );
 }
-/**
- * A site introduction written by one person about themself: three or more first-person-singular
- * words (「我」, I/my/me) and no plural voice (「我們」, we/our/us) or organization wording.
- */
+/** Site-level first-person introduction, using what the owner says rather than pronoun counts. */
 export function firstPersonIntroduction(text: string) {
   if (text.length < 30 || organizationEvidence(text) || /我們|我们|\b(?:we|our|us)\b/i.test(text)) return false;
-  const chinese = text.match(/我(?!們|们)/g)?.length ?? 0;
-  const english = text.match(/\b(?:I|I'm|I've|[Mm]y|me)\b/g)?.length ?? 0;
-  return chinese >= 3 || english >= 3;
+  const named =
+    /我(?:是|叫)\s*[\p{L}\p{N}][\p{L}\p{N} _·-]{1,39}[。，,!！?？、：:]/u.test(text) ||
+    /\bI(?:'m| am)\s+[A-Z][\p{L}'’-]{1,39}(?:[.,!]|$)/u.test(text);
+  const activity = /我(?:喜歡|喜欢|寫|写|分享|記錄|记录|擅長|擅长|住|在)|\bI (?:write|share|live|work|love|enjoy)\b/i.test(text);
+  const context =
+    /這裡|这里|這個網站|这个网站|本站|我的(?:網站|网站|部落格|網誌)|興趣|兴趣|畢業|毕业|生活|\b(?:my (?:work|blog|site)|here|about me)\b/i.test(
+      text,
+    );
+  return (named && context) || (activity && (named || context));
 }
 export const ownerIntroduction = (text: string) => selfDescription(text) || firstPersonIntroduction(text);
 /** Canonical JSON array of website strings: no generated prompt labels can qualify as quotations. */

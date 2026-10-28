@@ -3,9 +3,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('./candidate-validation.ts', () => ({ CANDIDATE_POLICY: 'test', validateCandidate: vi.fn() }));
 vi.mock('./candidate-promotion.ts', () => ({ recordCandidateCheck: vi.fn() }));
+vi.mock('../site-identity.ts', () => ({ accountEvidenceFor: vi.fn(async () => undefined) }));
 
 import { recordCandidateCheck } from './candidate-promotion.ts';
-import { runCandidateReviewBatch } from './candidate-review.ts';
+import { runCandidateReviewBatch, runReaderReviewBatch } from './candidate-review.ts';
 import { validateCandidate } from './candidate-validation.ts';
 
 function harness() {
@@ -165,4 +166,51 @@ describe('resumable candidate review batch', () => {
     await expect(runCandidateReviewBatch(h.pool)).rejects.toThrow('poolSize');
     expect(h.pool.getConnection).not.toHaveBeenCalled();
   });
+});
+
+it('reader requests spend a separate HTTP budget', async () => {
+  const scopes: string[] = [];
+  const budget = await import('../jobs/budget.ts');
+  const reserve = vi.spyOn(budget, 'reserveBudget').mockImplementation(async (_pool, [r]) => {
+    scopes.push(r.scope);
+    return true;
+  });
+  vi.mocked(validateCandidate).mockImplementation(async (_row, options) => {
+    await options?.fetcher?.('https://writer.test/');
+    return {
+      policy: 'test',
+      id: 1,
+      inputUrl: 'https://writer.test/',
+      checkedAt: new Date().toISOString(),
+      eligible: false,
+      reason: 'test',
+    };
+  });
+  try {
+    await runCandidateReviewBatch(harness().pool, { apply: true, ids: [1], readerQueue: true, fetcher: async () => new Response('') });
+    expect(scopes[1]).toBe('candidates:reader');
+  } finally {
+    reserve.mockRestore();
+  }
+});
+
+it('reader completion follows persisted results; budget waits and failed transactions remain pending', async () => {
+  for (const outcome of ['approved', 'budget', 'failure']) {
+    const h = harness();
+    const execute = vi.fn(async (_sql: string, _values?: unknown[]) => [{}]);
+    Object.assign(h.pool, {
+      query: vi.fn(async (sql: string) => (sql.includes('SELECT r.candidate_id') ? [[{ id: 1, requested_at: new Date() }]] : [{}])),
+      execute,
+    });
+    if (outcome === 'failure') vi.mocked(recordCandidateCheck).mockRejectedValueOnce(Error('write failed'));
+    else
+      vi.mocked(recordCandidateCheck).mockResolvedValueOnce({
+        id: 1,
+        status: outcome === 'approved' ? 'approved' : 'candidate',
+        reason: outcome === 'budget' ? 'candidate_host_budget_exhausted' : 'auto-approved-new-blog',
+      } as never);
+    await runReaderReviewBatch(h.pool, { apply: true });
+    expect(execute).toHaveBeenCalledTimes(outcome === 'approved' ? 1 : 0);
+    if (outcome === 'approved') expect(execute.mock.calls[0][0]).toContain('requested_at=?');
+  }
 });

@@ -636,3 +636,75 @@ export const searchUsageDaily = mysqlTable('search_usage_daily', {
   apiRequests: int('api_requests').notNull().default(0),
   updatedAt: datetime('updated_at').notNull(),
 });
+
+/** Login accounts manage publications independently of crawled author identities. */
+export const siteClaims = mysqlTable(
+  'site_claims',
+  {
+    id: int('id').autoincrement().primaryKey(),
+    homeKey: char('home_key', { length: 64 }).notNull(),
+    homeUrl: varchar('home_url', { length: 1024 }).notNull(),
+    userId: int('user_id').notNull(),
+    candidateId: int('candidate_id').notNull(),
+    method: varchar('method', { length: 16 }).notNull(),
+    relationship: varchar('relationship', { length: 16 }).notNull(),
+    token: varchar('token', { length: 96 }).notNull(),
+    status: varchar('status', { length: 16 }).notNull().default('pending'),
+    expiresAt: datetime('expires_at').notNull(),
+    verifiedAt: datetime('verified_at'),
+    lastAttemptAt: datetime('last_attempt_at'),
+    proofUrl: varchar('proof_url', { length: 1024 }),
+    proofSha256: char('proof_sha256', { length: 64 }),
+    createdAt: datetime('created_at').notNull(),
+  },
+  (table) => [
+    uniqueIndex('site_claim_token').on(table.token),
+    index('site_claim_home').on(table.homeKey, table.status),
+    index('site_claim_user').on(table.userId, table.createdAt),
+  ],
+);
+export const siteRecommendations = mysqlTable(
+  'site_recommendations',
+  {
+    id: int('id').autoincrement().primaryKey(),
+    homeKey: char('home_key', { length: 64 }).notNull(),
+    homeUrl: varchar('home_url', { length: 1024 }).notNull(),
+    userId: int('user_id').notNull(),
+    candidateId: int('candidate_id').notNull(),
+    reason: varchar('reason', { length: 500 }).notNull(),
+    status: varchar('status', { length: 16 }).notNull().default('active'),
+    createdAt: datetime('created_at').notNull(),
+  },
+  (table) => [
+    uniqueIndex('site_recommendation_user_home').on(table.userId, table.homeKey),
+    index('site_recommendation_home').on(table.homeKey, table.status),
+    index('site_recommendation_daily').on(table.userId, table.createdAt),
+  ],
+);
+export const siteReviewRequests = mysqlTable(
+  'site_review_requests',
+  {
+    candidateId: int('candidate_id').primaryKey(),
+    userId: int('user_id').notNull(),
+    status: varchar('status', { length: 16 }).notNull().default('pending'),
+    requestedAt: datetime('requested_at').notNull(),
+    processedAt: datetime('processed_at'),
+    result: varchar('result', { length: 96 }),
+  },
+  (table) => [
+    index('site_review_pending').on(table.status, table.requestedAt),
+    index('site_review_daily').on(table.userId, table.requestedAt),
+  ],
+);
+export const siteIdentityAudits = mysqlTable(
+  'site_identity_audits',
+  {
+    id: int('id').autoincrement().primaryKey(),
+    homeKey: char('home_key', { length: 64 }).notNull(),
+    userId: int('user_id').notNull(),
+    action: varchar('action', { length: 32 }).notNull(),
+    evidence: json('evidence').$type<Record<string, unknown>>().notNull(),
+    createdAt: datetime('created_at').notNull(),
+  },
+  (table) => [index('site_identity_audit_home').on(table.homeKey, table.createdAt)],
+);

@@ -61,10 +61,10 @@ describe('automatic discovery verification', () => {
     expect(result.eligible).toBe(false);
     expect(result.reason).toBe('rss_or_article_sitemap_required');
   });
-  it('does not accept a shared name fragment as full publication identity', async () => {
+  it('does not accept an unadvertised feed based on a shared name fragment', async () => {
     const result = await validateCandidate(
       candidate,
-      options(rss(home, 'Another Writer'), homepage.replace('Quill Writer', 'Another Writer')),
+      options(rss(home, 'Another Writer'), homepage.replace('Quill Writer', 'Another Writer').replace(/<link[^>]*>/, '')),
     );
     expect(result.eligible).toBe(false);
     expect(result.reason).toBe('feed_name_identity_mismatch');
@@ -95,7 +95,9 @@ describe('automatic discovery verification', () => {
     // A category feed the homepage never links (found at the guessed /feed/) does not stand for the home.
     const unlinked = homepage.replace(/<link[^>]*>/, '');
     expect((await validateCandidate(candidate, options(rss(home + 'category'), unlinked))).reason).toBe('feed_home_identity_mismatch');
-    expect((await validateCandidate(candidate, options(rss(home, 'Another publication')))).reason).toBe('feed_name_identity_mismatch');
+    expect((await validateCandidate(candidate, options(rss(home, 'Another publication'), unlinked))).reason).toBe(
+      'feed_name_identity_mismatch',
+    );
   });
   it('does not approve a syndicated or mixed-author feed', async () => {
     expect((await validateCandidate(candidate, options(rss(home, 'Quill Writer', 'https://someone.test/post')))).reason).toBe(
@@ -141,12 +143,12 @@ describe('automatic discovery verification', () => {
       directoryListing: 'https://blogblog.club/blogrollroll',
       reason: 'verified_homepage_and_rss_directory_listed',
     });
-    expect((await validateCandidate(listed, options(rss(home, 'Other Writer'), plain))).eligible).toBe(false);
+    expect((await validateCandidate(listed, options(rss(home, 'Other Writer'), plain))).eligible).toBe(true);
     expect((await validateCandidate(listed, options('<rss version="2.0"><channel></channel></rss>', plain))).eligible).toBe(false);
     // Only the directory itself counts: a listing claimed by another host is ordinary evidence.
     const elsewhere = { ...listed, source_evidence: { directoryListing: { page: 'https://blogblog.club.evil.test/' } } };
     expect((await validateCandidate(elsewhere, options(rss(), plain))).eligible).toBe(false);
-  });
+  }, 10000);
   it('a listed home whose feed names its blog section and its own domain (wiwi.blog) is admitted; others are not', async () => {
     const listed = {
       ...candidate,
@@ -166,9 +168,9 @@ describe('automatic discovery verification', () => {
     expect((await validateCandidate({ ...candidate, name: 'Quill.Test' }, options(section, unlinked))).reason).toBe(
       'feed_home_identity_mismatch',
     );
-    // A section on another host never counts, nor a feed that does not name the domain.
+    // An advertised feed may have a different title, but never represent another host.
     expect((await validateCandidate(listed, options(rss('https://other.test/blog', 'Quill.Test Blog'), plain))).eligible).toBe(false);
-    expect((await validateCandidate(listed, options(rss(`${home}blog`, 'Some Blog', `${home}blog/old-post`), plain))).eligible).toBe(false);
+    expect((await validateCandidate(listed, options(rss(`${home}blog`, 'Some Blog', `${home}blog/old-post`), plain))).eligible).toBe(true);
   }, 20_000);
   it('skips a stray title-less item (Hugo /archives/) but still refuses a feed that is mostly not articles', async () => {
     const item = (title: string, link: string) =>

@@ -22,6 +22,7 @@ const source = (file: string) => readFileSync(file, 'utf8');
 
 const PRIVATE_ROUTES = [
   '/my/',
+  '/my/sites/',
   '/login/',
   '/admin/',
   '/admin/blogs/',

@@ -34,6 +34,7 @@ import { registerPageApi } from './seo/page-api.ts';
 import { registerPageLinks } from './seo/page-links.ts';
 import { createPublicPageRedirect } from './seo/redirects.ts';
 import { registerSeoRoutes } from './seo/routes.ts';
+import { registerSiteClaimRoutes } from './site-claims.ts';
 import { registerTechRoutes } from './tech/routes.ts';
 import { registerTopicRoutes } from './topics/routes.ts';
 import { createUiProxy } from './ui-proxy.js';
@@ -309,6 +310,12 @@ export async function buildApp(config, { logger = false, store = null } = {}) {
   };
   registerBlogGenreRoutes(app, { pool });
   registerBlogSuggestionRoutes(app, { pool, requireUser, publicOrigin: config.publicOrigin });
+  registerSiteClaimRoutes(app, {
+    pool,
+    requireUser,
+    publicOrigin: config.publicOrigin,
+    crawl: { userAgent: config.crawlUserAgent, delayMs: config.crawlDelayMs },
+  });
   app.get('/api/me/follows', async (request, reply) => {
     const user = await requireUser(request, reply);
     if (!user) return reply;

@@ -1,5 +1,5 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
-import type { Pool, RowDataPacket } from 'mysql2/promise';
+import type { Pool, PoolConnection, RowDataPacket } from 'mysql2/promise';
 import type { SessionUser } from './auth/google-login.ts';
 import { isAllowedCrawlUrl } from './crawl/feed.ts';
 import { publicationDecision } from './relations/identity.ts';
@@ -49,7 +49,7 @@ function spellings(home: string) {
   return ['https://', 'http://'].flatMap((scheme) => ['', 'www.'].flatMap((www) => [`${scheme}${www}${rest}`, `${scheme}${www}${rest}/`]));
 }
 
-export async function suggestionState(pool: Pool, input: unknown): Promise<SuggestionState> {
+export async function suggestionState(pool: Pool | PoolConnection, input: unknown): Promise<SuggestionState> {
   const parsed = suggestionHome(input);
   if ('reason' in parsed) return { state: 'invalid', reason: parsed.reason };
   const { home } = parsed;
@@ -66,7 +66,7 @@ export async function suggestionState(pool: Pool, input: unknown): Promise<Sugge
   const blog = blogs[0];
   if (blog?.status === 'verified') return { state: 'listed', home, slug: String(blog.slug), name: String(blog.name) };
   const [candidates] = await pool.query<RowDataPacket[]>(
-    `SELECT status,JSON_UNQUOTE(JSON_EXTRACT(source_evidence,'$.automaticReview.checkedAt')) checkedAt,
+    `SELECT status,EXISTS(SELECT 1 FROM site_review_requests r WHERE r.candidate_id=discovery_candidates.id AND r.status='pending') reviewPending,JSON_UNQUOTE(JSON_EXTRACT(source_evidence,'$.automaticReview.checkedAt')) checkedAt,
        JSON_UNQUOTE(JSON_EXTRACT(source_evidence,'$.automaticReview.reason')) reason
      FROM discovery_candidates WHERE url IN (?) ORDER BY status='candidate' DESC,id DESC`,
     [spellings(home)],
@@ -79,7 +79,7 @@ export async function suggestionState(pool: Pool, input: unknown): Promise<Sugge
       state: 'queued',
       home,
       checkedAt: open.status === 'candidate' ? (open.checkedAt ?? null) : null,
-      reason: open.status === 'candidate' ? (open.reason ?? null) : null,
+      reason: open.status === 'candidate' && !open.reviewPending ? (open.reason ?? null) : null,
     };
   if (candidates.length) return { state: 'rejected', home };
   return { state: 'new', home };
@@ -107,6 +107,7 @@ const QUEUE_PAGE = 50;
 const review = (field: string) => `JSON_UNQUOTE(JSON_EXTRACT(d.source_evidence,'$.automaticReview.${field}'))`;
 const host = (column: string) => `LOWER(SUBSTRING_INDEX(SUBSTRING_INDEX(${column},'/',3),'/',-1))`;
 const queueState = `CASE WHEN d.status='approved' THEN 'listed' WHEN d.status='rejected' THEN 'rejected'
+  WHEN EXISTS(SELECT 1 FROM site_review_requests r WHERE r.candidate_id=d.id AND r.status='pending') THEN 'waiting'
   WHEN ${review('reason')} IS NULL OR ${review('reason')} LIKE '%budget_exhausted' THEN 'waiting' ELSE 'failed' END`;
 const checkedAt = `STR_TO_DATE(LEFT(${review('checkedAt')},19),'%Y-%m-%dT%H:%i:%s')`;
 

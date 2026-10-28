@@ -5,11 +5,12 @@ import { AI_POLICY, inputKey, normalizeInput } from '../ai/contracts.ts';
 import { aiPersonalProof, deterministicPersonalProof } from '../ai/personal.ts';
 import { reserveBudgetOnConnection } from '../jobs/budget.ts';
 import { activateScraperOnConnection } from '../scrapers/store.ts';
+import { validAccountEvidence } from '../site-identity.ts';
 import {
   advertisedSource,
   CANDIDATE_POLICY,
   type CandidateCheck,
-  candidateIdentityConfirmed,
+  candidateFeedIdentityConfirmed,
   candidatePreflight,
   publicationContains,
 } from './candidate-validation.ts';
@@ -97,14 +98,20 @@ export async function recordCandidateCheck(
     let created = false;
     const v = check.verification;
     const sourceEvidence = decode(candidate.source_evidence);
-    const depth = Number(sourceEvidence.discoveryDepth ?? 1);
+    const accountValid =
+      check.eligible &&
+      check.personalEvidence?.reason !== 'organization_media_or_shop_evidence' &&
+      Boolean(v?.finalUrl && safeKey(v.finalUrl) === safeKey(candidate.url)) &&
+      (await validAccountEvidence(c, candidate.url, check.accountEvidence));
+    // A signed-in direct submission is its own discovery source, independent of old crawler ancestry.
+    const depth = accountValid ? 1 : Number(sourceEvidence.discoveryDepth ?? 1);
     const decline = (why: string) => {
       check = { ...check, eligible: false };
       reason = why;
     };
     if (check.eligible && (!Number.isInteger(depth) || depth < 1 || depth > 3)) decline('discovery_depth_invalid');
     const parentEvidence = decode(sourceEvidence.minDepthEvidence || sourceEvidence.linkDiscovery || sourceEvidence);
-    if (check.eligible && (candidate.source_type === 'article-link' || parentEvidence.sourceBlogId !== undefined)) {
+    if (check.eligible && !accountValid && (candidate.source_type === 'article-link' || parentEvidence.sourceBlogId !== undefined)) {
       const parentId = Number(parentEvidence.sourceBlogId),
         postId = Number(parentEvidence.sourcePostId);
       if (!Number.isSafeInteger(parentId) || parentId < 1) decline('discovery_parent_missing');
@@ -136,7 +143,9 @@ export async function recordCandidateCheck(
     // An IndieWeb or IndiePing listing counts only once validation found the home Chinese (it then carries the listing).
     const listed = listing && (!CHINESE_ONLY_LISTINGS.has(candidate.source_type) || check.directoryListing === listing) ? listing : null;
     const effectiveName =
-      check.enrichedName && (['article-link', 'blogroll', 'reader-suggestion'].includes(candidate.source_type) || listed)
+      check.enrichedName &&
+      (['article-link', 'blogroll', 'reader-suggestion', 'blogblog-club', 'indieweb-wiki', 'indieping'].includes(candidate.source_type) ||
+        listed)
         ? check.enrichedName
         : candidate.name;
     if (check.eligible) {
@@ -151,7 +160,7 @@ export async function recordCandidateCheck(
         personalValid =
           cached?.input_hash === inputKey('classification', normalizeInput(personal.input)).inputHash && aiPersonalProof(personal, value);
       }
-      if (!personalValid && !listed) decline('personal_publication_unverified');
+      if (!personalValid && !listed && !accountValid) decline('personal_publication_unverified');
     }
     // biome-ignore lint/suspicious/noConfusingLabels: all declines must reach the shared append-only audit below.
     admission: if (apply && check.eligible) {
@@ -168,7 +177,7 @@ export async function recordCandidateCheck(
         >[0]) ||
         !v.evidence.identityMatches.length ||
         !check.feed ||
-        !candidateIdentityConfirmed(effectiveName, v, check.feed.title) ||
+        !candidateFeedIdentityConfirmed(effectiveName, v, check.feed.title, check.feed.url, check.feed.identityUrl) ||
         !(['rss', 'atom', 'sitemap'].includes(check.feed.type) || scraped) ||
         !isAllowedCrawlUrl(check.feed.url) ||
         check.feed.url.length > 1024 ||
@@ -234,9 +243,11 @@ export async function recordCandidateCheck(
           blogId = owner?.id ?? null;
           slug = owner?.slug ?? null;
           if (!blogId) {
-            const admissions = listed
-              ? { scope: 'discovery:directory-admissions', amount: 1, limit: DIRECTORY_ADMISSIONS_DAILY }
-              : { scope: 'discovery:admissions', amount: 1, limit: 10 };
+            const admissions = accountValid
+              ? { scope: 'discovery:account-admissions', amount: 1, limit: 50 }
+              : listed
+                ? { scope: 'discovery:directory-admissions', amount: 1, limit: DIRECTORY_ADMISSIONS_DAILY }
+                : { scope: 'discovery:admissions', amount: 1, limit: 10 };
             if (!(await reserveBudgetOnConnection(c, [admissions], now))) {
               decline('daily_admission_budget_exhausted');
               break admission;
@@ -252,7 +263,13 @@ export async function recordCandidateCheck(
                 name,
                 v.finalUrl,
                 new URL(v.finalUrl).hostname,
-                listed ? listingLabel(candidate.source_type) : '個人部落格自動驗證',
+                listed
+                  ? listingLabel(candidate.source_type)
+                  : accountValid
+                    ? check.accountEvidence?.kind === 'claim'
+                      ? '網站管理者驗證收錄'
+                      : '讀者具名推薦收錄'
+                    : '個人部落格自動驗證',
                 now,
               ],
             );

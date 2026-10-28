@@ -8,6 +8,7 @@ import Link from './NoPrefetchLink';
 
 const READER_LINKS = [
   ['/my/', '我的追蹤'],
+  ['/my/sites/', '我的網站'],
   ['/me/feed.xml', '個人 RSS'],
   ['/me/opml', '匯出 OPML'],
 ] as const;

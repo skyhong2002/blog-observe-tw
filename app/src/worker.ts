@@ -4,7 +4,7 @@ import pino from 'pino';
 import { runAiBatch } from './ai/batch.ts';
 import { loadConfig } from './config.js';
 import { runContentBatch } from './content/worker.ts';
-import { runCandidateReviewBatch } from './crawl/candidate-review.ts';
+import { runCandidateReviewBatch, runReaderReviewBatch } from './crawl/candidate-review.ts';
 import { deriveDirectoryHomes } from './crawl/directory-listing.ts';
 import { discoverBlogblog, discoverSimilar } from './crawl/discovery.ts';
 import { refreshMissingBlogFavicons } from './crawl/favicon-batch.ts';
@@ -220,6 +220,16 @@ const worker = new Worker(
       // BlogBlog.Club listings point at blogroll pages and party posts; queue their publication homes first.
       const directory = await deriveDirectoryHomes(store.pool);
       if (directory.inspected) log.info({ directory }, 'directory homes derived');
+      const reviewOptions = {
+        apply: true,
+        limit: 25,
+        maxDurationMs: 120000,
+        userAgent: config.crawlUserAgent,
+        delayMs: config.crawlDelayMs,
+        timeoutMs: 6000,
+      };
+      const reader = await runReaderReviewBatch(store.pool, reviewOptions);
+      if (reader.processed) log.info({ reader }, 'reader site requests reviewed');
       return runCandidateReviewBatch(store.pool, {
         apply: true,
         limit: 25,

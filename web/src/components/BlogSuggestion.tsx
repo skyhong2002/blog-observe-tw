@@ -5,6 +5,7 @@ import { candidateReasonText } from '@/lib/candidate-reasons';
 import { blogHref } from '@/lib/page-links';
 import { loginHref, useSession } from '@/lib/session';
 import Link from './NoPrefetchLink';
+import { SiteParticipation } from './SiteParticipation';
 
 // Under an empty search for an address (「thelingwu.com」): says whether that
 // blog is collected or queued, and lets a signed-in reader add it
@@ -88,11 +89,10 @@ export default function BlogSuggestion({ query }: { query: string }) {
   const session = useSession();
   const address = looksLikeAddress(query) ? query.trim() : '';
   const [state, setState] = useState<State | null>(null);
-  const [busy, setBusy] = useState(false);
-  const [message, setMessage] = useState('');
+  const [showActions, setShowActions] = useState(false);
   useEffect(() => {
     setState(null);
-    setMessage('');
+    setShowActions(false);
     if (!address) return;
     const controller = new AbortController();
     fetch(`/api/blog-suggestions?url=${encodeURIComponent(address)}`, { cache: 'no-store', credentials: 'omit', signal: controller.signal })
@@ -102,38 +102,19 @@ export default function BlogSuggestion({ query }: { query: string }) {
     return () => controller.abort();
   }, [address]);
   if (!state) return null;
-  async function add() {
-    setBusy(true);
-    setMessage('');
-    try {
-      const response = await fetch('/api/me/blog-suggestions', {
-        method: 'POST',
-        credentials: 'same-origin',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ url: address }),
-      });
-      if (response.ok) setState((await response.json()) as State);
-      else if (response.status === 401) window.location.href = loginHref(location.pathname + location.search);
-      else setMessage(response.status === 429 ? '今天新增的部落格已達上限，明天再試。' : '沒有新增成功，請稍後再試。');
-    } catch {
-      setMessage('連線失敗，請稍後再試。');
-    } finally {
-      setBusy(false);
-    }
-  }
   // Sign-in disabled on this server: there is no way to add, so only collected/queued states are said.
   if (state.state === 'new' && session && !session.enabled) return null;
   return (
     <div className="mt-3 space-y-1">
       <SuggestionNote
         state={state}
-        busy={busy || !session}
-        onAdd={add}
-        signIn={
-          session?.enabled && !session.user ? loginHref(typeof location === 'undefined' ? '/' : location.pathname + location.search) : null
-        }
+        busy={!session}
+        onAdd={() => setShowActions(true)}
+        signIn={session?.enabled && !session.user ? loginHref(`/queue/?q=${encodeURIComponent(address)}`) : null}
       />
-      {message && <p role="status">{message}</p>}
+      {(state.state === 'queued' || state.state === 'listed' || (state.state === 'new' && showActions)) && (
+        <SiteParticipation key={state.home} home={state.home} />
+      )}
     </div>
   );
 }
@@ -142,9 +123,10 @@ export default function BlogSuggestion({ query }: { query: string }) {
  * The 待查清單's own way in (/queue/#add): type a blog's address, see whether it is collected or queued, and add it
  * when signed in. The same check and note as under an empty address search, so the rules stay in one place.
  */
-export function BlogSubmitForm() {
-  const [text, setText] = useState('');
-  const [asked, setAsked] = useState('');
+export function BlogSubmitForm({ initialAddress = '' }: { initialAddress?: string } = {}) {
+  const initial = looksLikeAddress(initialAddress) ? initialAddress : '';
+  const [text, setText] = useState(initial);
+  const [asked, setAsked] = useState(initial);
   const invalid = asked !== '' && !looksLikeAddress(asked);
   return (
     <section

@@ -3,6 +3,7 @@ import type { Pool, PoolConnection, RowDataPacket } from 'mysql2/promise';
 import { fetch as undiciFetch } from 'undici';
 import { infer } from '../ai/service.ts';
 import { reserveBudget } from '../jobs/budget.ts';
+import { accountEvidenceFor } from '../site-identity.ts';
 import { recordCandidateCheck } from './candidate-promotion.ts';
 import { CANDIDATE_POLICY, type DiscoveryCandidate, validateCandidate } from './candidate-validation.ts';
 import type { FeedCrawlerOptions, FeedFetcher } from './feed.ts';
@@ -100,6 +101,8 @@ export async function runCandidateReviewBatch(
     now?: () => Date;
     /** Operator re-review of these candidates now, whatever their place in the queue; same checks and writer. */
     ids?: number[];
+    /** Reserved reader queue budget, separate from background discovery and operator rechecks. */
+    readerQueue?: boolean;
   } = {},
 ) {
   if ((pool as unknown as { pool?: { config?: { connectionLimit?: number } } }).pool?.config?.connectionLimit === 1)
@@ -157,7 +160,11 @@ export async function runCandidateReviewBatch(
               () => {
                 hostSpent = true;
               },
-              ids.length ? { scope: 'candidates:operator', limit: CANDIDATE_OPERATOR_DAILY } : undefined,
+              options.readerQueue
+                ? { scope: 'candidates:reader', limit: 500 }
+                : ids.length
+                  ? { scope: 'candidates:operator', limit: CANDIDATE_OPERATOR_DAILY }
+                  : undefined,
             ),
           }
         : options;
@@ -165,7 +172,8 @@ export async function runCandidateReviewBatch(
       if (Date.now() >= deadline || options.signal?.aborted) break;
       await assertLease(connection);
       hostSpent = false;
-      const checked = await validateCandidate(row as DiscoveryCandidate, boundedOptions);
+      const accountEvidence = await accountEvidenceFor(pool, String(row.url));
+      const checked = await validateCandidate(row as DiscoveryCandidate, { ...boundedOptions, accountEvidence });
       // Recorded (retried the next UTC day) rather than deferred: deferring left it first in line every run.
       if (hostSpent && !stopped) Object.assign(checked, { eligible: false, reason: 'candidate_host_budget_exhausted' });
       if (stopped) {
@@ -213,4 +221,33 @@ export async function runCandidateReviewBatch(
   } finally {
     await releaseLease(connection, held);
   }
+}
+
+/** Interactive requests do not wait for the weekly retry or compete with discovery's daily HTTP budget. */
+export async function runReaderReviewBatch(pool: Pool, options: Parameters<typeof runCandidateReviewBatch>[1] = {}) {
+  const [rows] = await pool.query<RowDataPacket[]>(
+    `SELECT r.candidate_id id,r.requested_at FROM site_review_requests r
+     JOIN discovery_candidates d ON d.id=r.candidate_id WHERE r.status='pending'
+     AND NOT (COALESCE(JSON_UNQUOTE(JSON_EXTRACT(d.source_evidence,'$.automaticReview.reason')),'') LIKE '%budget_exhausted'
+       AND LEFT(COALESCE(JSON_UNQUOTE(JSON_EXTRACT(d.source_evidence,'$.automaticReview.checkedAt')),''),10)>=UTC_DATE())
+     ORDER BY r.requested_at,r.candidate_id LIMIT 10`,
+  );
+  if (!rows.length) return { processed: 0 };
+  // Close requests that became ineligible without ever overriding explicit human decisions.
+  await pool.query(`UPDATE site_review_requests r JOIN discovery_candidates d ON d.id=r.candidate_id
+    SET r.status='completed',r.processed_at=UTC_TIMESTAMP(),r.result='decision_preserved'
+    WHERE r.status='pending' AND (d.status<>'candidate' OR EXISTS
+    (SELECT 1 FROM discovery_candidate_audits a WHERE a.candidate_id=d.id AND
+      (a.source_type IN ('manual','human-review','admin') OR a.source_actor_id IS NOT NULL)))`);
+  const result = await runCandidateReviewBatch(pool, { ...options, ids: rows.map((r) => Number(r.id)), readerQueue: true });
+  for (const item of result.results) {
+    if (!('id' in item) || !['approved', 'candidate'].includes(String(item.status)) || item.reason?.endsWith('budget_exhausted')) continue;
+    const row = rows.find((r) => Number(r.id) === Number(item.id));
+    await pool.execute(
+      `UPDATE site_review_requests SET status='completed',processed_at=UTC_TIMESTAMP(),result=?
+      WHERE candidate_id=? AND status='pending' AND requested_at=?`,
+      [item.reason, item.id, row!.requested_at],
+    );
+  }
+  return result;
 }

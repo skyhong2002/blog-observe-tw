@@ -33,6 +33,7 @@ try {
           'staged-proof-inspector',
           'scheduler-candidates',
           'sitemap',
+          'site-claims',
         ].includes(process.argv[5])))
   )
     throw Error('explicit_private_clone_env_required');
@@ -93,6 +94,7 @@ try {
     ['staged-scan-v2', '../app/src/topics/staged-scan-v2.integration.ts', 'runStagedScanV2Integration'],
     ['topic-body-owner', '../app/src/topics/body-owner.integration.ts', 'runTopicBodyOwnerIntegration'],
     ['budgets-ai', '../tests/integration/core.mjs', 'runCoreIntegration'],
+    ['site-claims', '../app/src/site-claims.integration.ts', 'runSiteClaimsIntegration'],
     ['candidates', '../tests/integration/candidates.mjs', 'runCandidateIntegration'],
     ['relations', '../app/src/relations/integration.ts', 'runRelationIntegration'],
     ['relation-candidates', '../app/src/relations/candidates.integration.ts', 'runRelationCandidatesIntegration'],
@@ -130,7 +132,7 @@ try {
     ['shared-label-selection', '../app/src/topics/shared-label-selection.integration.ts', 'runSharedLabelSelectionIntegration'],
     ['shared-label-store', '../app/src/topics/shared-label-store.integration.ts', 'runSharedLabelStoreIntegration'],
   ];
-  const selected =
+  let selected =
     process.argv[5] === 'public-api'
       ? suites.filter(([label]) => label === 'public-api')
       : process.argv[5] === 'fulltext'
@@ -174,6 +176,7 @@ try {
                               : process.argv[5] === 'sitemap'
                                 ? suites.filter(([label]) => label === 'indexability' || label === 'topic-history-read')
                                 : suites;
+  if (process.argv[5] === 'site-claims') selected = suites.filter(([label]) => label === 'site-claims' || label === 'candidates');
   // Without --suite every suite gets its own fresh database: several assume an empty corpus
   // (staged-scan-proof asserts it), so sharing one database made the full run stop there.
   for (const [index, [label, module, entry]] of selected.entries()) {

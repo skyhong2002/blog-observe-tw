@@ -929,6 +929,97 @@
       "occurrences": 1
     },
     {
+      "path": "app/src/site-claims.ts",
+      "digest": "08847ad2bd43f1ebe3f47b4004ad361065a50278fa4af91f13a0063dea6f0671",
+      "tables": [],
+      "dynamic": true,
+      "occurrences": 1
+    },
+    {
+      "path": "app/src/site-claims.ts",
+      "digest": "1f22f61ecb924be9a963a61790753afc6e2658b9fc0575e49124f1a1ea992dbd",
+      "tables": [],
+      "dynamic": true,
+      "occurrences": 1
+    },
+    {
+      "path": "app/src/site-claims.ts",
+      "digest": "315b10191f5e6740f086037a17eda93698957bd020730b140ed122882a3006d8",
+      "tables": [],
+      "dynamic": true,
+      "occurrences": 1
+    },
+    {
+      "path": "app/src/site-claims.ts",
+      "digest": "359f0415dd0991eb1fe95421abd57eaebc35a7ba2a94add1706ff53039f21963",
+      "tables": [],
+      "dynamic": true,
+      "occurrences": 1
+    },
+    {
+      "path": "app/src/site-claims.ts",
+      "digest": "52bc4bc2d43b97e8181f1c6d7da88cb2b2feb13e2d38d3dc721c590e244bf2e2",
+      "tables": [],
+      "dynamic": true,
+      "occurrences": 2
+    },
+    {
+      "path": "app/src/site-claims.ts",
+      "digest": "54b619bf6c2aa9e37331eaf2fd80308816165bbf168274b8c5d74049012c7881",
+      "tables": [],
+      "dynamic": true,
+      "occurrences": 1
+    },
+    {
+      "path": "app/src/site-claims.ts",
+      "digest": "60ad28a65dbd30a62fc87a25942f37edd7d7bf62aa98b785455ed5ce7f4ef158",
+      "tables": [],
+      "dynamic": true,
+      "occurrences": 1
+    },
+    {
+      "path": "app/src/site-claims.ts",
+      "digest": "676a6ffe008139be39366cc7d97c77be302d00365da693f8fb66b4ed3df75eb4",
+      "tables": [],
+      "dynamic": true,
+      "occurrences": 1
+    },
+    {
+      "path": "app/src/site-claims.ts",
+      "digest": "be1fe8d3eb4e0421fb15cf671d3e1a4c22b869f9d83c554d1b77b143688b5d6b",
+      "tables": [],
+      "dynamic": true,
+      "occurrences": 1
+    },
+    {
+      "path": "app/src/site-claims.ts",
+      "digest": "eda0821b6ebff94fbdedad521eba1ee948bebd02f9332bc7f19cdd6e7944b1b7",
+      "tables": [],
+      "dynamic": true,
+      "occurrences": 1
+    },
+    {
+      "path": "app/src/site-claims.ts",
+      "digest": "ee336362cfe45c21b34a1d77d4c9e3099c02ec66cd0157b5904aff8ddf7153c3",
+      "tables": [],
+      "dynamic": true,
+      "occurrences": 1
+    },
+    {
+      "path": "app/src/site-claims.ts",
+      "digest": "f1c448de82c6621261fee376dd7c250c6a78a386b339d82710a1ea5a10bc70ec",
+      "tables": [],
+      "dynamic": true,
+      "occurrences": 1
+    },
+    {
+      "path": "app/src/site-identity.ts",
+      "digest": "cac9fece6ebc74a5e0a6195339dcafe121054a9319e11e9af69d48641fcc8708",
+      "tables": [],
+      "dynamic": true,
+      "occurrences": 1
+    },
+    {
       "path": "app/src/tech/read-resource.ts",
       "digest": "115695b2277ffe3564b841331b913cf203f9169c669393226228ee60e2f0260b",
       "tables": [],

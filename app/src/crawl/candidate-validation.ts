@@ -3,13 +3,14 @@ import { XMLParser, XMLValidator } from 'fast-xml-parser';
 import { type PersonalEvidence, personalAboutPage, personalHomepage } from '../ai/personal.ts';
 import { type SitemapArticleEvidence, verifyArticleSitemap } from '../ai/publication-sitemap.ts';
 import { identityKey, publicationDecision } from '../relations/identity.ts';
+import type { AccountEvidence } from '../site-identity.ts';
 import { CHINESE_ONLY_LISTINGS, chineseContent, listingOf } from './directory-listing.ts';
 import { type FeedCrawlerOptions, isAllowedCrawlUrl, parseFeed, politeFetch, ROBOTS_UNREACHABLE, readFeedBody } from './feed.ts';
 import { seedIdentityKey } from './seed-url-resolution.ts';
 import { isSeedPlatformRoot, type SeedUrlValidation, validateSeedUrl } from './seed-url-validation.ts';
 
-// v5 (2026-10-16): domain-named identities, listed homes' blog-section feeds, Hugo index.xml, stray feed items skipped.
-export const CANDIDATE_POLICY = 'personal-rss-publication-v5-directory';
+// v6 (2026-10-28): account-backed evidence, semantic home introductions and home-advertised feed identities.
+export const CANDIDATE_POLICY = 'personal-rss-publication-v6-account-evidence';
 export type DiscoveryCandidate = {
   id: number;
   url: string;
@@ -29,6 +30,7 @@ export type CandidateCheck = {
   enrichedName?: string;
   sitemapArticles?: SitemapArticleEvidence[];
   personalEvidence?: PersonalEvidence;
+  accountEvidence?: AccountEvidence;
   /** The BlogBlog.Club page listing this publication (directory-listing.ts); stands in for personal-homepage proof. */
   directoryListing?: string;
   feed?: {
@@ -167,6 +169,24 @@ export function aboutPageUrl(html: string, home: string): string | null {
 export function advertisedSource(verification: Pick<SeedUrlValidation, 'evidence'>, url: string): boolean {
   return verification.evidence.sourceChecks.some((c) => c.advertised === true && (c.finalUrl || c.url) === url);
 }
+/** A homepage-advertised feed with a verified same-publication identity may use a different title. */
+export function candidateFeedIdentityConfirmed(
+  name: string | null,
+  verification: Pick<SeedUrlValidation, 'title' | 'siteName' | 'author' | 'finalUrl' | 'evidence'>,
+  title: string,
+  feedUrl: string,
+  identityUrl: string,
+) {
+  return (
+    candidateIdentityConfirmed(name, verification, title) ||
+    Boolean(
+      title.trim() &&
+        verification.finalUrl &&
+        advertisedSource(verification, feedUrl) &&
+        publicationContains(identityUrl, verification.finalUrl),
+    )
+  );
+}
 export function publicationContains(value: string, home: string): boolean {
   try {
     if (!isAllowedCrawlUrl(value)) return false;
@@ -182,7 +202,10 @@ export function publicationContains(value: string, home: string): boolean {
   }
 }
 /** Independent homepage name evidence plus an actual, non-empty RSS/Atom belonging to that publication. */
-export async function validateCandidate(candidate: DiscoveryCandidate, options: FeedCrawlerOptions = {}): Promise<CandidateCheck> {
+export async function validateCandidate(
+  candidate: DiscoveryCandidate,
+  options: FeedCrawlerOptions & { accountEvidence?: AccountEvidence } = {},
+): Promise<CandidateCheck> {
   const result: CandidateCheck = {
     policy: CANDIDATE_POLICY,
     id: candidate.id,
@@ -191,12 +214,23 @@ export async function validateCandidate(candidate: DiscoveryCandidate, options: 
     eligible: false,
     reason: candidatePreflight(candidate) || 'unverified',
   };
-  const listed = listingOf(candidate.source_type, candidate.source_evidence);
+  let listed = listingOf(candidate.source_type, candidate.source_evidence);
   if (listed) result.directoryListing = listed;
   // Directory-listed homes and reader suggestions are added without a name; like discovered links, they take the homepage's own.
-  const mayEnrich = ['article-link', 'blogroll', 'reader-suggestion'].includes(candidate.source_type) || Boolean(listed);
-  const personal = () => result.personalEvidence?.personal === true || Boolean(listed);
-  const personalReason = (verified: string) => (result.personalEvidence?.personal === true ? verified : `${verified}_directory_listed`);
+  const mayEnrich =
+    ['article-link', 'blogroll', 'reader-suggestion', 'blogblog-club', 'indieweb-wiki', 'indieping'].includes(candidate.source_type) ||
+    Boolean(listed);
+  if (options.accountEvidence && seedIdentityKey(options.accountEvidence.home) === seedIdentityKey(candidate.url))
+    result.accountEvidence = options.accountEvidence;
+  const personal = () =>
+    result.personalEvidence?.reason !== 'organization_media_or_shop_evidence' &&
+    (result.personalEvidence?.personal === true || Boolean(listed) || Boolean(result.accountEvidence));
+  const personalReason = (verified: string) =>
+    result.accountEvidence
+      ? `${verified}_account_${result.accountEvidence.kind}`
+      : result.personalEvidence?.personal === true
+        ? verified
+        : `${verified}_directory_listed`;
   // A homepage that proves nothing (Blowfish's profile home: a name and a one-line title) may introduce its owner on
   // its own about page: one more same-publication request, made only once a feed or article sitemap is found.
   let aboutUrl: string | null = null;
@@ -230,8 +264,11 @@ export async function validateCandidate(candidate: DiscoveryCandidate, options: 
       $('script,style,noscript,template').remove();
       if (!chineseContent($('html').attr('lang') || '', $('body').text().slice(0, 20000))) {
         delete result.directoryListing;
-        result.reason = candidate.source_type === 'indieping' ? 'indieping_listing_not_chinese' : 'indieweb_listing_not_chinese';
-        return result;
+        listed = null;
+        if (!result.accountEvidence) {
+          result.reason = candidate.source_type === 'indieping' ? 'indieping_listing_not_chinese' : 'indieweb_listing_not_chinese';
+          return result;
+        }
       }
     }
     const observed = personalHomepage(html);
@@ -267,6 +304,8 @@ export async function validateCandidate(candidate: DiscoveryCandidate, options: 
     result.reason = 'redirect_not_publication_home';
     return result;
   }
+  if (result.accountEvidence && seedIdentityKey(result.accountEvidence.home) !== seedIdentityKey(verification.finalUrl))
+    delete result.accountEvidence;
   const source =
     verification.feedSources.find((s) => s.type === 'rss' || s.type === 'atom') ||
     verification.feedSources.find((s) => s.type === 'sitemap');
@@ -353,7 +392,7 @@ export async function validateCandidate(candidate: DiscoveryCandidate, options: 
       result.reason = 'feed_home_identity_mismatch';
       return result;
     }
-    if (!candidateIdentityConfirmed(candidate.name, verification, title)) {
+    if (!candidateFeedIdentityConfirmed(candidate.name, verification, title, source.url, new URL(identity, source.url).href)) {
       result.reason = 'feed_name_identity_mismatch';
       return result;
     }

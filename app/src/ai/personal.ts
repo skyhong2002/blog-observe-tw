@@ -81,7 +81,31 @@ export function personalHomepage(html: string) {
         .filter(firstPersonIntroduction),
     ),
   ];
-  const identityRegions = [description, ...regions.map((el) => $(el).text()), ...(introTexts.length === 1 ? introTexts : [])];
+  // A homepage hero can use arbitrary CSS classes. Only paragraphs beside its sole h1 qualify;
+  // article lists, member profiles and author bylines cannot contribute ownership evidence.
+  const headings = $('h1')
+    .toArray()
+    .filter(
+      (el) =>
+        ![el, ...$(el).parents().toArray()].some((node) =>
+          tokens(node).some((t) => /(?:post|entry|article|author|user|member|team|staff|byline)/i.test(t)),
+        ),
+    );
+  const leadTexts =
+    headings.length === 1
+      ? $(headings[0])
+          .parent()
+          .children('p')
+          .toArray()
+          .map((el) => $(el).text().replace(/\s+/g, ' ').trim())
+          .filter(firstPersonIntroduction)
+      : [];
+  const identityRegions = [
+    description,
+    ...regions.map((el) => $(el).text()),
+    ...(introTexts.length === 1 ? introTexts : []),
+    ...(leadTexts.length === 1 ? leadTexts : []),
+  ];
   // Exclusions inspect every complete trusted region BEFORE byte/segment bounds, so
   // a late editorial/team notice cannot disappear behind a truncated personal bio.
   const excluded = [siteName, ...identityRegions].some(organizationEvidence);

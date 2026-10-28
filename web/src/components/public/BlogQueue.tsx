@@ -311,5 +311,12 @@ export default function BlogQueueFromUrl() {
   };
   const current = load?.status === 'ready' ? load.data : shown;
   const status = load?.status === 'ready' ? 'ready' : load?.status === 'pending' ? 'pending' : 'error';
-  return <BlogQueueView queue={status === 'error' ? null : current} status={status} onSearch={onSearch} submit={<BlogSubmitForm />} />;
+  return (
+    <BlogQueueView
+      queue={status === 'error' ? null : current}
+      status={status}
+      onSearch={onSearch}
+      submit={<BlogSubmitForm key={params.get('q') || ''} initialAddress={params.get('q') || ''} />}
+    />
+  );
 }
