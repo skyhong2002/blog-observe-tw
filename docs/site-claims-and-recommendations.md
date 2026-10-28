@@ -96,7 +96,7 @@ node --env-file=/private/blog.env tools/recheck-personal-candidates.ts --limit 2
 
 工具只挑舊政策的個人身分不明、名稱核對失敗等候選；避開人工處理，
 仍沿用 writer、鎖與 operator 每日額度，不直接批次 UPDATE 為 approved。
-本次實作沒有部署、沒有套用正式 migration，也沒有對正式候選執行 apply。
+初次實作階段沒有部署或套用正式資料；後續使用者授權的正式部署與 Hawks 重查結果見 [2026-10-28 部署紀錄](site-claims-deployment-20261028.md)。
 
 ## 驗證
 
