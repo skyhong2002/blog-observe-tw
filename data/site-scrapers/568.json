@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "blogId": 568,
+  "home": "https://blog.abb00717.com/",
+  "authoredBy": "gpt-6.1-sol",
+  "scraper": {
+    "listUrls": [
+      "https://blog.abb00717.com/index.xml"
+    ],
+    "maxPages": 1,
+    "code": "function listPosts({url,$}) { const posts=[]; $('item,entry').each((_,e)=>{ const x=$(e); const link=x.find('link[rel=\"alternate\"]').attr('href')||x.find('link').attr('href')||x.find('link').text(); if(link && !link.endsWith(\"/\")) posts.push({url:link,title:x.find('title').first().text().trim(),publishedAt:x.find('pubDate,published,updated').first().text().trim()}); }); return {posts,next:null}; }\nfunction parsePost({url,$}) { const title=$(\"h1.article-title\").first().text().trim(); const publishedAt=$('meta[property=\"article:published_time\"]').attr('content')||$('time[datetime]').first().attr('datetime')||$('.date').first().text().trim()||null; const author=$('meta[name=\"author\"]').attr('content')||$('.p-author').first().text().trim()||null; const body=$(\"article.popover-hint\").first().clone(); body.find('script,style,noscript,nav,footer,.upvote,.tags,.blog-tags,.post-tags,.subscribe-widget,.subscription-widget,.comment-list,.comments').remove();  return {title,bodyHtml:body.html()||'',publishedAt,author,tags:$('a[rel=\"tag\"]').map((_,e)=>$(e).text().trim()).get()}; }",
+    "render": false,
+    "noArticles": false,
+    "needsRender": false,
+    "notes": "實讀 Quartz RSS、資料夾索引與 CWES 通關心得文章。feed 的目錄頁以斜線結尾，排除索引後只列真文。文章標題 h1.article-title，正文 article.popover-hint（目錄版型是 div.popover-hint > article，不混用）。"
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "blogId": 349,
+  "home": "https://www.arnold.eu.org/",
+  "authoredBy": "gpt-6.1-sol",
+  "scraper": {
+    "listUrls": [
+      "https://www.arnold.eu.org/sitemap.xml"
+    ],
+    "maxPages": 1,
+    "code": "function listPosts({url,$}) {return {posts:$('urlset > url').map((i,e)=>({url:$(e).find('loc').text().trim(),publishedAt:$(e).find('lastmod').text().trim()})).get(),next:null};}\nfunction parsePost({url,$}) {const title=$(\"h1.post-title\").first().text().trim();const body=$(\".entry-content\").first().clone();body.find('h1,time,script,style,nav,aside,footer,.toc,.table-of-contents,.post-tags,.post-meta,.post-actions,.page-navigation,.blog-post-title,.title,.upvote-button,.embedded.blog-posts').remove();return {title,bodyHtml:body.html()||'',author:$('meta[name=\"author\"]').attr('content')||null,publishedAt:$('meta[property=\"article:published_time\"]').attr('content')||$('time[datetime]').first().attr('datetime')||$('meta[name=\"date\"]').attr('content')||null,tags:$('a[rel=\"tag\"]').map((i,e)=>$(e).text().trim()).get()};}",
+    "render": false,
+    "noArticles": false,
+    "needsRender": false,
+    "notes": "實抓列表 https://www.arnold.eu.org/sitemap.xml 使用 SITEMAP；實抓文章 https://www.arnold.eu.org/2026/10/aster-mail-business-email.html 標題 h1.post-title，正文 .entry-content。"
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "blogId": 141,
+  "home": "https://rayrrrrrrr.bearblog.dev/",
+  "authoredBy": "gpt-6.1-sol",
+  "scraper": {
+    "listUrls": [
+      "https://rayrrrrrrr.bearblog.dev/feed/"
+    ],
+    "maxPages": 1,
+    "code": "function listPosts({url,$}) {const posts=[]; $('entry,item').each((i,e)=>{const x=$(e);const link=x.find('link[rel=\"alternate\"]').attr('href')||x.find('link[href]').attr('href')||x.find('link').first().text();if(link)posts.push({url:link,title:x.find('title').first().text(),publishedAt:x.find('published,pubDate,updated').first().text()});});return {posts,next:null};}\nfunction parsePost({url,$}) {const b=$(\"main\").first().clone(); b.find('script,style,nav,.related-posts,.post-navigation,.post-meta,.blog-posts,.upvote-button,form').remove();return {title:$(\"main h1\").first().text().trim(),bodyHtml:b.html()||'',author:$('meta[name=\"author\"]').attr('content')||null,publishedAt:$('meta[property=\"article:published_time\"]').attr('content')||$('time[datetime]').first().attr('datetime')||null,tags:[]};}",
+    "render": false,
+    "noArticles": false,
+    "needsRender": false,
+    "notes": "實際頁面DOM：正文 main；標題 main h1；XML feed entry/item列表。"
+  }
+}

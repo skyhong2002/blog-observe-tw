@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "blogId": 136,
+  "home": "https://nicechord.com/",
+  "authoredBy": "gpt-6.1-sol",
+  "scraper": {
+    "listUrls": [
+      "https://nicechord.com/"
+    ],
+    "maxPages": 1,
+    "code": "function listPosts({url,$}) {return {posts:$('article .article-title a[href]').map((i,e)=>({url:$(e).attr('href'),title:$(e).text().trim()})).get(),next:null};}\nfunction parsePost({url,$}) {const title=$('.article-title').first().text().trim();const author=$('meta[name=\"author\"]').attr('content')||$('[rel=\"author\"]').first().text().trim()||null;const publishedAt=$('meta[property=\"article:published_time\"]').attr('content')||$('time[datetime]').first().attr('datetime')||null;const body=$('article.main-article > .article-content').first().clone();body.find('script,style,noscript,nav,footer,.header-anchor,.upvote-form,.post-footer,.toc,.table-of-contents').remove();return {title,bodyHtml:body.html()||'',author,publishedAt,tags:$('[rel=\"tag\"]').map((i,e)=>$(e).text().trim()).get()};}",
+    "render": false,
+    "noArticles": false,
+    "needsRender": false,
+    "notes": "Live listing RSS/Atom item/entry; article body article.main-article > .article-content; title .article-title. Homepage article cards used because full feed exceeds sandbox input or timeout budget."
+  }
+}

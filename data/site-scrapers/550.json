@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "blogId": 550,
+  "home": "https://canwen.substack.com/",
+  "authoredBy": "gpt-6.1-sol",
+  "scraper": {
+    "listUrls": [
+      "https://canwen.substack.com/feed"
+    ],
+    "maxPages": 1,
+    "code": "function listPosts({url,$}) {return {posts:$('entry,item').map((_,e)=>({url:$(e).find('link').first().attr('href')||$(e).find('link').first().text(),title:$(e).find('title').text(),publishedAt:$(e).find('published,pubDate').first().text()})).get(),next:null};}\nfunction parsePost({url,$}) {const body=$(\".available-content .body\").first().clone();body.find(\"script,style,nav,header,footer,.upvote,.embedded.blog-posts\").remove();return {title:$(\"h1.post-title\").first().text().trim(),bodyHtml:body.html()||'',author:$('meta[name=\"author\"]').attr('content')||null,publishedAt:$('time[datetime]').first().attr('datetime')||$('meta[property=\"article:published_time\"]').attr('content')||null,tags:[]};}",
+    "render": false,
+    "noArticles": false,
+    "needsRender": false,
+    "notes": "公開 RSS 列表，實際 Substack 文章 available-content/body，無會員登入。"
+  }
+}

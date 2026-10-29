@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "blogId": 375,
+  "home": "https://www.yishantsai.com/",
+  "authoredBy": "gpt-6.1-sol",
+  "scraper": {
+    "listUrls": [
+      "https://www.yishantsai.com/"
+    ],
+    "maxPages": 1,
+    "code": "function listPosts({url,$}) { return {posts: $(\".article-title a\").toArray().map(e=>({url:$(e).attr('href'),title:$(e).text().trim()})),next:null}; }\nfunction parsePost({url,$}) {const body=$(\".article-content\").first().clone();body.find('script,style,nav,.post-nav,.post-tag-list,.card:not(.book),.comments').remove();return {title:$(\".article-title\").first().text().trim(),bodyHtml:body.html()||'',author:$('meta[name=\"author\"]').attr('content')||null,publishedAt:$('meta[property=\"article:published_time\"]').attr('content')||$('time[datetime]').first().attr('datetime')||null,tags:[]};}",
+    "render": false,
+    "noArticles": false,
+    "needsRender": false,
+    "notes": "首頁文章連結 .article-title a；文章標題 .article-title；正文 .article-content，經實際公開首頁和文章 HTML 檢視。"
+  }
+}

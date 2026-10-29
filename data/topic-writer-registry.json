@@ -791,6 +791,20 @@
       "occurrences": 1
     },
     {
+      "path": "app/src/scrapers/site-catalog.ts",
+      "digest": "8fe25d0550d214374e757ae584e8754bfea3ea414263d70582898cbe056edc3f",
+      "tables": [],
+      "dynamic": true,
+      "occurrences": 1
+    },
+    {
+      "path": "app/src/scrapers/site-catalog.ts",
+      "digest": "f3f46847ef15b0e4b47a25bbf94713442605a8778720ebf969227d69a7ffec8a",
+      "tables": [],
+      "dynamic": true,
+      "occurrences": 1
+    },
+    {
       "path": "app/src/scrapers/store.ts",
       "digest": "3d5bd877bfdacff7bcf0ccbf9a8e86a0da98d2bd319ccc7534a86e643af60e6a",
       "tables": [],

@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "blogId": 668,
+  "home": "https://medium.com/bianjinglapin",
+  "authoredBy": "gpt-6.1-sol",
+  "scraper": {
+    "maxPages": 1,
+    "render": false,
+    "noArticles": false,
+    "needsRender": false,
+    "listUrls": [
+      "https://medium.com/feed/bianjinglapin"
+    ],
+    "code": "function listPosts({url,$}) {return {posts:$('item').toArray().map(e=>({url:$(e).find('link').text().split('?')[0],title:$(e).find('title').text(),publishedAt:$(e).find('pubDate').text()})),next:null};}\nfunction parsePost({url,$}) {return {title:$('h1').first().text(),bodyHtml:$('article section').first().html()||'',author:null,publishedAt:$('time').first().attr('datetime'),tags:[]};}",
+    "notes": "公開RSS可讀但真實文章HTML為403，blocked"
+  }
+}

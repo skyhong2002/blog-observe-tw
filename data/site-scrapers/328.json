@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "blogId": 328,
+  "home": "https://wancat.cc/",
+  "authoredBy": "gpt-6.1-sol",
+  "scraper": {
+    "listUrls": [
+      "https://wancat.cc/index.xml"
+    ],
+    "maxPages": 1,
+    "code": "function listPosts({url,$}) {const posts=[];$('item,entry').each((i,e)=>{const n=$(e);const u=n.find('link[rel=\"alternate\"]').attr('href')||n.find('link').attr('href')||n.find('guid').text().trim()||n.find('link').text().trim();if(u)posts.push({url:u,title:n.find('title').text().trim(),publishedAt:n.find('pubDate,published,updated').first().text().trim()});});return {posts:posts.filter(p=>new URL(p.url,url).pathname.startsWith('/post/')),next:null};}\nfunction parsePost({url,$}) {const title=$(\"h1.post-title\").first().text().trim();const body=$(\".post-content\").first().clone();body.find('h1,time,script,style,nav,aside,footer,.toc,.table-of-contents,.post-tags,.post-meta,.post-actions,.page-navigation,.blog-post-title,.title,.upvote-button,.embedded.blog-posts').remove();return {title,bodyHtml:body.html()||'',author:$('meta[name=\"author\"]').attr('content')||null,publishedAt:$('meta[property=\"article:published_time\"]').attr('content')||$('time[datetime]').first().attr('datetime')||$('meta[name=\"date\"]').attr('content')||null,tags:$('a[rel=\"tag\"]').map((i,e)=>$(e).text().trim()).get()};}",
+    "render": false,
+    "noArticles": false,
+    "needsRender": false,
+    "notes": "實抓列表 https://wancat.cc/index.xml 使用 XML；實抓文章 https://wancat.cc/post/doctor/ 標題 h1.post-title，正文 .post-content。"
+  }
+}

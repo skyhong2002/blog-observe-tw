@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "blogId": 574,
+  "home": "https://blog.mukyu.tw/",
+  "authoredBy": "gpt-6.1-sol",
+  "scraper": {
+    "listUrls": [
+      "https://blog.mukyu.tw/feed.rss"
+    ],
+    "maxPages": 1,
+    "code": "function listPosts({url,$}) {const posts=[]; $('item,entry').each((i,e)=>{const x=$(e);const u=x.find('link').text().trim()||x.find('link[rel=\"alternate\"]').attr('href')||x.find('link').attr('href');if(u)posts.push({url:u,title:x.find('title').first().text().trim(),publishedAt:x.find('pubDate,published').first().text().trim()||null});});return {posts,next:null};}\nfunction parsePost({url,$}) {const root=$(\".vp-doc\").first().clone();root.find('script,style,nav,form,.post-comments,.comments,.upvote-button,.toast,.post-footer,.post-meta,.blog-tags').remove();return {title:$(\"h1\").first().text().trim(),bodyHtml:root.html()||'',author:$('meta[name=\"author\"]').attr('content')||$('.byline .author,.author-name').first().text().trim()||null,publishedAt:$('meta[property=\"article:published_time\"]').attr('content')||$('time[datetime]').first().attr('datetime')||null,tags:[]};}",
+    "render": false,
+    "noArticles": false,
+    "needsRender": false,
+    "notes": "公開 feed.rss 列表；文章為 VitePress .vp-doc 正文，已實讀雪梨之旅頁。"
+  }
+}

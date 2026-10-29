@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "blogId": 643,
+  "home": "https://boringgame.codeberg.page/",
+  "originalHome": "https://boringgameofficial.github.io/",
+  "migrationRequired": true,
+  "authoredBy": "gpt-6.1-sol",
+  "scraper": {
+    "listUrls": [
+      "https://boringgame.codeberg.page/blog/index.xml"
+    ],
+    "maxPages": 1,
+    "code": "function listPosts({url,$}) {return {posts:$('entry,item').map((_,e)=>({url:$(e).find('link').first().attr('href')||$(e).find('link').first().text(),title:$(e).find('title').text(),publishedAt:$(e).find('published,pubDate').first().text()})).get(),next:null};}\nfunction parsePost({url,$}) {const body=$(\"main\").first().clone();body.find(\"script,style,footer,nav\").remove();return {title:$(\"main h1\").first().text().trim(),bodyHtml:body.html()||'',author:$('meta[name=\"author\"]').attr('content')||null,publishedAt:$('time[datetime]').first().attr('datetime')||$('meta[property=\"article:published_time\"]').attr('content')||null,tags:[]};}",
+    "render": false,
+    "noArticles": false,
+    "needsRender": false,
+    "notes": "migration_required: 原 GitHub 首頁實際 meta refresh 與新網址連結皆導向 boringgame.codeberg.page，站名 Boring Game；新站 blog/index.xml 提供 RSS item，文章 main。"
+  }
+}

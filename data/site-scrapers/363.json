@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "blogId": 363,
+  "home": "https://yomo-kawaii.idv.tw/",
+  "authoredBy": "gpt-6.1-sol",
+  "scraper": {
+    "listUrls": [
+      "https://yomo-kawaii.idv.tw/rss2.xml"
+    ],
+    "maxPages": 1,
+    "code": "function listPosts({url,$}) { const posts=[]; $('item,entry').each((i,e)=>{const x=$(e); const a=x.find('link[rel=\"alternate\"]').first(); const u=a.attr('href')||x.find('link').first().attr('href')||x.find('link').first().text(); if(u)posts.push({url:u,title:x.find('title').first().text(),publishedAt:x.find('pubDate,published,updated').first().text()});});return {posts,next:null};}\nfunction parsePost({url,$}) {const b=$(\".post-content\").first().clone();b.find('script,style,nav,header,footer,aside,.comments,#comments,.related-posts,.post-footer,.post-share').remove();const t=$(\"h1\").first();return {title:t.attr('content')||t.text().trim(),bodyHtml:b.html()||'',author:$('meta[name=\"author\"]').attr('content')||$('[rel=\"author\"]').first().text()||null,publishedAt:$('meta[property=\"article:published_time\"]').attr('content')||$('time[datetime]').first().attr('datetime')||null,tags:[]};}",
+    "render": false,
+    "noArticles": false,
+    "needsRender": false,
+    "notes": "實際讀取公開列表與文章 https://yomo-kawaii.idv.tw/2026/09/30/%E6%99%9A%E4%B8%8A%E4%B8%8D%E7%9D%A1%E8%A6%BA/；正文 .post-content，標題 h1。"
+  }
+}

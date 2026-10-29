@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "blogId": 674,
+  "home": "https://blog.xn--i2rt58ao7w.com/",
+  "authoredBy": "gpt-6.1-sol",
+  "scraper": {
+    "listUrls": [
+      "https://blog.xn--i2rt58ao7w.com/atom.xml"
+    ],
+    "maxPages": 1,
+    "code": "function listPosts({url,$}) { return {posts:[],next:null}; }\nfunction parsePost({url,$}) { return {title:\"\",bodyHtml:\"\",author:null,publishedAt:null,tags:[]}; }",
+    "render": false,
+    "noArticles": false,
+    "needsRender": false,
+    "notes": "blocked：首頁 Albireo security check；atom.xml 指向不同網域，不能跨 publication；沒有可驗證的文章解析器，明確停用空輸出，不能啟用。"
+  }
+}

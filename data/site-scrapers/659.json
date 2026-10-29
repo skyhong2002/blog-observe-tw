@@ -1,0 +1,25 @@
+{
+  "version": 1,
+  "blogId": 659,
+  "home": "https://blog.cytrogen.icu/",
+  "authoredBy": "gpt-6.1-sol",
+  "scraper": {
+    "listUrls": [
+      "https://blog.cytrogen.icu/"
+    ],
+    "maxPages": 1,
+    "code": "function listPosts({url,$}) {return {posts:$('article .post-title-link').map((_,e)=>({url:$(e).attr('href'),title:$(e).text().trim(),publishedAt:$(e).closest('article').find('time').first().attr('datetime')})).get(),next:null};}\nfunction parsePost({url,$}){const title=$(\"h1.post-title\").first().text().trim();const body=$(\".post-content.e-content\").first().clone();body.find('script,style,nav,footer').remove();return {title,bodyHtml:body.html()||'',author:$('meta[name=\"author\"]').attr('content')||$('.p-author').first().text().trim()||null,publishedAt:$('meta[property=\"article:published_time\"]').attr('content')||$('time[datetime]').first().attr('datetime')||null,tags:$('a[rel=\"tag\"]').map((_,e)=>$(e).text().trim()).get()};}",
+    "render": false,
+    "noArticles": false,
+    "needsRender": false,
+    "notes": "migration_required：原首頁 interior 圖書館明確連到作者 blog.cytrogen.icu；原host與文章host不符同出版檢查，僅definition採真正部落格home，未改資料庫。實讀久违住酒店。"
+  },
+  "originalHome": "https://cytrogen.icu/",
+  "migrationRequired": true,
+  "migrationEvidence": {
+    "sourceUrl": "https://cytrogen.icu/interior.html",
+    "anchor": "图书馆 — Blog",
+    "href": "https://blog.cytrogen.icu",
+    "inspectionPath": ".reviews/scraper-fleet/agent-06/659-extra.log"
+  }
+}

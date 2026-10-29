@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "blogId": 678,
+  "home": "https://gooseboop.com/",
+  "authoredBy": "gpt-6.1-sol",
+  "scraper": {
+    "maxPages": 1,
+    "render": false,
+    "noArticles": false,
+    "needsRender": false,
+    "listUrls": [
+      "https://gooseboop.com/"
+    ],
+    "code": "function listPosts({url,$}) {return {posts:[],next:null};}\nfunction parsePost({url,$}) {return null;}",
+    "notes": "DNS ENOTFOUND，blocked"
+  }
+}

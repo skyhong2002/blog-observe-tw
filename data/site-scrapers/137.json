@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "blogId": 137,
+  "home": "https://alexhsu.com/",
+  "authoredBy": "gpt-6.1-sol",
+  "scraper": {
+    "listUrls": [
+      "https://alexhsu.com/"
+    ],
+    "maxPages": 1,
+    "code": "function listPosts({url,$}) { return {posts: $(\"article a\").toArray().map(e=>({url:$(e).attr('href'),title:$(e).text().trim()})),next:null}; }\nfunction parsePost({url,$}) {const body=$(\".post-content\").first().clone();body.find('script,style,nav,.post-nav,.post-tag-list,.card:not(.book),.comments').remove();return {title:$(\"h1.page-title\").first().text().trim(),bodyHtml:body.html()||'',author:$('meta[name=\"author\"]').attr('content')||null,publishedAt:$('meta[property=\"article:published_time\"]').attr('content')||$('time[datetime]').first().attr('datetime')||null,tags:[]};}",
+    "render": false,
+    "noArticles": false,
+    "needsRender": false,
+    "notes": "首頁文章連結 article a；文章標題 h1.page-title；正文 .post-content，經實際公開首頁和文章 HTML 檢視。"
+  }
+}

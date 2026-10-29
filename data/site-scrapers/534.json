@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "blogId": 534,
+  "home": "https://alanwang.art/",
+  "authoredBy": "gpt-6.1-sol",
+  "scraper": {
+    "maxPages": 1,
+    "render": false,
+    "noArticles": false,
+    "needsRender": false,
+    "listUrls": [
+      "https://alanwang.art/tags/blogs/"
+    ],
+    "code": "function listPosts({url,$}) {return {posts:$(\"article h2 a\").toArray().map(e=>({url:$(e).attr('href'),title:$(e).text().trim()})),next:null};}\nfunction parsePost({url,$}) {const body=$(\".post__entry\").first().clone();body.find('script,style,header,footer,nav').remove();return {title:$(\"h1\").first().text().trim(),bodyHtml:body.html()||'',author:$('meta[name=\"author\"]').attr('content')||null,publishedAt:$('meta[property=\"article:published_time\"]').attr('content')||$('time').first().attr('datetime')||null,tags:[]};}",
+    "notes": "依實際首頁、列表與文章 HTML 檢視選擇專用文章連結及正文容器。"
+  }
+}

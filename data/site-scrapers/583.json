@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "blogId": 583,
+  "home": "https://chinghannhu.com/",
+  "authoredBy": "gpt-6.1-sol",
+  "scraper": {
+    "listUrls": [
+      "https://chinghannhu.com/"
+    ],
+    "maxPages": 1,
+    "code": "function listPosts({url,$}) {return {posts:[],next:null};}\nfunction parsePost({url,$}) {const title=$('article h1,main h1').first().text().trim();const author=$('meta[name=\"author\"]').attr('content')||$('[rel=\"author\"]').first().text().trim()||null;const publishedAt=$('meta[property=\"article:published_time\"]').attr('content')||$('time[datetime]').first().attr('datetime')||null;const body=$('article').first().clone();body.find('script,style,noscript,nav,footer,.header-anchor,.upvote-form,.post-footer,.toc,.table-of-contents').remove();return {title,bodyHtml:body.html()||'',author,publishedAt,tags:$('[rel=\"tag\"]').map((i,e)=>$(e).text().trim()).get()};}",
+    "render": false,
+    "noArticles": false,
+    "needsRender": false,
+    "notes": "DNS ENOTFOUND; homepage unavailable."
+  }
+}

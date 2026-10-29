@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "blogId": 380,
+  "home": "https://ivanhsu.co/",
+  "authoredBy": "gpt-6.1-sol",
+  "scraper": {
+    "listUrls": [
+      "https://ivanhsu.co/rss.xml"
+    ],
+    "maxPages": 1,
+    "code": "function listPosts({url,$}) {return {posts:$('entry,item').map((_,e)=>({url:$(e).find('link').first().attr('href')||$(e).find('link').first().text(),title:$(e).find('title').text(),publishedAt:$(e).find('published,pubDate').first().text()})).get(),next:null};}\nfunction parsePost({url,$}) {const body=$(\"main\").first().clone();body.find(\"nav,header,footer,button,h1\").remove();return {title:$(\"main h1\").first().text().trim(),bodyHtml:body.html()||'',author:$('meta[name=\"author\"]').attr('content')||null,publishedAt:$('time[datetime]').first().attr('datetime')||$('meta[property=\"article:published_time\"]').attr('content')||null,tags:[]};}",
+    "render": false,
+    "noArticles": false,
+    "needsRender": false,
+    "notes": "實際公開 RSS item 列表，文章 main h1 與正文，移除導覽標題。"
+  }
+}

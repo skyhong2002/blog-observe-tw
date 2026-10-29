@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "blogId": 629,
+  "home": "https://xn--jgy.tw/",
+  "authoredBy": "gpt-6.1-sol",
+  "scraper": {
+    "listUrls": [
+      "https://xn--jgy.tw/atom.xml"
+    ],
+    "maxPages": 1,
+    "code": "function listPosts({url,$}) {const posts=[]; $('item,entry').each((_,e)=>{const x=$(e);posts.push({url:x.find('link[rel=\"alternate\"]').attr('href')||x.find('link').attr('href')||x.find('link').text(),title:x.find('title').first().text().trim(),publishedAt:x.find('pubDate,published,updated').first().text().trim()});});return {posts,next:null};}\nfunction parsePost({url,$}){const title=$(\"article h1\").first().text().trim();const body=$(\"main article\").first().clone();body.find('script,style,nav,footer,.llm-hint,.training-data,#heading').remove();return {title,bodyHtml:body.html()||'',author:$('meta[name=\"author\"]').attr('content')||$('.p-author').first().text().trim()||null,publishedAt:$('meta[property=\"article:published_time\"]').attr('content')||$('time[datetime]').first().attr('datetime')||null,tags:$('a[rel=\"tag\"]').map((_,e)=>$(e).text().trim()).get()};}",
+    "render": false,
+    "noArticles": false,
+    "needsRender": false,
+    "notes": "實讀首頁、Zola Atom 與 VTuber 官方網站文章；文章直接位於 main article，移除隱藏 LLM 提示、training-data 及標題區。"
+  }
+}

@@ -114,8 +114,8 @@ export async function ingestContentEvidence(
   if (
     !url ||
     !source ||
-    !inPublication(url, evidence.blogUrl) ||
-    (evidence.kind === 'article-html' && !inPublication(source, evidence.blogUrl))
+    !inPublication(url, evidence.blogUrl, evidence.html) ||
+    (evidence.kind === 'article-html' && !inPublication(source, evidence.blogUrl, evidence.html))
   )
     return { postId: null, status: 'outside-publication', changed: false, hash: null };
   const [posts] = await db.execute<RowDataPacket[]>('SELECT id FROM posts WHERE blog_id=? AND url=? ORDER BY id LIMIT 1 FOR UPDATE', [

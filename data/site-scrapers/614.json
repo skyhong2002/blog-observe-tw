@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "blogId": 614,
+  "home": "https://rongwords.com/",
+  "authoredBy": "gpt-6.1-sol",
+  "scraper": {
+    "listUrls": [
+      "https://rongwords.com/"
+    ],
+    "maxPages": 1,
+    "code": "function listPosts({url,$}) {const posts=[]; $('.post-preview > a').each((i,e)=>{const a=$(e);const u=a.attr('href');if(u && !['/posts/','/zh/posts/'].includes(u)) posts.push({url:u,title:a.find('h2,h3').first().text().trim()||a.text().trim(),publishedAt:null});});return {posts,next:null};}\nfunction parsePost({url,$}) {const root=$(\".post-container\").first().clone();root.find('script,style,nav,form,.post-comments,.comments,.upvote-button,.toast,.post-footer,.post-meta,.blog-tags').remove();return {title:$(\"h1\").first().text().trim(),bodyHtml:root.html()||'',author:$('meta[name=\"author\"]').attr('content')||$('.byline .author,.author-name').first().text().trim()||null,publishedAt:$('meta[property=\"article:published_time\"]').attr('content')||$('time[datetime]').first().attr('datetime')||null,tags:[]};}",
+    "render": false,
+    "noArticles": false,
+    "needsRender": false,
+    "notes": "已親讀本站列表與真實文章頁；列表 .post-preview > a，正文 .post-container，標題 h1。正文排除互動表單、留言與導覽。"
+  }
+}

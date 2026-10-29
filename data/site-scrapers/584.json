@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "blogId": 584,
+  "home": "https://ericchung24.github.io/",
+  "authoredBy": "gpt-6.1-sol",
+  "scraper": {
+    "maxPages": 1,
+    "render": false,
+    "noArticles": false,
+    "needsRender": false,
+    "listUrls": [
+      "https://ericchung24.github.io/"
+    ],
+    "code": "function listPosts({url,$}) {return {posts:[],next:null};}\nfunction parsePost({url,$}) {return null;}",
+    "notes": "首頁與atom.xml均404，blocked"
+  }
+}

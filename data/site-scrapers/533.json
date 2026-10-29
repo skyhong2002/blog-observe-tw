@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "blogId": 533,
+  "home": "https://comedovalidus954105.substack.com/",
+  "authoredBy": "gpt-6.1-sol",
+  "scraper": {
+    "listUrls": [
+      "https://comedovalidus954105.substack.com/feed"
+    ],
+    "maxPages": 1,
+    "code": "function listPosts({url,$}) {return {posts:$('item,entry').map((i,e)=>{const n=$(e);const href=n.find('link[rel=\"alternate\"]').attr('href')||n.find('link').attr('href')||n.find('link').text();return {url:href,title:n.find('title').text().trim(),publishedAt:n.find('pubDate,published,updated').first().text()||null};}).get(),next:null};}\nfunction parsePost({url,$}) {const title=$('h1.post-title').first().text().trim();const author=$('meta[name=\"author\"]').attr('content')||$('[rel=\"author\"]').first().text().trim()||null;const publishedAt=$('meta[property=\"article:published_time\"]').attr('content')||$('time[datetime]').first().attr('datetime')||null;const body=$('.available-content .body.markup').first().clone();body.find('script,style,noscript,nav,footer,.header-anchor,.upvote-form,.post-footer,.toc,.table-of-contents').remove();return {title,bodyHtml:body.html()||'',author,publishedAt,tags:$('[rel=\"tag\"]').map((i,e)=>$(e).text().trim()).get()};}",
+    "render": false,
+    "noArticles": false,
+    "needsRender": false,
+    "notes": "Live listing RSS/Atom item/entry; article body .available-content .body.markup; title h1.post-title."
+  }
+}

@@ -11,11 +11,13 @@ import { ingestContentEvidence } from '../content/store.ts';
 import { identityKey, publicationDecision } from '../relations/identity.ts';
 import { type BodyIndexOptions, createBodyIndexStages } from '../search-index-staging.ts';
 import { cleanAuthorName, normalizedAuthorName } from './author-name.ts';
+import { type VocusArticleProof, vocusArticleCandidate, vocusProofMatches } from './vocus-publication.ts';
 
 export type FeedSourceType = 'rss' | 'atom' | 'sitemap' | 'wordpress' | 'scraper';
 export type FeedLink = { url: string; type: FeedSourceType };
 /** Internal-only evidence. Public lists and RSS continue reading the bounded posts.summary. */
 export type FeedContent = {
+  publicationProof?: VocusArticleProof;
   html: string;
   kind: ContentKind;
   completeness: Completeness;
@@ -892,11 +894,12 @@ export function parseSitemapArticle(html: string, candidate: FeedEntry, finalUrl
 }
 
 /** Shared publication boundary for feed/history article URLs, including path/query-owned platforms. */
-export function articleInPublication(value: string, home: string): boolean {
+export function articleInPublication(value: string, home: string, proof?: VocusArticleProof): boolean {
   if (!isAllowedCrawlUrl(value) || !isAllowedCrawlUrl(home)) return false;
   const url = new URL(value),
     blog = new URL(home);
   if (url.hostname.replace(/^www\./, '') !== blog.hostname.replace(/^www\./, '')) return false;
+  if (vocusArticleCandidate(value, home)) return vocusProofMatches(proof, value, home);
   const source = publicationDecision(home).home,
     target = publicationDecision(value).home;
   if (!source || !target || identityKey(source) !== identityKey(target)) return false;
@@ -987,7 +990,7 @@ export async function writeFeedEntries(
 ): Promise<number> {
   let written = 0;
   for (const original of entries) {
-    if (!articleInPublication(original.url, blog.url)) continue;
+    if (!articleInPublication(original.url, blog.url, original.content?.publicationProof)) continue;
     const entry = { ...original, url: canonicalArticleUrl(original.url) };
     const [existingUrl] = await pool.execute('SELECT guid FROM posts WHERE blog_id=? AND url=? ORDER BY id LIMIT 1', [blog.id, entry.url]);
     if (Array.isArray(existingUrl) && existingUrl[0]) entry.guid = String((existingUrl[0] as { guid: string }).guid);

@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "blogId": 654,
+  "home": "https://ghost8787.github.io/",
+  "authoredBy": "gpt-6.1-sol",
+  "scraper": {
+    "listUrls": [
+      "https://ghost8787.github.io/atom.xml"
+    ],
+    "maxPages": 1,
+    "code": "function listPosts({url,$}) { return {posts:[],next:null}; }\nfunction parsePost({url,$}) { return {title:\"\",bodyHtml:\"\",author:null,publishedAt:null,tags:[]}; }",
+    "render": false,
+    "noArticles": false,
+    "needsRender": false,
+    "notes": "blocked：首頁及 atom.xml 皆 HTTP 404；沒有可驗證的文章解析器，明確停用空輸出，不能啟用。"
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "blogId": 638,
+  "home": "https://ytanton.medium.com/",
+  "authoredBy": "gpt-6.1-sol",
+  "scraper": {
+    "maxPages": 1,
+    "render": false,
+    "noArticles": false,
+    "needsRender": false,
+    "listUrls": [
+      "https://ytanton.medium.com/feed"
+    ],
+    "code": "function listPosts({url,$}) {return {posts:$('item').toArray().map(e=>({url:$(e).find('link').text().split('?')[0],title:$(e).find('title').text(),publishedAt:$(e).find('pubDate').text()})),next:null};}\nfunction parsePost({url,$}) {return {title:$('h1').first().text(),bodyHtml:$('article section').first().html()||'',author:null,publishedAt:$('time').first().attr('datetime'),tags:[]};}",
+    "notes": "公開RSS可讀但真實文章HTML為403，blocked"
+  }
+}

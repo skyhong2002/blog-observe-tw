@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "blogId": 610,
+  "home": "https://nownownow.com/",
+  "authoredBy": "gpt-6.1-sol",
+  "scraper": {
+    "listUrls": [
+      "https://nownownow.com/"
+    ],
+    "maxPages": 1,
+    "code": "function listPosts({url,$}) { return {posts:[],next:null}; }\nfunction parsePost({url,$}) { return {title:null,bodyHtml:null,author:null,publishedAt:null,tags:[]}; }",
+    "render": false,
+    "noArticles": true,
+    "needsRender": false,
+    "notes": "no_articles: 本站是各作者 /now 頁目錄，沒有本站作者文章。"
+  }
+}

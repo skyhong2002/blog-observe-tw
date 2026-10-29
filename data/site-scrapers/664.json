@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "blogId": 664,
+  "home": "https://it9gamelog.medium.com/",
+  "authoredBy": "gpt-6.1-sol",
+  "scraper": {
+    "listUrls": [
+      "https://it9gamelog.medium.com/feed"
+    ],
+    "maxPages": 1,
+    "code": "function listPosts({url,$}) { return {posts:[],next:null}; }\nfunction parsePost({url,$}) { return {title:\"\",bodyHtml:\"\",author:null,publishedAt:null,tags:[]}; }",
+    "render": false,
+    "noArticles": false,
+    "needsRender": false,
+    "notes": "blocked：公開 feed 可讀，文章頁 HTTP 403；沒有可驗證的文章解析器，明確停用空輸出，不能啟用。"
+  }
+}

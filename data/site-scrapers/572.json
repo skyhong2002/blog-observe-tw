@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "blogId": 572,
+  "home": "https://blog.mdreame.space/",
+  "authoredBy": "gpt-6.1-sol",
+  "scraper": {
+    "listUrls": [
+      "https://blog.mdreame.space/rss.xml"
+    ],
+    "maxPages": 1,
+    "code": "function listPosts({url,$}) {const posts=[];$('item,entry').each((i,e)=>{const n=$(e);const u=n.find('link[rel=\"alternate\"]').attr('href')||n.find('link').attr('href')||n.find('guid').text().trim()||n.find('link').text().trim();if(u)posts.push({url:u,title:n.find('title').text().trim(),publishedAt:n.find('pubDate,published,updated').first().text().trim()});});return {posts,next:null};}\nfunction parsePost({url,$}) {const title=$(\"main h1\").first().text().trim();const body=$(\".prose\").first().clone();body.find('h1,time,script,style,nav,aside,footer,.toc,.table-of-contents,.post-tags,.post-meta,.post-actions,.page-navigation,.blog-post-title,.title,.upvote-button,.embedded.blog-posts').remove();return {title,bodyHtml:body.html()||'',author:$('meta[name=\"author\"]').attr('content')||null,publishedAt:$('meta[property=\"article:published_time\"]').attr('content')||$('time[datetime]').first().attr('datetime')||$('meta[name=\"date\"]').attr('content')||null,tags:$('a[rel=\"tag\"]').map((i,e)=>$(e).text().trim()).get()};}",
+    "render": false,
+    "noArticles": false,
+    "needsRender": false,
+    "notes": "實抓列表 https://blog.mdreame.space/rss.xml 使用 XML；實抓文章 https://blog.mdreame.space/blog/2026-10-16-%E4%B8%80%E6%AC%A1%E5%B8%AE%E5%8A%A9/ 標題 main h1，正文 .prose。"
+  }
+}

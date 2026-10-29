@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "blogId": 650,
+  "home": "https://www.pokanart.gallery/",
+  "authoredBy": "gpt-6.1-sol",
+  "scraper": {
+    "listUrls": [
+      "https://www.pokanart.gallery/"
+    ],
+    "maxPages": 1,
+    "code": "function listPosts({url,$}) { return {posts:[],next:null}; }\nfunction parsePost({url,$}) { return {title:null,bodyHtml:null,author:null,publishedAt:null,tags:[]}; }",
+    "render": true,
+    "noArticles": false,
+    "needsRender": true,
+    "notes": "blocked: 本輪受信任渲染可讀，首頁同站導至 /explore，頁面只有 Memos 日曆、Tags 與 loading spinner；沒有實際 memo 正文或文章網址，不能猜測文章解析器。"
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "blogId": 694,
+  "home": "https://zichenblog.com/",
+  "authoredBy": "gpt-6.1-sol",
+  "scraper": {
+    "listUrls": [
+      "https://zichenblog.com/About/"
+    ],
+    "maxPages": 1,
+    "code": "function listPosts({url,$}) {const posts=[];$('a[href*=\"/Blog/\"]').each((i,e)=>{const x=$(e),u=x.attr('href');if(u && /\\/Blog\\/[^/]+\\//.test(u))posts.push({url:u,title:x.text().trim(),publishedAt:null});});return {posts,next:null};}\nfunction parsePost({url,$}) {const root=$(\".book-content\").first().clone();root.find('script,style,nav,form,.post-comments,.comments,.upvote-button,.toast,.post-footer,.post-meta,.blog-tags').remove();return {title:$(\".book-content h1\").first().text().trim(),bodyHtml:root.html()||'',author:$('meta[name=\"author\"]').attr('content')||$('.byline .author,.author-name').first().text().trim()||null,publishedAt:$('meta[property=\"article:published_time\"]').attr('content')||$('time[datetime]').first().attr('datetime')||null,tags:[]};}",
+    "render": false,
+    "noArticles": false,
+    "needsRender": false,
+    "notes": "已實讀 https://zichenblog.com/About/ 列表及真實文章；正文 .book-content，標題 .book-content h1。"
+  }
+}

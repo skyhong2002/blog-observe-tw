@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "blogId": 600,
+  "home": "https://lixiang.blog/",
+  "authoredBy": "gpt-6.1-sol",
+  "scraper": {
+    "listUrls": [
+      "https://lixiang.blog/"
+    ],
+    "maxPages": 1,
+    "code": "function listPosts({url,$}) {return {posts:[],next:null};}\nfunction parsePost({url,$}) {return null;}",
+    "render": false,
+    "noArticles": false,
+    "needsRender": false,
+    "notes": "blocked: DNS ENOTFOUND lixiang.blog"
+  }
+}

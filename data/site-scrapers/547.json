@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "blogId": 547,
+  "home": "https://harrychung.com/",
+  "authoredBy": "gpt-6.1-sol",
+  "scraper": {
+    "listUrls": [
+      "https://harrychung.com/rss.xml"
+    ],
+    "maxPages": 1,
+    "code": "function listPosts({url,$}) { const posts=$('item,entry').map((_,e)=>{const n=$(e);return {url:n.find('link').text().trim()||n.find('link').attr('href'),title:n.find('title').text().trim(),publishedAt:n.find('pubDate,published,updated').first().text().trim()};}).get(); return {posts,next:null}; }\nfunction parsePost({url,$}) { const title=$(\"article h1\").first().text().trim(); const body=$(\"article .prose\").first().clone(); body.find(\"script,style,.sharedaddy,.jp-relatedposts\").remove(); return {title,bodyHtml:body.html(),author:$('meta[name=\"author\"]').attr('content')||null,publishedAt:$('meta[property=\"article:published_time\"]').attr('content')||$('time[datetime]').first().attr('datetime')||null,tags:$('meta[property=\"article:tag\"]').map((_,e)=>$(e).attr('content')).get()}; }",
+    "render": false,
+    "noArticles": false,
+    "needsRender": false,
+    "notes": "實際檢視首頁、公開RSS/Atom與文章 HTML；正文 article .prose，標題 article h1。"
+  }
+}

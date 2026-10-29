@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "blogId": 623,
+  "home": "https://wangdaodao.me/",
+  "authoredBy": "gpt-6.1-sol",
+  "scraper": {
+    "listUrls": [
+      "https://wangdaodao.me/"
+    ],
+    "maxPages": 1,
+    "code": "function listPosts({url,$}) {return {posts:$(\".archive-title-index a\").map((_,e)=>({url:$(e).attr('href'),title:$(e).text().trim()})).get(),next:null};}\nfunction parsePost({url,$}) {const body=$(\".content_zhengwen .content\").first().clone();body.find(\"script,style,nav,header,footer,.upvote,.embedded.blog-posts\").remove();return {title:$(\"h1\").first().text().trim(),bodyHtml:body.html()||'',author:$('meta[name=\"author\"]').attr('content')||null,publishedAt:$('time[datetime]').first().attr('datetime')||$('meta[property=\"article:published_time\"]').attr('content')||null,tags:[]};}",
+    "render": false,
+    "noArticles": false,
+    "needsRender": false,
+    "notes": "首頁 .archive-title-index a；文章 .content_zhengwen .content，metadata 作者日期。"
+  }
+}

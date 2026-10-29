@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "blogId": 592,
+  "home": "https://imuslab.com/",
+  "authoredBy": "gpt-6.1-sol",
+  "scraper": {
+    "listUrls": [
+      "https://imuslab.com/wordpress/feed/"
+    ],
+    "maxPages": 1,
+    "code": "function listPosts({url,$}) {const posts=[]; $('item,entry').each((_,e)=>{const x=$(e);posts.push({url:x.find('link[rel=\"alternate\"]').attr('href')||x.find('link').attr('href')||x.find('link').text(),title:x.find('title').first().text().trim(),publishedAt:x.find('pubDate,published,updated').first().text().trim()});});return {posts,next:null};}\nfunction parsePost({url,$}){const title=$(\".article__title\").first().text().trim();const body=$(\"section.article__content\").first().clone();body.find('script,style,nav,footer').remove();return {title,bodyHtml:body.html()||'',author:$('meta[name=\"author\"]').attr('content')||$('.p-author').first().text().trim()||null,publishedAt:$('meta[property=\"article:published_time\"]').attr('content')||$('time[datetime]').first().attr('datetime')||null,tags:$('a[rel=\"tag\"]').map((_,e)=>$(e).text().trim()).get()};}",
+    "render": false,
+    "noArticles": false,
+    "needsRender": false,
+    "notes": "首頁 BLOG 明確導向 /wordpress/；實讀 WordPress RSS 及 2026/08/25 Claude Code 樣本，正文 article__content。"
+  }
+}

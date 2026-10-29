@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "blogId": 653,
+  "home": "https://need.noefly.cc/",
+  "authoredBy": "gpt-6.1-sol",
+  "scraper": {
+    "listUrls": [
+      "https://need.noefly.cc/"
+    ],
+    "maxPages": 1,
+    "code": "function listPosts({url,$}) {return {posts:[],next:null};}\nfunction parsePost({url,$}) {return null;}",
+    "render": false,
+    "noArticles": false,
+    "needsRender": false,
+    "notes": "blocked: DNS ENOTFOUND need.noefly.cc"
+  }
+}

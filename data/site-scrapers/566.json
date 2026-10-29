@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "blogId": 566,
+  "home": "https://b23.kim/",
+  "authoredBy": "gpt-6.1-sol",
+  "scraper": {
+    "listUrls": [
+      "https://b23.kim/"
+    ],
+    "maxPages": 1,
+    "code": "function listPosts({url,$}) {return {posts:$(\"a.article-title\").toArray().map(e=>({url:$(e).attr('href'),title:$(e).text().trim()})),next:null};}\nfunction parsePost({url,$}) {const body=$(\"article.post-content\").first().clone();body.find('script,style,header,footer,nav').remove();return {title:$(\"h1.post-title\").first().text().trim(),bodyHtml:body.html()||'',author:$('meta[name=\"author\"]').attr('content')||null,publishedAt:$('meta[property=\"article:published_time\"]').attr('content')||$('time').first().attr('datetime')||null,tags:[]};}",
+    "render": false,
+    "noArticles": false,
+    "needsRender": false,
+    "notes": "依實際首頁、列表與文章 HTML 檢視選擇專用文章連結及正文容器。"
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "blogId": 562,
+  "home": "https://0x1.now/",
+  "authoredBy": "gpt-6.1-sol",
+  "scraper": {
+    "listUrls": [
+      "https://0x1.now/"
+    ],
+    "maxPages": 1,
+    "code": "function listPosts({url,$}) {const posts=[]; $('main a[href]').each((i,e)=>{const x=$(e);const u=x.attr('href');if(u && /^\\/(tech|travel|life|camp|gallery)\\/[^/]+\\//.test(u))posts.push({url:u,title:x.find('h2,h3').first().text().trim(),publishedAt:x.find('pubDate,published').first().text().trim()||null});});return {posts,next:null};}\nfunction parsePost({url,$}) {const root=$(\"article .prose\").first().clone();root.find('script,style,nav,form,.post-comments,.comments,.upvote-button,.toast,.post-footer,.post-meta,.blog-tags').remove();return {title:$(\"h1\").first().text().trim(),bodyHtml:root.html()||'',author:$('meta[name=\"author\"]').attr('content')||$('.byline .author,.author-name').first().text().trim()||null,publishedAt:$('meta[property=\"article:published_time\"]').attr('content')||$('time[datetime]').first().attr('datetime')||null,tags:[]};}",
+    "render": false,
+    "noArticles": false,
+    "needsRender": false,
+    "notes": "首頁分類文章卡片同站兩層路徑，正文已實讀 article .prose。"
+  }
+}

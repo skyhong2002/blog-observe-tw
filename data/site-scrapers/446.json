@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "blogId": 446,
+  "home": "https://jinholm.github.io/",
+  "authoredBy": "gpt-6.1-sol",
+  "scraper": {
+    "listUrls": [
+      "https://jinholm.github.io/index.xml"
+    ],
+    "maxPages": 1,
+    "code": "function listPosts({url,$}) { const posts=[]; $('item,entry').each((_,e)=>{ const x=$(e); const link=x.find('link[rel=\"alternate\"]').attr('href')||x.find('link').attr('href')||x.find('link').text(); if(link) posts.push({url:link,title:x.find('title').first().text().trim(),publishedAt:x.find('pubDate,published,updated').first().text().trim()}); }); return {posts,next:null}; }\nfunction parsePost({url,$}) { const title=$(\"h1.header-title\").first().text().trim(); const publishedAt=$('meta[property=\"article:published_time\"]').attr('content')||$('time[datetime]').first().attr('datetime')||$('.date').first().text().trim()||null; const author=$('meta[name=\"author\"]').attr('content')||$('.p-author').first().text().trim()||null; const body=$(\"article div.page-content\").first().clone(); body.find('script,style,noscript,nav,footer,.upvote,.tags,.blog-tags,.post-tags,.subscribe-widget,.subscription-widget,.comment-list,.comments').remove();  return {title,bodyHtml:body.html()||'',publishedAt,author,tags:$('a[rel=\"tag\"]').map((_,e)=>$(e).text().trim()).get()}; }",
+    "render": false,
+    "noArticles": false,
+    "needsRender": false,
+    "notes": "已實際讀取 https://jinholm.github.io/index.xml XML 及樣本 HTML；文章正文依 article div.page-content、標題依 h1.header-title，不將RSS摘要當正文。"
+  }
+}

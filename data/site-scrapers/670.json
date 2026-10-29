@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "blogId": 670,
+  "home": "https://augustblue.games/",
+  "authoredBy": "gpt-6.1-sol",
+  "scraper": {
+    "listUrls": [
+      "https://augustblue.games/zh/"
+    ],
+    "maxPages": 1,
+    "code": "function listPosts({url,$}) { const posts=$(\"a[class*=blogPost_]\").map((_,e)=>({url:$(e).attr('href'),title:$(e).text().trim()||$(e).closest('article').find('h2').text(),publishedAt:$(e).closest('article').find('time').attr('datetime')})).get(); return {posts,next:null}; }\nfunction parsePost({url,$}) { const title=$(\"article h1\").first().text().trim(); const body=$(\"article .markdown\").first().clone(); body.find(\"script,style,.sharedaddy,.jp-relatedposts\").remove(); return {title,bodyHtml:body.html(),author:$('meta[name=\"author\"]').attr('content')||null,publishedAt:$('meta[property=\"article:published_time\"]').attr('content')||$('time[datetime]').first().attr('datetime')||null,tags:$('meta[property=\"article:tag\"]').map((_,e)=>$(e).attr('content')).get()}; }",
+    "render": false,
+    "noArticles": false,
+    "needsRender": false,
+    "notes": "實際檢視首頁、公開HTML列表與文章 HTML；正文 article .markdown，標題 article h1。"
+  }
+}

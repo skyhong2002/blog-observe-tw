@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "blogId": 575,
+  "home": "https://blog.oopss.top/",
+  "authoredBy": "gpt-6.1-sol",
+  "scraper": {
+    "listUrls": [
+      "https://blog.oopss.top/"
+    ],
+    "maxPages": 1,
+    "code": "function listPosts({url,$}) { return {posts:[],next:null}; }\nfunction parsePost({url,$}) { return null; }",
+    "render": false,
+    "noArticles": false,
+    "needsRender": false,
+    "notes": "blocked: blog.oopss.top DNS ENOTFOUND；首頁與 index.xml 均無法存取，無法觀察文章結構。"
+  }
+}

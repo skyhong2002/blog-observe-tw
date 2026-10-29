@@ -33,7 +33,7 @@ function parsePost({ url, html, $ }) // → { title, author, publishedAt, tags, 
 ## 產生與驗證（`generate.ts`）
 
 1. 抓首頁，啟發式挑一篇文章；HTML 壓成骨架（去 script／style、保留 class／id／href／datetime／itemprop／JSON-LD／onclick 等）送模型。頁面內容在 prompt 中明示為不可信資料。
-2. 真實頁面試跑：列表至少列出文章；抽 3 篇（不足 3 篇則全抽）都要有在該頁出現過的標題、經 `extractContent` 認可且 ≥ 50 字的內文（至少一篇 ≥ 200 字），且標題、內文彼此不同（防寫死）。翻頁失敗不算失敗，只讀第一頁。沒有日期也不算失敗（例如數位花園筆記站）：日期依序取文章頁、列表頁，都沒有就用首次抓到的時間（使用者決定，2026-10-17）。
+2. 真實頁面試跑：列表至少列出文章；抽 3 篇（不足 3 篇則全抽）都要有在該頁出現過的標題、經 `extractContent` 認可的內文；少於 200 字元的正文須核對原頁文字與全部圖片，不設最低字數，且標題、內文彼此不同（防寫死）。翻頁失敗不算失敗，只讀第一頁。沒有日期也不算失敗（例如數位花園筆記站）：日期依序取文章頁、列表頁，都沒有就用首次抓到的時間（使用者決定，2026-10-17）。
 3. 不通過就把問題、舊程式碼與失敗頁的骨架回饋給模型，最多 3 輪；每輪佔 `scraper:gateway` 每日 18 次額度。
 
 ## 觸發（`repair.ts`，獨立 queue `<BLOG_QUEUE_NAME>-scrapers`，每 30 分鐘一輪）
@@ -81,3 +81,5 @@ node --env-file=/home/deck/.config/blog-observe.env tools/scraper-once.ts --cand
 worker 需 `BLOG_SCRAPER_GENERATION_ENABLED=true`（預設關閉，關閉時移除排程）；bwrap 不在 `/usr/bin/bwrap` 時設 `BLOG_SCRAPER_BWRAP`。
 
 回滾單一站：`UPDATE blog_scrapers SET status='rejected' WHERE id=?`——該站回到 feed（若有），否則下次符合條件時重新產生。整體停用：關掉 env 並重啟 worker；已收錄的站保留，只是不再更新。
+
+逐站 agent 撰寫、證據綁定與方格子歸屬驗證見 [逐站抓取器](site-scraper-fleet.md)。

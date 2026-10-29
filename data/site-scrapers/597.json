@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "blogId": 597,
+  "home": "https://kayro.top/",
+  "authoredBy": "gpt-6.1-sol",
+  "scraper": {
+    "listUrls": [
+      "https://kayro.top/"
+    ],
+    "maxPages": 1,
+    "code": "function listPosts({url,$}) {return {posts:[],next:null};}\nfunction parsePost({url,$}) {return {title:$(\"h1\").first().text(),bodyHtml:\"\",author:null,publishedAt:null,tags:[]};}",
+    "render": false,
+    "noArticles": false,
+    "needsRender": false,
+    "notes": "blocked: Error: http_404，未捏造文章。"
+  }
+}

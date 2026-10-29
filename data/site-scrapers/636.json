@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "blogId": 636,
+  "home": "https://blog.abb00717.com/",
+  "authoredBy": "gpt-6.1-sol",
+  "scraper": {
+    "listUrls": [
+      "https://blog.abb00717.com/index.xml"
+    ],
+    "maxPages": 1,
+    "code": "function listPosts({url,$}) { const posts=[]; $('item,entry').each((i,e)=>{const x=$(e); const a=x.find('link[rel=\"alternate\"]').first(); const u=a.attr('href')||x.find('link').first().attr('href')||x.find('link').first().text(); if(u && !u.endsWith(\"/\"))posts.push({url:u,title:x.find('title').first().text(),publishedAt:x.find('pubDate,published,updated').first().text()});});return {posts,next:null};}\nfunction parsePost({url,$}) {const b=$(\"article\").first().clone();b.find('script,style,nav,header,footer,aside,.comments,#comments,.related-posts,.post-footer,.post-share').remove();const t=$(\".article-title\").first();return {title:t.attr('content')||t.text().trim(),bodyHtml:b.html()||'',author:$('meta[name=\"author\"]').attr('content')||$('[rel=\"author\"]').first().text()||null,publishedAt:$('meta[property=\"article:published_time\"]').attr('content')||$('time[datetime]').first().attr('datetime')||null,tags:[]};}",
+    "render": false,
+    "noArticles": false,
+    "needsRender": false,
+    "notes": "實際讀取公開列表與文章 https://blog.abb00717.com/%E6%96%87%E7%AB%A0/CWES-%E9%80%9A%E9%97%9C%E5%BF%83%E5%BE%97；正文 article，標題 .page-title。 文章標題 .article-title；.page-title 為站名，禁止取用。"
+  },
+  "originalHome": "https://abb00717.com/",
+  "migration_required": true,
+  "migrationEvidence": "首頁 https://abb00717.com/ 明示「部落格」連結 https://blog.abb00717.com/；實讀該公開部落格及 index.xml。"
+}

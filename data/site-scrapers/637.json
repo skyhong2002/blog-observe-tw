@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "blogId": 637,
+  "home": "https://wox080xow.github.io/",
+  "authoredBy": "gpt-6.1-sol",
+  "scraper": {
+    "listUrls": [
+      "https://wox080xow.github.io/"
+    ],
+    "maxPages": 1,
+    "code": "function listPosts({url,$}) {const posts=[]; $('#main_content h3 a[href]').each((i,e)=>{const a=$(e);let href=a.attr('href');if(!href)return;posts.push({url:href,title:a.text().trim(),publishedAt:a.closest('article,.post').find('time').first().attr('datetime')||null});});return {posts,next:null};}\nfunction parsePost({url,$}) {const title=$('#main_content > h1').first().text().trim();const author=$('meta[name=\"author\"]').attr('content')||$('[rel=\"author\"]').first().text().trim()||null;const publishedAt=$('meta[property=\"article:published_time\"]').attr('content')||$('time[datetime]').first().attr('datetime')||null;const body=$('#main_content').first().clone();body.find('script,style,noscript,nav,footer,.header-anchor,.upvote-form,.post-footer,.toc,.table-of-contents').remove();return {title,bodyHtml:body.html()||'',author,publishedAt,tags:$('[rel=\"tag\"]').map((i,e)=>$(e).text().trim()).get()};}",
+    "render": false,
+    "noArticles": false,
+    "needsRender": false,
+    "notes": "Live listing #main_content h3 a[href]; article body #main_content; title #main_content > h1."
+  }
+}

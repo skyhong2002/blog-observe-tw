@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "blogId": 548,
+  "home": "https://jaron.tw/",
+  "authoredBy": "gpt-6.1-sol",
+  "scraper": {
+    "listUrls": [
+      "https://jaron.tw/blog"
+    ],
+    "maxPages": 1,
+    "code": "function listPosts({url,$}) {return {posts:$('article header h2 a').toArray().map(e=>({url:$(e).attr('href'),title:$(e).text(),publishedAt:$(e).closest('article').find('time').attr('datetime')})),next:null};}\nfunction parsePost({url,$}) {const b=$(\".markdown\").first().clone(); b.find('script,style,nav,.related-posts,.post-navigation,.post-meta,.blog-posts,.upvote-button,form').remove();return {title:$(\"h1\").first().text().trim(),bodyHtml:b.html()||'',author:$('meta[name=\"author\"]').attr('content')||null,publishedAt:$('meta[property=\"article:published_time\"]').attr('content')||$('time[datetime]').first().attr('datetime')||null,tags:[]};}",
+    "render": false,
+    "noArticles": false,
+    "needsRender": false,
+    "notes": "已實抓 /blog 列表頁，透過 article header h2 a 讀取文章連結、time日期；單篇 .markdown 為正文。"
+  }
+}

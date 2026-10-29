@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "blogId": 589,
+  "home": "https://howmaywang.com/",
+  "authoredBy": "gpt-6.1-sol",
+  "scraper": {
+    "listUrls": [
+      "https://howmaywang.com/"
+    ],
+    "maxPages": 1,
+    "code": "function listPosts({url,$}) {return {posts:$('a.project-card').map((_,e)=>({url:$(e).attr('href'),title:$(e).attr('data-project-title'),publishedAt:$(e).attr('data-project-date')})).get(),next:null};}\nfunction parsePost({url,$}) {const body=$('.content-wrap').first().clone();body.find('script,style,button,svg,.wm-side,.carousel__dots,.meta,.tags').remove();return {title:$('title').text().replace(/ - 皓梅 Howmay$/, '').trim(),bodyHtml:body.html()||'',author:null,publishedAt:null,tags:[]};}",
+    "render": false,
+    "noArticles": false,
+    "needsRender": false,
+    "notes": "首頁 .project-card 為作者獨立作品圖文頁，有 data-project-title/date；實際作品頁 .content .prose 有創作文字，.media-column 有作者圖片。標題取 meta title。"
+  }
+}

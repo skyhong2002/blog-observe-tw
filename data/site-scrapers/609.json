@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "blogId": 609,
+  "home": "https://note.iach.cc/",
+  "authoredBy": "gpt-6.1-sol",
+  "scraper": {
+    "listUrls": [
+      "https://note.iach.cc/Thread/atom.xml"
+    ],
+    "maxPages": 1,
+    "code": "function listPosts({url,$}) {const posts=[]; $('item,entry').each((_,e)=>{const x=$(e);posts.push({url:x.find('link[rel=\"alternate\"]').attr('href')||x.find('link').attr('href')||x.find('link').text(),title:x.find('title').first().text().trim(),publishedAt:x.find('pubDate,published,updated').first().text().trim()});});return {posts,next:null};}\nfunction parsePost({url,$}){const title=$(\"article h1\").first().text().trim();const body=$(\"#__blog-post-container\").first().clone();body.find('script,style,nav,footer').remove();return {title,bodyHtml:body.html()||'',author:$('meta[name=\"author\"]').attr('content')||$('.p-author').first().text().trim()||null,publishedAt:$('meta[property=\"article:published_time\"]').attr('content')||$('time[datetime]').first().attr('datetime')||null,tags:$('a[rel=\"tag\"]').map((_,e)=>$(e).text().trim()).get()};}",
+    "render": false,
+    "noArticles": false,
+    "needsRender": false,
+    "notes": "首頁公開 Thread atom 訂閱連結；實讀 Atom 與資安是無感的政績，Docusaurus 正文 __blog-post-container。"
+  }
+}

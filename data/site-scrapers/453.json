@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "blogId": 453,
+  "home": "https://yuncolorblog.com/",
+  "authoredBy": "gpt-6.1-sol",
+  "scraper": {
+    "listUrls": [
+      "https://yuncolorblog.com/"
+    ],
+    "maxPages": 1,
+    "code": "function listPosts({url,$}) {return {posts:$(\"article header a[href*=\\\"/posts/\\\"]\").map((i,e)=>({url:$(e).attr('href'),title:$(e).text().trim()})).get(),next:null};}\nfunction parsePost({url,$}) {const b=$(\".article-content\").first().clone();b.find('script,style,nav,header,footer,aside,.comments,#comments,.related-posts,.post-footer,.post-share').remove();const t=$(\"main h1\").first();return {title:t.attr('content')||t.text().trim(),bodyHtml:b.html()||'',author:$('meta[name=\"author\"]').attr('content')||$('[rel=\"author\"]').first().text()||null,publishedAt:$('meta[property=\"article:published_time\"]').attr('content')||$('time[datetime]').first().attr('datetime')||null,tags:[]};}",
+    "render": false,
+    "noArticles": false,
+    "needsRender": false,
+    "notes": "實際讀取公開列表與文章 https://yuncolorblog.com/posts/%E7%94%9F%E6%B4%BB%E6%97%A5%E5%B8%B8/removing-ropes-from-a-canyoning-route/；正文 .article-content，標題 main h1。"
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "blogId": 648,
+  "home": "https://ssur.cc/",
+  "authoredBy": "gpt-6.1-sol",
+  "scraper": {
+    "maxPages": 1,
+    "render": false,
+    "noArticles": true,
+    "needsRender": false,
+    "listUrls": [
+      "https://ssur.cc/"
+    ],
+    "code": "function listPosts({url,$}) {return {posts:[],next:null};}\nfunction parsePost({url,$}) {return null;}",
+    "notes": "no_articles：首頁是縮網址工具服務，沒有文章列表"
+  }
+}

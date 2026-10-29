@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "blogId": 665,
+  "home": "https://holychung.medium.com/",
+  "authoredBy": "gpt-6.1-sol",
+  "scraper": {
+    "listUrls": [
+      "https://holychung.medium.com/feed"
+    ],
+    "maxPages": 1,
+    "code": "function listPosts({url,$}) { const posts=[]; $('item,entry').each((_,e)=>{const n=$(e);let link=n.children('link').filter((_,a)=>!$(a).attr('rel')||$(a).attr('rel')==='alternate').first();const u=link.attr('href')||link.text().trim(); if(u) posts.push({url:u,title:n.children('title').text().trim(),publishedAt:n.children('pubDate,published,updated').first().text().trim()});});return {posts,next:null}; }\nfunction parsePost({url,$}) { return null; }",
+    "render": false,
+    "noArticles": false,
+    "needsRender": false,
+    "notes": "blocked: Medium 公開 feed 有作者文章，但首頁與三篇樣本文章均 HTTP 403。listPosts 僅解析已觀察到的 RSS；文章頁不可檢視，parsePost 拒絕猜測 DOM，不以 feed 正文冒充文章。"
+  }
+}

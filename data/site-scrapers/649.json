@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "blogId": 649,
+  "home": "https://open.substack.com/",
+  "authoredBy": "gpt-6.1-sol",
+  "scraper": {
+    "listUrls": [
+      "https://open.substack.com/"
+    ],
+    "maxPages": 1,
+    "code": "function listPosts({url,$}) { return {posts:[],next:null}; }\nfunction parsePost({url,$}) { return null; }",
+    "render": false,
+    "noArticles": false,
+    "needsRender": false,
+    "notes": "blocked: open.substack.com 重導 Substack 平台首頁，無 CT 作者識別；不可跨作者收集平台推薦內容。"
+  }
+}

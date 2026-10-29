@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "blogId": 599,
+  "home": "https://leaftechblog.cloudns.biz/",
+  "authoredBy": "gpt-6.1-sol",
+  "scraper": {
+    "listUrls": [
+      "https://leaftechblog.cloudns.biz/"
+    ],
+    "maxPages": 1,
+    "code": "function listPosts({url,$}) { return {posts:[],next:null}; }\nfunction parsePost({url,$}) { return null; }",
+    "render": false,
+    "noArticles": false,
+    "needsRender": false,
+    "notes": "blocked: 原站重導 blog.xn--i2rt58ao7w.com 人類驗證 Security Check/Access Denied；未繞過驗證。"
+  }
+}

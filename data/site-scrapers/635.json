@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "blogId": 635,
+  "home": "https://zooyoo.top/",
+  "authoredBy": "gpt-6.1-sol",
+  "scraper": {
+    "listUrls": [
+      "https://zooyoo.top/"
+    ],
+    "maxPages": 1,
+    "code": "function listPosts({url,$}) {const posts=[]; $('article.post a.post-title').each((_,e)=>{const a=$(e); posts.push({url:a.attr('href'),title:a.text().trim(),publishedAt:a.closest('article').find('time').attr('datetime')||null});});return {posts,next:null};}\nfunction parsePost({url,$}) {\n const title=$(\"article.post .post-title\").first().text().trim(); const body=$(\"article.post .post-content\").first().clone();\n  body.find('script,style,noscript').remove();\n let ld={}; $('script[type=\"application/ld+json\"]').each((_,e)=>{try{const v=JSON.parse($(e).text());const walk=x=>{if(Array.isArray(x))x.forEach(walk);else if(x&&typeof x==='object'){if(/Article|Posting/i.test(String(x['@type']||'')))ld=x;if(x['@graph'])walk(x['@graph']);}};walk(v);}catch{}});\n const author=$('meta[name=\"author\"]').attr('content')||$('a[rel=\"author\"],.article-author,.gh-author-name,.author-name').first().text().trim()||(typeof ld.author==='string'?ld.author:Array.isArray(ld.author)?ld.author.map(a=>a.name).join(', '):ld.author?.name)||null;\n const publishedAt=$('.breadcrumbs').text().match(/\\d{4}-\\d{2}-\\d{2}/)?.[0]||$('meta[property=\"article:published_time\"],meta[itemprop=\"datePublished\"]').first().attr('content')||$('time[datetime]').first().attr('datetime')||ld.datePublished||null;\n const tags=Array.isArray(ld.keywords)?ld.keywords:$('a[rel=\"tag\"],.post-tags a,.article-tags a,.tags a,a[href^=\"/tags/\"]').map((_,e)=>$(e).text().trim().replace(/^#/, '')).get();\n return {title,bodyHtml:body.html()||'',author,publishedAt,tags};\n}",
+    "render": false,
+    "noArticles": false,
+    "needsRender": false,
+    "notes": "Typecho 首頁 article.post a.post-title 為列表；文章 .post-content 是完整正文，.breadcrumbs 尾端為發布日（不可取留言 time）；標籤在 article .tags。"
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "blogId": 513,
+  "home": "https://yaxuanhe.me/",
+  "authoredBy": "gpt-6.1-sol",
+  "scraper": {
+    "listUrls": [
+      "https://yaxuanhe.me/index.xml"
+    ],
+    "maxPages": 1,
+    "code": "function listPosts({url,$}) {const posts=[]; $('item,entry').each((i,e)=>{const x=$(e);const u=x.find('link').text().trim()||x.find('link[rel=\"alternate\"]').attr('href')||x.find('link').attr('href');if(u && u.includes(\"/post/\"))posts.push({url:u,title:x.find('title').first().text().trim(),publishedAt:x.find('pubDate,published').first().text().trim()||null});});return {posts,next:null};}\nfunction parsePost({url,$}) {const root=$(\".e-content\").first().clone();root.find('script,style,nav,form,.post-comments,.comments,.upvote-button,.toast,.post-footer,.post-meta,.blog-tags').remove();return {title:$(\"article h1\").first().text().trim(),bodyHtml:root.html()||'',author:$('meta[name=\"author\"]').attr('content')||$('.byline .author,.author-name').first().text().trim()||null,publishedAt:$('meta[property=\"article:published_time\"]').attr('content')||$('time[datetime]').first().attr('datetime')||null,tags:[]};}",
+    "render": false,
+    "noArticles": false,
+    "needsRender": false,
+    "notes": "已親讀本站列表與真實文章頁；列表 公開 RSS/Atom item/entry，正文 .e-content，標題 article h1。正文排除互動表單、留言與導覽。"
+  }
+}

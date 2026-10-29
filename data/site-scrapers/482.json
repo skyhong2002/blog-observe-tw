@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "blogId": 482,
+  "home": "https://www.liu-guo.com/",
+  "authoredBy": "gpt-6.1-sol",
+  "scraper": {
+    "listUrls": [
+      "https://www.liu-guo.com/rss.xml"
+    ],
+    "maxPages": 1,
+    "code": "function listPosts({url,$}) {const posts=[];$('item,entry').each((i,e)=>{const n=$(e);posts.push({url:n.find('link').attr('href')||n.find('link').text().trim(),title:n.find('title').text().trim(),publishedAt:n.find('pubDate,published,updated').first().text().trim()});});return {posts,next:null};}\nfunction parsePost({url,$}) {const title=$(\"h1\").first().text().trim();const body=$(\"main article\").first().clone();body.find('script,style,nav,aside,footer,.toc,.table-of-contents,.post-tags,.post-meta,.blog-post-title,.title,.upvote-button,.embedded.blog-posts').remove();return {title,bodyHtml:body.html()||'',author:$('meta[name=\"author\"]').attr('content')||null,publishedAt:$('meta[property=\"article:published_time\"]').attr('content')||$('time[datetime]').first().attr('datetime')||$('meta[name=\"date\"]').attr('content')||null,tags:$('a[rel=\"tag\"]').map((i,e)=>$(e).text().trim()).get()};}",
+    "render": false,
+    "noArticles": false,
+    "needsRender": false,
+    "notes": "實抓列表 https://www.liu-guo.com/rss.xml 使用 XML；實抓文章 https://www.liu-guo.com/writings/distributed-web/dweb-camp-2026/index.html?utm_source=rss&utm_medium=feed 標題 h1，正文 main article。"
+  }
+}

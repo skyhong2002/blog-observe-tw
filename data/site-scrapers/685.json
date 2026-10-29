@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "blogId": 685,
+  "home": "https://pclip.cc/",
+  "authoredBy": "gpt-6.1-sol",
+  "scraper": {
+    "listUrls": [
+      "https://pclip.cc/blogs"
+    ],
+    "maxPages": 1,
+    "code": "function listPosts({url,$}) {const posts=[]; $('a[href^=\"/blogs/post/\"]').each((_,e)=>{const a=$(e); posts.push({url:a.attr('href'),title:a.text().trim(),publishedAt:a.closest('article').find('time').attr('datetime')||null});});return {posts,next:null};}\nfunction parsePost({url,$}) {\n const title=$(\".container > h1\").first().text().trim(); const body=$(\".blur-container.container\").first().clone();\n body.children('h1,.json-container').remove(); body.find('script,style,noscript').remove();\n let ld={}; $('script[type=\"application/ld+json\"]').each((_,e)=>{try{const v=JSON.parse($(e).text());const walk=x=>{if(Array.isArray(x))x.forEach(walk);else if(x&&typeof x==='object'){if(/Article|Posting/i.test(String(x['@type']||'')))ld=x;if(x['@graph'])walk(x['@graph']);}};walk(v);}catch{}});\n let info={}; try{info=JSON.parse($('.json-container code').first().text());}catch{} const author=info['作者']||$('meta[name=\"author\"]').attr('content')||$('a[rel=\"author\"],.article-author,.gh-author-name,.author-name').first().text().trim()||(typeof ld.author==='string'?ld.author:Array.isArray(ld.author)?ld.author.map(a=>a.name).join(', '):ld.author?.name)||null;\n const publishedAt=info['撰寫日期']?.replaceAll('/', '-')||$('meta[property=\"article:published_time\"],meta[itemprop=\"datePublished\"]').first().attr('content')||$('time[datetime]').first().attr('datetime')||ld.datePublished||null;\n const tags=Array.isArray(ld.keywords)?ld.keywords:$('a[rel=\"tag\"],.post-tags a,.article-tags a,.tags a,a[href^=\"/tags/\"]').map((_,e)=>$(e).text().trim().replace(/^#/, '')).get();\n return {title,bodyHtml:body.html()||'',author,publishedAt,tags};\n}",
+    "render": false,
+    "noArticles": false,
+    "needsRender": false,
+    "notes": "首頁部落格按鈕指向 /blogs；列表 a[href^=\"/blogs/post/\"]；文章 .blur-container.container 移除 h1 與 .json-container 後為正文，.json-container code 的 JSON 提供實際撰寫日期與作者。"
+  }
+}

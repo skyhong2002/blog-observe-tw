@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "blogId": 679,
+  "home": "https://gou935.com/",
+  "authoredBy": "gpt-6.1-sol",
+  "scraper": {
+    "listUrls": [
+      "https://gou935.com/"
+    ],
+    "maxPages": 1,
+    "code": "function listPosts({url,$}) { return {posts:[],next:null}; }\nfunction parsePost({url,$}) { return null; }",
+    "render": false,
+    "noArticles": false,
+    "needsRender": false,
+    "notes": "blocked: gou935.com DNS ENOTFOUND，manifest 無可用替代列表。"
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "blogId": 663,
+  "home": "https://writee.org/",
+  "authoredBy": "gpt-6.1-sol",
+  "scraper": {
+    "listUrls": [
+      "https://writee.org/"
+    ],
+    "maxPages": 1,
+    "code": "function listPosts({url,$}) {return {posts:[],next:null};}\nfunction parsePost({url,$}) {return null;}",
+    "render": false,
+    "noArticles": true,
+    "needsRender": false,
+    "notes": "no_articles: writee.org 是多人寫作平台首頁，只有服務介紹；未識別冷莫凡作者路徑，不採集 Reader 跨作者文章。"
+  }
+}

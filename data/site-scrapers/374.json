@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "blogId": 374,
+  "home": "https://jimmychen.me/",
+  "authoredBy": "gpt-6.1-sol",
+  "scraper": {
+    "listUrls": [
+      "https://jimmychen.me/sitemap-0.xml"
+    ],
+    "maxPages": 1,
+    "code": "function listPosts({url,$}) {return {posts:$('url').map((i,e)=>{const u=$(e).find('loc').text();return /^https:\\/\\/jimmychen\\.me\\/blog\\/(?!tags(?:\\/|$)|search(?:\\/|$))[^/]+\\/$/.test(u)?{url:u}:null;}).get(),next:null};}\nfunction parsePost({url,$}) {const title=$('article h1,main h1').first().text().trim();const author=$('meta[name=\"author\"]').attr('content')||$('[rel=\"author\"]').first().text().trim()||null;const publishedAt=$('meta[property=\"article:published_time\"]').attr('content')||$('time[datetime]').first().attr('datetime')||null;const body=$('.e-content').first().clone();body.find('script,style,noscript,nav,footer,.header-anchor,.upvote-form,.post-footer,.toc,.table-of-contents').remove();return {title,bodyHtml:body.html()||'',author,publishedAt,tags:$('[rel=\"tag\"]').map((i,e)=>$(e).text().trim()).get()};}",
+    "render": false,
+    "noArticles": false,
+    "needsRender": false,
+    "notes": "Live sitemap url loc lists /blog/<slug>/ article pages, excluding taxonomy and search pages; article .e-content body and article h1 title. Verified actual /blog/30tdd/ HTML."
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "blogId": 147,
+  "home": "https://revolc.blog/",
+  "authoredBy": "gpt-6.1-sol",
+  "scraper": {
+    "listUrls": [
+      "https://revolc.blog/"
+    ],
+    "maxPages": 1,
+    "code": "function listPosts({url,$}) {return {posts:$('article .article-content-title a[href]').map((i,e)=>({url:$(e).attr('href'),title:$(e).text().trim()})).get(),next:null};}\nfunction parsePost({url,$}) {const title=$('.article-content-title').first().text().trim();const author=$('meta[name=\"author\"]').attr('content')||$('[rel=\"author\"]').first().text().trim()||null;const publishedAt=$('meta[property=\"article:published_time\"]').attr('content')||$('time[datetime]').first().attr('datetime')||$('time.article-time--published').first().text().trim()||null;const body=$('article.main-article > .article-content').first().clone();body.find('script,style,noscript,nav,footer,.header-anchor,.upvote-form,.post-footer,.toc,.table-of-contents').remove();return {title,bodyHtml:body.html()||'',author,publishedAt,tags:$('[rel=\"tag\"]').map((i,e)=>$(e).text().trim()).get()};}",
+    "render": false,
+    "noArticles": false,
+    "needsRender": false,
+    "notes": "Homepage article .article-content-title a cards list posts. Article main-article > .article-content body, .article-content-title title, visible time.article-time--published date. Full 1.6MB feed avoided to reduce sandbox work."
+  }
+}

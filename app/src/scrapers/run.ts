@@ -1,4 +1,5 @@
 import { type BlogToCrawl, boundedFeedContent, type FeedCrawlerOptions, type FeedEntry, publicSummary } from '../crawl/feed.ts';
+import { vocusArticleCandidate, vocusProofFromHtml, vocusProofMatches } from '../crawl/vocus-publication.ts';
 import { type ListedPost, listedPage, MAX_HISTORY_PAGES, MAX_LIST_PAGES, parsedPost, scraperArticleHtml } from './contract.ts';
 import { fetchFailure, fetchHtml } from './pages.ts';
 import { fetchRendered } from './render.ts';
@@ -54,12 +55,17 @@ export async function scrapeBlog(
     if (options.signal?.aborted) break;
     try {
       const page = await fetchPage(item.url, options);
+      const proof = vocusProofFromHtml(page.html, page.url, blog.url);
+      if (vocusArticleCandidate(item.url, blog.url) && !vocusProofMatches(proof, item.url, blog.url)) {
+        postErrors++;
+        continue;
+      }
       const post = parsedPost(await sandbox(scraper.code, 'parsePost', page), now);
       if (!post) {
         postErrors++;
         continue;
       }
-      const html = scraperArticleHtml(post, item.url);
+      const html = scraperArticleHtml(post, item.url, proof);
       entries.push({
         guid: item.url,
         url: item.url,
@@ -67,6 +73,7 @@ export async function scrapeBlog(
         summary: publicSummary(post.bodyHtml),
         content: boundedFeedContent({
           html,
+          ...(proof ? { publicationProof: proof } : {}),
           kind: 'article-html',
           completeness: 'full',
           sourceUrl: item.url,

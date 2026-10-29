@@ -1,4 +1,5 @@
 import { articleInPublication, canonicalArticleUrl, isAllowedCrawlUrl } from '../crawl/feed.ts';
+import { type VocusArticleProof, vocusArticleCandidate } from '../crawl/vocus-publication.ts';
 
 export const SCRAPER_POLICY = 'generated-scraper-v1';
 export const MAX_CODE_BYTES = 40 * 1024;
@@ -61,7 +62,13 @@ export function listedPage(value: unknown, pageUrl: string, home: string, now = 
   for (const item of Array.isArray(raw.posts) ? raw.posts.slice(0, 200) : []) {
     const entry = item && typeof item === 'object' ? (item as Record<string, unknown>) : {};
     const url = resolved(entry.url, pageUrl);
-    if (!url || seen.has(url) || url.replace(/\/$/, '') === homeKey || !articleInPublication(url, home)) continue;
+    if (
+      !url ||
+      seen.has(url) ||
+      url.replace(/\/$/, '') === homeKey ||
+      !(articleInPublication(url, home) || vocusArticleCandidate(url, home))
+    )
+      continue;
     seen.add(url);
     posts.push({ url, title: text(entry.title, 512) || null, publishedAt: scraperDate(entry.publishedAt, now) });
   }
@@ -129,7 +136,10 @@ export function generatedScraper(value: unknown, home: string): GeneratedScraper
   };
 }
 /** The body parsePost chose, as a page the existing extractor reads like any article (content/article-content.ts). */
-export function scraperArticleHtml(post: ParsedPost, url: string) {
+export function scraperArticleHtml(post: ParsedPost, url: string, proof?: VocusArticleProof) {
   const attr = (value: string) => value.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
-  return `<!doctype html><html><head><title>${attr(post.title)}</title><link rel="canonical" href="${attr(url)}"></head><body><article class="generated-scraper-body">${post.bodyHtml}</article></body></html>`;
+  const ownership = proof
+    ? `<script id="__NEXT_DATA__" type="application/json">${JSON.stringify({ props: { pageProps: { parsedArticle: { _id: proof.articleId, salonId: proof.salonId, userId: proof.userId, salon: { _id: proof.salonId } } } } })}</script>`
+    : '';
+  return `<!doctype html><html><head>${ownership}<title>${attr(post.title)}</title><link rel="canonical" href="${attr(url)}"></head><body><article class="generated-scraper-body">${post.bodyHtml}</article></body></html>`;
 }

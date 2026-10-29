@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "blogId": 695,
+  "home": "https://vocus.cc/salon/6698ea42fd89780001c6cc46",
+  "authoredBy": "gpt-6.1-sol",
+  "scraper": {
+    "listUrls": [
+      "https://vocus.cc/salon/6698ea42fd89780001c6cc46"
+    ],
+    "maxPages": 1,
+    "code": "function listPosts({url,$}) {const posts=[];try{const data=JSON.parse($('script#__NEXT_DATA__').text());const salonId=new URL(url).pathname.split('/')[2];const fallback=data.props?.pageProps?.fallback||{};Object.keys(fallback).filter(k=>k.includes('salonId='+salonId)).forEach(k=>{const batches=Array.isArray(fallback[k])?fallback[k]:[fallback[k]];batches.forEach(batch=>(batch.contents||[]).forEach(p=>{if(p.salonId===salonId&&p.type==='article'&&p.contentId)posts.push({url:'/article/'+p.contentId,title:p.title,publishedAt:p.publishAt});}));});}catch{}return {posts,next:null};}\nfunction parsePost({url,$}) {\n const title=$(\"main h1\").first().text().trim(); const body=$(\"article.editor-content-block\").first().clone();\n  body.find('script,style,noscript').remove();\n let ld={}; $('script[type=\"application/ld+json\"]').each((_,e)=>{try{const v=JSON.parse($(e).text());const walk=x=>{if(Array.isArray(x))x.forEach(walk);else if(x&&typeof x==='object'){if(/Article|Posting/i.test(String(x['@type']||'')))ld=x;if(x['@graph'])walk(x['@graph']);}};walk(v);}catch{}});\n const author=$('meta[name=\"author\"]').attr('content')||$('a[rel=\"author\"],.article-author,.gh-author-name,.author-name').first().text().trim()||(typeof ld.author==='string'?ld.author:Array.isArray(ld.author)?ld.author.map(a=>a.name).join(', '):ld.author?.name)||null;\n const publishedAt=$('meta[property=\"article:published_time\"],meta[itemprop=\"datePublished\"]').first().attr('content')||$('time[datetime]').first().attr('datetime')||ld.datePublished||null;\n const tags=Array.isArray(ld.keywords)?ld.keywords:$('a[rel=\"tag\"],.post-tags a,.article-tags a,.tags a,a[href^=\"/tags/\"]').map((_,e)=>$(e).text().trim().replace(/^#/, '')).get();\n return {title,bodyHtml:body.html()||'',author,publishedAt,tags};\n}",
+    "render": false,
+    "noArticles": false,
+    "needsRender": false,
+    "notes": "公開 salon 列表連結與 article.editor-content-block 可讀；合約同出版者路徑界線將 /article/ 排除，需上層處理；不越過界線。"
+  }
+}

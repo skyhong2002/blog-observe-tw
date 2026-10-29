@@ -1,5 +1,6 @@
 import type { Pool, RowDataPacket } from 'mysql2/promise';
 import { politeFetch } from '../crawl/feed.ts';
+import { vocusArticleCandidate, vocusProofFromHtml, vocusProofMatches } from '../crawl/vocus-publication.ts';
 import { reserveBudget } from '../jobs/budget.ts';
 import type { BatchOptions, BatchResult } from '../jobs/contracts.ts';
 import { withJobLease } from '../jobs/lease.ts';
@@ -62,13 +63,22 @@ async function noteFailure(pool: Pool, post: RowDataPacket, rule: ContentRule, r
 }
 /** A blog's generated scraper (app/src/scrapers) knows where its body is; the extractor then reads only that.
  * Any scraper failure falls back to the page as fetched. */
-async function scraperBody(scraper: StoredScraper | null, articleUrl: string, sourceUrl: string, html: string, userAgent?: string) {
+async function scraperBody(
+  scraper: StoredScraper | null,
+  articleUrl: string,
+  sourceUrl: string,
+  html: string,
+  blogUrl: string,
+  userAgent?: string,
+) {
   if (!scraper) return html;
   try {
     // The page already passed politeFetch (robots, address); a rendering scraper reads it after its scripts ran.
     const page = scraper.render ? await renderVetted(sourceUrl, userAgent) : { url: sourceUrl, html };
+    const proof = vocusProofFromHtml(page.html, page.url, blogUrl);
+    if (vocusArticleCandidate(articleUrl, blogUrl) && !vocusProofMatches(proof, articleUrl, blogUrl)) return html;
     const post = parsedPost(await runInSandbox(scraper.code, 'parsePost', page));
-    return post ? scraperArticleHtml(post, articleUrl) : html;
+    return post ? scraperArticleHtml(post, articleUrl, proof) : html;
   } catch {
     return html;
   }
@@ -122,7 +132,7 @@ export async function runContentBatch(
         }
         await assertLease();
         const rule = await loadContentRule(pool, post.blog_id, post.blog_url);
-        if (!inPublication(post.url, post.blog_url)) {
+        if (!(inPublication(post.url, post.blog_url) || vocusArticleCandidate(post.url, post.blog_url))) {
           await noteFailure(
             pool,
             post,
@@ -167,7 +177,8 @@ export async function runContentBatch(
               timeoutMs: Math.min(options.timeoutMs ?? 15000, 20000),
             });
             const final = response.url || request.url;
-            if (request.method === 'article-html' && !inPublication(final, post.blog_url)) throw Error('content_identity_mismatch');
+            if (request.method === 'article-html' && !(inPublication(final, post.blog_url) || vocusArticleCandidate(final, post.blog_url)))
+              throw Error('content_identity_mismatch');
             if (request.method === 'wordpress-api' && new URL(final).origin !== new URL(post.url).origin)
               throw Error('content_identity_mismatch');
             if (response.status === 304 && post.status === 'ok' && (headers['if-none-match'] || headers['if-modified-since'])) {
@@ -201,7 +212,7 @@ export async function runContentBatch(
                 ? wordpressEvidence(raw, base)
                 : {
                     ...base,
-                    html: await scraperBody(scrapers.get(post.blog_id) ?? null, post.url, final, raw, options.userAgent),
+                    html: await scraperBody(scrapers.get(post.blog_id) ?? null, post.url, final, raw, post.blog_url, options.userAgent),
                     kind: 'article-html',
                   };
             if (!evidence) throw Error('content_api_no_matching_post');

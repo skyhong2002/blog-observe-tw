@@ -3,6 +3,7 @@
 import { createHash } from 'node:crypto';
 import * as cheerio from 'cheerio';
 import { articleIdentityKey, canonicalArticleUrl, MAX_RESPONSE_BYTES } from '../crawl/feed.ts';
+import { vocusArticleCandidate, vocusProofFromHtml } from '../crawl/vocus-publication.ts';
 import { identityKey, normalizeLink, publicationHome } from '../relations/identity.ts';
 import { articleNodes } from './article-nodes.ts';
 import {
@@ -35,7 +36,8 @@ const CHALLENGE =
 const MORE = /(?:繼續閱讀|閱讀全文|read (?:the )?(?:full|more)|continue reading)/i;
 const clean = (s: string) => s.replace(/\s+/g, ' ').trim();
 const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-export function inPublication(article: string, home: string): boolean {
+export function inPublication(article: string, home: string, html?: string): boolean {
+  if (vocusArticleCandidate(article, home)) return Boolean(html && vocusProofFromHtml(html, article, home));
   const a = normalizeLink(article),
     b = normalizeLink(home);
   if (!a || !b) return false;
@@ -61,7 +63,10 @@ export function extractContent(evidence: ContentEvidence, rule: ContentRule): Ex
   const syndicated = evidence.kind !== 'article-html';
   let reason: string | null = null;
   let identityMismatch =
-    evidence.kind === 'article-html' && articleIdentityKey(evidence.articleUrl) !== articleIdentityKey(evidence.sourceUrl);
+    evidence.kind === 'article-html' &&
+    (articleIdentityKey(evidence.articleUrl) !== articleIdentityKey(evidence.sourceUrl) ||
+      (vocusArticleCandidate(evidence.articleUrl, evidence.blogUrl) &&
+        !vocusProofFromHtml(bounded, evidence.articleUrl, evidence.blogUrl)));
   let root: cheerio.Cheerio<import('domhandler').AnyNode> = syndicated ? $('body') : $([]);
   let structured = '';
   if (!syndicated) {
@@ -70,7 +75,7 @@ export function extractContent(evidence: ContentEvidence, rule: ContentRule): Ex
       const url = normalizeLink(canonical, evidence.sourceUrl);
       if (
         !url ||
-        !inPublication(url, evidence.blogUrl) ||
+        !inPublication(url, evidence.blogUrl, bounded) ||
         ![evidence.articleUrl].some((value) => articleIdentityKey(value) === articleIdentityKey(url))
       )
         identityMismatch = true;

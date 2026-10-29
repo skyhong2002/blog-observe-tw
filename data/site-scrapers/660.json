@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "blogId": 660,
+  "home": "https://thee5513.bearblog.dev/",
+  "authoredBy": "gpt-6.1-sol",
+  "scraper": {
+    "listUrls": [
+      "https://thee5513.bearblog.dev/"
+    ],
+    "maxPages": 1,
+    "code": "function listPosts({url,$}) { return {posts:[],next:null}; }\nfunction parsePost({url,$}) { return {title:null,bodyHtml:null,author:null,publishedAt:null,tags:[]}; }",
+    "render": false,
+    "noArticles": false,
+    "needsRender": false,
+    "notes": "blocked: 首頁與 feed 404。"
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "blogId": 612,
+  "home": "https://paperfishblog.netlify.app/",
+  "authoredBy": "gpt-6.1-sol",
+  "scraper": {
+    "listUrls": [
+      "https://paperfishblog.netlify.app/"
+    ],
+    "maxPages": 1,
+    "code": "function listPosts({url,$}) {return {posts:$(\"a[href*=\\\"/posts/\\\"]\").map((i,e)=>({url:$(e).attr('href'),title:$(e).text().trim(),publishedAt:$(e).closest('li,article').find('time').attr('datetime')})).get(),next:null};}\nfunction parsePost({url,$}) {const title=$(\"h1\").first().text().trim();const body=$(\"#quarto-document-content\").first().clone();body.find('script,style,nav,aside,footer,.toc,.table-of-contents,.post-tags,.post-meta,.blog-post-title,.title,.upvote-button,.embedded.blog-posts').remove();return {title,bodyHtml:body.html()||'',author:$('meta[name=\"author\"]').attr('content')||null,publishedAt:$('meta[property=\"article:published_time\"]').attr('content')||$('time[datetime]').first().attr('datetime')||$('meta[name=\"date\"]').attr('content')||null,tags:$('a[rel=\"tag\"]').map((i,e)=>$(e).text().trim()).get()};}",
+    "render": false,
+    "noArticles": false,
+    "needsRender": false,
+    "notes": "實抓列表 https://paperfishblog.netlify.app/ 使用 a[href*=\"/posts/\"]；實抓文章 https://paperfishblog.netlify.app/posts/tech/my-thesis/ 標題 h1，正文 #quarto-document-content。"
+  }
+}

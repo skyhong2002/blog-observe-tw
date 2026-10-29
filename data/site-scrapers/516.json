@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "blogId": 516,
+  "home": "https://www.jyhblog.xyz/",
+  "authoredBy": "gpt-6.1-sol",
+  "scraper": {
+    "listUrls": [
+      "https://jyhblog.xyz/rss.xml"
+    ],
+    "maxPages": 1,
+    "code": "function listPosts({url,$}) { const posts=[]; $('item,entry').each((i,e)=>{const x=$(e); const a=x.find('link[rel=\"alternate\"]').first(); const u=a.attr('href')||x.find('link').first().attr('href')||x.find('link').first().text(); if(u)posts.push({url:u,title:x.find('title').first().text(),publishedAt:x.find('pubDate,published,updated').first().text()});});return {posts,next:null};}\nfunction parsePost({url,$}) {const b=$(\".post-body\").first().clone();b.find('script,style,nav,header,footer,aside,.comments,#comments,.related-posts,.post-footer,.post-share').remove();const t=$(\"h1\").first();return {title:t.attr('content')||t.text().trim(),bodyHtml:b.html()||'',author:$('meta[name=\"author\"]').attr('content')||$('[rel=\"author\"]').first().text()||null,publishedAt:$('meta[property=\"article:published_time\"]').attr('content')||$('time[datetime]').first().attr('datetime')||null,tags:[]};}",
+    "render": false,
+    "noArticles": false,
+    "needsRender": false,
+    "notes": "實際讀取公開列表與文章 https://jyhblog.xyz/posts/60cny/；正文 .post-body，標題 h1。"
+  }
+}

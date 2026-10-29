@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "blogId": 348,
+  "home": "https://cheuk.blog/",
+  "authoredBy": "gpt-6.1-sol",
+  "scraper": {
+    "listUrls": [
+      "https://cheuk.blog/index.xml"
+    ],
+    "maxPages": 1,
+    "code": "function listPosts({url,$}) {const posts=[]; $('entry,item').each((i,e)=>{const x=$(e);const link=x.find('link[rel=\"alternate\"]').attr('href')||x.find('link[href]').attr('href')||x.find('link').first().text();if(link)posts.push({url:link,title:x.find('title').first().text(),publishedAt:x.find('published,pubDate,updated').first().text()});});return {posts,next:null};}\nfunction parsePost({url,$}) {const b=$(\"article.spellcard\").first().clone(); b.find('script,style,nav,.related-posts,.post-navigation,.post-meta,.blog-posts,.upvote-button,form').remove();return {title:$(\"h1.spell-title\").first().text().trim(),bodyHtml:b.html()||'',author:$('meta[name=\"author\"]').attr('content')||null,publishedAt:$('meta[property=\"article:published_time\"]').attr('content')||$('time[datetime]').first().attr('datetime')||null,tags:[]};}",
+    "render": false,
+    "noArticles": false,
+    "needsRender": false,
+    "notes": "index.xml RSS item列表；單篇 h1.spell-title 標題、article.spellcard 正文。"
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "blogId": 593,
+  "home": "https://indieping.giveanornot.com/",
+  "authoredBy": "gpt-6.1-sol",
+  "scraper": {
+    "listUrls": [
+      "https://indieping.giveanornot.com/"
+    ],
+    "maxPages": 1,
+    "code": "function listPosts({url,$}) { return {posts:[],next:null}; }\nfunction parsePost({url,$}) { return {title:null,bodyHtml:null,author:null,publishedAt:null,tags:[]}; }",
+    "render": true,
+    "noArticles": true,
+    "needsRender": false,
+    "notes": "no_articles: 本輪原始首頁與受信任渲染均可讀；渲染後是 IndiePing 反向連結查詢／部落格名錄服務，首頁只有 /blogs 與站方作者外部部落格連結，沒有本站作者文章，不採集名錄成員文章。"
+  }
+}

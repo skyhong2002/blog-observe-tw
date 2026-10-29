@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "blogId": 177,
+  "home": "https://scrubbyinabox.substack.com/",
+  "authoredBy": "gpt-6.1-sol",
+  "scraper": {
+    "listUrls": [
+      "https://scrubbyinabox.substack.com/archive"
+    ],
+    "maxPages": 1,
+    "code": "function listPosts({url,$}) { return {posts:$('a[href*=\"/p/\"][class*=\"font-pub-headings\"]').map((_,e)=>({url:$(e).attr('href'),title:$(e).text().trim(),publishedAt:null})).get(),next:null}; }\nfunction parsePost({url,$}) { const title=$(\"h1.post-title\").first().text().trim(); const body=$(\".body.markup\").first().clone(); body.find(\"script,style,.sharedaddy,.jp-relatedposts\").remove(); return {title,bodyHtml:body.html(),author:$('meta[name=\"author\"]').attr('content')||null,publishedAt:$('meta[property=\"article:published_time\"]').attr('content')||$('time[datetime]').first().attr('datetime')||null,tags:$('meta[property=\"article:tag\"]').map((_,e)=>$(e).attr('content')).get()}; }",
+    "render": false,
+    "noArticles": false,
+    "needsRender": false,
+    "notes": "實際檢視 /archive 公開HTML列表：a[href*=\"/p/\"][class*=\"font-pub-headings\"]；文章正文 .body.markup、標題 h1.post-title。RSS含大量全文超過sandbox限制，採HTML列表。"
+  }
+}

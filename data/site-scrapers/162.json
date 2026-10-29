@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "blogId": 162,
+  "home": "https://blog.solazy.me/",
+  "authoredBy": "gpt-6.1-sol",
+  "scraper": {
+    "listUrls": [
+      "https://blog.solazy.me/feed/"
+    ],
+    "maxPages": 1,
+    "code": "function listPosts({url,$}) {return {posts:$('item,entry').map((i,e)=>{const n=$(e);const href=n.find('link[rel=\"alternate\"]').attr('href')||n.find('link').attr('href')||n.find('link').text();return {url:href,title:n.find('title').text().trim(),publishedAt:n.find('pubDate,published,updated').first().text()||null};}).get(),next:null};}\nfunction parsePost({url,$}) {const title=$('main > h1').first().text().trim();const author=$('meta[name=\"author\"]').attr('content')||$('[rel=\"author\"]').first().text().trim()||null;const publishedAt=$('meta[property=\"article:published_time\"]').attr('content')||$('time[datetime]').first().attr('datetime')||null;const body=$('main').first().clone();body.find('script,style,noscript,nav,footer,.header-anchor,.upvote-form,#upvote-form,.post-footer,.toc,.table-of-contents').remove();body.children('h1').first().remove();body.find('.tags,.blog-posts').remove();return {title,bodyHtml:body.html()||'',author,publishedAt,tags:$('[rel=\"tag\"]').map((i,e)=>$(e).text().trim()).get()};}",
+    "render": false,
+    "noArticles": false,
+    "needsRender": false,
+    "notes": "Live listing RSS/Atom item/entry; article body main; title main > h1."
+  }
+}

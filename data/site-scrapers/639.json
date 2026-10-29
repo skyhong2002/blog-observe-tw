@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "blogId": 639,
+  "home": "https://jahsehjaeger.com/",
+  "authoredBy": "gpt-6.1-sol",
+  "scraper": {
+    "listUrls": [
+      "https://jahsehjaeger.com/"
+    ],
+    "maxPages": 1,
+    "code": "function listPosts({url,$}) { return {posts:[],next:null}; }\nfunction parsePost({url,$}) { return null; }",
+    "render": false,
+    "noArticles": false,
+    "needsRender": false,
+    "notes": "blocked: 公開首頁 HTTP 404，manifest 無可用文章或 feed。"
+  }
+}

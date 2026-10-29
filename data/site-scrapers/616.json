@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "blogId": 616,
+  "home": "https://taxonomicdune.com/",
+  "authoredBy": "gpt-6.1-sol",
+  "scraper": {
+    "listUrls": [
+      "https://taxonomicdune.com/feed/"
+    ],
+    "maxPages": 1,
+    "code": "function listPosts({url,$}) { const posts=[]; $('item,entry').each((i,e)=>{const x=$(e); const a=x.find('link[rel=\"alternate\"]').first(); const u=a.attr('href')||x.find('link').first().attr('href')||x.find('link').first().text(); if(u)posts.push({url:u,title:x.find('title').first().text(),publishedAt:x.find('pubDate,published,updated').first().text()});});return {posts,next:null};}\nfunction parsePost({url,$}) {const b=$(\".post-content\").first().clone();b.find('script,style,nav,header,footer,aside,.comments,#comments,.related-posts,.post-footer,.post-share').remove();const t=$(\"h1\").first();return {title:t.attr('content')||t.text().trim(),bodyHtml:b.html()||'',author:$('meta[name=\"author\"]').attr('content')||$('[rel=\"author\"]').first().text()||null,publishedAt:$('meta[property=\"article:published_time\"]').attr('content')||$('time[datetime]').first().attr('datetime')||null,tags:[]};}",
+    "render": false,
+    "noArticles": false,
+    "needsRender": false,
+    "notes": "實際讀取公開列表與文章 https://taxonomicdune.com/%e4%b8%8d%e8%83%bd%e5%88%86%e7%9a%84%e8%91%89%e5%ad%90%e8%88%87%e5%8f%af%e4%bb%a5%e5%88%86%e7%9a%84%e6%9e%9c%e5%af%a6/；正文 .post-content，標題 h1。"
+  }
+}

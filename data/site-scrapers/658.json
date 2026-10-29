@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "blogId": 658,
+  "home": "https://vocus.cc/salon/69cb7ad9fd897800010376eb",
+  "authoredBy": "gpt-6.1-sol",
+  "scraper": {
+    "maxPages": 1,
+    "render": false,
+    "noArticles": false,
+    "needsRender": false,
+    "listUrls": [
+      "https://vocus.cc/salon/69cb7ad9fd897800010376eb"
+    ],
+    "code": "function listPosts({url,$}) {const j=JSON.parse($('#__NEXT_DATA__').text());const f=j.props.pageProps.fallback;const posts=[];for(const k of Object.keys(f)){if(k.includes('/api/contents?'))for(const page of f[k])for(const x of page.contents||[]){if(x.type==='article'&&!x.isPay&&x.salonId===url.split('/salon/')[1].split('/')[0])posts.push({url:'/article/'+x.contentId,title:x.title,publishedAt:x.publishAt});}}return {posts,next:null};}\nfunction parsePost({url,$}) {const j=JSON.parse($('#__NEXT_DATA__').text()).props.pageProps.parsedArticle;return {title:$('h1').first().text().trim(),bodyHtml:$('article.editor-content-block').first().html()||'',author:j.user?.fullname||null,publishedAt:j.lastPublishAt,tags:(j.tags||[]).map(x=>x.title)};}",
+    "notes": "依實際首頁、列表與文章 HTML 檢視選擇專用文章連結及正文容器。"
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "blogId": 689,
+  "home": "https://tahsimpiano.com/",
+  "authoredBy": "gpt-6.1-sol",
+  "scraper": {
+    "listUrls": [
+      "https://tahsimpiano.com/"
+    ],
+    "maxPages": 1,
+    "code": "function listPosts({url,$}) { return {posts:[],next:null}; }\nfunction parsePost({url,$}) { return null; }",
+    "render": false,
+    "noArticles": false,
+    "needsRender": false,
+    "notes": "blocked: tahsimpiano.com HTTP 403，未嘗試繞過。"
+  }
+}

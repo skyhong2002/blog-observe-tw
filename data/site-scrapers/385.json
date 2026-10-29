@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "blogId": 385,
+  "home": "https://water-bottle-fly.bearblog.dev/",
+  "authoredBy": "gpt-6.1-sol",
+  "scraper": {
+    "maxPages": 1,
+    "render": false,
+    "noArticles": false,
+    "needsRender": false,
+    "listUrls": [
+      "https://water-bottle-fly.bearblog.dev/blog/"
+    ],
+    "code": "function listPosts({url,$}) {return {posts:$(\".blog-posts li a\").toArray().map(e=>({url:$(e).attr('href'),title:$(e).text().trim()})),next:null};}\nfunction parsePost({url,$}) {const body=$(\"main\").first().clone();body.find('script,style,nav,header,footer,.post-nav,.subscribe-widget,.subscription-widget,.post-bottom').remove();return {title:$(\"main h1\").first().text().trim(),bodyHtml:body.html()||'',author:$('meta[name=\"author\"]').attr('content')||null,publishedAt:$('meta[property=\"article:published_time\"]').attr('content')||$('time').first().attr('datetime')||null,tags:[]};}",
+    "notes": "實際檢視首頁、文章列表與文章HTML；正文容器 main。"
+  }
+}

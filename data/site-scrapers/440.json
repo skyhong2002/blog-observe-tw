@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "blogId": 440,
+  "home": "https://blog.ananq.me/",
+  "authoredBy": "gpt-6.1-sol",
+  "scraper": {
+    "listUrls": [
+      "https://blog.ananq.me/"
+    ],
+    "maxPages": 1,
+    "code": "function listPosts({url,$}) {return {posts:$(\".gh-card a.gh-card-link\").map((_,e)=>({url:$(e).attr('href'),title:$(e).text().trim()})).get(),next:null};}\nfunction parsePost({url,$}) {const body=$(\".gh-content\").first().clone();body.find(\"script,style,nav,header,footer,.upvote,.embedded.blog-posts\").remove();return {title:$(\".gh-article-title\").first().text().trim(),bodyHtml:body.html()||'',author:$('meta[name=\"author\"]').attr('content')||null,publishedAt:$('time[datetime]').first().attr('datetime')||$('meta[property=\"article:published_time\"]').attr('content')||null,tags:[]};}",
+    "render": false,
+    "noArticles": false,
+    "needsRender": false,
+    "notes": "Ghost gh-card-link 列表，文章 gh-content。"
+  }
+}

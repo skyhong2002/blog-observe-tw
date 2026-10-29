@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "blogId": 344,
+  "home": "https://matling.fit/",
+  "authoredBy": "gpt-6.1-sol",
+  "scraper": {
+    "listUrls": [
+      "https://matling.fit/blog/"
+    ],
+    "maxPages": 1,
+    "code": "function listPosts({url,$}) {return {posts:$(\"h3 a[href^=\\\"/blog/\\\"]\").toArray().map(e=>({url:$(e).attr('href'),title:$(e).text().trim()})),next:null};}\nfunction parsePost({url,$}) {const body=$(\"main article\").first().clone();body.find('script,style,nav,header,footer,.post-nav,.subscribe-widget,.subscription-widget,.post-bottom').remove();return {title:$(\"h1\").first().text().trim(),bodyHtml:body.html()||'',author:$('meta[name=\"author\"]').attr('content')||null,publishedAt:$('meta[property=\"article:published_time\"]').attr('content')||$('time').first().attr('datetime')||null,tags:[]};}",
+    "render": false,
+    "noArticles": false,
+    "needsRender": false,
+    "notes": "實際檢視首頁、文章列表與文章HTML；正文容器 main article。"
+  }
+}

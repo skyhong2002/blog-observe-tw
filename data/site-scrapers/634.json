@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "blogId": 634,
+  "home": "https://yumemirusekaide.wordpress.com/",
+  "authoredBy": "gpt-6.1-sol",
+  "scraper": {
+    "listUrls": [
+      "https://yumemirusekaide.wordpress.com/"
+    ],
+    "maxPages": 1,
+    "code": "function listPosts({url,$}) {const posts=[]; $('.entry-title a').each((i,e)=>{const a=$(e);const u=a.attr('href');if(u && !['/posts/','/zh/posts/'].includes(u)) posts.push({url:u,title:a.find('h2,h3').first().text().trim()||a.text().trim(),publishedAt:null});});return {posts,next:null};}\nfunction parsePost({url,$}) {const root=$(\".entry-content\").first().clone();root.find('script,style,nav,form,.post-comments,.comments,.upvote-button,.toast,.post-footer,.post-meta,.blog-tags').remove();return {title:$(\".entry-title\").first().text().trim(),bodyHtml:root.html()||'',author:$('meta[name=\"author\"]').attr('content')||$('.byline .author,.author-name').first().text().trim()||null,publishedAt:$('meta[property=\"article:published_time\"]').attr('content')||$('time[datetime]').first().attr('datetime')||null,tags:[]};}",
+    "render": false,
+    "noArticles": false,
+    "needsRender": false,
+    "notes": "已親讀本站列表與真實文章頁；列表 .entry-title a，正文 .entry-content，標題 .entry-title。正文排除互動表單、留言與導覽。"
+  }
+}

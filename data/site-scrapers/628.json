@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "blogId": 628,
+  "home": "https://xiaoten.com/",
+  "authoredBy": "gpt-6.1-sol",
+  "scraper": {
+    "listUrls": [
+      "https://xiaoten.com/"
+    ],
+    "maxPages": 1,
+    "code": "function listPosts({url,$}) { return {posts: $(\"article.post-item a\").toArray().map(e=>({url:$(e).attr('href'),title:$(e).text().trim()})),next:null}; }\nfunction parsePost({url,$}) {const body=$(\"div.page-content\").first().clone();body.find('script,style,nav,.post-nav,.post-tag-list,.card:not(.book),.comments').remove();return {title:$(\"h1.header-title\").first().text().trim(),bodyHtml:body.html()||'',author:$('meta[name=\"author\"]').attr('content')||null,publishedAt:$('meta[property=\"article:published_time\"]').attr('content')||$('time[datetime]').first().attr('datetime')||null,tags:[]};}",
+    "render": false,
+    "noArticles": false,
+    "needsRender": false,
+    "notes": "首頁文章連結 article.post-item a；文章標題 h1.header-title；正文 div.page-content，經實際公開首頁和文章 HTML 檢視。"
+  }
+}

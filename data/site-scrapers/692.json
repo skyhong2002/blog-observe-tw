@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "blogId": 692,
+  "home": "https://wyatt180lu.vercel.app/",
+  "authoredBy": "gpt-6.1-sol",
+  "scraper": {
+    "listUrls": [
+      "https://wyatt180lu.vercel.app/"
+    ],
+    "maxPages": 1,
+    "code": "function listPosts({url,$}) {return {posts:[],next:null};}\nfunction parsePost({url,$}) {return {title:$(\"h1\").first().text(),bodyHtml:\"\",author:null,publishedAt:null,tags:[]};}",
+    "render": false,
+    "noArticles": false,
+    "needsRender": false,
+    "notes": "blocked: Error: http_404，未捏造文章。"
+  }
+}

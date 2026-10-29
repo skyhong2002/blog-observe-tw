@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "blogId": 619,
+  "home": "https://tianxianzi.me/",
+  "authoredBy": "gpt-6.1-sol",
+  "scraper": {
+    "listUrls": [
+      "https://www.tianxianzi.me/archives/"
+    ],
+    "maxPages": 1,
+    "code": "function listPosts({url,$}) {return {posts:$('.article-list--compact article').map((_,e)=>({url:$(e).find('a').first().attr('href'),title:$(e).find('.article-title').text().trim(),publishedAt:$(e).find('time').attr('datetime')})).get(),next:null};}\nfunction parsePost({url,$}){const title=$(\".article-title\").first().text().trim();const body=$(\"section.article-content\").first().clone();body.find('script,style,nav,footer').remove();return {title,bodyHtml:body.html()||'',author:$('meta[name=\"author\"]').attr('content')||$('.p-author').first().text().trim()||null,publishedAt:$('meta[property=\"article:published_time\"]').attr('content')||$('time[datetime]').first().attr('datetime')||null,tags:$('a[rel=\"tag\"]').map((_,e)=>$(e).text().trim()).get()};}",
+    "render": false,
+    "noArticles": false,
+    "needsRender": false,
+    "notes": "首頁未列文；公開 archives 有文章標題與日期，實讀写给十年前的自己的信，Hugo Stack article-content。"
+  }
+}

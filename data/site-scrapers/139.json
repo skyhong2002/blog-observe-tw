@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "blogId": 139,
+  "home": "https://blog.ikukaroom.com/",
+  "authoredBy": "gpt-6.1-sol",
+  "scraper": {
+    "listUrls": [
+      "https://blog.ikukaroom.com/"
+    ],
+    "maxPages": 1,
+    "code": "function listPosts({url,$}) { return {posts:[],next:null}; }\nfunction parsePost({url,$}) { return null; }",
+    "render": false,
+    "noArticles": false,
+    "needsRender": false,
+    "notes": "blocked: 原首頁與 feed 重導 ikuka.blog，DNS ENOTFOUND。"
+  }
+}

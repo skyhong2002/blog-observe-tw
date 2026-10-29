@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "blogId": 412,
+  "home": "https://sugarbeanlovecode.bearblog.dev/",
+  "authoredBy": "gpt-6.1-sol",
+  "scraper": {
+    "listUrls": [
+      "https://sugarbeanlovecode.bearblog.dev/feed/"
+    ],
+    "maxPages": 1,
+    "code": "function listPosts({url,$}) { const posts=[]; $('item,entry').each((_,e)=>{const n=$(e);let link=n.children('link').filter((_,a)=>!$(a).attr('rel')||$(a).attr('rel')==='alternate').first();const u=link.attr('href')||link.text().trim(); if(u) posts.push({url:u,title:n.children('title').text().trim(),publishedAt:n.children('pubDate,published,updated').first().text().trim()});});return {posts,next:null}; }\nfunction parsePost({url,$}) {\n const title=$(\"main h1\").first().text().trim(); const body=$(\"main\").first().clone();\n body.children('h1').first().remove(); body.find('form,#comments,.tags,.upvote,.upvote-button,script,style').remove(); body.find('time').closest('p').remove(); body.find('hr').last().nextAll('p').filter((_,e)=>/^(Published|Last updated)/.test($(e).text())).remove(); body.find('script,style,noscript').remove();\n let ld={}; $('script[type=\"application/ld+json\"]').each((_,e)=>{try{const v=JSON.parse($(e).text());const walk=x=>{if(Array.isArray(x))x.forEach(walk);else if(x&&typeof x==='object'){if(/Article|Posting/i.test(String(x['@type']||'')))ld=x;if(x['@graph'])walk(x['@graph']);}};walk(v);}catch{}});\n const author=$('meta[name=\"author\"]').attr('content')||$('a[rel=\"author\"],.article-author,.gh-author-name,.author-name').first().text().trim()||(typeof ld.author==='string'?ld.author:Array.isArray(ld.author)?ld.author.map(a=>a.name).join(', '):ld.author?.name)||null;\n const publishedAt=$('meta[property=\"article:published_time\"],meta[itemprop=\"datePublished\"]').first().attr('content')||$('time[datetime]').first().attr('datetime')||ld.datePublished||null;\n const tags=Array.isArray(ld.keywords)?ld.keywords:$('a[rel=\"tag\"],.post-tags a,.article-tags a,.tags a,a[href^=\"/tags/\"]').map((_,e)=>$(e).text().trim().replace(/^#/, '')).get();\n return {title,bodyHtml:body.html()||'',author,publishedAt,tags};\n}",
+    "render": false,
+    "noArticles": false,
+    "needsRender": false,
+    "notes": "實際讀取首頁、列表與樣本；bear 結構，標題 main h1，正文 main；日期採頁面 meta/time/JSON-LD，僅收文章區塊。"
+  }
+}

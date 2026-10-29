@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "blogId": 506,
+  "home": "https://blade520.com/",
+  "authoredBy": "gpt-6.1-sol",
+  "scraper": {
+    "listUrls": [
+      "https://blade520.com/"
+    ],
+    "maxPages": 1,
+    "code": "function listPosts({url,$}) {return {posts:$(\"article > a[href^=\\\"/posts/\\\"]\").toArray().map(e=>({url:$(e).attr('href'),title:$(e).text().trim()})),next:null};}\nfunction parsePost({url,$}) {const body=$(\".markdown-content\").first().clone();body.find('script,style,nav,header,footer,.post-nav,.subscribe-widget,.subscription-widget,.post-bottom').remove();return {title:$('meta[property=\"og:title\"]').attr('content')||$('title').text(),bodyHtml:body.html()||'',author:$('meta[name=\"author\"]').attr('content')||null,publishedAt:$('meta[property=\"article:published_time\"]').attr('content')||$('time').first().attr('datetime')||null,tags:[]};}",
+    "render": false,
+    "noArticles": false,
+    "needsRender": false,
+    "notes": "實際檢視首頁、文章列表與文章HTML；正文容器 .markdown-content。"
+  }
+}

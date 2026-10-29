@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "blogId": 594,
+  "home": "https://infonbd.lima-city.de/",
+  "authoredBy": "gpt-6.1-sol",
+  "scraper": {
+    "listUrls": [
+      "https://infonbd.lima-city.de/"
+    ],
+    "maxPages": 1,
+    "code": "function listPosts({url,$}) { return {posts:[],next:null}; }\nfunction parsePost({url,$}) { return null; }",
+    "render": false,
+    "noArticles": false,
+    "needsRender": false,
+    "notes": "blocked: 首頁實際抓取失敗，未假定沒有文章。"
+  }
+}

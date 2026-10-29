@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "blogId": 624,
+  "home": "https://windson.cc/",
+  "authoredBy": "gpt-6.1-sol",
+  "scraper": {
+    "listUrls": [
+      "https://windson.cc/"
+    ],
+    "maxPages": 1,
+    "code": "function listPosts({url,$}) {const posts=[]; $('main a[href^=\"/zh/posts/\"]').each((i,e)=>{const a=$(e);const u=a.attr('href');if(u && !['/posts/','/zh/posts/'].includes(u)) posts.push({url:u,title:a.find('h2,h3').first().text().trim()||a.text().trim(),publishedAt:null});});return {posts,next:null};}\nfunction parsePost({url,$}) {const root=$(\"main .prose\").first().clone();root.find('script,style,nav,form,.post-comments,.comments,.upvote-button,.toast,.post-footer,.post-meta,.blog-tags').remove();return {title:$(\"main h1\").first().text().trim(),bodyHtml:root.html()||'',author:$('meta[name=\"author\"]').attr('content')||$('.byline .author,.author-name').first().text().trim()||null,publishedAt:$('meta[property=\"article:published_time\"]').attr('content')||$('time[datetime]').first().attr('datetime')||null,tags:[]};}",
+    "render": false,
+    "noArticles": false,
+    "needsRender": false,
+    "notes": "已親讀本站列表與真實文章頁；列表 main a[href^=\"/zh/posts/\"]，正文 main，標題 main h1。正文排除互動表單、留言與導覽。 正文限定 main .prose。"
+  }
+}

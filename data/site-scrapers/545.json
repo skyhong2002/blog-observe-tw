@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "blogId": 545,
+  "home": "https://voyagermj.substack.com/",
+  "authoredBy": "gpt-6.1-sol",
+  "scraper": {
+    "maxPages": 1,
+    "render": false,
+    "noArticles": false,
+    "needsRender": false,
+    "listUrls": [
+      "https://voyagermj.substack.com/feed"
+    ],
+    "code": "function listPosts({url,$}) {return {posts:$('item,entry').toArray().map(e=>{const x=$(e);return {url:x.find('link').first().attr('href')||x.find('link').first().text(),title:x.find('title').first().text(),publishedAt:x.find('pubDate,published,updated').first().text()};}),next:null};}\nfunction parsePost({url,$}) {const body=$(\".available-content\").first().clone();body.find('script,style,nav,header,footer,.post-nav,.subscribe-widget,.subscription-widget,.post-bottom').remove();return {title:$(\"h1.post-title\").first().text().trim(),bodyHtml:body.html()||'',author:$('meta[name=\"author\"]').attr('content')||null,publishedAt:$('meta[property=\"article:published_time\"]').attr('content')||$('time').first().attr('datetime')||null,tags:[]};}",
+    "notes": "實際檢視首頁、公開RSS/Atom與文章HTML；正文容器 .available-content。"
+  }
+}

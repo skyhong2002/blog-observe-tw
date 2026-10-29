@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import type { Pool, ResultSetHeader, RowDataPacket } from 'mysql2/promise';
+import { SCRAPER_POLICY } from '../scrapers/contract.ts';
+import { installSiteScraper, type SiteDefinition, type SiteValidation } from '../scrapers/site-catalog.ts';
 import { resolvePublicPage } from '../seo/page-routes.ts';
 import { runCuratedContentBatch } from './curated-content.ts';
 import { admitCuratedMember, CURATED_PAGES, INDIEPING_API, runCuratedDirectorySync, syncCuratedMembers } from './curated-directories.ts';
@@ -145,5 +147,124 @@ export async function runCuratedDirectoryIntegration(pool: Pool) {
     0,
     'Subsequent runs use the repair and preserve article deduplication',
   );
-  return { qualified: 5, created: 4, articles: posts.length, preservedExclusion: true, sourceFailureRetained: true };
+  // The operator catalog installer must commit the scraper, content retry, and provenance together.
+  const empty = blogs.find((b) => b.id === existing.insertId)!;
+  const installedAt = new Date();
+  const hash = (value: string) => createHash('sha256').update(value).digest('hex');
+  const definition: SiteDefinition = {
+    version: 1,
+    blogId: Number(empty.id),
+    home: empty.url,
+    authoredBy: 'gpt-6.1-sol',
+    scraper: {
+      code,
+      listUrls: [empty.url],
+      maxPages: 1,
+      render: false,
+      noArticles: false,
+      needsRender: false,
+      notes: 'Fixture operator validation',
+    },
+  };
+  const validationFor = (input: SiteDefinition): SiteValidation => ({
+    blogId: input.blogId,
+    home: input.home,
+    codeSha256: hash(input.scraper.code),
+    definitionSha256: hash(JSON.stringify(input)),
+    checkedAt: installedAt.toISOString(),
+    passed: true,
+    report: {
+      policy: SCRAPER_POLICY,
+      listUrl: input.home,
+      listed: 1,
+      nextPage: null,
+      problems: [],
+      samples: [{ url: `${input.home}post/1`, title: 'Fixture article', publishedAt: null, author: null, tags: 0, bodyChars: 28 }],
+    },
+  });
+  const validation = validationFor(definition);
+  const installerState = async () => {
+    const [[state]] = await pool.query<RowDataPacket[]>(
+      `SELECT (SELECT COUNT(*) FROM blog_scrapers WHERE blog_id=?) scrapers,
+        (SELECT COUNT(*) FROM scraper_generation_attempts WHERE target_type='blog' AND target_id=?) attempts,
+        JSON_UNQUOTE(JSON_EXTRACT(source_evidence,'$.curatedContent.status')) contentStatus,
+        JSON_UNQUOTE(JSON_EXTRACT(source_evidence,'$.curatedContent.lastAttemptAt')) lastAttemptAt
+       FROM discovery_candidates WHERE status='approved' AND JSON_EXTRACT(source_evidence,'$.automaticReview.blogId')=? LIMIT 1`,
+      [empty.id, empty.id, empty.id],
+    );
+    return {
+      scrapers: Number(state.scrapers),
+      attempts: Number(state.attempts),
+      contentStatus: state.contentStatus,
+      lastAttemptAt: state.lastAttemptAt,
+    };
+  };
+  const untouched = await installerState();
+  assert.equal(untouched.scrapers, 0);
+  assert.equal(untouched.attempts, 0);
+  assert.equal(untouched.contentStatus, 'failed');
+  assert.ok(untouched.lastAttemptAt);
+  await assert.rejects(
+    installSiteScraper(
+      pool,
+      definition,
+      { ...validation, checkedAt: new Date(installedAt.getTime() - 86400001).toISOString() },
+      installedAt,
+    ),
+    /fresh_matching_validation_required/,
+  );
+  assert.deepEqual(await installerState(), untouched, 'Stale evidence creates neither scraper nor attempt and preserves retry state');
+  await pool.query(`CREATE TRIGGER curated_fixture_scraper_attempt_failure BEFORE INSERT ON scraper_generation_attempts
+    FOR EACH ROW BEGIN IF NEW.target_type='blog' AND NEW.target_id=${Number(empty.id)} THEN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='fixture'; END IF; END`);
+  try {
+    await assert.rejects(installSiteScraper(pool, definition, validation, installedAt));
+    assert.deepEqual(await installerState(), untouched, 'Attempt audit failure rolls back activation and content retry reset');
+  } finally {
+    await pool.query('DROP TRIGGER curated_fixture_scraper_attempt_failure');
+  }
+  const installation = await installSiteScraper(pool, definition, validation, installedAt);
+  assert.equal(installation.status, 'activated');
+  assert.equal(installation.postsBefore, 0);
+  assert.deepEqual(await installerState(), { scrapers: 1, attempts: 1, contentStatus: 'pending', lastAttemptAt: null });
+  const repeatedInstallation = await installSiteScraper(pool, definition, validation, installedAt);
+  assert.equal(repeatedInstallation.status, 'unchanged');
+  assert.equal(repeatedInstallation.reason, 'already_installed');
+  assert.equal(repeatedInstallation.scraperId, installation.scraperId);
+  const alternative: SiteDefinition = { ...definition, scraper: { ...definition.scraper, code: `${code}\n// Alternative valid parser` } };
+  const preservedInstallation = await installSiteScraper(pool, alternative, validationFor(alternative), installedAt);
+  assert.equal(preservedInstallation.status, 'unchanged');
+  assert.equal(preservedInstallation.reason, 'existing_active_scraper_preserved');
+  assert.equal(preservedInstallation.scraperId, installation.scraperId);
+  assert.deepEqual(
+    await installerState(),
+    { scrapers: 1, attempts: 1, contentStatus: 'pending', lastAttemptAt: null },
+    'Retries and alternate validated definitions preserve the active scraper without duplicate attempts',
+  );
+  const [[provenance]] = await pool.query<RowDataPacket[]>(
+    `SELECT s.status,s.code_sha256,s.actual_model,
+      JSON_UNQUOTE(JSON_EXTRACT(s.validation,'$.provenance.method')) method,
+      JSON_UNQUOTE(JSON_EXTRACT(s.validation,'$.provenance.authoredBy')) authoredBy,
+      JSON_UNQUOTE(JSON_EXTRACT(s.validation,'$.provenance.definitionSha256')) definitionSha256,
+      a.scraper_id,a.status attemptStatus,a.actual_model attemptModel,
+      JSON_UNQUOTE(JSON_EXTRACT(a.report,'$.provenance.definitionSha256')) attemptDefinitionSha256
+     FROM blog_scrapers s JOIN scraper_generation_attempts a ON a.scraper_id=s.id WHERE s.id=?`,
+    [installation.scraperId],
+  );
+  assert.equal(provenance.status, 'active');
+  assert.equal(provenance.code_sha256, validation.codeSha256);
+  assert.equal(provenance.actual_model, 'gpt-6.1-sol');
+  assert.equal(provenance.method, 'operator-agent-authored');
+  assert.equal(provenance.authoredBy, 'gpt-6.1-sol');
+  assert.equal(provenance.definitionSha256, validation.definitionSha256);
+  assert.equal(provenance.attemptDefinitionSha256, validation.definitionSha256);
+  assert.equal(provenance.attemptStatus, 'activated');
+  assert.equal(provenance.attemptModel, 'gpt-6.1-sol');
+  return {
+    qualified: 5,
+    created: 4,
+    articles: posts.length,
+    preservedExclusion: true,
+    sourceFailureRetained: true,
+    installerTransactions: true,
+  };
 }

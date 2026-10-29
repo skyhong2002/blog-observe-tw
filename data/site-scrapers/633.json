@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "blogId": 633,
+  "home": "https://yozmusic.com/",
+  "authoredBy": "gpt-6.1-sol",
+  "scraper": {
+    "listUrls": [
+      "https://yozmusic.com/"
+    ],
+    "maxPages": 1,
+    "code": "function listPosts({url,$}) {return {posts:[],next:null};}\nfunction parsePost({url,$}) {return null;}",
+    "render": false,
+    "noArticles": false,
+    "needsRender": false,
+    "notes": "blocked: 公開首頁 fetchHtml 12 秒逾時，未觀察到文章結構。"
+  }
+}

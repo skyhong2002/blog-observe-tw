@@ -3,6 +3,7 @@ import { callScraperGateway, SCRAPER_INPUT_LIMIT } from '../ai/gateway.ts';
 import { extractContent } from '../content/article-content.ts';
 import { CONTENT_VERSION, type ContentRule } from '../content/contracts.ts';
 import type { FeedCrawlerOptions } from '../crawl/feed.ts';
+import { vocusArticleCandidate, vocusProofFromHtml, vocusProofMatches } from '../crawl/vocus-publication.ts';
 import { compactHtml, likelyArticleUrl } from './compact-html.ts';
 import {
   type GeneratedScraper,
@@ -82,6 +83,32 @@ function pageCorpus(html: string) {
   const ld = $('script[type="application/ld+json"],script[type="application/json"]').text();
   $('script,style,noscript').remove();
   return normal(`${$('title').text()} ${meta} ${ld} ${$.root().text()}`);
+}
+
+/** Short notes and photo posts are real articles too; ground them in the fetched page instead of padding text. */
+function shortBodyOnPage(pageHtml: string, bodyText: string, bodyHtml: string, pageUrl: string) {
+  const compact = (value: string) => normal(value).replace(/\s+/g, '');
+  const text = compact(bodyText);
+  const page = cheerio.load(pageHtml),
+    body = cheerio.load(bodyHtml);
+  const imageUrl = (src: string | undefined) => {
+    try {
+      return src ? new URL(src, pageUrl).href : '';
+    } catch {
+      return '';
+    }
+  };
+  const original = new Set(
+    page('img[src]')
+      .map((_, el) => imageUrl(page(el).attr('src')))
+      .get()
+      .filter(Boolean),
+  );
+  const requested = body('img[src]')
+    .toArray()
+    .map((el) => imageUrl(body(el).attr('src')));
+  if (requested.some((src) => !src || !original.has(src))) return false;
+  return text ? compact(pageCorpus(pageHtml)).includes(text) : requested.length > 0;
 }
 
 /** Raw or rendered pages, by the round's mode; a page fetched in both modes counts twice against the budget. */
@@ -189,6 +216,11 @@ export async function validateScraper(
   for (const listed of posts.slice(0, SAMPLE_POSTS)) {
     try {
       const page = await pages.get(listed.url);
+      const proof = vocusProofFromHtml(page.html, page.url, home);
+      if (vocusArticleCandidate(listed.url, home) && !vocusProofMatches(proof, listed.url, home)) {
+        report.problems.push({ stage: 'post', url: listed.url, reason: 'publication_owner_mismatch' });
+        continue;
+      }
       const post = parsedPost(await sandbox(scraper.code, 'parsePost', page), now);
       if (!post) {
         report.problems.push({ stage: 'post', url: listed.url, reason: 'post_missing_title_or_body' });
@@ -201,7 +233,7 @@ export async function validateScraper(
           blogUrl: home,
           articleUrl: listed.url,
           sourceUrl: listed.url,
-          html: scraperArticleHtml(post, listed.url),
+          html: scraperArticleHtml(post, listed.url, proof),
           kind: 'article-html',
         },
         RULE,
@@ -210,7 +242,7 @@ export async function validateScraper(
       const reasons = [
         !pageCorpus(page.html).includes(normal(post.title)) && 'title_not_on_page',
         !['ok', 'partial'].includes(extracted.status) && `body_${extracted.status}`,
-        bodyChars < 50 && 'body_too_short',
+        bodyChars < 200 && !shortBodyOnPage(page.html, extracted.bodyText, post.bodyHtml, page.url) && 'short_body_not_on_page',
         titles.has(normal(post.title)) && 'title_repeats_other_article',
         extracted.hash && bodies.has(extracted.hash) && 'body_repeats_other_article',
       ].filter((r): r is string => Boolean(r));
@@ -233,8 +265,6 @@ export async function validateScraper(
       });
     }
   }
-  if (report.samples.length && Math.max(...report.samples.map((s) => s.bodyChars)) < 200)
-    report.problems.push({ stage: 'post', url: null, reason: 'bodies_all_under_200_characters' });
   return report;
 }
 export const reportPasses = (report: ValidationReport) =>

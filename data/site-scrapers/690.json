@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "blogId": 690,
+  "home": "https://trave11er.org/",
+  "authoredBy": "gpt-6.1-sol",
+  "scraper": {
+    "listUrls": [
+      "https://trave11er.org/"
+    ],
+    "maxPages": 1,
+    "code": "function listPosts({url,$}) { return {posts:[],next:null}; }\nfunction parsePost({url,$}) { return {title:null,bodyHtml:null,author:null,publishedAt:null,tags:[]}; }",
+    "render": false,
+    "noArticles": true,
+    "needsRender": false,
+    "notes": "no_articles: 網域為 lander 導向，沒有部落格文章。"
+  }
+}

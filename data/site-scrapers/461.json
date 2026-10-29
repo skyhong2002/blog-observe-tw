@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "blogId": 461,
+  "home": "https://dannypsnl.me/",
+  "authoredBy": "gpt-6.1-sol",
+  "scraper": {
+    "listUrls": [
+      "https://dannypsnl.me/posts/"
+    ],
+    "maxPages": 1,
+    "code": "function listPosts({url,$}) {return {posts:$('main > details > article.tr-body > details > summary h1 a.link-self').map((_,e)=>({url:$(e).attr('href'),title:$(e).parent().text().trim(),publishedAt:$(e).closest('summary').find('.metadata > span').first().text()})).get(),next:null};}\nfunction parsePost({url,$}) {const body=$(\"main > details > article.tr-body\").first().clone();body.find(\"script,style,nav,header,footer,.upvote,.embedded.blog-posts\").remove();return {title:$(\"main > details > summary h1\").first().text().trim(),bodyHtml:body.html()||'',author:$('meta[name=\"author\"]').attr('content')||null,publishedAt:$('time[datetime]').first().attr('datetime')||$('meta[property=\"article:published_time\"]').attr('content')||null,tags:[]};}",
+    "render": false,
+    "noArticles": false,
+    "needsRender": false,
+    "notes": "實際 /posts/ 列表為最外層 details/article 內各篇 details/summary，僅取直屬文章；單篇正文 main > details > article.tr-body。RSS 5.2MB 超過沙箱輸入限制，改讀較小的公開文章列表。"
+  }
+}

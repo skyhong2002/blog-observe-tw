@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "blogId": 696,
+  "home": "https://vocus.cc/salon/66693b1cfd8978000196fdd2",
+  "authoredBy": "gpt-6.1-sol",
+  "scraper": {
+    "listUrls": [
+      "https://vocus.cc/salon/66693b1cfd8978000196fdd2"
+    ],
+    "maxPages": 1,
+    "code": "function listPosts({url,$}) {return {posts:$(\"a[href^=\\\"/article/\\\"]\").map((i,e)=>({url:$(e).attr('href'),title:$(e).text().trim()})).get(),next:null};}\nfunction parsePost({url,$}) {const b=$(\"main\").first().clone();b.find('script,style,nav,header,footer,aside,.comments,#comments,.related-posts,.post-footer,.post-share').remove();const t=$(\"main h1\").first();return {title:t.attr('content')||t.text().trim(),bodyHtml:b.html()||'',author:$('meta[name=\"author\"]').attr('content')||$('[rel=\"author\"]').first().text()||null,publishedAt:$('meta[property=\"article:published_time\"]').attr('content')||$('time[datetime]').first().attr('datetime')||null,tags:[]};}",
+    "render": false,
+    "noArticles": false,
+    "needsRender": false,
+    "notes": "實際讀取公開列表與文章 https://vocus.cc/article/64400f6dfd89780001c8e500；正文 main，標題 main h1。"
+  }
+}
