@@ -42,3 +42,16 @@ OAuth 起始仍為 S256 與 weblog.tw callback，舊 Host 308、tag／youtube 20
 回滾使用本版工具 `bash tools/deploy-blue-green.sh rollback blue`，並停止唯一 worker、
 移出本批新增的 `zzzz-no-rss-title-ec460c9.conf` 後 daemon-reload／start；
 不刪除已完成審查的資料。回滾程式會恢復舊政策，僅供故障恢復使用。
+
+## 公開說明同步（同日）
+
+公開待查清單的方法說明也移除「網站名稱要和訂閱來源一致」，明寫 RSS／Atom 名稱不同或空白不影響收錄。
+前端同步提交 `45f274cfbf5ebc6b0836fb5b7b47fb842a31b8c2`，blue／gen112，
+BUILD_ID `tPryECj8Aogu96hcyNMyo`，已從不可變 release 建置、record／prepare-built／switch。
+`/queue/` 實際 HTML 200、release 正確、CF DYNAMIC、private no-store，新文字存在、舊文字不存在。
+首次文字 smoke 誤選沒有此段落的首頁，未通過時沒有切流量；改用實際有說明的 `/queue/` 驗證後才切換。
+
+唯一 worker 持續使用 ec460c9、PID 1940429、active、NRestarts=0；ec460c9 與 45f274c 的
+`app/src` 完全相同，後一次僅同步公開說明，沒有再次停止 worker。
+現行立即回滾點為保留的 green／ec460c9：`bash tools/deploy-blue-green.sh rollback green`，
+worker 可維持現況，RSS 名稱規則仍保持取消。前節回滾至 blue／1056514 的說明僅代表第一次切換時的歷史狀態。
