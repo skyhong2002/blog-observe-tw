@@ -57,7 +57,7 @@ export async function runCuratedDirectoryIntegration(pool: Pool) {
   assert.equal(sync.failures.length, 0);
   assert.equal(sync.results.filter((r) => r.status === 'approved').length, 5);
   assert.equal(sync.results.filter((r) => r.created).length, 4);
-  assert.ok(sync.results.some((r) => r.reason === 'manual_rejection_preserved'));
+  assert.ok(sync.results.some((r) => r.reason === 'rejected_identity_preserved'));
   const [[alias]] = await pool.query<RowDataPacket[]>('SELECT name,url FROM blogs WHERE id=?', [existing.insertId]);
   assert.equal(alias.name, 'Keep my name');
   assert.equal(alias.url, `https://${domains[3]}/zh/`);
