@@ -16,6 +16,11 @@ export async function runCuratedDirectoryIntegration(pool: Pool) {
     "INSERT INTO discovery_candidates(url,name,source_type,status,discovered_at) VALUES (?,'Opt out','owner-exclusion','rejected',UTC_TIMESTAMP())",
     [`https://${domains[2]}/`],
   );
+  // A URL can have several discovery sources. Sync must select the exact source row it updated.
+  await pool.execute(
+    "INSERT INTO discovery_candidates(url,name,source_type,status,discovered_at) VALUES (?,'Indirect link','article-link','candidate',UTC_TIMESTAMP())",
+    [`https://${domains[0]}/`],
+  );
   let sourceDown = false;
   const options = {
     delayMs: 250,
@@ -73,7 +78,9 @@ export async function runCuratedDirectoryIntegration(pool: Pool) {
   );
   const repeated = await runCuratedContentBatch(pool, { ...options, limit: 10 });
   assert.equal(repeated.processed, 0, 'Successful content and daily failure backoff are respected');
-  const [[candidate]] = await pool.query<RowDataPacket[]>('SELECT id FROM discovery_candidates WHERE url=?', [`https://${domains[0]}/`]);
+  const [[candidate]] = await pool.query<RowDataPacket[]>("SELECT id FROM discovery_candidates WHERE url=? AND source_type='indieping'", [
+    `https://${domains[0]}/`,
+  ]);
   assert.equal((await admitCuratedMember(pool, candidate.id)).reason, 'already_linked');
   sourceDown = true;
   const failedSource = await runCuratedDirectorySync(pool, options);

@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest';
-import { CURATED_PAGES, curatedProof, parseBlogblogMembers, parseIndiepingMembers } from './curated-directories.ts';
+import { CURATED_PAGES, curatedProof, parseBlogblogMembers, parseIndiepingMembers, vocusSalonFromArticle } from './curated-directories.ts';
 
 it('accepts only curated directory table rows, excluding resource links and member recommendations', () => {
   const html =
@@ -43,4 +43,28 @@ it('requires structured proof for the exact publication, with a known source and
     expect(curatedProof({ curatedListings: [{ ...p, ...change }] }, p.home)).toBeNull();
   expect(curatedProof({ directoryListing: { page: CURATED_PAGES[0] } }, p.home)).toBeNull();
   expect(curatedProof({ curatedListings: [p] }, 'https://other.test/')).toBeNull();
+});
+it('resolves a Vocus participant only through that exact article’s declared salon', () => {
+  const id = 'a'.repeat(24),
+    salonId = 'b'.repeat(24),
+    url = `https://vocus.cc/article/${id}`;
+  const html = (article: unknown) =>
+    `<script id="__NEXT_DATA__" type="application/json">${JSON.stringify({ props: { pageProps: { parsedArticle: article } } })}</script>`;
+  expect(vocusSalonFromArticle(html({ _id: id, salonId, salon: { _id: salonId } }), url)).toBe(salonId);
+  expect(vocusSalonFromArticle(html({ _id: 'c'.repeat(24), salonId, salon: { _id: salonId } }), url)).toBeNull();
+  expect(vocusSalonFromArticle(html({ _id: id, salonId, salon: { _id: 'c'.repeat(24) } }), url)).toBeNull();
+  expect(vocusSalonFromArticle('<a href="https://vocus.cc/salon/other">Other author</a>', url)).toBeNull();
+  const p = {
+    url,
+    home: `https://vocus.cc/salon/${salonId}`,
+    name: 'Writer',
+    provider: 'blogblog-club',
+    page: CURATED_PAGES[1],
+    kind: 'participant',
+    sha256: 'a'.repeat(64),
+    observedAt: new Date().toISOString(),
+    resolution: { kind: 'vocus-article-salon', salonId, sha256: 'b'.repeat(64) },
+  };
+  expect(curatedProof({ curatedListings: [p] }, p.home)).toEqual(p);
+  expect(curatedProof({ curatedListings: [{ ...p, resolution: undefined }] }, p.home)).toBeNull();
 });

@@ -15,7 +15,12 @@ export type CuratedMember = {
   page: string;
   kind: 'api' | 'blogroll' | 'participant';
 };
-export type CuratedProof = CuratedMember & { home: string; sha256: string; observedAt: string };
+export type CuratedProof = CuratedMember & {
+  home: string;
+  sha256: string;
+  observedAt: string;
+  resolution?: { kind: 'vocus-article-salon'; sha256: string; salonId: string };
+};
 const object = (x: unknown): Record<string, unknown> => {
   if (typeof x === 'string') {
     try {
@@ -88,11 +93,40 @@ export function curatedProof(evidence: unknown, home: string): CuratedProof | nu
       (p.provider === 'blogblog-club' &&
         ((p.page === CURATED_PAGES[0] && p.kind === 'blogroll') || (p.page === CURATED_PAGES[1] && p.kind === 'participant')));
     if (!source || !isAllowedCrawlUrl(p.url) || !isAllowedCrawlUrl(p.home)) continue;
-    const derived = publicationDecision(p.url).home;
+    const resolution = object(p.resolution);
+    const resolvedVocus =
+      /^https:\/\/vocus\.cc\/article\/[a-f0-9]{24}$/.test(p.url) &&
+      resolution.kind === 'vocus-article-salon' &&
+      typeof resolution.salonId === 'string' &&
+      /^[a-f0-9]{24}$/.test(resolution.salonId) &&
+      typeof resolution.sha256 === 'string' &&
+      /^[a-f0-9]{64}$/.test(resolution.sha256)
+        ? `https://vocus.cc/salon/${resolution.salonId}`
+        : null;
+    const derived = publicationDecision(p.url).home || resolvedVocus;
     if (derived && seedIdentityKey(derived) === seedIdentityKey(p.home) && seedIdentityKey(home) === seedIdentityKey(p.home))
       return p as CuratedProof;
   }
   return null;
+}
+/** Resolve only the exact article's declared salon, never a random author link elsewhere on the page. */
+export function vocusSalonFromArticle(html: string, articleUrl: string): string | null {
+  const id = /^https:\/\/vocus\.cc\/article\/([a-f0-9]{24})$/.exec(articleUrl)?.[1];
+  if (!id) return null;
+  try {
+    const $ = cheerio.load(html);
+    const props = object(object(JSON.parse($('#__NEXT_DATA__').text())).props);
+    const article = object(object(props.pageProps).parsedArticle);
+    const salon = object(article.salon);
+    return article._id === id &&
+      typeof article.salonId === 'string' &&
+      /^[a-f0-9]{24}$/.test(article.salonId) &&
+      salon._id === article.salonId
+      ? article.salonId
+      : null;
+  } catch {
+    return null;
+  }
 }
 export async function fetchCuratedMembers(options: FeedCrawlerOptions = {}) {
   const members: CuratedProof[] = [];
@@ -116,12 +150,30 @@ export async function fetchCuratedMembers(options: FeedCrawlerOptions = {}) {
       if (!parsed.length) throw Error('empty_directory');
       const sha256 = createHash('sha256').update(body).digest('hex');
       for (const member of parsed) {
-        const home = publicationDecision(member.url).home;
+        let home = publicationDecision(member.url).home;
+        let resolution: CuratedProof['resolution'];
+        if (!home && /^https:\/\/vocus\.cc\/article\/[a-f0-9]{24}$/.test(member.url)) {
+          try {
+            const article = await politeFetch(member.url, {}, { ...options, timeoutMs: options.timeoutMs ?? 15000 });
+            if (!article.ok || (article.url && article.url !== member.url)) {
+              await article.body?.cancel();
+              throw Error('article_unavailable');
+            }
+            const html = await readFeedBody(article);
+            const salonId = vocusSalonFromArticle(html, member.url);
+            if (salonId) {
+              home = `https://vocus.cc/salon/${salonId}`;
+              resolution = { kind: 'vocus-article-salon', salonId, sha256: createHash('sha256').update(html).digest('hex') };
+            }
+          } catch {
+            /* Preserve unresolved membership and retry on the next source sync. */
+          }
+        }
         if (!home) {
           unresolved.push(member);
           continue;
         }
-        members.push({ ...member, home, sha256, observedAt: new Date().toISOString() });
+        members.push({ ...member, home, sha256, observedAt: new Date().toISOString(), ...(resolution ? { resolution } : {}) });
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : '';
@@ -153,7 +205,10 @@ export async function syncCuratedMembers(pool: Pool, options: FeedCrawlerOptions
       JSON_SET(COALESCE(source_evidence,JSON_OBJECT()),'$.curatedListings',JSON_EXTRACT(VALUES(source_evidence),'$.curatedListings'))`,
       [p.home, p.name || new URL(p.home).hostname, p.provider, p.page, evidence],
     );
-    const [[row]] = await pool.query<RowDataPacket[]>('SELECT id FROM discovery_candidates WHERE url=?', [p.home]);
+    const [[row]] = await pool.query<RowDataPacket[]>('SELECT id FROM discovery_candidates WHERE url=? AND source_type=?', [
+      p.home,
+      p.provider,
+    ]);
     ids.push(Number(row.id));
   }
   return { members: groups.size, ids, failures: fetched.failures, unresolved: fetched.unresolved };

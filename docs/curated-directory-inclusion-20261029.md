@@ -8,9 +8,9 @@ IndiePing and BlogBlog's direct members are trusted for catalog qualification. H
 
 - IndiePing: read only `GET https://indieping.giveanornot.com/api/blogs`. Never use per-domain application endpoints. The current official response contains 312 domains.
 - BlogBlog: first-column members in the `/blogrollroll/` table, plus named hosts and participants on `/party/`. Resource links, references, member blogroll links and arbitrary outgoing article links do not inherit this trust. Repeated participation is deduplicated by publication home.
-- The first live read resolves 425 distinct publication homes across the sources. Two Vocus article-only links have no safely derived publication home; retain these as unresolved rather than assigning the whole platform to an author.
+- The first live read yields 404 normalized publication identities (425 URL variants, including www aliases). Two Vocus article-only links are resolved through each exact article’s structured salon declaration; mismatched article/salon IDs or unavailable pages stay unresolved for a later retry. No platform-wide identity is inferred.
 
-Membership proof records the official source URL, membership kind, original link, publication home, retrieval time and response SHA-256. A legacy `source_type` or `directoryListing` alone cannot authorize this writer. Sync is additive: a failed source or disappearing link never automatically removes a publication.
+Membership proof records the official source URL, membership kind, original link, publication home, retrieval time and response SHA-256. Candidate lookup includes both URL and source type, matching the database’s composite unique key. A legacy `source_type` or `directoryListing` alone cannot authorize this writer. Sync is additive: a failed source or disappearing link never automatically removes a publication.
 
 ## Admission and content
 
