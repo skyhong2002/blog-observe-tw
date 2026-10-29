@@ -283,7 +283,7 @@ function sourceInfo(xml: string, finalUrl: string): SourceInfo | null {
   const root = record(parser.parse(xml));
   if (!root) return null;
   const channel = record(record(root.rss)?.channel);
-  if (channel && typeof channel.title === 'string' && channel.title.trim()) {
+  if (channel && ((typeof channel.title === 'string' && channel.title.trim()) || array(channel.item).length)) {
     return {
       type: 'rss',
       identityUrls: array(channel.link).flatMap((link) => {
@@ -293,15 +293,14 @@ function sourceInfo(xml: string, finalUrl: string): SourceInfo | null {
           ? [object['@_href']]
           : [];
       }),
-      comments: /^(?:comments? (?:on|for)\b)|comments? feed|(?:留言|評論)(?:摘要|訂閱|回應|feed)/i.test(channel.title),
+      comments: /^(?:comments? (?:on|for)\b)|comments? feed|(?:留言|評論)(?:摘要|訂閱|回應|feed)/i.test(String(channel.title || '')),
       items: array(channel.item).length,
     };
   }
   const feed = record(root.feed);
   if (
     feed &&
-    typeof feed.title === 'string' &&
-    feed.title.trim() &&
+    ((typeof feed.title === 'string' && feed.title.trim()) || array(feed.entry).length) &&
     /xmlns(?::[\w-]+)?\s*=\s*["']http:\/\/www\.w3\.org\/2005\/Atom["']/.test(xml)
   ) {
     const links = array(feed.link)

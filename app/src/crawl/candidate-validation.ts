@@ -9,8 +9,8 @@ import { type FeedCrawlerOptions, isAllowedCrawlUrl, parseFeed, politeFetch, ROB
 import { seedIdentityKey } from './seed-url-resolution.ts';
 import { isSeedPlatformRoot, type SeedUrlValidation, validateSeedUrl } from './seed-url-validation.ts';
 
-// v6 (2026-10-28): account-backed evidence, semantic home introductions and home-advertised feed identities.
-export const CANDIDATE_POLICY = 'personal-rss-publication-v6-account-evidence';
+// v7 (2026-10-29): RSS/Atom titles are not admission evidence; publication ownership and article scope remain required.
+export const CANDIDATE_POLICY = 'personal-rss-publication-v7-no-feed-title-gate';
 export type DiscoveryCandidate = {
   id: number;
   url: string;
@@ -168,24 +168,6 @@ export function aboutPageUrl(html: string, home: string): string | null {
 /** The homepage itself named this source (head link or RSS button), as recorded by validateSeedUrl. */
 export function advertisedSource(verification: Pick<SeedUrlValidation, 'evidence'>, url: string): boolean {
   return verification.evidence.sourceChecks.some((c) => c.advertised === true && (c.finalUrl || c.url) === url);
-}
-/** A homepage-advertised feed with a verified same-publication identity may use a different title. */
-export function candidateFeedIdentityConfirmed(
-  name: string | null,
-  verification: Pick<SeedUrlValidation, 'title' | 'siteName' | 'author' | 'finalUrl' | 'evidence'>,
-  title: string,
-  feedUrl: string,
-  identityUrl: string,
-) {
-  return (
-    candidateIdentityConfirmed(name, verification, title) ||
-    Boolean(
-      title.trim() &&
-        verification.finalUrl &&
-        advertisedSource(verification, feedUrl) &&
-        publicationContains(identityUrl, verification.finalUrl),
-    )
-  );
 }
 export function publicationContains(value: string, home: string): boolean {
   try {
@@ -390,10 +372,6 @@ export async function validateCandidate(
     });
     if (!identity) {
       result.reason = 'feed_home_identity_mismatch';
-      return result;
-    }
-    if (!candidateFeedIdentityConfirmed(candidate.name, verification, title, source.url, new URL(identity, source.url).href)) {
-      result.reason = 'feed_name_identity_mismatch';
       return result;
     }
     const parsed = parseFeed(xml, response.url || source.url);

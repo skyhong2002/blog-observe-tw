@@ -61,13 +61,13 @@ describe('automatic discovery verification', () => {
     expect(result.eligible).toBe(false);
     expect(result.reason).toBe('rss_or_article_sitemap_required');
   });
-  it('does not accept an unadvertised feed based on a shared name fragment', async () => {
+  it('accepts a same-publication feed regardless of its title, including guessed feeds', async () => {
     const result = await validateCandidate(
       candidate,
       options(rss(home, 'Another Writer'), homepage.replace('Quill Writer', 'Another Writer').replace(/<link[^>]*>/, '')),
     );
-    expect(result.eligible).toBe(false);
-    expect(result.reason).toBe('feed_name_identity_mismatch');
+    expect(result.eligible).toBe(true);
+    expect(result.feed?.title).toBe('Another Writer');
   });
   it('skips an advertised comments feed even when it appears before the main RSS', async () => {
     const opts = options(
@@ -91,13 +91,12 @@ describe('automatic discovery verification', () => {
     expect((await validateCandidate({ ...candidate, url: home + 'article' }, opts)).reason).toBe('needs_publication_home');
     expect(opts.fetcher).not.toHaveBeenCalled();
   });
-  it('requires feed home identity and matching feed name', async () => {
+  it('requires feed home identity but ignores feed name', async () => {
     // A category feed the homepage never links (found at the guessed /feed/) does not stand for the home.
     const unlinked = homepage.replace(/<link[^>]*>/, '');
     expect((await validateCandidate(candidate, options(rss(home + 'category'), unlinked))).reason).toBe('feed_home_identity_mismatch');
-    expect((await validateCandidate(candidate, options(rss(home, 'Another publication'), unlinked))).reason).toBe(
-      'feed_name_identity_mismatch',
-    );
+    expect((await validateCandidate(candidate, options(rss(home, 'Another publication'), unlinked))).eligible).toBe(true);
+    expect((await validateCandidate(candidate, options(rss(home, ''), unlinked))).eligible).toBe(true);
   });
   it('does not approve a syndicated or mixed-author feed', async () => {
     expect((await validateCandidate(candidate, options(rss(home, 'Quill Writer', 'https://someone.test/post')))).reason).toBe(

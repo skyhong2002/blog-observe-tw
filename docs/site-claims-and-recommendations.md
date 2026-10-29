@@ -117,3 +117,7 @@ Hawks 類型首頁有固定回歸案例，另以實際保存的首頁確認可�
 網頁契約 251 項、隔離資料庫 103 項斷言通過；TypeScript、變更檔案 Biome 與乾淨的
 Next standalone 正式建置通過。SQL writer registry 的新增動態參照僅來自認領／推薦
 表的固定白名單與既有查詢插值，沒有新增話題寫入路徑。
+
+## 2026-10-29：RSS 名稱規則取消（v7）
+
+依使用者指示，RSS／Atom title 不再作為候選收錄或准入 writer 的門檻，包含首頁未宣告而由標準路徑找到的 feed，以及空白 title。保留 feed 指向的 publication 身分、文章網址範圍、實際文章、留言 feed 排除與既有人工決定。首頁本身與 sitemap 的身分核對沒有取消。舊 `feed_name_identity_mismatch` 是歷史診斷，v7 不會再產生這項拒收原因。

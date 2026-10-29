@@ -10,7 +10,6 @@ import {
   advertisedSource,
   CANDIDATE_POLICY,
   type CandidateCheck,
-  candidateFeedIdentityConfirmed,
   candidatePreflight,
   publicationContains,
 } from './candidate-validation.ts';
@@ -177,7 +176,6 @@ export async function recordCandidateCheck(
         >[0]) ||
         !v.evidence.identityMatches.length ||
         !check.feed ||
-        !candidateFeedIdentityConfirmed(effectiveName, v, check.feed.title, check.feed.url, check.feed.identityUrl) ||
         !(['rss', 'atom', 'sitemap'].includes(check.feed.type) || scraped) ||
         !isAllowedCrawlUrl(check.feed.url) ||
         check.feed.url.length > 1024 ||
