@@ -21,6 +21,10 @@ export async function runCuratedDirectoryIntegration(pool: Pool) {
     "INSERT INTO discovery_candidates(url,name,source_type,status,discovered_at) VALUES (?,'Indirect link','article-link','candidate',UTC_TIMESTAMP())",
     [`https://${domains[0]}/`],
   );
+  await pool.execute(
+    "INSERT INTO discovery_candidates(url,name,source_type,status,discovered_at) VALUES (?,'Article URL rejected, not the publication','blogblog-club','rejected',UTC_TIMESTAMP())",
+    [`https://${domains[0]}/old-post`],
+  );
   let sourceDown = false;
   const options = {
     delayMs: 250,

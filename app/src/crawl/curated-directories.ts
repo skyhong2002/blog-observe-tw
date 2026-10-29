@@ -261,7 +261,7 @@ export async function admitCuratedMember(pool: Pool, id: number): Promise<Curate
     const h = new URL(proof.home).hostname.replace(/^www\./, '');
     if (
       rejected.some((r) =>
-        r.source_type === 'owner-exclusion' ? new URL(r.url).hostname.replace(/^www\./, '') === h : homeOf(r.url) === key,
+        r.source_type === 'owner-exclusion' ? new URL(r.url).hostname.replace(/^www\./, '') === h : seedIdentityKey(r.url) === key,
       )
     )
       return await skip('rejected_identity_preserved');

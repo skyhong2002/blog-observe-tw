@@ -36,13 +36,25 @@ export async function runCuratedContentBatch(pool: Pool, options: FeedCrawlerOpt
         if (stopped || Date.now() >= deadline) break;
         await assertLease();
         let error: string | null = null;
+        let siteFailure: string | null = null;
+        const siteDeadline = Date.now() + 45000;
+        let requests = 0;
+        const siteFetcher: NonNullable<FeedCrawlerOptions['fetcher']> = async (input, init) => {
+          if (Date.now() >= siteDeadline || requests++ >= 24) {
+            siteFailure = 'site_attempt_budget_exhausted';
+            throw Error(siteFailure);
+          }
+          const response = await fetcher(input, init);
+          if ([403, 429].includes(response.status)) siteFailure = `http_${response.status}`;
+          return response;
+        };
         const [[before]] = await pool.query<RowDataPacket[]>('SELECT COUNT(*) n FROM posts WHERE blog_id=?', [row.id]);
         if (!Number(before.n)) {
           try {
             const crawled = await crawlBlog(
               { pool },
               { id: Number(row.id), slug: String(row.slug), url: String(row.url) },
-              { ...options, fetcher },
+              { ...options, fetcher: siteFetcher },
             );
             if (!crawled.sources) error = 'no_usable_source';
           } catch (e) {
@@ -54,7 +66,12 @@ export async function runCuratedContentBatch(pool: Pool, options: FeedCrawlerOpt
         const [[count]] = await pool.query<RowDataPacket[]>('SELECT COUNT(*) n FROM posts WHERE blog_id=?', [row.id]);
         const posts = Number(count.n),
           status = posts ? 'ready' : 'failed';
-        const content = { status, posts, reason: posts ? null : error || 'no_articles_found', lastAttemptAt: new Date().toISOString() };
+        const content = {
+          status,
+          posts,
+          reason: posts ? null : siteFailure || error || 'no_articles_found',
+          lastAttemptAt: new Date().toISOString(),
+        };
         await pool.execute(
           `UPDATE discovery_candidates SET source_evidence=JSON_SET(source_evidence,'$.curatedContent',JSON_EXTRACT(?,'$'))
         WHERE status='approved' AND JSON_EXTRACT(source_evidence,'$.automaticReview.blogId')=? AND JSON_EXTRACT(source_evidence,'$.curatedListings') IS NOT NULL`,
