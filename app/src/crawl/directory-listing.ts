@@ -46,16 +46,15 @@ export function indiewebListing(evidence: unknown): string | null {
   const page = object(object(evidence).indiewebListing).page;
   return page === INDIEWEB_LISTING ? page : null;
 }
-/** IndiePing (JN's hand-approved list of Chinese indie blogs; reuse agreed 2026-10-21). Like the IndieWeb
- * list, a member counts as listed only when its home is in Chinese. The per-domain query walk was stopped at the
- * owner's request (it submitted applications on their side); wait for their /api/blogs instead. */
+/** IndiePing members qualify from the hand-maintained list regardless of homepage language.
+ * Use only GET /api/blogs for synchronization: per-domain queries submit applications on their side. */
 export const INDIEPING_LISTING = 'https://indieping.giveanornot.com/';
 export function indiepingListing(evidence: unknown): string | null {
   const page = object(object(evidence).indiepingListing).page;
   return page === INDIEPING_LISTING ? page : null;
 }
 /** Listings whose members must also have a Chinese home (candidate-validation.ts). */
-export const CHINESE_ONLY_LISTINGS = new Set(['indieweb-wiki', 'indieping']);
+export const CHINESE_ONLY_LISTINGS = new Set(['indieweb-wiki']);
 /** The directory listing a candidate of this source carries, else null. */
 export function listingOf(sourceType: string, evidence: unknown): string | null {
   if (sourceType === 'blogblog-club') return directoryListing(evidence);

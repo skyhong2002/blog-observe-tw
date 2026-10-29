@@ -5,6 +5,8 @@ import { runAiBatch } from './ai/batch.ts';
 import { loadConfig } from './config.js';
 import { runContentBatch } from './content/worker.ts';
 import { runCandidateReviewBatch, runReaderReviewBatch } from './crawl/candidate-review.ts';
+import { runCuratedContentBatch } from './crawl/curated-content.ts';
+import { runCuratedDirectorySync } from './crawl/curated-directories.ts';
 import { deriveDirectoryHomes } from './crawl/directory-listing.ts';
 import { discoverBlogblog, discoverSimilar } from './crawl/discovery.ts';
 import { refreshMissingBlogFavicons } from './crawl/favicon-batch.ts';
@@ -91,6 +93,8 @@ for (const [name, every, enabled] of [
   ['blogs-vocabulary', 15 * 60_000, vocabularyEnabled],
   ['blogs-history', 5 * 60_000, historyEnabled],
   ['blogs-candidate-review', 5 * 60_000, candidateReviewEnabled],
+  ['blogs-curated-content', 5 * 60_000, true],
+  ['blogs-curated-sync', 24 * 60 * 60_000, true],
   ['blogs-missing-icons', 15 * 60_000, missingIconsEnabled],
   ['blogs-public-routes', 15 * 60_000, true],
   // Ten homepages an hour, each blog again after 30 days: 作者 for feeds that name nobody, and the 經營者 filter.
@@ -215,6 +219,10 @@ const worker = new Worker(
       }
       return { count: results.length, results };
     }
+    if (job.name === 'blogs-curated-sync')
+      return runCuratedDirectorySync(store.pool, { userAgent: config.crawlUserAgent, delayMs: config.crawlDelayMs, timeoutMs: 15000 });
+    if (job.name === 'blogs-curated-content')
+      return runCuratedContentBatch(store.pool, { userAgent: config.crawlUserAgent, delayMs: config.crawlDelayMs, timeoutMs: 6000 });
     if (job.name === 'blogs-candidate-review') {
       if (!candidateReviewEnabled) return { skipped: 'disabled' };
       // BlogBlog.Club listings point at blogroll pages and party posts; queue their publication homes first.

@@ -26,6 +26,8 @@ export type QueueItem = {
   checkedAt: string | null;
   reason: string | null;
   slug: string | null;
+  contentStatus?: string;
+  contentPosts?: number;
 };
 export type QueueSort = 'added' | 'checked' | 'site' | 'state' | 'source';
 export type Queue = {
@@ -232,6 +234,15 @@ export function BlogQueueView({
                         </Link>
                       ) : (
                         QUEUE_STATE_LABELS[item.state]
+                      )}
+                      {item.state === 'listed' && item.contentStatus && (
+                        <span className="block text-xs text-zinc-500">
+                          {item.contentStatus === 'ready'
+                            ? `${item.contentPosts} 篇文章`
+                            : item.contentStatus === 'failed'
+                              ? '文章抓取待修復'
+                              : '文章待抓取'}
+                        </span>
                       )}
                     </td>
                     {reasons && (

@@ -72,6 +72,8 @@ test('the 待查清單 shows each site, its state, the reason in words and links
             checkedAt: null,
             reason: null,
             slug: 'wiwi',
+            contentStatus: 'failed',
+            contentPosts: 0,
           },
         ],
       }}
@@ -82,6 +84,7 @@ test('the 待查清單 shows each site, its state, the reason in words and links
   expect(html).toContain('讀者新增');
   expect(html).toContain('未通過 1');
   expect(html).toContain('href="/blogs/wiwi/"');
+  expect(html).toContain('文章抓取待修復');
   expect(html).not.toContain('personal_identity_uncertain');
   // Newest added first by default; its header flips it, the others start from their own default and keep the default out of links.
   expect(html).toMatch(/aria-sort="descending"[\s\S]*?href="\/queue\/\?sort=added&amp;dir=asc"[\s\S]*?加入/);

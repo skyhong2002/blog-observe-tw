@@ -196,6 +196,36 @@
       "occurrences": 1
     },
     {
+      "path": "app/src/crawl/curated-directories.ts",
+      "digest": "6cc6868c57f3c1914c573dcc6310530357fb9768af131d59c6b9cca9491c6bb5",
+      "tables": [],
+      "dynamic": true,
+      "occurrences": 1
+    },
+    {
+      "path": "app/src/crawl/curated-directories.ts",
+      "digest": "9ec137de16c1409757ffa6c9c5d576e05e59c8f459936837489da0051c164672",
+      "tables": [
+        "blogs"
+      ],
+      "dynamic": false,
+      "occurrences": 1
+    },
+    {
+      "path": "app/src/crawl/curated-directories.ts",
+      "digest": "d8d0f858e12713beedacda139e9f44bd4c099342368cb2a13f3a1235a9f1acfb",
+      "tables": [],
+      "dynamic": true,
+      "occurrences": 1
+    },
+    {
+      "path": "app/src/crawl/curated-directories.ts",
+      "digest": "f56b18f07e7a1be3d590f4100f9b76def75210a78d39f8a3c400b7c4fa88a9d3",
+      "tables": [],
+      "dynamic": true,
+      "occurrences": 1
+    },
+    {
       "path": "app/src/crawl/feed.ts",
       "digest": "104220ae0fa714ed6161d4de976f7527564ddac3371869888983cb871497c6bb",
       "tables": [],

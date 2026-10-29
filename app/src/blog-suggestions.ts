@@ -165,7 +165,11 @@ export async function loadBlogQueue(pool: Pool, query: Record<string, unknown> =
   const narrowed = [...(filters.state ? [`${queueState}=?`] : []), ...(filters.source ? ['d.source_type=?'] : [])];
   const [rows] = await pool.query<RowDataPacket[]>(
     `SET STATEMENT max_statement_time=3 FOR SELECT d.id,d.url,d.name,d.source_type source,d.discovered_at addedAt,${checkedAt} checkedAt,
-       ${review('reason')} reason,${review('slug')} slug,${queueState} state
+       ${review('reason')} reason,${review('slug')} slug,${queueState} state,
+       JSON_EXTRACT(d.source_evidence,'$.curatedListings') IS NOT NULL curated,
+       JSON_UNQUOTE(JSON_EXTRACT(d.source_evidence,'$.curatedContent.status')) contentStatus,
+       CASE WHEN JSON_EXTRACT(d.source_evidence,'$.curatedListings') IS NOT NULL THEN
+         (SELECT COUNT(*) FROM posts p WHERE p.blog_id=JSON_EXTRACT(d.source_evidence,'$.automaticReview.blogId')) ELSE NULL END contentPosts
      ${base}${narrowed.map((condition) => ` AND ${condition}`).join('')}
      ORDER BY ${sortKey[filters.sort]} ${direction},d.id ${direction} LIMIT ? OFFSET ?`,
     [
@@ -191,6 +195,12 @@ export async function loadBlogQueue(pool: Pool, query: Record<string, unknown> =
       // Why the last check did not admit it; an admitted or decided row has no pending reason.
       reason: row.state === 'failed' ? String(row.reason) : null,
       slug: row.state === 'listed' && row.slug ? String(row.slug) : null,
+      ...(Number(row.curated) === 1
+        ? {
+            contentPosts: Number(row.contentPosts || 0),
+            contentStatus: Number(row.contentPosts) > 0 ? 'ready' : row.contentStatus === 'failed' ? 'failed' : 'pending',
+          }
+        : {}),
     })),
   };
 }

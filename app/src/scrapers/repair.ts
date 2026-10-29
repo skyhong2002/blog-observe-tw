@@ -89,6 +89,18 @@ export async function pickRepairTarget(pool: Pool, now: Date, only: Pick<RepairO
   );
   if (failing[0])
     return { kind: 'blog', trigger: 'scraper_failing', blog: blogRow(failing[0]), previous: previousOf(failing[0]) } satisfies RepairTarget;
+  // Directory qualification is already settled: repair missing content immediately, not after fourteen days.
+  const [curated] = await pool.query<RowDataPacket[]>(
+    `SELECT DISTINCT b.id,b.slug,b.url FROM blogs b JOIN discovery_candidates c
+     ON b.id=JSON_EXTRACT(c.source_evidence,'$.automaticReview.blogId')
+     WHERE b.status='verified' AND c.status='approved' AND JSON_EXTRACT(c.source_evidence,'$.curatedListings') IS NOT NULL
+       AND JSON_UNQUOTE(JSON_EXTRACT(c.source_evidence,'$.curatedContent.status'))='failed'
+       AND NOT EXISTS(SELECT 1 FROM posts p WHERE p.blog_id=b.id)
+       AND NOT EXISTS(SELECT 1 FROM blog_scrapers s WHERE s.blog_id=b.id AND s.status='active')
+       AND ${cooldown('blog', 'b.id')} ORDER BY b.id LIMIT 1`,
+    windows,
+  );
+  if (curated[0]) return { kind: 'blog', trigger: 'feed_dead', blog: blogRow(curated[0]) } satisfies RepairTarget;
   // Feeds that answer but carry no new posts are alive; only fetch failures for 14 days while the crawler still runs count.
   const [dead] = await pool.query<RowDataPacket[]>(
     `SELECT b.id,b.slug,b.url FROM blogs b
@@ -222,6 +234,12 @@ async function repairBlog(pool: Pool, target: Extract<RepairTarget, { kind: 'blo
     await pool.execute("UPDATE blog_scrapers SET status='rejected' WHERE id=? AND status='validated'", [scraperId]);
     return { target: base, status: 'declined', reason: 'blog_changed_during_generation', generation, scraperId } satisfies RepairOutcome;
   }
+  await pool.execute(
+    `UPDATE discovery_candidates SET source_evidence=JSON_REMOVE(
+    JSON_SET(source_evidence,'$.curatedContent.status','pending'),'$.curatedContent.lastAttemptAt')
+    WHERE status='approved' AND JSON_EXTRACT(source_evidence,'$.automaticReview.blogId')=? AND JSON_EXTRACT(source_evidence,'$.curatedListings') IS NOT NULL`,
+    [target.blog.id],
+  );
   // Bodies the page extractor could not find are due again now that the scraper knows where they are.
   if (target.trigger === 'content_failing')
     await pool.execute("UPDATE content_post_bodies SET next_attempt_at=? WHERE blog_id=? AND status IN ('missing','partial')", [

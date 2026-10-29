@@ -34,6 +34,7 @@ try {
           'scheduler-candidates',
           'sitemap',
           'site-claims',
+          'curated-directories',
         ].includes(process.argv[5])))
   )
     throw Error('explicit_private_clone_env_required');
@@ -94,6 +95,7 @@ try {
     ['staged-scan-v2', '../app/src/topics/staged-scan-v2.integration.ts', 'runStagedScanV2Integration'],
     ['topic-body-owner', '../app/src/topics/body-owner.integration.ts', 'runTopicBodyOwnerIntegration'],
     ['budgets-ai', '../tests/integration/core.mjs', 'runCoreIntegration'],
+    ['curated-directories', '../app/src/crawl/curated-directories.integration.ts', 'runCuratedDirectoryIntegration'],
     ['site-claims', '../app/src/site-claims.integration.ts', 'runSiteClaimsIntegration'],
     ['candidates', '../tests/integration/candidates.mjs', 'runCandidateIntegration'],
     ['relations', '../app/src/relations/integration.ts', 'runRelationIntegration'],
@@ -177,6 +179,7 @@ try {
                                 ? suites.filter(([label]) => label === 'indexability' || label === 'topic-history-read')
                                 : suites;
   if (process.argv[5] === 'site-claims') selected = suites.filter(([label]) => label === 'site-claims' || label === 'candidates');
+  if (process.argv[5] === 'curated-directories') selected = suites.filter(([label]) => label === 'curated-directories');
   // Without --suite every suite gets its own fresh database: several assume an empty corpus
   // (staged-scan-proof asserts it), so sharing one database made the full run stop there.
   for (const [index, [label, module, entry]] of selected.entries()) {
