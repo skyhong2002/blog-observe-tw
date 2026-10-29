@@ -1139,6 +1139,16 @@ async function scraperInCharge(pool: SqlPool, blogId: number, now: Date) {
   const { activeScraper } = await import('../scrapers/store.ts');
   const scraper = await activeScraper(pool, blogId);
   if (!scraper) return null;
+  // An HTTP-successful but empty/unusable feed must not suppress a validated repair.
+  // Keep the repair in charge while a curated publication has no feed-derived articles.
+  const [missingContent] = await pool.execute(
+    `SELECT 1 FROM discovery_candidates d WHERE d.status='approved'
+      AND JSON_EXTRACT(d.source_evidence,'$.automaticReview.blogId')=?
+      AND JSON_EXTRACT(d.source_evidence,'$.curatedListings') IS NOT NULL
+      AND NOT EXISTS(SELECT 1 FROM posts p WHERE p.blog_id=? AND p.source_type IN ('rss','atom','sitemap')) LIMIT 1`,
+    [blogId, blogId],
+  );
+  if (Array.isArray(missingContent) && missingContent.length) return scraper;
   const [rows] = await pool.execute('SELECT 1 FROM feed_sources WHERE blog_id=? AND last_success_at>? LIMIT 1', [
     blogId,
     new Date(now.getTime() - SCRAPER_TAKEOVER_MS),

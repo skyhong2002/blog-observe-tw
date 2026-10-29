@@ -1,8 +1,10 @@
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import type { Pool, ResultSetHeader, RowDataPacket } from 'mysql2/promise';
 import { resolvePublicPage } from '../seo/page-routes.ts';
 import { runCuratedContentBatch } from './curated-content.ts';
 import { admitCuratedMember, CURATED_PAGES, INDIEPING_API, runCuratedDirectorySync, syncCuratedMembers } from './curated-directories.ts';
+import { crawlBlog } from './feed.ts';
 
 /** Disposable MariaDB only; all HTTP is injected, including the robots and DNS checks. */
 export async function runCuratedDirectoryIntegration(pool: Pool) {
@@ -26,6 +28,7 @@ export async function runCuratedDirectoryIntegration(pool: Pool) {
     [`https://${domains[0]}/old-post`],
   );
   let sourceDown = false;
+  let repairReady = false;
   const options = {
     delayMs: 250,
     timeoutMs: 1000,
@@ -43,6 +46,12 @@ export async function runCuratedDirectoryIntegration(pool: Pool) {
         );
       if (url === CURATED_PAGES[1])
         return new Response('<main><ul><li>主持人：<a href="https://host-curated.example/post/1">Host</a></li></ul></main>');
+      if (repairReady && url === `https://${domains[1]}/`)
+        return new Response('<html><a href="/post/1">Recovered article</a></html>', { headers: { 'content-type': 'text/html' } });
+      if (repairReady && url === `https://${domains[1]}/post/1`)
+        return new Response('<html><h1>Recovered article</h1><article>My actual personal writing recovered from HTML.</article></html>', {
+          headers: { 'content-type': 'text/html' },
+        });
       if (url === `https://${domains[0]}/`)
         return new Response(
           '<html lang="en"><title>English</title><link rel="alternate" type="application/rss+xml" href="/feed.xml"></html>',
@@ -117,5 +126,24 @@ export async function runCuratedDirectoryIntegration(pool: Pool) {
   }
   const concurrent = await Promise.all([admitCuratedMember(pool, rollback.id), admitCuratedMember(pool, rollback.id)]);
   assert.equal(concurrent.filter((r) => r.created).length, 1, 'Concurrent runs create one publication');
+  const repaired = blogs.find((b) => b.url === `https://${domains[1]}/`)!;
+  const code = `function listPosts({url,$}) { return { posts: $('a').map((i,a)=>({url:new URL($(a).attr('href'),url).href})).get(),next:null }; }
+    function parsePost({$}) { return { title: $('h1').text(),bodyHtml:$('article').html(),tags:[] }; }`;
+  await pool.execute(
+    "INSERT INTO blog_scrapers(blog_id,status,`trigger`,code,code_sha256,list_urls,model,created_at,activated_at) VALUES (?,'active','feed_dead',?,?,?,'fixture',UTC_TIMESTAMP(),UTC_TIMESTAMP())",
+    [repaired.id, code, createHash('sha256').update(code).digest('hex'), JSON.stringify([repaired.url])],
+  );
+  await pool.execute("INSERT INTO feed_sources(blog_id,url,type,last_success_at) VALUES (?,?,'rss',UTC_TIMESTAMP())", [
+    repaired.id,
+    repaired.url + 'empty-feed',
+  ]);
+  repairReady = true;
+  const recovered = await crawlBlog({ pool }, { id: repaired.id, slug: repaired.slug, url: repaired.url }, options);
+  assert.equal(recovered.posts, 1, 'An HTTP-successful empty feed cannot suppress the validated HTML repair');
+  assert.equal(
+    (await crawlBlog({ pool }, { id: repaired.id, slug: repaired.slug, url: repaired.url }, options)).posts,
+    0,
+    'Subsequent runs use the repair and preserve article deduplication',
+  );
   return { qualified: 5, created: 4, articles: posts.length, preservedExclusion: true, sourceFailureRetained: true };
 }
