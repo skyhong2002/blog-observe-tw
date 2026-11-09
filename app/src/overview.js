@@ -149,10 +149,15 @@ async function loadProjection(pool, { onFailure } = {}) {
       WHERE b.status='verified' AND (p.published_at IS NULL OR p.published_at<=UTC_TIMESTAMP()) ORDER BY p.published_at DESC,p.id DESC LIMIT 200`),
     ),
     overviewRead(pool, 'full.tags', () =>
-      pool.query(`SELECT t.slug,t.label,COUNT(DISTINCT p.id) AS postCount,COUNT(DISTINCT p.blog_id) AS blogCount
-      FROM tags t JOIN post_tags pt ON pt.tag_id=t.id JOIN posts p ON p.id=pt.post_id JOIN blogs b ON b.id=p.blog_id
-      WHERE b.status='verified' AND t.visibility='public' AND t.status='active' AND pt.status='active' AND (p.published_at IS NULL OR p.published_at<=UTC_TIMESTAMP())
-      GROUP BY t.id,t.slug,t.label ORDER BY blogCount DESC,postCount DESC,t.slug LIMIT 100`),
+      // Count per tag id first, then join the tag's text: grouping ~800k rows on slug/label strings took 3-4 s
+      // (2026-11-09), this ~0.9 s with the same 100 rows. COUNT(*) is COUNT(DISTINCT p.id): post_tags' key is (post_id,tag_id).
+      pool.query(`SELECT t.slug,t.label,agg.postCount,agg.blogCount FROM (
+      SELECT pt.tag_id,COUNT(*) AS postCount,COUNT(DISTINCT p.blog_id) AS blogCount
+      FROM post_tags pt JOIN posts p ON p.id=pt.post_id JOIN blogs b ON b.id=p.blog_id
+      WHERE b.status='verified' AND pt.status='active' AND (p.published_at IS NULL OR p.published_at<=UTC_TIMESTAMP())
+      GROUP BY pt.tag_id) agg
+      JOIN tags t ON t.id=agg.tag_id WHERE t.visibility='public' AND t.status='active'
+      ORDER BY agg.blogCount DESC,agg.postCount DESC,t.slug LIMIT 100`),
     ),
     overviewRead(pool, 'full.authors', () => pool.query(FULL_AUTHORS_SQL)),
     overviewRead(pool, 'full.blogs', () =>

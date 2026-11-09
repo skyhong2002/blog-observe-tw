@@ -3,7 +3,7 @@ import type { FastifyRequest } from 'fastify';
 import Fastify from 'fastify';
 import { describe, expect, it } from 'vitest';
 import { registerFavicons } from '../v1/favicon-routes.ts';
-import { gatewayRateKey, gatewayRateMax, internalRenderRead } from './client-ip.ts';
+import { gatewayRateKey, gatewayRateMax, INTERNAL_RENDER_READS_PER_MINUTE, internalRenderRead } from './client-ip.ts';
 
 function request(url = '/api/overview', headers = {}, remoteAddress = '127.0.0.1', method = 'GET') {
   return { url, headers, method, ip: remoteAddress, raw: { socket: { remoteAddress } } } as FastifyRequest;
@@ -28,10 +28,15 @@ describe('server render rate bucket isolation', () => {
       await app.close();
     }
   });
+  it('sizes the render bucket for a crawl, still bounded', () => {
+    // ~8 reads a blog page: at least 20 pages/s for the whole site, not the 4/s that 500'd a Googlebot crawl.
+    expect(INTERNAL_RENDER_READS_PER_MINUTE).toBeGreaterThanOrEqual(8 * 20 * 60);
+    expect(INTERNAL_RENDER_READS_PER_MINUTE).toBeLessThanOrEqual(60_000);
+  });
   it('keeps an explicit limit for direct anonymous public-data rendering', () => {
     const r = request('/api/topics/example?days=90');
     expect(internalRenderRead(r)).toBe(true);
-    expect(gatewayRateMax(r)).toBe(2000);
+    expect(gatewayRateMax(r)).toBe(INTERNAL_RENDER_READS_PER_MINUTE);
     expect(gatewayRateKey(r)).toBe('internal-render-read');
   });
   it.each([
@@ -46,7 +51,7 @@ describe('server render rate bucket isolation', () => {
     const r = request(path);
     expect(internalRenderRead(r)).toBe(true);
     expect(gatewayRateKey(r)).toBe('internal-render-read');
-    expect(gatewayRateMax(r)).toBe(2000);
+    expect(gatewayRateMax(r)).toBe(INTERNAL_RENDER_READS_PER_MINUTE);
   });
   it.each([
     'cf-connecting-ip',
@@ -96,7 +101,7 @@ describe('footer count rate compatibility', () => {
       expect(gatewayRateKey(count)).toBe(gatewayRateKey(old));
       expect(gatewayRateMax(count)).toBe(gatewayRateMax(old));
       expect(gatewayRateKey(count)).toBe('internal-render-read');
-      expect(gatewayRateMax(count)).toBe(2000);
+      expect(gatewayRateMax(count)).toBe(INTERNAL_RENDER_READS_PER_MINUTE);
     }
   });
 

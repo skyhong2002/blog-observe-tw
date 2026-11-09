@@ -42,4 +42,8 @@ export function internalRenderRead(request: FastifyRequest): boolean {
   );
 }
 export const gatewayRateKey = (request: FastifyRequest) => (internalRenderRead(request) ? 'internal-render-read' : clientIp(request));
-export const gatewayRateMax = (request: FastifyRequest) => (internalRenderRead(request) ? 2000 : 240);
+/** Every visitor's page reaches the gateway through this one render bucket, about eight reads a blog page, so it is
+ * the whole site's page budget, not one client's: 2000/min held a Googlebot crawl to ~4 pages/s and 500'd the rest
+ * (2026-11-09). Still bounded; the database keeps its own pool and overview admission limits. */
+export const INTERNAL_RENDER_READS_PER_MINUTE = 12_000;
+export const gatewayRateMax = (request: FastifyRequest) => (internalRenderRead(request) ? INTERNAL_RENDER_READS_PER_MINUTE : 240);
