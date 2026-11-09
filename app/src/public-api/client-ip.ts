@@ -34,7 +34,10 @@ export function internalRenderRead(request: FastifyRequest): boolean {
   )
     return false;
   const path = request.url.split('?')[0];
-  return /^\/api\/(?:overview|collection-count|catalog(?:\/authors)?|search|icons|traffic|relations|content\/coverage|pages\/(?:blogs|topics)\/[^/]+|blogs\/[^/]+(?:\/(?:topics|relations|content))?|topics(?:\/[^/]+)?)$/.test(
+  // Every anonymous read a public page renders server-side. One missing here shares the 240/min loopback-IP
+  // bucket with every other render (all SSR arrives from 127.0.0.1), so a crawl turns it into 429 and the page
+  // into 500 (2026-11-09: /blogs/* under Googlebot via /inference). Keep in step with web/src SSR reads.
+  return /^\/api\/(?:overview|collection-count|catalog(?:\/authors)?|search|icons|traffic|relations|mentions|tech|content\/coverage|pages\/(?:blogs|topics)\/[^/]+|blogs\/[^/]+(?:\/(?:topics|relations|content|inference|tech|mentions(?:\/all)?))?|topics(?:\/[^/]+)?)$/.test(
     path,
   );
 }

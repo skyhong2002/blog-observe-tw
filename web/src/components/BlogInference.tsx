@@ -1,5 +1,6 @@
 import { taipei } from '@/lib/api';
 import { publicJsonOrNull } from '@/lib/public-api';
+import { unavailableRead } from '@/lib/public-read';
 
 type Inference = {
   label: string;
@@ -9,7 +10,14 @@ type Inference = {
   topics: Array<{ postId: number; title: string; topics: string[]; coverage: string; updatedAt: string; label: string }>;
 };
 export default async function BlogInference({ slug }: { slug: string }) {
-  const data = await publicJsonOrNull<Inference>(`/api/blogs/${encodeURIComponent(slug)}/inference`);
+  let data: Inference | null;
+  try {
+    data = await publicJsonOrNull<Inference>(`/api/blogs/${encodeURIComponent(slug)}/inference`);
+  } catch (error) {
+    // A secondary section: a failed read (timeout, 429, 5xx) leaves this note, never a 500 for the whole page.
+    if (!unavailableRead(error)) throw error;
+    data = null;
+  }
   if (!data) return <p className="mt-8 text-sm text-zinc-500">AI 閱讀線索暫時無法讀取。</p>;
   if (!data.profile?.bio && !data.topics?.length) return null;
   return (

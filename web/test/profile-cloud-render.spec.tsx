@@ -124,8 +124,14 @@ describe('profile topic cloud', () => {
     $ = load(renderToString(await BlogTopicCloud({ slug: 'a' })));
     expect($('section').length).toBe(0);
     expect($('body').text()).toBe('');
-    answer({ error: 'busy' }, 503);
-    await expect(BlogTopicCloud({ slug: 'a' })).rejects.toBeInstanceOf(PublicGatewayError);
+    // An unavailable gateway (5xx, 429) leaves the cloud and the list out instead of failing the whole blog page;
+    // only a malformed 200 (below) still fails it.
+    for (const status of [503, 429]) {
+      answer({ error: 'busy' }, status);
+      $ = load(renderToString(await BlogTopicCloud({ slug: 'a' })));
+      expect($('a').length).toBe(0);
+      expect(await BlogTopics({ slug: 'a' })).toBeNull();
+    }
     const pending = load(renderToString(<MediaWordCloudPending />));
     expect(pending('[role="status"]').attr('aria-busy')).toBe('true');
     expect(pending('body').text()).not.toMatch(/\d+ 篇/);

@@ -7,14 +7,22 @@ import BlogTrafficProfile from '@/components/BlogTrafficProfile';
 import FooterMethod, { methodHeading } from '@/components/FooterMethod';
 import TrafficComparisonFromUrl from '@/components/public/TrafficComparisonFromUrl';
 import { publicJson } from '@/lib/public-api';
-import { PublicGatewayError } from '@/lib/public-read';
+import { PublicGatewayError, unavailableRead } from '@/lib/public-read';
 import { COMPARE_LIMIT, normalizeTraffic } from '@/lib/traffic';
 
 const NO_QUERY: Record<string, string | undefined> = {};
 
 export default async function SimilarwebTraffic({ slug, compact = false }: { slug?: string; compact?: boolean }) {
   const path = `/api/traffic${slug ? `?${new URLSearchParams({ blog: slug })}` : ''}`;
-  const data = normalizeTraffic(await publicJson<unknown>(path));
+  let raw: unknown;
+  try {
+    raw = await publicJson<unknown>(path);
+  } catch (error) {
+    // On a blog page the traffic block is secondary: leave it out on a failed read. /traffic/ itself still fails.
+    if (slug && unavailableRead(error)) return null;
+    throw error;
+  }
+  const data = normalizeTraffic(raw);
   // public-contracts.ts already requires `blogs`; an unreadable payload must not be cached as a "no data" page.
   if (!data) throw new PublicGatewayError(path, 200, 'unexpected traffic payload');
   if (compact || slug) {

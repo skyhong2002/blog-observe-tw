@@ -9,6 +9,7 @@ import {
   sourceText,
 } from '@/lib/content-sources';
 import { publicJsonOrNull } from '@/lib/public-api';
+import { unavailableRead } from '@/lib/public-read';
 
 const box = 'rounded-lg border border-zinc-200 p-3 text-xs dark:border-zinc-800';
 // What the text is used for is in the footer's 部落格頁 block (FooterMethod.tsx), not repeated here.
@@ -18,7 +19,13 @@ const contentSlug = /^[a-z0-9][a-z0-9-]{0,199}$/;
 
 export default async function BlogContentSources({ slug }: { slug: string }) {
   // null: the gateway's real 404, or a slug the route never looks up. A wrong-shaped 200 throws in public-read.ts.
-  const raw = contentSlug.test(slug) ? await publicJsonOrNull<unknown>(`/api/blogs/${encodeURIComponent(slug)}/content`) : null;
+  // A failed read (timeout, 429, 5xx) shows the same 暫時無法讀取 as a missing one, not a 500 for the whole page.
+  const raw = contentSlug.test(slug)
+    ? await publicJsonOrNull<unknown>(`/api/blogs/${encodeURIComponent(slug)}/content`).catch((error: unknown) => {
+        if (!unavailableRead(error)) throw error;
+        return null;
+      })
+    : null;
   const data = raw === null ? null : normalizeContent(raw);
   if (!data)
     return (

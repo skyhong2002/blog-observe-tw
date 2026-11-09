@@ -37,6 +37,11 @@ export class PublicGatewayError extends Error {
   }
 }
 
+/** The gateway did not answer in time or refused (network, 429, 5xx): a secondary section may leave itself out.
+ * A malformed 200 is not this: it still fails the page, so a broken contract never renders as empty data. */
+export const unavailableRead = (error: unknown): error is PublicGatewayError =>
+  error instanceof PublicGatewayError && (error.status === null || error.status === 429 || error.status >= 500);
+
 export type PublicRead = { found: true; body: unknown } | { found: false; gone?: true };
 type Fetch = (url: string, init: RequestInit) => Promise<Response>;
 

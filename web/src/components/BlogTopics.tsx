@@ -1,12 +1,20 @@
 import { topicLink } from '@/lib/page-links';
 import { publicJsonOrNull } from '@/lib/public-api';
 import { BLOG_TOPICS_PERIOD, blogTopicsApiPath } from '@/lib/public-query';
+import { unavailableRead } from '@/lib/public-read';
 import type { Topics } from '@/lib/topics';
 import Link from './NoPrefetchLink';
 // Same 90-day path as BlogTopicCloud: one per-request read for the list and the profile's word cloud.
 export default async function BlogTopics({ slug }: { slug: string }) {
-  const data = await publicJsonOrNull<Topics>(blogTopicsApiPath(slug));
-  // No topic data offered (the gateway's 404; a failed read throws) or none in the period: the section is left out.
+  let data: Topics | null;
+  try {
+    data = await publicJsonOrNull<Topics>(blogTopicsApiPath(slug));
+  } catch (error) {
+    // A secondary section: a failed read leaves it out rather than turning the whole blog page into a 500.
+    if (!unavailableRead(error)) throw error;
+    data = null;
+  }
+  // No topic data offered (the gateway's 404), a failed read, or none in the period: the section is left out.
   // What counts as a topic is in the footer's 部落格頁 block.
   if (!data?.items.length) return null;
   return (

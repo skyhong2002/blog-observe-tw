@@ -35,6 +35,20 @@ describe('server render rate bucket isolation', () => {
     expect(gatewayRateKey(r)).toBe('internal-render-read');
   });
   it.each([
+    '/api/blogs/example/inference',
+    '/api/blogs/example/mentions',
+    '/api/blogs/example/mentions/all?cursor=abc',
+    '/api/blogs/example/tech',
+    '/api/blogs/example/topics?days=90',
+    '/api/mentions',
+    '/api/tech?limit=20',
+  ])('keeps every blog-page server render read %s in the render bucket', (path) => {
+    const r = request(path);
+    expect(internalRenderRead(r)).toBe(true);
+    expect(gatewayRateKey(r)).toBe('internal-render-read');
+    expect(gatewayRateMax(r)).toBe(2000);
+  });
+  it.each([
     'cf-connecting-ip',
     'x-real-ip',
     'true-client-ip',
@@ -58,6 +72,9 @@ describe('server render rate bucket isolation', () => {
     '/auth/google',
     '/api/me/follows',
     '/api/blogs/example/follow',
+    '/api/blogs/example/mentions.xml',
+    '/api/blogs/example/inference/x',
+    '/api/blogs/example/mentions/all/x',
     '//api/overview',
     '/api/%61dmin',
   ])('does not widen protected or unrelated route %s', (path) => expect(internalRenderRead(request(path))).toBe(false));
