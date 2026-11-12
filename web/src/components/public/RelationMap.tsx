@@ -111,10 +111,12 @@ function graphFor(data: Relations, view: GraphView) {
 function RelationDetails({ data }: { data: Relations }) {
   const [showAll, setShowAll] = useState({ most: false, mutual: false });
   const [view, setView] = useState<GraphView>('all');
-  // A phone cannot show a crowded map legibly: start it on the links of 3+ articles (the chips switch back).
+  // A phone cannot show a crowded map legibly: start it on a narrower view that still has a real network
+  // (3+ articles, else mutual mentions, each kept only with 8+ blogs); the chips switch back.
   useEffect(() => {
-    if (window.matchMedia('(max-width: 639px)').matches && data.nodes.length > 40 && data.edges.some((e) => e.count >= 3))
-      setView('repeat');
+    if (!window.matchMedia('(max-width: 639px)').matches || data.nodes.length <= 40) return;
+    const narrower = (['repeat', 'mutual'] as const).find((key) => graphFor(data, key).nodes.length >= 8);
+    if (narrower) setView(narrower);
   }, [data]);
   const graph = useMemo(() => graphFor(data, view), [data, view]);
   const nodes = new Map(data.nodes.map((n) => [n.id, n]));
