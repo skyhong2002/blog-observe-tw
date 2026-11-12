@@ -1,6 +1,7 @@
 import MethodLink from '@/components/MethodLink';
 import Link from '@/components/NoPrefetchLink';
 import SectionTabs from '@/components/SectionTabs';
+import StateNotice from '@/components/StateNotice';
 import TableScroller from '@/components/TableScroller';
 import TagCountChartLoader from '@/components/TagCountChartLoader';
 import { taipei } from '@/lib/api';
@@ -14,19 +15,20 @@ export default async function RankingPage() {
   const data = await overview();
   return (
     <div className="space-y-5 pb-8">
+      <SectionTabs
+        label="文章瀏覽"
+        tabs={[
+          { href: '/articles/', label: '最新文章' },
+          { href: '/tags/', label: '文章標籤' },
+          { href: '/ranking/', label: '標籤收錄排行', current: true },
+        ]}
+      />
       <header>
         <h1 className="text-2xl font-semibold">標籤收錄排行</h1>
         <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
           {data.updatedAt ? `更新於 ${taipei(data.updatedAt)}` : '等待資料更新'} · <MethodLink />
         </p>
       </header>
-      <SectionTabs
-        label="標籤觀察"
-        tabs={[
-          { href: '/ranking/', label: '收錄排行', current: true },
-          { href: '/tags/', label: '探索標籤' },
-        ]}
-      />
       {data.tags.length ? (
         <>
           <section className="rounded-xl border border-zinc-300 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">
@@ -72,7 +74,9 @@ export default async function RankingPage() {
           </TableScroller>
         </>
       ) : (
-        <p className="py-8 text-zinc-500">目前沒有可列出的標籤。</p>
+        <StateNotice tone="notice" title="排行還沒有資料" actions={[{ href: '/articles/', label: '看最新文章', primary: true }]}>
+          收錄的文章帶有標籤後，這裡會依參與的部落格數排出前幾名。
+        </StateNotice>
       )}
     </div>
   );

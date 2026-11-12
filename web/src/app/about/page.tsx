@@ -46,7 +46,7 @@ export default function AboutPage() {
           Google 登入用於建立帳號與管理追蹤。你可以透過個人 RSS 閱讀追蹤內容，或匯出 OPML 到自己的閱讀器。完整文章仍由原站提供。
         </p>
         <Link href="/my/" className="inline-block text-sm text-brand-700 hover:underline dark:text-brand-400">
-          管理我的閱讀 →
+          管理我的追蹤 →
         </Link>
       </section>
       <section className="space-y-2">

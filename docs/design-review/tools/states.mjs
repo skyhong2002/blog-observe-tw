@@ -10,6 +10,8 @@
 // navFrom: load this path normally first, then switch the gateway to `data`
 //          and click the link `navClick`, and shoot after `navWait` ms: what a
 //          reader sees while the next page is still on its way.
+// streamOnly: open `path` directly while reads hang and shoot what has streamed after 2 s
+//          (the route's loading skeleton).
 export const SIZES = {
   desktop: { width: 1440, height: 900, deviceScaleFactor: 1, maxHeight: 2700 },
   mobile: { width: 390, height: 844, deviceScaleFactor: 2, maxHeight: 1688, isMobile: true, hasTouch: true },
@@ -66,7 +68,7 @@ export const STATES = [
   // Relations
   { id: 'relations', path: '/relations/' },
   { id: 'relations-30', path: '/relations/?days=30' },
-  { id: 'relations-loading', path: '/relations/', navFrom: '/about/', navClick: 'a[href="/relations/"]', data: 'loading', viewportOnly: true },
+  { id: 'relations-loading', path: '/relations/', data: 'loading', streamOnly: true, viewportOnly: true },
   { id: 'relations-error', path: '/relations/', data: 'error' },
   // Account
   { id: 'my-signed-out', path: '/my/' },

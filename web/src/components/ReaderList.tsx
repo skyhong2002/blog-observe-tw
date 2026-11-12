@@ -3,6 +3,8 @@ import BlogIcon from '@/components/BlogIcon';
 import { useFollows } from '@/lib/follows-store';
 import { blogHref } from '@/lib/page-links';
 import Link from './NoPrefetchLink';
+import ReloadButton from './public/ReloadButton';
+import StateNotice, { stateActionClass } from './StateNotice';
 export default function ReaderList() {
   // The same shared /api/me/follows read as FollowButton (lib/follows-store.ts).
   const loaded = useFollows();
@@ -16,9 +18,9 @@ export default function ReaderList() {
     );
   if (state === 'error')
     return (
-      <p role="alert" className="py-8 text-zinc-500">
-        暫時無法取得閱讀清單，請稍後重新整理。
-      </p>
+      <StateNotice tone="error" title="暫時無法取得追蹤清單" extra={<ReloadButton />}>
+        你的追蹤沒有遺失，只是這次沒讀到。重新整理通常就能解決。
+      </StateNotice>
     );
   if (state === 'login')
     return (
@@ -31,44 +33,44 @@ export default function ReaderList() {
       </section>
     );
   return (
-    <>
-      <div className="flex flex-wrap justify-between gap-3 text-sm">
-        <span className="text-zinc-500">{follows?.length ?? 0} 個追蹤網站</span>
-        <div className="flex flex-wrap gap-4">
-          <a className="text-brand-700 hover:underline dark:text-brand-400" href="/me/feed.xml">
-            個人 RSS
+    <section className="rounded-2xl border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-zinc-200 px-4 py-3 dark:border-zinc-800">
+        <h2 className="text-base font-semibold">
+          追蹤中的部落格{' '}
+          <span className="ml-1 text-sm font-normal tabular-nums text-zinc-600 dark:text-zinc-400">{follows?.length ?? 0} 個</span>
+        </h2>
+        <div className="flex flex-wrap gap-2 text-sm">
+          <a className={stateActionClass()} href="/me/feed.xml">
+            訂閱個人 RSS
           </a>
-          <a className="text-brand-700 hover:underline dark:text-brand-400" href="/me/opml">
+          <a className={stateActionClass()} href="/me/opml">
             匯出 OPML
           </a>
         </div>
       </div>
       {follows?.length ? (
-        <ul className="divide-y divide-zinc-200 dark:divide-zinc-800">
+        <ul className="divide-y divide-zinc-200 px-4 dark:divide-zinc-800">
           {follows.map((blog) => (
             <li key={blog.slug}>
-              <Link href={blogHref(blog.slug, blog.canonicalPath)} className="flex min-h-14 items-center justify-between gap-3 py-3">
-                <strong className="inline-flex items-center gap-1.5 text-sm font-medium text-brand-700 dark:text-brand-400">
+              <Link href={blogHref(blog.slug, blog.canonicalPath)} className="group flex min-h-14 items-center justify-between gap-3 py-3">
+                <span className="inline-flex min-w-0 items-center gap-2 text-[0.9375rem] font-medium text-zinc-900 group-hover:text-brand-700 dark:text-zinc-100 dark:group-hover:text-brand-400">
                   <BlogIcon media={blog.slug} iconUrl={blog.iconUrl} title={blog.name} />
-                  {blog.name}
-                </strong>
-                <span className="text-xs text-zinc-500">{blog.category === '待分類' ? '' : (blog.category ?? '')}</span>
+                  <span className="truncate">{blog.name}</span>
+                </span>
+                <span className="shrink-0 text-sm text-zinc-600 dark:text-zinc-400">
+                  {blog.category && blog.category !== '待分類' ? blog.category : ''} <span aria-hidden="true">→</span>
+                </span>
               </Link>
             </li>
           ))}
         </ul>
       ) : (
-        <section className="rounded-xl border border-dashed border-zinc-300 p-8 dark:border-zinc-700">
-          <h2 className="text-lg font-semibold">還沒有追蹤的網站</h2>
-          <p className="mt-3 text-sm text-zinc-600 dark:text-zinc-400">
-            先從{' '}
-            <Link href="/blogs/" className="text-brand-700 hover:underline dark:text-brand-400">
-              部落格目錄
-            </Link>{' '}
-            找到想持續閱讀的作者。
-          </p>
-        </section>
+        <div className="p-4">
+          <StateNotice title="還沒有追蹤任何部落格" actions={[{ href: '/blogs/', label: '逛部落格目錄', primary: true }]}>
+            在部落格頁按「追蹤」，它的新文章就會出現在你的個人 RSS 裡。
+          </StateNotice>
+        </div>
       )}
-    </>
+    </section>
   );
 }

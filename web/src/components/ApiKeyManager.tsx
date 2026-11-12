@@ -14,7 +14,7 @@ type Fresh = { key: string; label: string };
 
 const card = 'rounded-xl border border-zinc-300 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900';
 const primary =
-  'inline-flex min-h-10 shrink-0 items-center rounded-lg bg-brand-700 px-4 text-sm text-white hover:bg-brand-800 disabled:cursor-not-allowed disabled:opacity-60';
+  'inline-flex min-h-10 shrink-0 items-center rounded-lg bg-brand-700 px-4 text-sm text-white hover:bg-brand-800 disabled:cursor-not-allowed disabled:bg-zinc-200 disabled:text-zinc-600 dark:disabled:bg-zinc-800 dark:disabled:text-zinc-400';
 const secondary =
   'inline-flex min-h-9 shrink-0 items-center rounded-lg border border-zinc-300 px-3 text-sm hover:border-brand-600 hover:text-brand-700 disabled:opacity-60 dark:border-zinc-700 dark:hover:border-brand-400 dark:hover:text-brand-400';
 const danger =
@@ -313,7 +313,7 @@ export default function ApiKeyManager({ example }: { example: string }) {
 
           <div className="space-y-1">
             <p className="text-sm font-medium">使用方式</p>
-            <pre className="overflow-x-auto rounded-md bg-zinc-900 p-3 text-[13px] leading-relaxed text-zinc-100 dark:bg-zinc-900/80">
+            <pre className="whitespace-pre-wrap break-all rounded-md bg-zinc-900 p-3 text-[13px] leading-relaxed text-zinc-100 dark:bg-zinc-900/80">
               <code>{`curl -s -H 'x-api-key: <你的 API 金鑰>' 'https://weblog.tw${example}'`}</code>
             </pre>
           </div>

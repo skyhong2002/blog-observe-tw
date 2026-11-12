@@ -25,7 +25,7 @@ export default function RelationMapView({ days, load }: { days: Period; load: Pu
     <div className="space-y-5 pb-8">
       <header>
         <RelationTabs current="relations" />
-        <h1 className="text-2xl font-semibold">部落格關係圖</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">引用關係圖</h1>
         <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
           誰在文章中提到誰 · <MethodLink />
         </p>

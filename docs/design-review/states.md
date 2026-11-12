@@ -57,7 +57,7 @@
 | `ranking-empty` | 標籤收錄排行 | 空資料 | data=empty |
 | `relations` | 關係圖 `/relations/` | 近 7 天 | — |
 | `relations-30` | 關係圖 | 近 30 天 | `?days=30` |
-| `relations-loading` | 關係圖 | 從 `/about/` 點導覽到關係圖、資料讀取中 | 同 `home-loading`，點 `a[href="/relations/"]` |
+| `relations-loading` | 關係圖 | 直接開啟、資料讀取中 | 公開讀取不回應，直接載入 `/relations/`，2.5 秒後截一屏（伺服器先串流的 loading 畫面）。第 1 輪的定義點的是 `/about/` 上不存在的連結，沒有發生導覽，第 2 輪起改正 |
 | `relations-error` | 關係圖 | 讀取失敗（伺服器與瀏覽器重試都失敗） | data=error |
 | `my-signed-out` | 我的閱讀 `/my/` | 未登入 | — |
 | `my-signed-in` | 我的閱讀 | 已登入、追蹤三站、一把金鑰 | session=in |

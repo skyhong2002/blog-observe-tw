@@ -685,7 +685,9 @@ describe('navigation switch', () => {
       const link = $('a[href="/tech/"]');
       expect(link.length).toBe(shown ? 1 : 0);
       if (shown) {
-        expect(link.text()).toBe('技術');
+        // Phones read the full label (使用的技術), the desktop row the short one (技術).
+        expect(link.find('span.lg\\:hidden').text()).toBe('使用的技術');
+        expect(link.find('span.lg\\:inline').text()).toBe('技術');
         expect(link.attr('data-prefetch')).toBe('false');
       }
       expect($('a[href="/traffic/"]').length).toBe(1);

@@ -43,7 +43,7 @@ export default function SourceProfile({ blog, sidebar, cloud }: { blog: Blog; si
   const allPosts = blog.posts ?? [];
   const authors = blog.authors ?? [];
   const tags = blog.tags ?? [];
-  const owner = { slug: blog.slug, name: blog.name, canonicalPath: blog.canonicalPath };
+  const owner = { slug: blog.slug, name: blog.name, canonicalPath: blog.canonicalPath, url: blog.url };
   return (
     <div className="pb-4">
       <nav aria-label="麵包屑" className="mb-3 text-xs text-zinc-500 dark:text-zinc-400">

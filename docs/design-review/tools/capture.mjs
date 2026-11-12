@@ -85,13 +85,9 @@ async function shoot(page, file, size, { anchor, viewportOnly } = {}) {
   if (viewportOnly) return page.screenshot({ path: file, animations: 'disabled', caret: 'hide', timeout: 120000 });
   const full = await page.evaluate(() => document.documentElement.scrollHeight);
   const height = Math.max(size.height, Math.min(full - top, size.maxHeight));
-  // Grow the viewport to the shot instead of a full-page capture: a 1,000-post page
-  // would otherwise be rasterised whole and can take the browser down.
-  await page.setViewportSize({ width: size.width, height: Math.round(height) });
-  await page.waitForTimeout(800);
-  await page.evaluate((y) => window.scrollTo(0, y), top);
-  await page.waitForTimeout(400);
-  return page.screenshot({ path: file, animations: 'disabled', caret: 'hide', timeout: 120000 });
+  // Full-page capture of only the clip: the viewport (and so 100vh) stays at the
+  // device size, as a reader sees it; Chromium paints just the clipped region.
+  return page.screenshot({ path: file, fullPage: true, clip: { x: 0, y: top, width: size.width, height }, animations: 'disabled', caret: 'hide', timeout: 120000 });
 }
 
 async function newContext(browser, size, { theme, locale = 'zh-TW' } = {}) {
@@ -133,6 +129,10 @@ try {
           await setState(state.data, state.session);
           await page.evaluate((selector) => document.querySelector(selector)?.click(), state.navClick);
           await page.waitForTimeout(state.navWait ?? 1500);
+        } else if (state.streamOnly) {
+          await setState(state.data, state.session);
+          await page.goto(base + state.path, { waitUntil: 'commit', timeout: 60000 }).catch(() => {});
+          await page.waitForTimeout(2500);
         } else {
           await setState(state.data, state.session);
           await page.goto(base + state.path, { waitUntil: 'networkidle', timeout: 60000 }).catch(() => {});

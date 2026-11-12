@@ -86,7 +86,7 @@ function TopicBlogs({ blogs }: { blogs: TopicDetail['blogs'] }) {
               {b.posts} 篇
               {typeof b.titlePosts === 'number' && typeof b.bodyOnlyPosts === 'number' ? (
                 <span className="ml-1 text-xs text-zinc-500 dark:text-zinc-400">
-                  （標題 {b.titlePosts}／僅正文 {b.bodyOnlyPosts}）
+                  （標題提到 {b.titlePosts}、只在內文 {b.bodyOnlyPosts}）
                 </span>
               ) : null}
             </span>
