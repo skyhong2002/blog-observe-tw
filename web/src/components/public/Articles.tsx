@@ -10,7 +10,6 @@ import FooterMethod, { methodHeading } from '@/components/FooterMethod';
 import MethodLink from '@/components/MethodLink';
 import Link from '@/components/NoPrefetchLink';
 import SearchBox from '@/components/SearchBox';
-import SectionTabs from '@/components/SectionTabs';
 import StateNotice from '@/components/StateNotice';
 import { type Post, taipei } from '@/lib/api';
 import {
@@ -282,14 +281,6 @@ export default function ArticlesView({
   const filtered = filterLatestPosts(latest, effective);
   return (
     <div className="space-y-5 pb-8">
-      <SectionTabs
-        label="文章瀏覽"
-        tabs={[
-          { href: '/articles/', label: '最新文章', current: true },
-          { href: '/tags/', label: '文章標籤' },
-          { href: '/ranking/', label: '標籤收錄排行' },
-        ]}
-      />
       <header>
         <h1 className="text-2xl font-semibold tracking-tight">{searching ? `搜尋「${asked.q}」` : '最新文章'}</h1>
         <p className="mt-1 text-[0.9375rem] leading-7 text-zinc-700 dark:text-zinc-300">

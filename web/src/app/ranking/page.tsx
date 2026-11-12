@@ -16,9 +16,8 @@ export default async function RankingPage() {
   return (
     <div className="space-y-5 pb-8">
       <SectionTabs
-        label="文章瀏覽"
+        label="標籤"
         tabs={[
-          { href: '/articles/', label: '最新文章' },
           { href: '/tags/', label: '文章標籤' },
           { href: '/ranking/', label: '標籤收錄排行', current: true },
         ]}
@@ -30,8 +29,8 @@ export default async function RankingPage() {
         </p>
       </header>
       {data.tags.length ? (
-        <>
-          <section className="rounded-xl border border-zinc-300 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">
+        <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,34rem)]">
+          <section className="rounded-xl border border-zinc-300 bg-white p-4 lg:sticky lg:top-20 dark:border-zinc-800 dark:bg-zinc-900">
             <h2 className="mb-3 text-sm font-semibold">前十個標籤 · 參與部落格數</h2>
             <TagCountChartLoader rows={data.tags.slice(0, 10).map((t) => ({ label: t.label, blogCount: t.blogCount }))} />
           </section>
@@ -55,7 +54,11 @@ export default async function RankingPage() {
                   <tr className={table.row} key={tag.slug}>
                     <td className={table.lead}>
                       <div className={`${table.leadBox} flex items-center gap-2`}>
-                        <span className={`${table.leadExtra} w-7 shrink-0 text-right text-xs tabular-nums text-zinc-500`}>{i + 1}</span>
+                        <span
+                          className={`${table.leadExtra} w-7 shrink-0 text-right text-sm font-semibold tabular-nums ${i < 3 ? 'text-brand-700 dark:text-brand-400' : 'text-zinc-700 dark:text-zinc-300'}`}
+                        >
+                          {i + 1}
+                        </span>
                         <Link
                           className={`${table.leadText} text-brand-700 hover:underline dark:text-brand-400 sm:max-w-80`}
                           href={`/tags/?tag=${encodeURIComponent(tag.slug)}`}
@@ -72,7 +75,7 @@ export default async function RankingPage() {
               </tbody>
             </table>
           </TableScroller>
-        </>
+        </div>
       ) : (
         <StateNotice tone="notice" title="排行還沒有資料" actions={[{ href: '/articles/', label: '看最新文章', primary: true }]}>
           收錄的文章帶有標籤後，這裡會依參與的部落格數排出前幾名。

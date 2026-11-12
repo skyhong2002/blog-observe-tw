@@ -175,7 +175,8 @@ export default function BlogRelationGraph({ nodes, edges }: { nodes: RelationNod
           rank: incoming.get(n.id) ?? 0,
           wanted: (incoming.get(n.id) ?? 0) >= LABELLED_MENTIONS,
         })),
-        { maxWidth: style.width, lineHeight: style.lineHeight, gap: 5, pad: 2, width, height, mustShow: MUST_LABEL },
+        // Phones: only the top two names may be drawn over other icons; the rest appear only where they fit.
+        { maxWidth: style.width, lineHeight: style.lineHeight, gap: 5, pad: 2, width, height, mustShow: isNarrow() ? 2 : MUST_LABEL },
       );
       placed = { points, sides };
       render();

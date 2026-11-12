@@ -62,9 +62,8 @@ export default function TagExplorerView({
   return (
     <div className="space-y-5 pb-8">
       <SectionTabs
-        label="文章瀏覽"
+        label="標籤"
         tabs={[
-          { href: '/articles/', label: '最新文章' },
           { href: '/tags/', label: '文章標籤', current: true },
           { href: '/ranking/', label: '標籤收錄排行' },
         ]}

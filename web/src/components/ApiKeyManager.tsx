@@ -263,8 +263,9 @@ export default function ApiKeyManager({ example }: { example: string }) {
                         </span>
                         <code className="shrink-0 font-mono text-xs text-zinc-500">{k.prefix}…</code>
                       </p>
-                      <p className="truncate text-xs text-zinc-500">
-                        建立於 {time(k.createdAt) ?? '—'} · {used ? `最後使用 ${used}` : '尚未使用'}
+                      <p className="flex flex-wrap gap-x-2 text-sm text-zinc-600 dark:text-zinc-400">
+                        <span className="whitespace-nowrap">建立於 {time(k.createdAt) ?? '—'}</span>
+                        <span className="whitespace-nowrap">{used ? `最後使用 ${used}` : '尚未使用'}</span>
                       </p>
                     </div>
                     {confirming === k.id ? (
@@ -295,6 +296,7 @@ export default function ApiKeyManager({ example }: { example: string }) {
               <label className="flex min-w-0 flex-1 flex-col gap-1 text-sm">
                 <span className="text-zinc-600 dark:text-zinc-400">金鑰名稱（例如用途或專案）</span>
                 <input
+                  aria-describedby="api-key-name-hint"
                   value={label}
                   onChange={(e) => setLabel(e.target.value)}
                   maxLength={60}
@@ -307,6 +309,11 @@ export default function ApiKeyManager({ example }: { example: string }) {
                 {busy === 'create' ? '建立中…' : '建立金鑰'}
               </button>
             </form>
+          ) : null}
+          {keys.length < max ? (
+            <p id="api-key-name-hint" className="-mt-2 text-sm text-zinc-600 dark:text-zinc-400">
+              {label.trim() ? `還可以建立 ${max - keys.length} 把。` : '先輸入名稱，就能建立金鑰。'}
+            </p>
           ) : (
             <p className="text-sm text-zinc-500">已達 {max} 把上限，撤銷一把後才能再建立。</p>
           )}

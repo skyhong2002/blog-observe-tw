@@ -3,7 +3,7 @@
 // One view for the prerendered 7-day relation map and the browser's ?days=30|90; see app/relations/page.tsx.
 
 import { useSearchParams } from 'next/navigation';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import BlogIcon from '@/components/BlogIcon';
 import BlogRelationGraph from '@/components/BlogRelationGraph';
 import { filterChipClass, filterRowClass } from '@/components/FilterChips';
@@ -38,10 +38,34 @@ export default function RelationMapView({ days, load }: { days: Period; load: Pu
         <RelationDetails data={load.data} />
       ) : load.status === 'pending' ? (
         <>
-          <p role="status" aria-busy="true" className="text-zinc-500">
+          <p role="status" aria-busy="true" className="text-zinc-600 dark:text-zinc-400">
             正在載入近 {days} 天的關係資料…
           </p>
-          <PendingRows />
+          {/* The same shape as the loaded page: the graph's frame, then the two ranking lists. */}
+          <div
+            aria-hidden="true"
+            className="relative flex aspect-[4/3] max-h-[34rem] w-full items-center justify-center overflow-hidden rounded-xl border border-zinc-300 bg-white sm:aspect-[16/9] dark:border-zinc-800 dark:bg-zinc-900"
+          >
+            {[
+              [22, 30, 5],
+              [48, 44, 7],
+              [70, 28, 4],
+              [36, 68, 4],
+              [62, 70, 5],
+              [82, 56, 3],
+              [14, 60, 3],
+            ].map(([x, y, r]) => (
+              <span
+                key={`${x}-${y}`}
+                className="absolute rounded-full bg-zinc-200 motion-safe:animate-pulse dark:bg-zinc-800"
+                style={{ left: `${x}%`, top: `${y}%`, width: `${r * 0.5}rem`, height: `${r * 0.5}rem` }}
+              />
+            ))}
+          </div>
+          <div className="grid gap-4 md:grid-cols-2">
+            <PendingRows rows={5} />
+            <PendingRows rows={5} />
+          </div>
         </>
       ) : (
         <SectionUnavailable label="關係資料" />
@@ -87,6 +111,11 @@ function graphFor(data: Relations, view: GraphView) {
 function RelationDetails({ data }: { data: Relations }) {
   const [showAll, setShowAll] = useState({ most: false, mutual: false });
   const [view, setView] = useState<GraphView>('all');
+  // A phone cannot show a crowded map legibly: start it on the links of 3+ articles (the chips switch back).
+  useEffect(() => {
+    if (window.matchMedia('(max-width: 639px)').matches && data.nodes.length > 40 && data.edges.some((e) => e.count >= 3))
+      setView('repeat');
+  }, [data]);
   const graph = useMemo(() => graphFor(data, view), [data, view]);
   const nodes = new Map(data.nodes.map((n) => [n.id, n]));
   const name = (id: number) => nodes.get(id)?.name ?? `部落格 #${id}`;
