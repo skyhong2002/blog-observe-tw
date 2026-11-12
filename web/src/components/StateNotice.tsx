@@ -92,7 +92,7 @@ export default function StateNotice({
           </Heading>
           {children && <div className="text-[0.9375rem] leading-7 text-zinc-700 dark:text-zinc-300">{children}</div>}
           {actions.length > 0 && (
-            <div className="flex flex-wrap items-center gap-2 pt-1">
+            <div className="flex flex-col gap-2 pt-1 sm:flex-row sm:flex-wrap sm:items-center [&>*]:justify-center">
               {actions.map((action) =>
                 action.external ? (
                   <a key={action.href} href={action.href} rel="noopener noreferrer" className={stateActionClass(action.primary)}>

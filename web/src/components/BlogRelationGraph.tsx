@@ -18,7 +18,7 @@ const LABEL_WIDTH_NARROW = 96,
 const ICON_WAIT_MS = 2500;
 const LABELLED_MENTIONS = 2;
 // The most-mentioned blogs keep their names even in a crowd, drawn over other icons (with a halo) if need be.
-const MUST_LABEL = 5;
+const MUST_LABEL = 3;
 type GraphData = { count(): number; getItemLayout(i: number): unknown };
 /** The icon URLs that actually load within ICON_WAIT_MS; a node whose icon fails keeps the green dot. */
 function loadedIcons(urls: string[]): Promise<Set<string>> {

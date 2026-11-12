@@ -183,10 +183,11 @@ function RelationDetails({ data }: { data: Relations }) {
           <h2 className="font-semibold">最常被提及</h2>
           <ol className="mt-3 divide-y divide-zinc-200 dark:divide-zinc-800">
             {(showAll.most ? data.mostMentioned : data.mostMentioned.slice(0, LIST_PREVIEW)).map((r, i) => (
-              <li className="flex items-center gap-3 py-2.5 text-sm" key={r.blogId}>
-                <span className="w-6 shrink-0 text-right text-xs tabular-nums text-zinc-500 dark:text-zinc-400">{i + 1}</span>
+              // Phones: the counts drop under the name, so the name keeps the row's width instead of a "…".
+              <li className="flex flex-wrap items-center gap-x-3 gap-y-1 py-2.5 text-sm sm:flex-nowrap" key={r.blogId}>
+                <span className="w-6 shrink-0 text-right text-sm font-medium tabular-nums text-zinc-600 dark:text-zinc-400">{i + 1}</span>
                 <span className="min-w-0 flex-1">{chip(r.blogId)}</span>
-                <span className="shrink-0 text-xs tabular-nums text-zinc-600 dark:text-zinc-400">
+                <span className="w-full shrink-0 pl-9 text-xs tabular-nums text-zinc-600 sm:w-auto sm:pl-0 dark:text-zinc-400">
                   {r.incomingBlogs} 個部落格提及 · {r.mentions} 篇
                 </span>
               </li>

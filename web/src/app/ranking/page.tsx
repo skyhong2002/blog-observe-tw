@@ -11,8 +11,13 @@ import { table } from '@/lib/table-styles';
 // Rendered per request (no-store reads, public-read.ts).
 export const dynamic = 'force-dynamic';
 export const metadata = staticPageMetadata('/ranking/');
+/** Blog platforms' default category names: not a topic anyone chose, so they stay out of the ranking (and say so). */
+const PLATFORM_DEFAULT = /^(?:未分類|未分类|無分類|uncategori[sz]ed)$/iu;
+
 export default async function RankingPage() {
-  const data = await overview();
+  const all = await overview();
+  const skipped = all.tags.filter((t) => PLATFORM_DEFAULT.test(t.label.trim()));
+  const data = { ...all, tags: all.tags.filter((t) => !PLATFORM_DEFAULT.test(t.label.trim())) };
   return (
     <div className="space-y-5 pb-8">
       <SectionTabs
@@ -33,6 +38,27 @@ export default async function RankingPage() {
           <section className="rounded-xl border border-zinc-300 bg-white p-4 lg:sticky lg:top-20 dark:border-zinc-800 dark:bg-zinc-900">
             <h2 className="mb-3 text-sm font-semibold">前十個標籤 · 參與部落格數</h2>
             <TagCountChartLoader rows={data.tags.slice(0, 10).map((t) => ({ label: t.label, blogCount: t.blogCount }))} />
+            <dl className="mt-4 grid grid-cols-2 gap-3 border-t border-zinc-200 pt-4 text-sm dark:border-zinc-800">
+              <div>
+                <dt className="text-zinc-600 dark:text-zinc-400">列出的標籤</dt>
+                <dd className="mt-0.5 text-xl font-semibold tabular-nums">{data.tags.length.toLocaleString('zh-TW')}</dd>
+              </div>
+              <div>
+                <dt className="text-zinc-600 dark:text-zinc-400">最多部落格在用</dt>
+                <dd className="mt-0.5 truncate text-xl font-semibold" title={data.tags[0].label}>
+                  {data.tags[0].label}
+                </dd>
+              </div>
+            </dl>
+            <p className="mt-4 text-sm leading-6 text-zinc-700 dark:text-zinc-300">
+              先比有多少部落格用過這個標籤，再比收錄的文章數。這是「多少人在寫」，不是熱度或品質評分。
+              {skipped.length > 0 && ` 已略過部落格平台的預設分類（${skipped.map((t) => t.label).join('、')}）。`}
+            </p>
+            <p className="mt-3">
+              <Link href="/tags/" className="text-sm font-medium text-brand-700 hover:underline dark:text-brand-400">
+                依標籤看文章 →
+              </Link>
+            </p>
           </section>
           <TableScroller card label="標籤收錄排行表格，可左右捲動">
             <table className="w-full whitespace-nowrap text-sm">
