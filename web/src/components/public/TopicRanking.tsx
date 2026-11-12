@@ -2,7 +2,7 @@
 
 // The two topic rankings, one view each for the prerendered 30-day read and the browser's ?days=7|90:
 // /topics/ (order=blogs, what the most blogs are writing about) and /topics/trending/ (heat, what is rising).
-// Each opens like the homepage, its title in the middle of its own ranking's word cloud; see app/topics/page.tsx.
+// Each opens like the homepage, its title in the middle of its own ranking's word cloud; see app/topics/(ranking)/page.tsx.
 
 import { useSearchParams } from 'next/navigation';
 import { useState } from 'react';
@@ -10,6 +10,7 @@ import FilterChips from '@/components/FilterChips';
 import FooterMethod from '@/components/FooterMethod';
 import MethodLink from '@/components/MethodLink';
 import Link from '@/components/NoPrefetchLink';
+import PendingRows from '@/components/PendingRows';
 import { SectionUnavailable } from '@/components/SectionBoundary';
 import SectionTabs from '@/components/SectionTabs';
 import SortIndicator from '@/components/SortIndicator';
@@ -76,9 +77,12 @@ export default function TopicRankingView({
       {data ? (
         <TopicRows order={order} days={days} data={data} />
       ) : load.status === 'pending' ? (
-        <p role="status" aria-busy="true" className="text-center text-zinc-500 dark:text-zinc-400">
-          正在載入近 {days} 天的話題…
-        </p>
+        <>
+          <p role="status" aria-busy="true" className="text-center text-zinc-500 dark:text-zinc-400">
+            正在載入近 {days} 天的話題…
+          </p>
+          <PendingRows rows={10} />
+        </>
       ) : (
         <SectionUnavailable label="話題資料" />
       )}
@@ -190,6 +194,11 @@ function TopicRows({ order, days, data }: { order: TopicOrder; days: Period; dat
 
 // public-contracts.ts has checked items and vocabulary; an empty ranking is a valid answer.
 const parseTopics = asIs<Topics>;
+
+/** app/topics/(ranking)/loading.tsx and app/topics/trending/loading.tsx: the ranking's own pending view. */
+export function TopicRankingLoading({ order }: { order: TopicOrder }) {
+  return <TopicRankingView order={order} days={periodOf(useSearchParams(), TOPICS_PERIOD)} load={{ status: 'pending' }} />;
+}
 
 /** Reads ?days= (inside the page's Suspense boundary); periods other than the prerendered one come from /api/topics. */
 export function TopicRankingFromUrl({

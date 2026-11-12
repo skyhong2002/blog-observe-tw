@@ -16,8 +16,13 @@ function pages(dir = APP): string[] {
     return name === 'page.tsx' ? [path] : [];
   });
 }
-/** /blogs/[slug]/page.tsx -> /blogs/[slug]/ */
-const routeOf = (file: string) => `/${relative(APP, file).replace(/page\.tsx$/, '')}`;
+/** /blogs/[slug]/page.tsx -> /blogs/[slug]/; a route group such as (ranking)/ is not part of the URL. */
+const routeOf = (file: string) =>
+  `/${relative(APP, file)
+    .replace(/page\.tsx$/, '')
+    .replace(/\([^/]+\)\//g, '')}`;
+/** The page file serving a route (the reverse of routeOf). */
+const fileOf = (route: string) => pages().find((file) => routeOf(file) === route) ?? join(APP, route.slice(1), 'page.tsx');
 const source = (file: string) => readFileSync(file, 'utf8');
 
 const PRIVATE_ROUTES = [
@@ -58,11 +63,11 @@ test('every page route is either a known public page or a noindexed private one'
   const known = [...Object.keys(STATIC_PAGES), ...DYNAMIC_PUBLIC, ...PRIVATE_ROUTES, ...REDIRECT_ROUTES].sort();
   assert.deepEqual(routes, known);
   for (const route of Object.keys(STATIC_PAGES)) {
-    const text = source(join(APP, route.slice(1), 'page.tsx'));
+    const text = source(fileOf(route));
     assert.ok(text.includes(`staticPageMetadata('${route}')`), `${route} uses its STATIC_PAGES metadata`);
   }
   for (const route of DYNAMIC_PUBLIC) {
-    const text = source(join(APP, route.slice(1), 'page.tsx'));
+    const text = source(fileOf(route));
     // The registry's canonicalPath (readable URL), or a fixed subpage of it, resolved through the page API, with
     // ordinary public metadata.
     assert.match(text, /generateMetadata[\s\S]*pageMetadata\(\s*(?:page\.canonicalPath|`\$\{page\.canonicalPath\}[a-z]+\/`),/, route);
@@ -71,7 +76,7 @@ test('every page route is either a known public page or a noindexed private one'
     assert.ok(!/(blogPath|topicPath)\(/.test(text), `${route} uses canonicalPath, not the legacy URL`);
   }
   for (const route of PRIVATE_ROUTES) {
-    const text = source(join(APP, route.slice(1), 'page.tsx'));
+    const text = source(fileOf(route));
     assert.match(text, /privatePageMetadata\(|robots: \{ index: false/, route);
     assert.ok(!text.includes('alternates'), `${route} has no canonical`);
   }

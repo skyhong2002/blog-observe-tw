@@ -272,7 +272,7 @@ const PUBLIC_DATA_PAGES = [
   'app/blogs/[slug]/page.tsx',
   'app/blogs/[slug]/mentions/page.tsx',
   'app/articles/page.tsx',
-  'app/topics/page.tsx',
+  'app/topics/(ranking)/page.tsx',
   'app/topics/trending/page.tsx',
   'app/relations/page.tsx',
   'app/mentions/page.tsx',
@@ -388,4 +388,38 @@ test('route contract: query pages read the URL in the browser inside Suspense, w
     const source = read(path);
     if (source.includes('useSearchParams()')) assert.match(source, /^'use client';/, path);
   }
+});
+
+test('route contract: reader follows are one shared credentialed no-store read, held only while shown', () => {
+  const store = read('lib/follows-store.ts');
+  assert.match(store, /fetcher\('\/api\/me\/follows', \{ credentials: 'same-origin', cache: 'no-store'/);
+  assert.doesNotMatch(store, /localStorage|sessionStorage|caches\.|public-paths|use-public-json/);
+  // The server snapshot is always `loading`: no reader data is ever part of server-rendered (shared) HTML.
+  assert.match(store, /const serverSnapshot = \(\) => LOADING;/);
+  for (const path of ['components/ReaderList.tsx', 'components/follow-button.tsx']) {
+    const source = read(path);
+    assert.match(source, /useFollows\(\)/, path);
+    assert.doesNotMatch(source, /fetch\(['`]\/(?:api\/me\/follows|auth\/me)/, path);
+  }
+});
+
+test('route contract: loading boundaries sit only above pages that never answer 404 or fail on a read', () => {
+  const boundaries = files('app').filter((path) => /\/loading\.tsx$/.test(path));
+  // /traffic/ fails the page on a failed read and /tech/ is a 404 when off: streaming a boundary first would turn
+  // those into 200 pages. /topics/[id]/ answers 404, so /topics/'s boundary lives in the (ranking) group.
+  assert.deepEqual(boundaries.sort(), ['app/relations/loading.tsx', 'app/topics/(ranking)/loading.tsx', 'app/topics/trending/loading.tsx']);
+  for (const boundary of boundaries) {
+    const dir = boundary.replace(/\/loading\.tsx$/, '');
+    for (const page of files(dir).filter((path) => /\/page\.tsx$/.test(path))) {
+      assert.doesNotMatch(read(page), /notFound\(|redirect\(/, page);
+      assert.match(read(page), /^export const dynamic = 'force-dynamic';$/m, page);
+    }
+  }
+  assert.equal(files('app/topics/(ranking)').includes('app/topics/(ranking)/[id]/page.tsx'), false);
+});
+
+test('route contract: the image endpoint fetches nothing; every image is loaded by the browser', () => {
+  const config = readFileSync(join(SRC, '../next.config.ts'), 'utf8');
+  assert.match(config, /images: \{ unoptimized: true, remotePatterns: \[\], localPatterns: \[\] \}/);
+  for (const path of ['components/SafeImage.tsx', 'components/MediaIcon.tsx']) assert.match(read(path), /unoptimized/, path);
 });

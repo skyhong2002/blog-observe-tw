@@ -1,42 +1,35 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { ACTION_EVENT, type AnalyticsAction } from '@/lib/analytics-consent.mts';
+import { useFollows } from '@/lib/follows-store';
+
+const signIn = () => {
+  window.location.href = `/auth/google?next=${encodeURIComponent(window.location.pathname)}`;
+};
 
 export default function FollowButton({ slug }: { slug: string }) {
-  const [following, setFollowing] = useState(false);
+  // One shared /api/me/follows read (lib/follows-store.ts); a toggle on this page overrides it until it unmounts.
+  const follows = useFollows();
+  const [toggled, setToggled] = useState<boolean | null>(null);
+  const following = toggled ?? (follows.status === 'ready' && follows.follows.some((item) => item.slug === slug));
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
-  useEffect(() => {
-    let active = true;
-    fetch('/api/me/follows', { credentials: 'same-origin' })
-      .then((response) => (response.ok ? response.json() : null))
-      .then((payload: { follows?: Array<{ slug: string }> } | null) => {
-        if (active) setFollowing(Boolean(payload?.follows?.some((item) => item.slug === slug)));
-      })
-      .catch(() => undefined);
-    return () => {
-      active = false;
-    };
-  }, [slug]);
   async function toggle() {
     setBusy(true);
     setMessage('');
     try {
-      const me = await fetch('/auth/me', { credentials: 'same-origin' });
-      const account = me.ok ? ((await me.json()) as { user?: unknown }) : null;
-      if (!account?.user) {
-        window.location.href = `/auth/google?next=${encodeURIComponent(window.location.pathname)}`;
-        return;
-      }
+      // The follows read already said 401: go straight to sign-in. A session that expired since is caught below.
+      if (follows.status === 'login') return signIn();
       const response = await fetch(`/api/blogs/${encodeURIComponent(slug)}/follow`, {
         method: following ? 'DELETE' : 'POST',
         credentials: 'same-origin',
       });
+      if (response.status === 401) return signIn();
       if (response.ok) {
         // A completed follow only; no blog or reader identifiers.
         if (!following) window.dispatchEvent(new CustomEvent<AnalyticsAction>(ACTION_EVENT, { detail: 'follow' }));
-        setFollowing(!following);
+        setToggled(!following);
       } else setMessage('追蹤設定未更新，請稍後再試。');
     } catch {
       setMessage('連線失敗，請稍後再試。');

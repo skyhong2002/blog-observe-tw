@@ -10,6 +10,7 @@ import { filterChipClass, filterRowClass } from '@/components/FilterChips';
 import FooterMethod, { methodHeading } from '@/components/FooterMethod';
 import MethodLink from '@/components/MethodLink';
 import Link from '@/components/NoPrefetchLink';
+import PendingRows from '@/components/PendingRows';
 import RelationTabs from '@/components/RelationTabs';
 import { SectionUnavailable } from '@/components/SectionBoundary';
 import SectionTabs from '@/components/SectionTabs';
@@ -36,9 +37,12 @@ export default function RelationMapView({ days, load }: { days: Period; load: Pu
       {load.status === 'ready' ? (
         <RelationDetails data={load.data} />
       ) : load.status === 'pending' ? (
-        <p role="status" aria-busy="true" className="text-zinc-500">
-          正在載入近 {days} 天的關係資料…
-        </p>
+        <>
+          <p role="status" aria-busy="true" className="text-zinc-500">
+            正在載入近 {days} 天的關係資料…
+          </p>
+          <PendingRows />
+        </>
       ) : (
         <SectionUnavailable label="關係資料" />
       )}
@@ -247,6 +251,11 @@ function RelationNotes({ data }: { data: Relations }) {
 
 // public-contracts.ts has checked nodes, edges, rankings and coverage; an empty period is a valid answer.
 const parseRelations = asIs<Relations>;
+
+/** app/relations/loading.tsx: this page's own pending view for the URL's period while the server reads. */
+export function RelationMapLoading() {
+  return <RelationMapView days={periodOf(useSearchParams(), RELATIONS_PERIOD)} load={{ status: 'pending' }} />;
+}
 
 /** Reads ?days= (inside the page's Suspense boundary); periods other than the prerendered one come from /api/relations. */
 export function RelationMapFromUrl({ baseline }: { baseline: Relations | null }) {

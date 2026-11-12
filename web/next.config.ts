@@ -21,7 +21,12 @@ const nextConfig: NextConfig = {
   // (`stale-while-revalidate`) instead of Next's one-year default.
   expireTime: 300,
   allowedDevOrigins: process.env.BLOG_DEV_ORIGINS?.split(',').filter(Boolean),
-  images: { remotePatterns: [{ protocol: 'https', hostname: '**' }, { protocol: 'http', hostname: '**' }] },
+  // Every next/image here is unoptimized (SafeImage, MediaIcon): blog images and icons are loaded by the
+  // browser straight from the blog (no-referrer), never fetched or resized by this host. Globally
+  // unoptimized, Next serves no /_next/image endpoint (404), so it cannot be used as an open fetch/resize
+  // proxy for arbitrary hosts and sharp never runs on request on the shared host; the empty patterns keep
+  // it closed if `unoptimized` is ever dropped.
+  images: { unoptimized: true, remotePatterns: [], localPatterns: [] },
   async rewrites() {
     return [
       // The gateway owns sessions and API credentials. The internal origin is
