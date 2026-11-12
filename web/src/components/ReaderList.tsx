@@ -1,30 +1,13 @@
 'use client';
-import { useEffect, useState } from 'react';
 import BlogIcon from '@/components/BlogIcon';
-import type { Follow } from '@/lib/api';
+import { useFollows } from '@/lib/follows-store';
 import { blogHref } from '@/lib/page-links';
 import Link from './NoPrefetchLink';
 export default function ReaderList() {
-  const [follows, setFollows] = useState<Follow[] | null>(null);
-  const [state, setState] = useState<'loading' | 'ready' | 'login' | 'error'>('loading');
-  useEffect(() => {
-    const controller = new AbortController();
-    fetch('/api/me/follows', { credentials: 'same-origin', cache: 'no-store', signal: controller.signal })
-      .then(async (response) => {
-        if (response.status === 401) {
-          setState('login');
-          return;
-        }
-        if (!response.ok) throw new Error('Unable to load follows');
-        const data = (await response.json()) as { follows: Follow[] };
-        setFollows(data.follows);
-        setState('ready');
-      })
-      .catch(() => {
-        if (!controller.signal.aborted) setState('error');
-      });
-    return () => controller.abort();
-  }, []);
+  // The same shared /api/me/follows read as FollowButton (lib/follows-store.ts).
+  const loaded = useFollows();
+  const state = loaded.status;
+  const follows = loaded.status === 'ready' ? loaded.follows : null;
   if (state === 'loading')
     return (
       <p role="status" className="py-8 text-zinc-500">
