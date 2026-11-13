@@ -157,7 +157,7 @@ function TopicRows({ order, days, data }: { order: TopicOrder; days: Period; dat
     <>
       <TableScroller card label="共同話題表格，可左右捲動">
         <table className="w-full whitespace-nowrap text-sm">
-          <thead className="bg-zinc-50 text-left text-xs text-zinc-600 dark:bg-zinc-950 dark:text-zinc-400">
+          <thead className="bg-zinc-50 text-left text-xs font-medium text-zinc-700 dark:bg-zinc-950 dark:text-zinc-300">
             <tr>
               {header('rank', '#', `${table.num} w-12`)}
               <th scope="col" className={table.leadHead}>
@@ -174,7 +174,7 @@ function TopicRows({ order, days, data }: { order: TopicOrder; days: Period; dat
           <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
             {rows.map(({ t, rank }) => (
               <tr key={t.id} className={table.row}>
-                <td className={`${table.num} text-xs text-zinc-500 dark:text-zinc-400`}>{rank}</td>
+                <td className={`${table.num} text-xs text-zinc-600 dark:text-zinc-400`}>{rank}</td>
                 <td className={table.lead}>
                   <div className={`${table.leadBox} flex items-baseline gap-2`}>
                     <Link

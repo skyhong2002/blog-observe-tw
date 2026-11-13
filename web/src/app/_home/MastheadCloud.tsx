@@ -27,11 +27,13 @@ interface Canvas {
   small: number;
   sizes: { min: number; max: number; floor: number; budget: number; gap: number; markGap: number; scatter: number };
 }
+// Heights leave a modest margin around the mark: the cloud's policy (tag vocabulary, title share) often keeps fewer
+// than ten words, and a taller canvas only left an empty band under the masthead.
 const CANVASES: Canvas[] = [
   {
     key: 'compact',
     width: 340,
-    height: 300,
+    height: 260,
     max: 420,
     logo: 100,
     tagline: 14,
@@ -41,7 +43,7 @@ const CANVASES: Canvas[] = [
   {
     key: 'medium',
     width: 680,
-    height: 280,
+    height: 240,
     max: 780,
     logo: 120,
     tagline: 14,
@@ -51,7 +53,7 @@ const CANVASES: Canvas[] = [
   {
     key: 'wide',
     width: 1120,
-    height: 280,
+    height: 240,
     max: 1120,
     logo: 128,
     tagline: 14,

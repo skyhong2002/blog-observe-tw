@@ -76,22 +76,33 @@ function TopicBlogs({ blogs }: { blogs: TopicDetail['blogs'] }) {
     <section id="topic-blogs" className="scroll-mt-20 rounded-xl border border-zinc-300 p-4 lg:order-first dark:border-zinc-800">
       <h2 className="font-semibold">哪些部落格在寫</h2>
       <ul className="mt-3 divide-y divide-zinc-200 dark:divide-zinc-800">
-        {blogs.map((b) => (
-          <li key={b.id} className="flex justify-between gap-3 py-3 text-sm">
-            <Link className="flex items-center gap-2 text-brand-700 dark:text-brand-400" {...blogLink(b.slug, b.canonicalPath)}>
-              <BlogIcon media={b.slug} title={b.name} size={18} />
-              {b.name}
-            </Link>
-            <span className="shrink-0 tabular-nums">
-              {b.posts} 篇
+        {blogs.map((b) => {
+          // Feed names can be long (a whole URL) or carry HTML entities: decoded, at most two lines, and the counts sit
+          // apart from the name, so nothing is pushed past the card's edge.
+          const name = displayTitle(b.name);
+          return (
+            <li key={b.id} className="py-3 text-sm">
+              <div className="flex items-start justify-between gap-3">
+                <Link
+                  className="flex min-w-0 items-start gap-2 text-brand-700 hover:underline dark:text-brand-400"
+                  title={name}
+                  {...blogLink(b.slug, b.canonicalPath)}
+                >
+                  <span className="mt-px shrink-0">
+                    <BlogIcon media={b.slug} title={name} size={18} />
+                  </span>
+                  <span className="line-clamp-2 min-w-0 [overflow-wrap:anywhere]">{name}</span>
+                </Link>
+                <span className="shrink-0 font-medium tabular-nums text-zinc-900 dark:text-zinc-100">{b.posts} 篇</span>
+              </div>
               {typeof b.titlePosts === 'number' && typeof b.bodyOnlyPosts === 'number' ? (
-                <span className="ml-1 text-xs text-zinc-500 dark:text-zinc-400">
-                  （標題提到 {b.titlePosts}、只在內文 {b.bodyOnlyPosts}）
-                </span>
+                <p className="mt-0.5 pl-[26px] text-xs tabular-nums text-zinc-600 dark:text-zinc-400">
+                  標題提到 {b.titlePosts}、只在內文 {b.bodyOnlyPosts}
+                </p>
               ) : null}
-            </span>
-          </li>
-        ))}
+            </li>
+          );
+        })}
       </ul>
     </section>
   );

@@ -5,6 +5,7 @@ import StateNotice from '@/components/StateNotice';
 import TableScroller from '@/components/TableScroller';
 import TagCountChartLoader from '@/components/TagCountChartLoader';
 import { taipei } from '@/lib/api';
+import { isPlatformDefaultTag } from '@/lib/platform-tags';
 import { overview } from '@/lib/public-api';
 import { staticPageMetadata } from '@/lib/seo';
 import { table } from '@/lib/table-styles';
@@ -15,13 +16,11 @@ export const metadata = staticPageMetadata('/ranking/');
 const SHOWN = 30;
 /** Rows per column of the shown part on a desktop. */
 const HALF = SHOWN / 2;
-/** Blog platforms' default category names: not a topic anyone chose, so they stay out of the ranking (and say so). */
-const PLATFORM_DEFAULT = /^(?:未分類|未分类|無分類|uncategori[sz]ed)$/iu;
 
 export default async function RankingPage() {
   const all = await overview();
-  const skipped = all.tags.filter((t) => PLATFORM_DEFAULT.test(t.label.trim()));
-  const data = { ...all, tags: all.tags.filter((t) => !PLATFORM_DEFAULT.test(t.label.trim())) };
+  const skipped = all.tags.filter((t) => isPlatformDefaultTag(t.label));
+  const data = { ...all, tags: all.tags.filter((t) => !isPlatformDefaultTag(t.label)) };
   const cols = (
     <colgroup>
       <col />

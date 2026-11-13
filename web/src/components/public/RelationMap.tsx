@@ -112,7 +112,7 @@ function graphFor(data: Relations, view: GraphView) {
 }
 
 function RelationDetails({ data }: { data: Relations }) {
-  const [showAll, setShowAll] = useState({ most: false, mutual: false });
+  const [showAll, setShowAll] = useState({ most: false, mutual: false, links: false });
   const [view, setView] = useState<GraphView>('all');
   // A crowded map is unreadable (a phone sooner than a desktop): start on a narrower view that still has a real
   // network (3+ articles, else mutual mentions, each kept only with enough blogs); the chips switch back.
@@ -156,6 +156,21 @@ function RelationDetails({ data }: { data: Relations }) {
       <span className="text-xs">部落格 #{id}</span>
     );
   };
+  const strongest = useMemo(() => [...data.edges].sort((a, b) => b.count - a.count), [data.edges]);
+  const linkRow = (e: Relations['edges'][number]) => (
+    <li key={`${e.sourceBlogId}:${e.targetBlogId}`} className="min-w-0 break-words py-2 text-sm">
+      {blog(e.sourceBlogId)} → {blog(e.targetBlogId)}{' '}
+      <span className="whitespace-nowrap tabular-nums text-zinc-600 dark:text-zinc-400">
+        · {e.count} 篇 · {shareLabel} {sharePercent(e.share)}
+      </span>
+    </li>
+  );
+  // When the right column's lists are short (a quiet week), the strongest links fill it up to about the left list's
+  // length instead of leaving a hole beside it; a long right column keeps them folded. Rough row heights in px.
+  const leftHeight = Math.min(LIST_PREVIEW, data.mostMentioned.length) * 37 + 60;
+  const rightHeight = Math.min(LIST_PREVIEW, data.mutual.length) * 54 + 290;
+  const fit = Math.floor((leftHeight - rightHeight) / 37);
+  const linkRows = fit >= 4 ? Math.min(fit, strongest.length) : 0;
   return (
     <>
       {data.edges.length > 0 && (
@@ -256,19 +271,32 @@ function RelationDetails({ data }: { data: Relations }) {
               <li>滑過（手機上點一下）一個部落格，只看它的連結；拖曳或捏合可以移動縮放，「重設縮放」回到全貌。</li>
             </ul>
           </section>
-          <details className="rounded-xl border border-zinc-300 p-4 dark:border-zinc-800">
-            <summary className="cursor-pointer text-sm font-medium">圖中連結明細（{data.edges.length} 條）</summary>
-            <ul className="mt-3 divide-y divide-zinc-200 dark:divide-zinc-800">
-              {data.edges.map((e) => (
-                <li key={`${e.sourceBlogId}:${e.targetBlogId}`} className="min-w-0 break-words py-2 text-sm">
-                  {blog(e.sourceBlogId)} → {blog(e.targetBlogId)}{' '}
-                  <span className="whitespace-nowrap tabular-nums text-zinc-600 dark:text-zinc-400">
-                    · {e.count} 篇 · {shareLabel} {sharePercent(e.share)}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          </details>
+          {linkRows > 0 ? (
+            <section className="min-w-0 rounded-xl border border-zinc-300 p-4 dark:border-zinc-800">
+              <div className="flex items-baseline justify-between gap-3">
+                <h2 className="font-semibold">圖中連結明細</h2>
+                <span className="text-sm tabular-nums text-zinc-700 dark:text-zinc-300">共 {data.edges.length} 條</span>
+              </div>
+              <ul className="mt-3 divide-y divide-zinc-200 dark:divide-zinc-800">
+                {(showAll.links ? strongest : strongest.slice(0, linkRows)).map(linkRow)}
+              </ul>
+              {strongest.length > linkRows && (
+                <button
+                  type="button"
+                  aria-expanded={showAll.links}
+                  onClick={() => setShowAll((s) => ({ ...s, links: !s.links }))}
+                  className="mt-2 inline-flex min-h-9 items-center rounded-full border border-zinc-300 px-3 text-xs text-zinc-700 hover:border-brand-700 dark:border-zinc-700 dark:text-zinc-300 dark:hover:border-brand-400"
+                >
+                  {showAll.links ? `只看前 ${linkRows} 條` : `顯示全部 ${strongest.length} 條`}
+                </button>
+              )}
+            </section>
+          ) : (
+            <details className="rounded-xl border border-zinc-300 p-4 dark:border-zinc-800">
+              <summary className="cursor-pointer text-sm font-medium">圖中連結明細（{data.edges.length} 條）</summary>
+              <ul className="mt-3 divide-y divide-zinc-200 dark:divide-zinc-800">{strongest.map(linkRow)}</ul>
+            </details>
+          )}
         </div>
       </div>
     </>
