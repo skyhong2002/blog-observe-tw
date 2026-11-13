@@ -23,17 +23,20 @@ import { asIs, type PublicLoad, usePublicJson } from '@/lib/use-public-json';
 export default function RelationMapView({ days, load }: { days: Period; load: PublicLoad<Relations> }) {
   return (
     <div className="space-y-5 pb-8">
+      {/* Same top row as the topic rankings: the section's tabs on the left, the period on the right. */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <RelationTabs current="relations" className="" />
+        <SectionTabs
+          label="觀察期間"
+          tabs={[7, 30, 90].map((d) => ({ href: `/relations/?days=${d}`, label: `近 ${d} 天`, current: String(d) === days }))}
+        />
+      </div>
       <header>
-        <RelationTabs current="relations" />
         <h1 className="text-2xl font-semibold tracking-tight">引用關係圖</h1>
-        <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
-          誰在文章中提到誰 · <MethodLink />
+        <p className="mt-1 text-[0.9375rem] text-zinc-700 dark:text-zinc-300">
+          部落格在文章正文裡連到其他部落格，就是一次引用；箭頭指向被引用的一方。 <MethodLink />
         </p>
       </header>
-      <SectionTabs
-        label="觀察期間"
-        tabs={[7, 30, 90].map((d) => ({ href: `/relations/?days=${d}`, label: `近 ${d} 天`, current: String(d) === days }))}
-      />
       {load.status === 'ready' ? (
         <RelationDetails data={load.data} />
       ) : load.status === 'pending' ? (
@@ -111,11 +114,12 @@ function graphFor(data: Relations, view: GraphView) {
 function RelationDetails({ data }: { data: Relations }) {
   const [showAll, setShowAll] = useState({ most: false, mutual: false });
   const [view, setView] = useState<GraphView>('all');
-  // A phone cannot show a crowded map legibly: start it on a narrower view that still has a real network
-  // (3+ articles, else mutual mentions, each kept only with 8+ blogs); the chips switch back.
+  // A crowded map is unreadable (a phone sooner than a desktop): start on a narrower view that still has a real
+  // network (3+ articles, else mutual mentions, each kept only with enough blogs); the chips switch back.
   useEffect(() => {
-    if (!window.matchMedia('(max-width: 639px)').matches || data.nodes.length <= 40) return;
-    const narrower = (['repeat', 'mutual'] as const).find((key) => graphFor(data, key).nodes.length >= 8);
+    const phone = window.matchMedia('(max-width: 639px)').matches;
+    if (data.nodes.length <= (phone ? 40 : 80)) return;
+    const narrower = (['repeat', 'mutual'] as const).find((key) => graphFor(data, key).nodes.length >= (phone ? 8 : 12));
     if (narrower) setView(narrower);
   }, [data]);
   const graph = useMemo(() => graphFor(data, view), [data, view]);
@@ -170,7 +174,7 @@ function RelationDetails({ data }: { data: Relations }) {
                 </button>
               ))}
             </div>
-            <span role="status" className="text-xs tabular-nums text-zinc-500 dark:text-zinc-400">
+            <span role="status" className="text-sm tabular-nums text-zinc-700 dark:text-zinc-300">
               {graph.nodes.length} 個部落格 · {graph.edges.length} 條連結
             </span>
           </div>
@@ -178,7 +182,7 @@ function RelationDetails({ data }: { data: Relations }) {
         </section>
       )}
       {/* min-w-0: a grid item is otherwise as wide as its widest row, and two long chips pushed the page sideways. */}
-      <div className="grid gap-5 lg:grid-cols-2">
+      <div className="grid items-start gap-5 lg:grid-cols-2">
         <section className="min-w-0 rounded-xl border border-zinc-300 p-4 dark:border-zinc-800">
           <h2 className="font-semibold">最常被提及</h2>
           <ol className="mt-3 divide-y divide-zinc-200 dark:divide-zinc-800">
@@ -187,7 +191,7 @@ function RelationDetails({ data }: { data: Relations }) {
               <li className="flex flex-wrap items-center gap-x-3 gap-y-1 py-2.5 text-sm sm:flex-nowrap" key={r.blogId}>
                 <span className="w-6 shrink-0 text-right text-sm font-medium tabular-nums text-zinc-600 dark:text-zinc-400">{i + 1}</span>
                 <span className="min-w-0 flex-1">{chip(r.blogId)}</span>
-                <span className="w-full shrink-0 pl-9 text-xs tabular-nums text-zinc-600 sm:w-auto sm:pl-0 dark:text-zinc-400">
+                <span className="w-full shrink-0 pl-9 text-sm tabular-nums text-zinc-700 sm:w-auto sm:pl-0 dark:text-zinc-300">
                   {r.incomingBlogs} 個部落格提及 · {r.mentions} 篇
                 </span>
               </li>
@@ -211,7 +215,7 @@ function RelationDetails({ data }: { data: Relations }) {
                   <span className="sr-only">與</span>
                   {chip(r.targetBlogId)}
                 </p>
-                <p className="mt-1 text-xs tabular-nums text-zinc-600 dark:text-zinc-400">
+                <p className="mt-1 text-sm tabular-nums text-zinc-700 dark:text-zinc-300">
                   <span title={`${name(r.sourceBlogId)} 提及 ${name(r.targetBlogId)}`}>
                     <span aria-hidden="true">→</span>
                     <span className="sr-only">{name(r.sourceBlogId)} 提及對方</span> {r.forwardCount} 篇

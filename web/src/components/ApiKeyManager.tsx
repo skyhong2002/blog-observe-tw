@@ -176,6 +176,16 @@ export default function ApiKeyManager({ example }: { example: string }) {
     </div>
   );
 
+  // Signed out, the page is about signing in to keep a reading list: the developer section shrinks to one line.
+  if (state === 'login')
+    return (
+      <p id="api-keys" className="scroll-mt-24 border-t border-zinc-200 pt-5 text-sm text-zinc-600 dark:border-zinc-800 dark:text-zinc-400">
+        開發者：登入後可以在這裡建立 API 金鑰。{' '}
+        <a href="/api/" className="font-medium text-brand-700 hover:underline dark:text-brand-400">
+          API 文件 →
+        </a>
+      </p>
+    );
   return (
     <section
       id="api-keys"
@@ -201,14 +211,6 @@ export default function ApiKeyManager({ example }: { example: string }) {
         <p role="alert" className="py-4 text-sm text-zinc-500">
           {message ?? '暫時無法取得 API 金鑰，請稍後重新整理。'}
         </p>
-      )}
-      {state === 'login' && (
-        <div className={card}>
-          <p className="text-sm text-zinc-600 dark:text-zinc-400">登入後即可建立與管理 API 金鑰。</p>
-          <a href="/login/?next=/my" className={`${primary} mt-3`}>
-            登入
-          </a>
-        </div>
       )}
 
       {state === 'ready' && (
