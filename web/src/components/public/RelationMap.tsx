@@ -174,8 +174,17 @@ function RelationDetails({ data }: { data: Relations }) {
                 </button>
               ))}
             </div>
+            {/* A narrower view says how much of the period it draws, so the lists below (always the whole period) add up. */}
             <span role="status" className="text-sm tabular-nums text-zinc-700 dark:text-zinc-300">
-              {graph.nodes.length} 個部落格 · {graph.edges.length} 條連結
+              {view === 'all' ? (
+                <>
+                  {graph.nodes.length} 個部落格 · {graph.edges.length} 條連結
+                </>
+              ) : (
+                <>
+                  圖上 {graph.nodes.length}／{data.nodes.length} 個部落格 · {graph.edges.length}／{data.edges.length} 條連結
+                </>
+              )}
             </span>
           </div>
           <BlogRelationGraph nodes={graph.nodes} edges={graph.edges} />
@@ -184,7 +193,10 @@ function RelationDetails({ data }: { data: Relations }) {
       {/* min-w-0: a grid item is otherwise as wide as its widest row, and two long chips pushed the page sideways. */}
       <div className="grid items-start gap-5 lg:grid-cols-2">
         <section className="min-w-0 rounded-xl border border-zinc-300 p-4 dark:border-zinc-800">
-          <h2 className="font-semibold">最常被提及</h2>
+          <div className="flex items-baseline justify-between gap-3">
+            <h2 className="font-semibold">最常被提及</h2>
+            <span className="text-sm tabular-nums text-zinc-700 dark:text-zinc-300">共 {data.mostMentioned.length} 個部落格</span>
+          </div>
           <ol className="mt-3 divide-y divide-zinc-200 dark:divide-zinc-800">
             {(showAll.most ? data.mostMentioned : data.mostMentioned.slice(0, LIST_PREVIEW)).map((r, i) => (
               // Phones: the counts drop under the name, so the name keeps the row's width instead of a "…".
@@ -202,7 +214,10 @@ function RelationDetails({ data }: { data: Relations }) {
         {/* The right column takes the short lists and the reading notes, so the two columns end near each other. */}
         <div className="min-w-0 space-y-5">
           <section className="min-w-0 rounded-xl border border-zinc-300 p-4 dark:border-zinc-800">
-            <h2 className="font-semibold">互相提及</h2>
+            <div className="flex items-baseline justify-between gap-3">
+              <h2 className="font-semibold">互相提及</h2>
+              <span className="text-sm tabular-nums text-zinc-700 dark:text-zinc-300">共 {data.mutual.length} 組</span>
+            </div>
             {/* Same pills as the homepage's citation cards. Each direction is its own articles and dates (see the foot's
               引用與交流), so the counts stay per direction and the pair is never called a same-time exchange. */}
             <ol className="mt-3 divide-y divide-zinc-200 dark:divide-zinc-800">

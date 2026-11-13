@@ -85,7 +85,7 @@ export default function ArticleListItem({
               {article.description}
             </p>
           )}
-          <div className="mt-0.5 flex flex-wrap items-center gap-x-2.5 text-[11px] leading-5 text-zinc-500 dark:text-zinc-400">
+          <div className="mt-0.5 flex flex-wrap items-center gap-x-2.5 text-xs leading-5 text-zinc-600 dark:text-zinc-400">
             {showMedia && article.media && (
               <Link
                 {...blogLink(article.media, post.blogCanonicalPath)}
@@ -97,7 +97,7 @@ export default function ArticleListItem({
             )}
             {article.publishedAt ? <time dateTime={article.publishedAt}>{taipei(article.publishedAt)}</time> : <span>發文日期不明</span>}
             {article.authors.length > 0 && <span className="max-w-40 truncate">{article.authors.join('、')}</span>}
-            <SourceLink url={article.url} showUrl className="!min-h-5 !text-[11px]" />
+            <SourceLink url={article.url} showHost className="!min-h-5" />
           </div>
         </div>
         {href && <ArticleThumbnail src={article.image} href={href} title={headline.title} />}
