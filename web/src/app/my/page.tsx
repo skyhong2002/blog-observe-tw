@@ -1,6 +1,5 @@
 import ApiKeyManager from '@/components/ApiKeyManager';
 import ReaderList from '@/components/ReaderList';
-import SectionTabs from '@/components/SectionTabs';
 import { exampleUrl, loadSpec, operations } from '@/lib/openapi-spec';
 import { privatePageMetadata } from '@/lib/seo';
 
@@ -24,14 +23,7 @@ export default function MyPage() {
         <h1 className="text-2xl font-semibold tracking-tight">我的追蹤</h1>
         <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">管理追蹤的部落格，把閱讀清單帶回自己的閱讀器。</p>
       </header>
-      <SectionTabs
-        label="我的追蹤"
-        tabs={[
-          { href: '/my/', label: '追蹤清單', current: true },
-          { href: '/me/feed.xml', label: '個人 RSS' },
-          { href: '/me/opml', label: '匯出 OPML' },
-        ]}
-      />
+      {/* No tab row: 個人 RSS and 匯出 OPML are downloads, offered on the follow list's own header (ReaderList). */}
       <ReaderList />
       <ApiKeyManager example={keyExample()} />
     </div>

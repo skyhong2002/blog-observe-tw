@@ -97,7 +97,8 @@ export default function ArticleListItem({
             )}
             {article.publishedAt ? <time dateTime={article.publishedAt}>{taipei(article.publishedAt)}</time> : <span>發文日期不明</span>}
             {article.authors.length > 0 && <span className="max-w-40 truncate">{article.authors.join('、')}</span>}
-            <SourceLink url={article.url} showHost className="!min-h-6 !text-[13px]" />
+            {/* Phones: the title already opens the original; the host would take a line of its own. */}
+            <SourceLink url={article.url} showHost className="!min-h-6 !text-[13px] max-sm:hidden" />
           </div>
         </div>
         {href && <ArticleThumbnail src={article.image} href={href} title={headline.title} />}

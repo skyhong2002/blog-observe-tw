@@ -50,6 +50,29 @@ export default async function RankingPage() {
       <td className={table.num}>{tag.postCount.toLocaleString('zh-TW')}</td>
     </tr>
   );
+  const rankTable = (from: number, to: number, label: string) => (
+    <TableScroller card label={label}>
+      <table className="w-full table-fixed whitespace-nowrap text-sm">
+        {cols}
+        <thead className="bg-zinc-50 text-left text-xs text-zinc-600 dark:bg-zinc-950 dark:text-zinc-400">
+          <tr>
+            <th scope="col" className={table.leadHead}>
+              名次 · 標籤
+            </th>
+            <th scope="col" className={table.num}>
+              部落格
+            </th>
+            <th scope="col" className={table.num}>
+              收錄文章
+            </th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
+          {data.tags.slice(from, to).map((tag, i) => row(tag, from + i))}
+        </tbody>
+      </table>
+    </TableScroller>
+  );
   return (
     <div className="space-y-5 pb-8">
       <SectionTabs
@@ -98,30 +121,14 @@ export default async function RankingPage() {
               </p>
             </div>
           </section>
-          <div className="grid items-start gap-5 lg:grid-cols-2">
+          {/* Phones: the top 30 in one table. Desktops: two columns of 15, so neither column runs on alone. */}
+          <div className="lg:hidden">{rankTable(0, SHOWN, '標籤收錄排行表格，可左右捲動')}</div>
+          <div className="hidden items-start gap-5 lg:grid lg:grid-cols-2">
             {[0, HALF].map((from) =>
               data.tags.length > from ? (
-                <TableScroller key={from} card label={`標籤收錄排行表格，第 ${from + 1} 名起，可左右捲動`}>
-                  <table className="w-full table-fixed whitespace-nowrap text-sm">
-                    {cols}
-                    <thead className="bg-zinc-50 text-left text-xs text-zinc-600 dark:bg-zinc-950 dark:text-zinc-400">
-                      <tr>
-                        <th scope="col" className={table.leadHead}>
-                          名次 · 標籤
-                        </th>
-                        <th scope="col" className={table.num}>
-                          部落格
-                        </th>
-                        <th scope="col" className={table.num}>
-                          收錄文章
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
-                      {data.tags.slice(from, Math.min(from + HALF, SHOWN)).map((tag, i) => row(tag, from + i))}
-                    </tbody>
-                  </table>
-                </TableScroller>
+                <div key={from} className="min-w-0">
+                  {rankTable(from, Math.min(from + HALF, SHOWN), `標籤收錄排行表格，第 ${from + 1} 名起，可左右捲動`)}
+                </div>
               ) : null,
             )}
           </div>

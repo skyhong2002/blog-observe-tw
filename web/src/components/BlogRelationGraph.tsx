@@ -87,8 +87,8 @@ export default function BlogRelationGraph({ nodes, edges }: { nodes: RelationNod
       const narrow = isNarrow();
       return {
         fontFamily: getComputedStyle(document.body).fontFamily,
-        fontSize: narrow ? 13 : 12,
-        lineHeight: narrow ? 16 : 15,
+        fontSize: 13,
+        lineHeight: 16,
         width: narrow ? LABEL_WIDTH_NARROW : LABEL_WIDTH,
       };
     };
@@ -123,10 +123,13 @@ export default function BlogRelationGraph({ nodes, edges }: { nodes: RelationNod
               label: {
                 show: true,
                 position: 'bottom',
-                color: dark ? '#d4d4d8' : '#3f3f46',
-                // A halo in the page background keeps a name readable where it crosses edges or icons.
+                color: dark ? '#e4e4e7' : '#27272a',
+                // A plate and a halo in the page background keep a name readable where it crosses edges or icons.
+                backgroundColor: dark ? 'rgba(24,24,27,0.85)' : 'rgba(255,255,255,0.88)',
+                borderRadius: 3,
+                padding: [1, 2],
                 textBorderColor: dark ? '#18181b' : '#ffffff',
-                textBorderWidth: 3,
+                textBorderWidth: 2,
                 overflow: 'break',
                 ...labelStyle(),
               },

@@ -53,13 +53,16 @@ export default function ReaderList() {
           {follows.map((blog) => (
             <li key={blog.slug}>
               <Link href={blogHref(blog.slug, blog.canonicalPath)} className="group flex min-h-14 items-center justify-between gap-3 py-3">
-                <span className="inline-flex min-w-0 items-center gap-2 text-[0.9375rem] font-medium text-zinc-900 group-hover:text-brand-700 dark:text-zinc-100 dark:group-hover:text-brand-400">
+                {/* The name reads as the link (to the blog's page); the category is a plain label, not a second destination. */}
+                <span className="inline-flex min-w-0 items-center gap-2 text-[0.9375rem] font-medium text-brand-700 group-hover:underline dark:text-brand-400">
                   <BlogIcon media={blog.slug} iconUrl={blog.iconUrl} title={blog.name} />
                   <span className="truncate">{blog.name}</span>
                 </span>
-                <span className="shrink-0 text-sm text-zinc-600 dark:text-zinc-400">
-                  {blog.category && blog.category !== '待分類' ? blog.category : ''} <span aria-hidden="true">→</span>
-                </span>
+                {blog.category && blog.category !== '待分類' ? (
+                  <span className="shrink-0 rounded-full bg-zinc-100 px-2.5 py-0.5 text-xs text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">
+                    {blog.category}
+                  </span>
+                ) : null}
               </Link>
             </li>
           ))}

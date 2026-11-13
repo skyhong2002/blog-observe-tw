@@ -4,19 +4,19 @@ import Link from './NoPrefetchLink';
 /**
  * One look for every "nothing here" and "something went wrong" message: an icon, a title, a sentence on what
  * happened and what to do next, then the actions. `tone` carries meaning in colour and in the icon, never colour
- * alone: empty (neutral), notice (amber, data not ready yet) or error (red, a read failed).
+ * alone: empty (neutral), notice (a brand tint: data not ready yet, nothing wrong) or error (red, a read failed).
  */
 export type StateTone = 'empty' | 'notice' | 'error';
 export type StateAction = { href: string; label: string; primary?: boolean; external?: boolean };
 
 const frame: Record<StateTone, string> = {
   empty: 'border-dashed border-zinc-300 bg-white dark:border-zinc-700 dark:bg-zinc-900',
-  notice: 'border-amber-500 bg-amber-50 dark:border-amber-600/80 dark:bg-amber-950/40',
+  notice: 'border-brand-300 bg-brand-50 dark:border-brand-800 dark:bg-brand-950/40',
   error: 'border-red-300 bg-red-50 dark:border-red-900/70 dark:bg-red-950/40',
 };
 const badge: Record<StateTone, string> = {
   empty: 'bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300',
-  notice: 'bg-amber-200 text-amber-900 dark:bg-amber-900/70 dark:text-amber-200',
+  notice: 'bg-brand-100 text-brand-800 dark:bg-brand-900/60 dark:text-brand-200',
   error: 'bg-red-100 text-red-700 dark:bg-red-900/60 dark:text-red-200',
 };
 
