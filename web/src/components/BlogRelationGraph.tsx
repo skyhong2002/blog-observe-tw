@@ -175,8 +175,8 @@ export default function BlogRelationGraph({ nodes, edges }: { nodes: RelationNod
           rank: incoming.get(n.id) ?? 0,
           wanted: (incoming.get(n.id) ?? 0) >= LABELLED_MENTIONS,
         })),
-        // Phones: only the top two names may be drawn over other icons; the rest appear only where they fit.
-        { maxWidth: style.width, lineHeight: style.lineHeight, gap: 5, pad: 2, width, height, mustShow: isNarrow() ? 2 : MUST_LABEL },
+        // Phones: only the top name may be drawn over other icons; the rest appear only where they fit.
+        { maxWidth: style.width, lineHeight: style.lineHeight, gap: 5, pad: 2, width, height, mustShow: isNarrow() ? 1 : MUST_LABEL },
       );
       placed = { points, sides };
       render();
@@ -226,21 +226,24 @@ export default function BlogRelationGraph({ nodes, edges }: { nodes: RelationNod
       chart.dispose();
     };
   }, [nodes, edges]);
+  // The reset button sits above the canvas, never over a node or its name.
   return (
-    <div className="relative">
+    <div>
+      <div className="mb-1 flex justify-end">
+        <button
+          type="button"
+          onClick={() => reset.current()}
+          className="inline-flex min-h-9 items-center rounded-full border border-zinc-300 bg-white px-3 text-sm text-zinc-700 hover:border-brand-700 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:border-brand-400"
+        >
+          重設縮放
+        </button>
+      </div>
       <div
         ref={ref}
         className="h-[520px] w-full lg:h-[600px]"
         role="img"
         aria-label="部落格正文提及關係圖；箭頭指向被提及的部落格，詳細資料列於下方表格"
       />
-      <button
-        type="button"
-        onClick={() => reset.current()}
-        className="absolute top-0 right-0 inline-flex min-h-9 items-center rounded-full border border-zinc-300 bg-white/90 px-3 text-xs text-zinc-700 hover:border-brand-700 dark:border-zinc-700 dark:bg-zinc-900/90 dark:text-zinc-300 dark:hover:border-brand-400"
-      >
-        重設縮放
-      </button>
     </div>
   );
 }

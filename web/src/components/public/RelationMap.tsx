@@ -145,7 +145,7 @@ function RelationDetails({ data }: { data: Relations }) {
     const n = nodes.get(id);
     return n ? (
       <Link
-        className="inline-flex h-6 min-w-0 max-w-full items-center gap-1.5 rounded-full border border-zinc-300 pr-2.5 pl-1.5 text-xs leading-none text-zinc-900 hover:border-brand-700 dark:border-zinc-800 dark:text-zinc-100 dark:hover:border-brand-400"
+        className="inline-flex h-7 min-w-0 max-w-full items-center gap-1.5 rounded-full border border-zinc-300 pr-3 pl-1.5 text-sm leading-none text-zinc-900 hover:border-brand-700 dark:border-zinc-800 dark:text-zinc-100 dark:hover:border-brand-400"
         {...blogLink(n.slug, n.canonicalPath)}
         title={n.name}
       >
@@ -199,52 +199,63 @@ function RelationDetails({ data }: { data: Relations }) {
           </ol>
           <MoreButton total={data.mostMentioned.length} open={showAll.most} onClick={() => setShowAll((s) => ({ ...s, most: !s.most }))} />
         </section>
-        <section className="min-w-0 rounded-xl border border-zinc-300 p-4 dark:border-zinc-800">
-          <h2 className="font-semibold">互相提及</h2>
-          {/* Same pills as the homepage's citation cards. Each direction is its own articles and dates (see the foot's
+        {/* The right column takes the short lists and the reading notes, so the two columns end near each other. */}
+        <div className="min-w-0 space-y-5">
+          <section className="min-w-0 rounded-xl border border-zinc-300 p-4 dark:border-zinc-800">
+            <h2 className="font-semibold">互相提及</h2>
+            {/* Same pills as the homepage's citation cards. Each direction is its own articles and dates (see the foot's
               引用與交流), so the counts stay per direction and the pair is never called a same-time exchange. */}
-          <ol className="mt-3 divide-y divide-zinc-200 dark:divide-zinc-800">
-            {(showAll.mutual ? data.mutual : data.mutual.slice(0, LIST_PREVIEW)).map((r) => (
-              <li className="py-2.5" key={`${r.sourceBlogId}:${r.targetBlogId}`}>
-                {/* Chips wrap rather than cut a name short; the arrows read from the first chip to the second. */}
-                <p className="flex min-w-0 flex-wrap items-center gap-1.5">
-                  {chip(r.sourceBlogId)}
-                  <span aria-hidden="true" className="text-xs text-zinc-500">
-                    ⇄
+            <ol className="mt-3 divide-y divide-zinc-200 dark:divide-zinc-800">
+              {(showAll.mutual ? data.mutual : data.mutual.slice(0, LIST_PREVIEW)).map((r) => (
+                <li className="py-2.5" key={`${r.sourceBlogId}:${r.targetBlogId}`}>
+                  {/* Chips wrap rather than cut a name short; the arrows read from the first chip to the second. */}
+                  <p className="flex min-w-0 flex-wrap items-center gap-1.5">
+                    {chip(r.sourceBlogId)}
+                    <span aria-hidden="true" className="text-xs text-zinc-500">
+                      ⇄
+                    </span>
+                    <span className="sr-only">與</span>
+                    {chip(r.targetBlogId)}
+                  </p>
+                  <p className="mt-1 text-sm tabular-nums text-zinc-700 dark:text-zinc-300">
+                    <span title={`${name(r.sourceBlogId)} 提及 ${name(r.targetBlogId)}`}>
+                      <span aria-hidden="true">→</span>
+                      <span className="sr-only">{name(r.sourceBlogId)} 提及對方</span> {r.forwardCount} 篇
+                    </span>
+                    <span aria-hidden="true"> · </span>
+                    <span title={`${name(r.targetBlogId)} 提及 ${name(r.sourceBlogId)}`}>
+                      <span aria-hidden="true">←</span>
+                      <span className="sr-only">{name(r.targetBlogId)} 提及對方</span> {r.reverseCount} 篇
+                    </span>
+                  </p>
+                </li>
+              ))}
+            </ol>
+            <MoreButton total={data.mutual.length} open={showAll.mutual} onClick={() => setShowAll((s) => ({ ...s, mutual: !s.mutual }))} />
+          </section>
+          <section className="rounded-xl border border-zinc-300 p-4 dark:border-zinc-800">
+            <h2 className="font-semibold">怎麼讀這張圖</h2>
+            <ul className="mt-2 list-disc space-y-1.5 pl-5 text-[0.9375rem] leading-7 text-zinc-700 dark:text-zinc-300">
+              <li>每個圖示是一個部落格；被越多部落格提及，圖示越大。</li>
+              <li>箭頭從寫文章的部落格，指向它在正文裡連到的部落格。</li>
+              <li>滑過（手機上點一下）一個部落格，只看它的連結；拖曳或捏合可以移動縮放，「重設縮放」回到全貌。</li>
+            </ul>
+          </section>
+          <details className="rounded-xl border border-zinc-300 p-4 dark:border-zinc-800">
+            <summary className="cursor-pointer text-sm font-medium">圖中連結明細（{data.edges.length} 條）</summary>
+            <ul className="mt-3 divide-y divide-zinc-200 dark:divide-zinc-800">
+              {data.edges.map((e) => (
+                <li key={`${e.sourceBlogId}:${e.targetBlogId}`} className="min-w-0 break-words py-2 text-sm">
+                  {blog(e.sourceBlogId)} → {blog(e.targetBlogId)}{' '}
+                  <span className="whitespace-nowrap tabular-nums text-zinc-600 dark:text-zinc-400">
+                    · {e.count} 篇 · {shareLabel} {sharePercent(e.share)}
                   </span>
-                  <span className="sr-only">與</span>
-                  {chip(r.targetBlogId)}
-                </p>
-                <p className="mt-1 text-sm tabular-nums text-zinc-700 dark:text-zinc-300">
-                  <span title={`${name(r.sourceBlogId)} 提及 ${name(r.targetBlogId)}`}>
-                    <span aria-hidden="true">→</span>
-                    <span className="sr-only">{name(r.sourceBlogId)} 提及對方</span> {r.forwardCount} 篇
-                  </span>
-                  <span aria-hidden="true"> · </span>
-                  <span title={`${name(r.targetBlogId)} 提及 ${name(r.sourceBlogId)}`}>
-                    <span aria-hidden="true">←</span>
-                    <span className="sr-only">{name(r.targetBlogId)} 提及對方</span> {r.reverseCount} 篇
-                  </span>
-                </p>
-              </li>
-            ))}
-          </ol>
-          <MoreButton total={data.mutual.length} open={showAll.mutual} onClick={() => setShowAll((s) => ({ ...s, mutual: !s.mutual }))} />
-        </section>
+                </li>
+              ))}
+            </ul>
+          </details>
+        </div>
       </div>
-      <details className="rounded-xl border border-zinc-300 p-4 dark:border-zinc-800">
-        <summary className="cursor-pointer text-sm font-medium">圖中連結明細（{data.edges.length} 條）</summary>
-        <ul className="mt-3 divide-y divide-zinc-200 dark:divide-zinc-800">
-          {data.edges.map((e) => (
-            <li key={`${e.sourceBlogId}:${e.targetBlogId}`} className="min-w-0 break-words py-2 text-sm">
-              {blog(e.sourceBlogId)} → {blog(e.targetBlogId)}{' '}
-              <span className="whitespace-nowrap tabular-nums text-zinc-600 dark:text-zinc-400">
-                · {e.count} 篇 · {shareLabel} {sharePercent(e.share)}
-              </span>
-            </li>
-          ))}
-        </ul>
-      </details>
     </>
   );
 }

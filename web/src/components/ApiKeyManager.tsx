@@ -45,6 +45,8 @@ export default function ApiKeyManager({ example }: { example: string }) {
   const csrf = useRef('');
   const [fresh, setFresh] = useState<Fresh | null>(null);
   const [copied, setCopied] = useState(false);
+  const [exampleCopied, setExampleCopied] = useState(false);
+  const command = `curl -s \\\n  -H 'x-api-key: <你的 API 金鑰>' \\\n  'https://weblog.tw${example}'`;
   const [label, setLabel] = useState('');
   const [busy, setBusy] = useState<string | null>(null);
   const [confirming, setConfirming] = useState<string | null>(null);
@@ -320,10 +322,25 @@ export default function ApiKeyManager({ example }: { example: string }) {
             <p className="text-sm text-zinc-500">已達 {max} 把上限，撤銷一把後才能再建立。</p>
           )}
 
-          <div className="space-y-1">
-            <p className="text-sm font-medium">使用方式</p>
-            <pre className="whitespace-pre-wrap break-all rounded-md bg-zinc-900 p-3 text-[13px] leading-relaxed text-zinc-100 dark:bg-zinc-900/80">
-              <code>{`curl -s -H 'x-api-key: <你的 API 金鑰>' 'https://weblog.tw${example}'`}</code>
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-sm font-medium">使用方式</p>
+              <button
+                type="button"
+                className={secondary}
+                onClick={() => {
+                  void navigator.clipboard?.writeText(command).then(
+                    () => setExampleCopied(true),
+                    () => undefined,
+                  );
+                }}
+              >
+                {exampleCopied ? '已複製' : '複製指令'}
+              </button>
+            </div>
+            {/* One argument per line, never broken inside the URL; a long URL scrolls sideways. */}
+            <pre className="overflow-x-auto whitespace-pre rounded-md bg-zinc-900 p-3 text-[13px] leading-relaxed text-zinc-100 dark:bg-zinc-900/80">
+              <code>{command}</code>
             </pre>
           </div>
         </>

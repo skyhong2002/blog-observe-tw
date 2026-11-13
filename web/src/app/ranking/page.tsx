@@ -11,6 +11,8 @@ import { table } from '@/lib/table-styles';
 // Rendered per request (no-store reads, public-read.ts).
 export const dynamic = 'force-dynamic';
 export const metadata = staticPageMetadata('/ranking/');
+/** The first rows on the page; the rest open below. */
+const SHOWN = 30;
 /** Blog platforms' default category names: not a topic anyone chose, so they stay out of the ranking (and say so). */
 const PLATFORM_DEFAULT = /^(?:未分類|未分类|無分類|uncategori[sz]ed)$/iu;
 
@@ -18,6 +20,35 @@ export default async function RankingPage() {
   const all = await overview();
   const skipped = all.tags.filter((t) => PLATFORM_DEFAULT.test(t.label.trim()));
   const data = { ...all, tags: all.tags.filter((t) => !PLATFORM_DEFAULT.test(t.label.trim())) };
+  const cols = (
+    <colgroup>
+      <col />
+      <col className="w-24" />
+      <col className="w-28" />
+    </colgroup>
+  );
+  const row = (tag: (typeof data.tags)[number], i: number) => (
+    <tr className={table.row} key={tag.slug}>
+      <td className={table.lead}>
+        <div className={`${table.leadBox} flex items-center gap-2`}>
+          <span
+            className={`${table.leadExtra} w-7 shrink-0 text-right text-sm font-semibold tabular-nums ${i < 3 ? 'text-brand-700 dark:text-brand-400' : 'text-zinc-700 dark:text-zinc-300'}`}
+          >
+            {i + 1}
+          </span>
+          <Link
+            className={`${table.leadText} text-brand-700 hover:underline dark:text-brand-400 sm:max-w-80`}
+            href={`/tags/?tag=${encodeURIComponent(tag.slug)}`}
+            title={`第 ${i + 1} 名：${tag.label}`}
+          >
+            {tag.label}
+          </Link>
+        </div>
+      </td>
+      <td className={table.num}>{tag.blogCount.toLocaleString('zh-TW')}</td>
+      <td className={table.num}>{tag.postCount.toLocaleString('zh-TW')}</td>
+    </tr>
+  );
   return (
     <div className="space-y-5 pb-8">
       <SectionTabs
@@ -60,47 +91,45 @@ export default async function RankingPage() {
               </Link>
             </p>
           </section>
-          <TableScroller card label="標籤收錄排行表格，可左右捲動">
-            <table className="w-full whitespace-nowrap text-sm">
-              <thead className="bg-zinc-50 text-left text-xs text-zinc-600 dark:bg-zinc-950 dark:text-zinc-400">
-                <tr>
-                  <th scope="col" className={table.leadHead}>
-                    名次 · 標籤
-                  </th>
-                  <th scope="col" className={table.num}>
-                    部落格
-                  </th>
-                  <th scope="col" className={table.num}>
-                    收錄文章
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
-                {data.tags.map((tag, i) => (
-                  <tr className={table.row} key={tag.slug}>
-                    <td className={table.lead}>
-                      <div className={`${table.leadBox} flex items-center gap-2`}>
-                        <span
-                          className={`${table.leadExtra} w-7 shrink-0 text-right text-sm font-semibold tabular-nums ${i < 3 ? 'text-brand-700 dark:text-brand-400' : 'text-zinc-700 dark:text-zinc-300'}`}
-                        >
-                          {i + 1}
-                        </span>
-                        <Link
-                          className={`${table.leadText} text-brand-700 hover:underline dark:text-brand-400 sm:max-w-80`}
-                          href={`/tags/?tag=${encodeURIComponent(tag.slug)}`}
-                          title={`第 ${i + 1} 名：${tag.label}`}
-                        >
-                          {tag.label}
-                        </Link>
-                      </div>
-                    </td>
-                    <td className={table.num}>{tag.blogCount.toLocaleString('zh-TW')}</td>
-                    <td className={table.num}>{tag.postCount.toLocaleString('zh-TW')}</td>
+          <div className="min-w-0 space-y-3">
+            <TableScroller card label="標籤收錄排行表格，可左右捲動">
+              <table className="w-full table-fixed whitespace-nowrap text-sm">
+                {cols}
+                <thead className="bg-zinc-50 text-left text-xs text-zinc-600 dark:bg-zinc-950 dark:text-zinc-400">
+                  <tr>
+                    <th scope="col" className={table.leadHead}>
+                      名次 · 標籤
+                    </th>
+                    <th scope="col" className={table.num}>
+                      部落格
+                    </th>
+                    <th scope="col" className={table.num}>
+                      收錄文章
+                    </th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </TableScroller>
+                </thead>
+                <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
+                  {data.tags.slice(0, SHOWN).map((tag, i) => row(tag, i))}
+                </tbody>
+              </table>
+            </TableScroller>
+            {data.tags.length > SHOWN && (
+              <details className="group rounded-xl border border-zinc-300 bg-white dark:border-zinc-800 dark:bg-zinc-900">
+                <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between px-4 text-sm font-medium [&::-webkit-details-marker]:hidden">
+                  顯示第 {SHOWN + 1}–{data.tags.length} 名
+                  <span aria-hidden="true" className="text-zinc-500 transition-transform group-open:rotate-180">
+                    ▾
+                  </span>
+                </summary>
+                <table className="w-full table-fixed whitespace-nowrap border-t border-zinc-200 text-sm dark:border-zinc-800">
+                  {cols}
+                  <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
+                    {data.tags.slice(SHOWN).map((tag, i) => row(tag, i + SHOWN))}
+                  </tbody>
+                </table>
+              </details>
+            )}
+          </div>
         </div>
       ) : (
         <StateNotice tone="notice" title="排行還沒有資料" actions={[{ href: '/articles/', label: '看最新文章', primary: true }]}>
