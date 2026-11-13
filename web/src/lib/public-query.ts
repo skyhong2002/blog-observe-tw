@@ -58,6 +58,24 @@ const STATUS_CODES: Record<string, string> = {
   indieweb: 'IndieWeb 名單自動收錄',
 };
 const statusLabelOf = (code: string) => (Object.hasOwn(STATUS_CODES, code) ? STATUS_CODES[code] : code);
+/**
+ * How a blog entered the directory, in a reader's words. The gateway's statusLabel stays the filter value
+ * (statusCodeOf); only the text shown (directory chips and table, the blog page's header) changes.
+ */
+export function sourceLabel(value: string | null | undefined): string {
+  if (!value) return '待核對';
+  const text = value.trim();
+  const from = /^(.+?)\s*(?:名錄|名單)(?:自動)?收錄$/u.exec(text);
+  if (from) return `來自 ${from[1]}${/名單/u.test(text) ? ' 名單' : ' 名錄'}`;
+  const known: Record<string, string> = {
+    'RSS 自動驗證': '從 RSS 自動發現',
+    個人部落格自動驗證: '自動發現的個人部落格',
+    已核對部落格入口: '人工確認',
+    網站管理者驗證收錄: '站主認領',
+  };
+  return known[text] ?? text;
+}
+
 /** The link form of a status: its short code when it has one, else the label itself. */
 export const statusCodeOf = (label: string) => Object.entries(STATUS_CODES).find(([, text]) => text === label)?.[0] ?? label;
 

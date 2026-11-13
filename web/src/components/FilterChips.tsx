@@ -5,13 +5,14 @@ import Link from './NoPrefetchLink';
 
 /** One filter chip; `muted` greys out a choice that has little or no data. */
 export const filterChipClass = (current: boolean, muted = false) =>
-  `whitespace-nowrap rounded-full px-3 py-1 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600 ${
+  // Phones get a 40px tall target; a mouse keeps the compact chip.
+  `inline-flex min-h-10 items-center whitespace-nowrap rounded-full px-3 py-1 sm:min-h-8 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600 ${
     current
       ? 'bg-brand-700 text-white'
       : `bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 ${muted ? 'text-zinc-500 dark:text-zinc-500' : 'text-zinc-700 dark:text-zinc-300'}`
   }`;
 export const filterRowClass = 'flex flex-wrap items-center gap-1.5 text-sm';
-export const filterLabelClass = 'mr-1 text-xs text-zinc-500 dark:text-zinc-400';
+export const filterLabelClass = 'mr-1 text-xs text-zinc-600 dark:text-zinc-400';
 
 export type FilterChip = { href: string; label: string; current?: boolean; title?: string };
 

@@ -26,6 +26,7 @@ import {
   catalogOpmlPath,
   catalogQueryOf,
   isCatalogBaseline,
+  sourceLabel,
   statusCodeOf,
 } from '@/lib/public-query';
 import { type RobotsStatus, robotsLabel, robotsTone } from '@/lib/robots';
@@ -33,24 +34,6 @@ import { table } from '@/lib/table-styles';
 import { asIs, usePublicJson } from '@/lib/use-public-json';
 
 type Status = 'ready' | 'pending' | 'error';
-
-/**
- * How a blog entered the directory, in a reader's words. The gateway's statusLabel stays the filter value
- * (statusCodeOf); only the text on the chip and in the table changes.
- */
-export function sourceLabel(value: string | null | undefined): string {
-  if (!value) return '待核對';
-  const text = value.trim();
-  const from = /^(.+?)\s*(?:名錄|名單)(?:自動)?收錄$/u.exec(text);
-  if (from) return `來自 ${from[1]}${/名單/u.test(text) ? ' 名單' : ' 名錄'}`;
-  const known: Record<string, string> = {
-    'RSS 自動驗證': '從 RSS 自動發現',
-    個人部落格自動驗證: '自動發現的個人部落格',
-    已核對部落格入口: '人工確認',
-    網站管理者驗證收錄: '站主認領',
-  };
-  return known[text] ?? text;
-}
 
 /** What the blog's robots.txt last said to this crawler; the hover text names blocked paths and the read time. */
 function RobotsCell({ robots }: { robots?: RobotsStatus | null }) {
@@ -433,7 +416,9 @@ export default function BlogCatalogView({
                             robots.txt
                           </abbr>
                         </th>
-                        <Th col="status" label="收錄來源" />
+                        {/* Where a blog came from is also a filter (更多篩選) and on its page: the column waits for very wide screens,
+                          so the table fits a 1440 window without scrolling sideways. */}
+                        <Th col="status" label="收錄來源" className="hidden 2xl:table-cell" />
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
@@ -485,7 +470,7 @@ export default function BlogCatalogView({
                           <td className={`${table.cell} text-xs tabular-nums text-zinc-500`}>{taipei(blog.lastPublishedAt)}</td>
                           <td className={`${table.cell} text-xs tabular-nums text-zinc-500`}>{taipei(blog.lastCrawlSuccessAt)}</td>
                           <RobotsCell robots={blog.robots} />
-                          <td className={`${table.cell} text-xs`}>
+                          <td className={`${table.cell} hidden text-xs 2xl:table-cell`}>
                             <span className="block max-w-40 truncate" title={blog.statusLabel ?? '待核對'}>
                               {sourceLabel(blog.statusLabel)}
                             </span>

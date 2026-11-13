@@ -5,6 +5,7 @@ import BlogIcon from '@/components/BlogIcon';
 import Link from '@/components/NoPrefetchLink';
 import PostTags from '@/components/PostTags';
 import SectionBoundary from '@/components/SectionBoundary';
+import StateNotice from '@/components/StateNotice';
 import { displayTitle, taipei } from '@/lib/api';
 import { recentBlogRows } from '@/lib/home';
 import { externalHref } from '@/lib/images';
@@ -43,98 +44,115 @@ export default async function HomePage() {
             </SectionBoundary>
           }
         />
-        {/* What this is and where to start, in one line, before the three columns. */}
-        <section aria-label="關於部落格觀察" className={styles.intro}>
-          <p>
-            收錄 <strong>{data.totals.blogs.toLocaleString('zh-TW')}</strong>{' '}
-            個臺灣與華文的個人部落格，追蹤它們的新文章，整理大家共同在寫的話題，以及部落格之間的引用。點標題就回到作者的網站閱讀。
-          </p>
-          <nav aria-label="從這裡開始" className={styles.introLinks}>
-            <Link href="/articles/">看最新文章</Link>
-            <Link href="/blogs/">逛部落格目錄</Link>
-            <Link href="/topics/">大家在寫什麼</Link>
-          </nav>
-        </section>
-        <div className={styles.columns}>
-          <aside className={styles.left} aria-label="部落格觀察與最近共同話題">
-            <div className={styles.sectionHeading}>
-              <h2>部落格觀察</h2>
-              <Link href="/blogs/">完整目錄 →</Link>
-            </div>
-            <div className={styles.brief}>
-              <div className={styles.briefCount}>
-                {data.totals.blogs}
-                <span>個部落格</span>
-              </div>
-              <p className={styles.briefSub}>已收錄 {data.totals.posts.toLocaleString('zh-TW')} 篇文章</p>
-              <Link href="/blogs/" className={styles.textLink}>
-                探索部落格 <span>→</span>
-              </Link>
-            </div>
-            <div className={`${styles.sectionHeading} ${styles.sectionHeadingLater}`}>
-              <h2>最近共同話題</h2>
-              <Link href="/topics/trending/">完整排行 →</Link>
-            </div>
-            <SectionBoundary label="最近共同話題" className={styles.notice}>
-              <Suspense fallback={<HomeTopicsPending />}>
-                <HomeTopicRanking />
-              </Suspense>
-            </SectionBoundary>
-          </aside>
-          <HomeMentionsSection mentions={data.mentions} />
-          <aside className={styles.right} aria-label="最新更新的部落格">
-            <div className={styles.sectionHeading}>
-              <h2>最新更新的部落格</h2>
-              <Link href="/blogs/?sort=latest&dir=desc">依最新排序 →</Link>
-            </div>
-            {recentBlogs.length ? (
-              <div className={styles.recentBlogs}>
-                <ol>
-                  {recentBlogs.map(({ blog, latest, missing, publishedAt }) => {
-                    const href = externalHref(latest?.url);
-                    const title = displayTitle(latest?.title).trim() || '未提供標題';
-                    return (
-                      <li key={blog.slug}>
-                        <p className={styles.recentBlogName}>
-                          <Link {...blogLink(blog.slug, blog.canonicalPath)} title={blog.name}>
-                            <BlogIcon media={blog.slug} title={blog.name} />
-                            <span>{blog.name}</span>
-                          </Link>
-                          {publishedAt && <time dateTime={publishedAt}>{taipei(publishedAt)}</time>}
-                        </p>
-                        {latest ? (
-                          href ? (
-                            <a
-                              href={href}
-                              data-analytics="open_original"
-                              rel="noopener noreferrer"
-                              className={styles.recentPost}
-                              title={title}
-                            >
-                              {title}
-                            </a>
-                          ) : (
-                            <p className={styles.recentPost} title={title}>
-                              {title}
+        {/* Nothing collected yet (a new install, or every blog withdrawn): one card instead of three columns of empty
+          sections, which read as a broken page. Any collected blog brings the columns back, each leaving out what it lacks. */}
+        {data.totals.blogs === 0 ? (
+          <StateNotice
+            tone="notice"
+            title="部落格還在收錄中"
+            actions={[
+              { href: '/queue/#add', label: '推薦一個部落格', primary: true },
+              { href: '/about/', label: '收錄方式' },
+            ]}
+          >
+            收錄第一批部落格之後，這裡會列出最新文章、大家共同在寫的話題，以及部落格之間的引用。
+          </StateNotice>
+        ) : (
+          <>
+            {/* What this is and where to start, in one line, before the three columns. */}
+            <section aria-label="關於部落格觀察" className={styles.intro}>
+              <p>
+                收錄 <strong>{data.totals.blogs.toLocaleString('zh-TW')}</strong>{' '}
+                個臺灣與華文的個人部落格，追蹤它們的新文章，整理大家共同在寫的話題，以及部落格之間的引用。點標題就回到作者的網站閱讀。
+              </p>
+              <nav aria-label="從這裡開始" className={styles.introLinks}>
+                <Link href="/articles/">看最新文章</Link>
+                <Link href="/blogs/">逛部落格目錄</Link>
+                <Link href="/topics/">大家在寫什麼</Link>
+              </nav>
+            </section>
+            <div className={styles.columns}>
+              <aside className={styles.left} aria-label="部落格觀察與最近共同話題">
+                <div className={styles.sectionHeading}>
+                  <h2>部落格觀察</h2>
+                  <Link href="/blogs/">完整目錄 →</Link>
+                </div>
+                <div className={styles.brief}>
+                  <div className={styles.briefCount}>
+                    {data.totals.blogs}
+                    <span>個部落格</span>
+                  </div>
+                  <p className={styles.briefSub}>已收錄 {data.totals.posts.toLocaleString('zh-TW')} 篇文章</p>
+                  <Link href="/blogs/" className={styles.textLink}>
+                    探索部落格 <span>→</span>
+                  </Link>
+                </div>
+                <div className={`${styles.sectionHeading} ${styles.sectionHeadingLater}`}>
+                  <h2>最近共同話題</h2>
+                  <Link href="/topics/trending/">完整排行 →</Link>
+                </div>
+                <SectionBoundary label="最近共同話題" className={styles.notice}>
+                  <Suspense fallback={<HomeTopicsPending />}>
+                    <HomeTopicRanking />
+                  </Suspense>
+                </SectionBoundary>
+              </aside>
+              <HomeMentionsSection mentions={data.mentions} />
+              <aside className={styles.right} aria-label="最新更新的部落格">
+                <div className={styles.sectionHeading}>
+                  <h2>最新更新的部落格</h2>
+                  <Link href="/blogs/?sort=latest&dir=desc">依最新排序 →</Link>
+                </div>
+                {recentBlogs.length ? (
+                  <div className={styles.recentBlogs}>
+                    <ol>
+                      {recentBlogs.map(({ blog, latest, missing, publishedAt }) => {
+                        const href = externalHref(latest?.url);
+                        const title = displayTitle(latest?.title).trim() || '未提供標題';
+                        return (
+                          <li key={blog.slug}>
+                            <p className={styles.recentBlogName}>
+                              <Link {...blogLink(blog.slug, blog.canonicalPath)} title={blog.name}>
+                                <BlogIcon media={blog.slug} title={blog.name} />
+                                <span>{blog.name}</span>
+                              </Link>
+                              {publishedAt && <time dateTime={publishedAt}>{taipei(publishedAt)}</time>}
                             </p>
-                          )
-                        ) : (
-                          <p className={styles.recentMissing}>{missing === 'none' ? '尚未收錄文章' : '最新文章標題暫缺'}</p>
-                        )}
-                        {latest && <PostTags tags={latest.tags} total={latest.tagCount} max={3} className={styles.postTags} />}
-                      </li>
-                    );
-                  })}
-                </ol>
-                <Link href="/articles/" className={styles.more}>
-                  探索更多文章 <span aria-hidden="true">→</span>
-                </Link>
-              </div>
-            ) : (
-              <p className={styles.notice}>部落格更新資料整理中。</p>
-            )}
-          </aside>
-        </div>
+                            {latest ? (
+                              href ? (
+                                <a
+                                  href={href}
+                                  data-analytics="open_original"
+                                  rel="noopener noreferrer"
+                                  className={styles.recentPost}
+                                  title={title}
+                                >
+                                  {title}
+                                </a>
+                              ) : (
+                                <p className={styles.recentPost} title={title}>
+                                  {title}
+                                </p>
+                              )
+                            ) : (
+                              <p className={styles.recentMissing}>{missing === 'none' ? '尚未收錄文章' : '最新文章標題暫缺'}</p>
+                            )}
+                            {latest && <PostTags tags={latest.tags} total={latest.tagCount} max={3} className={styles.postTags} />}
+                          </li>
+                        );
+                      })}
+                    </ol>
+                    <Link href="/articles/" className={styles.more}>
+                      探索更多文章 <span aria-hidden="true">→</span>
+                    </Link>
+                  </div>
+                ) : (
+                  <p className={styles.notice}>部落格更新資料整理中。</p>
+                )}
+              </aside>
+            </div>
+          </>
+        )}
       </div>
     </>
   );

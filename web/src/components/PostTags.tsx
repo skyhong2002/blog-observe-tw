@@ -21,7 +21,7 @@ export default function PostTags({
   if (!shown.length) return null;
   const more = Math.max(0, (total ?? tags?.length ?? 0) - shown.length);
   return (
-    <ul aria-label="作者標籤" className={`flex flex-wrap gap-x-2 text-xs leading-5 ${className}`}>
+    <ul aria-label="作者標籤" className={`flex flex-wrap gap-x-2 text-[13px] leading-6 ${className}`}>
       {shown.map((tag) => (
         <li key={tag.slug} className="min-w-0 max-w-full">
           <Link

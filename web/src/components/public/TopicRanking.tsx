@@ -163,10 +163,11 @@ function TopicRows({ order, days, data }: { order: TopicOrder; days: Period; dat
               <th scope="col" className={table.leadHead}>
                 話題
               </th>
-              {order === 'heat' ? header('lift', '升溫倍率', table.num, liftTitle) : null}
-              {header('blogs', '部落格', table.num)}
-              {header('posts', '文章', table.num)}
-              <th scope="col" className={`${table.num} hidden sm:table-cell`} title="標題提到這個話題的文章／只在內文提到的文章">
+              {/* Fixed widths keep the numbers together at the right, next to each other, instead of spread across a wide table. */}
+              {order === 'heat' ? header('lift', '升溫倍率', `${table.num} w-28`, liftTitle) : null}
+              {header('blogs', '部落格', `${table.num} w-24`)}
+              {header('posts', '文章', `${table.num} w-24`)}
+              <th scope="col" className={`${table.num} hidden w-44 sm:table-cell`} title="標題提到這個話題的文章／只在內文提到的文章">
                 標題提到／只在內文
               </th>
             </tr>
