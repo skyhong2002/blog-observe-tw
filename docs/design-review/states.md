@@ -72,7 +72,7 @@
 
 ## 參考對手
 
-第一輪截一次，之後每輪重用同一組檔案：
+第一輪截一次，之後每輪重用同一組檔案；換到 skyhong-SM 時（第 6 輪）連同基準一起重拍一次，之後同樣重用：
 
 | ID | 網址 | 對應的我方頁面 |
 |---|---|---|
@@ -83,18 +83,26 @@
 
 ## 重現
 
+工具的資料夾預設是 `~/.cache/weblog-ui-hill-climb`（`REVIEW_HOME` 可改）：`snapshot/`、`assets/`、`private/`、`sets/`、`rounds/`、`builds/` 都在這裡，`pw/node_modules` 放截圖用的 playwright（目前 1.63.0，與本機 `~/.cache/ms-playwright` 的 chromium 1243 相符）。第 6 輪起在 skyhong-SM 上拍攝（12 核心；CJK 字型為系統的 Noto Sans CJK TC）；第 1–5 輪在 sky-server 上拍攝，兩段的截圖不混用。
+
 ```bash
-W=~/.cache/weblog-ui-hill-climb
+W=${REVIEW_HOME:-~/.cache/weblog-ui-hill-climb}
+# 0. 截圖用的 playwright（一次）；worktree 先 npm ci、npm --prefix web ci（nice／ionice）
+(mkdir -p $W/pw && cd $W/pw && npm init -y && npm i playwright@1.63.0)
 # 1. 快照 gateway（重播；只有第一次錄製時加 --record）
 node docs/design-review/tools/snapshot-gateway.mjs --port 18391 --store $W/snapshot
-# 2. 建置（基準版用 `git archive <main SHA>` 匯出的目錄）；等 load1 ≤ 10 且沒有其他 next build
+# 2. 建置：基準版用 `git archive <main SHA>` 匯出的目錄，新版用 prepare-candidate.sh <commit> <name>；
+#    等 load1 ≤ 10 且沒有其他 next build，nice 19／ionice idle
 docs/design-review/tools/review-build.sh <checkout> http://127.0.0.1:18391
-# 3. 啟動（固定時鐘）
-cd <checkout>/web && NODE_OPTIONS="--import $PWD/../docs/design-review/tools/fixed-clock.mjs" \
-  REVIEW_NOW=2026-11-13T02:20:00+08:00 nice -n 10 ./node_modules/.bin/next start -p 18392
-# 4. 截圖（NODE_PATH 指向裝有 playwright 的 node_modules）
-NODE_PATH=<dir>/node_modules node docs/design-review/tools/capture.mjs site http://127.0.0.1:18392 http://127.0.0.1:18391 OUT_DIR
-node docs/design-review/tools/capture.mjs references OUT_DIR
-# 5. 組一輪盲測
-python3 docs/design-review/tools/make_round.py 1 OUT_DIR
+# 3. 啟動（固定時鐘）：基準 18392、新版 18393
+docs/design-review/tools/review-serve.sh <checkout> 18392
+# 4. 截圖（背景、可續拍）。每張之前等 load1 ≤ REVIEW_LOAD_MAX（預設 10），
+#    而且本機沒有別的截圖瀏覽器（例如 tag 的 hill climb）；有的話先關掉自己的瀏覽器再等，全機只開一個
+docs/design-review/tools/run-capture.sh 18392 $W/sets/baseline
+NODE_PATH=$W/pw/node_modules node docs/design-review/tools/capture.mjs references $W/sets/reference
+# 5. 組一輪盲測；評審結束後存原文
+python3 docs/design-review/tools/make_round.py 6 $W/sets/r6
+python3 docs/design-review/tools/save_review.py 6 opus-5-5 <評審最後一則訊息的文字檔或 .jsonl> "<備註>"
 ```
+
+參考對手會連外拍攝，所以 `references` 不加 `OFFLINE=1`；它不經過快照 gateway，也不碰 weblog.tw。

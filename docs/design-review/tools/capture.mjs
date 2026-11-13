@@ -7,7 +7,8 @@
 // favicons, article thumbnails, tag.observe.tw tag visuals) is answered from
 // ASSETS, fetched once on first sight; analytics are blocked.
 import { createHash } from 'node:crypto';
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { createRequire } from 'node:module';
 import { NOW, REFERENCES, SIZES, STATES } from './states.mjs';
@@ -15,19 +16,52 @@ import { NOW, REFERENCES, SIZES, STATES } from './states.mjs';
 const require = createRequire(join(process.env.NODE_PATH ?? process.cwd(), 'noop.js'));
 const { chromium } = require('playwright');
 const [mode, ...rest] = process.argv.slice(2);
-const ASSETS = process.env.ASSETS ?? '/home/sky/.cache/weblog-ui-hill-climb/assets';
+const REVIEW_HOME = process.env.REVIEW_HOME ?? join(homedir(), '.cache/weblog-ui-hill-climb');
+const ASSETS = process.env.ASSETS ?? join(REVIEW_HOME, 'assets');
 mkdirSync(ASSETS, { recursive: true });
 const BLOCK = /google-analytics\.com|googletagmanager\.com|doubleclick\.net|analytics\.google\.com/;
 const sizes = Object.entries(SIZES).filter(([name]) => !process.env.ONLY_SIZE || name === process.env.ONLY_SIZE);
 const pause = (ms) => new Promise((done) => setTimeout(done, ms));
-// Host gate: never start a shot while load1 > 10 (shared host with tag-db).
-async function loadGate() {
-  for (;;) {
-    const load1 = Number(readFileSync('/proc/loadavg', 'utf8').split(' ')[0]);
-    if (load1 <= 10) return;
-    console.log(`${new Date().toISOString()} waiting: load1=${load1}`);
-    await pause(30000);
+const LOAD_MAX = Number(process.env.REVIEW_LOAD_MAX ?? 10);
+
+// Browser parents (not --type= children) that this script did not launch: another
+// review on this host (e.g. the tag hill climb) is photographing right now.
+function otherBrowsers() {
+  const mine = new Set([String(process.pid)]);
+  const found = [];
+  for (const pid of readdirSync('/proc').filter((name) => /^\d+$/.test(name))) {
+    try {
+      // Chromium rewrites its argv into one space-separated string, so split on both.
+      const args = readFileSync(`/proc/${pid}/cmdline`, 'utf8').split(/[\0 ]/);
+      if (!/(^|\/)(chrome|chromium|chrome-headless-shell|headless_shell)$/.test(args[0]) || args.some((a) => a.startsWith('--type='))) continue;
+      const ppid = readFileSync(`/proc/${pid}/stat`, 'utf8').replace(/^.*\) /, '').split(' ')[1];
+      if (!mine.has(ppid)) found.push(pid);
+    } catch {}
   }
+  return found;
+}
+
+// Host gate before every shot: load1 <= LOAD_MAX and no other screenshot browser on
+// the host. While another one runs, our browser is closed, so at most one is open.
+let browser;
+async function loadGate() {
+  for (let calm = 0; calm < 2; ) {
+    const load1 = Number(readFileSync('/proc/loadavg', 'utf8').split(' ')[0]);
+    const others = otherBrowsers();
+    if (load1 <= LOAD_MAX && others.length === 0) {
+      calm++;
+      if (calm < 2) await pause(1000 + Math.random() * 2000);
+      continue;
+    }
+    calm = 0;
+    if (others.length && browser) {
+      await browser.close().catch(() => {});
+      browser = undefined;
+    }
+    console.log(`${new Date().toISOString()} waiting: load1=${load1} other-browsers=${others.length}`);
+    await pause(30000 + Math.random() * 10000);
+  }
+  if (!browser?.isConnected()) browser = await chromium.launch();
 }
 
 async function cachedAsset(route) {
@@ -104,7 +138,6 @@ async function newContext(browser, size, { theme, locale = 'zh-TW' } = {}) {
   });
 }
 
-let browser = await chromium.launch();
 try {
   if (mode === 'site') {
     const [base, gateway, out, filter] = rest;
@@ -154,7 +187,6 @@ try {
         break;
         } catch (error) {
           console.warn(`FAILED ${state.id}_${sizeName} attempt ${attempt}: ${String(error.message).split('\n')[0]}`);
-          if (!browser.isConnected()) browser = await chromium.launch();
         }
         }
       }
@@ -187,5 +219,5 @@ try {
     }
   }
 } finally {
-  await browser.close();
+  await browser?.close();
 }

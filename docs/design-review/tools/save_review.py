@@ -9,11 +9,12 @@ docs/design-review/results/rROUND-REVIEWER.md and prints the per-set means of
 the 12 category scores from the reviewer's JSON block.
 """
 import json
+import os
 import re
 import sys
 from pathlib import Path
 
-ROOT = Path('/home/sky/.cache/weblog-ui-hill-climb')
+ROOT = Path(os.environ.get('REVIEW_HOME') or Path.home() / '.cache/weblog-ui-hill-climb')
 DOCS = Path(__file__).resolve().parents[1]
 CATEGORIES = ['資訊層級', '字體排印', '色彩', '間距與版面', '一致性', '資訊密度', '導覽', '狀態與回饋', '響應式', '文案', '無障礙', '動畫與轉場']
 

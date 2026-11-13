@@ -20,6 +20,7 @@
 import { createHash } from 'node:crypto';
 import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:http';
+import { homedir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -29,7 +30,7 @@ const opt = (name, fallback) => {
   return at >= 0 ? args[at + 1] : fallback;
 };
 const port = Number(opt('port', '18391'));
-const store = resolve(opt('store', '/home/sky/.cache/weblog-ui-hill-climb/snapshot'));
+const store = resolve(opt('store', join(process.env.REVIEW_HOME ?? join(homedir(), '.cache/weblog-ui-hill-climb'), 'snapshot')));
 const record = args.includes('--record');
 const UPSTREAM = 'https://weblog.tw';
 const SPACING_MS = 2000;

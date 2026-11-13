@@ -10,12 +10,13 @@ review folder, to ROOT/private/rROUND.json, and only read after the review.
 """
 import hashlib
 import json
+import os
 import random
 import shutil
 import sys
 from pathlib import Path
 
-ROOT = Path('/home/sky/.cache/weblog-ui-hill-climb')
+ROOT = Path(os.environ.get('REVIEW_HOME') or Path.home() / '.cache/weblog-ui-hill-climb')
 DOCS = Path(__file__).resolve().parents[1]
 
 
