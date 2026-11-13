@@ -33,7 +33,8 @@ export default async function HomePage() {
     <>
       {/* Static site facts; serializeJsonLd escapes '<'. */}
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: serializeJsonLd(siteSchema()) }} />
-      <div className={styles.home}>
+      {/* An empty collection is one card: the page ends after it instead of a screen-tall empty panel. */}
+      <div className={data.totals.blogs === 0 ? `${styles.home} ${styles.homeEmpty}` : styles.home}>
         <MastheadCloud
           edition={updated}
           cloud={

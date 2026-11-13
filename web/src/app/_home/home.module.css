@@ -16,6 +16,7 @@
   color: var(--ink);
   font-family: inherit;
 }
+.homeEmpty { min-height: 0; padding-bottom: 24px; }
 .main a, .feed a { text-decoration: none; }
 .main a:hover, .feed a:hover { color: var(--accent); }
 .home a:focus-visible, .home button:focus-visible, .feed a:focus-visible, .feed button:focus-visible, .main input:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; }
