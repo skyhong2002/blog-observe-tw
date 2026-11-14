@@ -251,9 +251,9 @@ const homeTopicRow = {
   titlePosts: optional(count),
   heat: optional((v) => typeof v === 'number' && Number.isFinite(v) && v > 0),
 };
-/** Candidates for the masthead cloud, a longer slice of the same ranked pool (at most 60, of which the cloud
+/** Candidates for the masthead cloud, a longer slice of the same ranked pool (at most 100, of which the cloud
  * draws 30 after skipping body-mention words); absent on older gateways. */
-const HOME_CLOUD_LIMIT = 60;
+const HOME_CLOUD_LIMIT = 100;
 const homeTopics = (raw: unknown) => {
   if (
     !shape(raw, {

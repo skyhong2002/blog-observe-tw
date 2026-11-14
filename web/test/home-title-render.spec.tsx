@@ -414,7 +414,7 @@ describe('homepage method disclosure', () => {
     expect(text).toContain('同一篇文章連到幾個部落格就在同一張卡片列出幾筆，兩個方向是不同的文章、各自保留日期');
     expect(text).toContain('側欄、Blogroll、留言、共同標籤與文字相似都不列入，也不代表雙方交流');
     expect(text).toContain('最近共同話題（前 8 名）與首頁文字雲（同一份排行，最多 30 個）只取近 30 天共同關鍵字詞庫的排行');
-    expect(text).toContain('標題有寫到它的不到三分之一，表示多半只是在正文順帶提到，這個詞仍留在排行，但不畫進文字雲');
+    expect(text).toContain('標題有寫到它的不到五分之一，表示幾乎都只是在正文順帶提到，這個詞仍留在排行，但不畫進文字雲');
     expect(text).toContain('排行看熱度與參與的部落格數，不看篇數多寡');
     expect(text).toContain('再乘上 log₂(1＋參與部落格數)');
     expect(text).toContain('且至少兩個部落格參與');
@@ -496,8 +496,8 @@ describe('masthead cloud: the local 30-day topic ranking only', () => {
 
   test('body-mention words keep their ranking row but are not drawn; the cloud fills from later candidates', async () => {
     stubs.cloud = false;
-    // 話題1–10 are mostly met in the body (a quarter of their articles in the title); the rest are title-led.
-    const pool = Array.from({ length: 45 }, (_, i) => topic(i + 1, i < 10 ? { posts: 8, titlePosts: 2 } : { posts: 9, titlePosts: 3 }));
+    // 話題1–10 are almost only met in the body (a tenth of their articles in the title); the rest are title-led.
+    const pool = Array.from({ length: 45 }, (_, i) => topic(i + 1, i < 10 ? { posts: 10, titlePosts: 1 } : { posts: 9, titlePosts: 3 }));
     answer(TOPICS, { ...topics(pool.slice(0, 8)), cloudItems: pool, cloudTruncated: true });
     const $ = load(renderToString(await HomeTopicCloud()));
     const words = new Set(
@@ -510,7 +510,7 @@ describe('masthead cloud: the local 30-day topic ranking only', () => {
     // Beyond the old 30-row slice: later candidates fill the places of the skipped words.
     expect(words.has('話題31')).toBe(true);
     expect(words.size).toBeLessThanOrEqual(30);
-    // Exactly a third in the title is about the word; rows without titlePosts are not judged.
+    // Exactly a fifth in the title is about the word; rows without titlePosts are not judged.
     const { topicCloudWords } = await import('@/lib/topic-cloud');
     // A heat-ranked pool is sized by rank (first largest), so many articles cannot outgrow a rising word;
     // a pool without heat (blog profiles) keeps article-count sizes.
@@ -520,8 +520,8 @@ describe('masthead cloud: the local 30-day topic ranking only', () => {
       ['話題2', 1],
     ]);
     expect(topicCloudWords([topic(1, { posts: 3 }), topic(2, { posts: 300 })], '30').map((w) => w.count)).toEqual([3, 300]);
-    expect(topicCloudWords([topic(1, { posts: 9, titlePosts: 3 }), topic(2)], '30').map((w) => w.label)).toEqual(['話題1', '話題2']);
-    expect(topicCloudWords([topic(1, { posts: 9, titlePosts: 2 })], '30')).toEqual([]);
+    expect(topicCloudWords([topic(1, { posts: 10, titlePosts: 2 }), topic(2)], '30').map((w) => w.label)).toEqual(['話題1', '話題2']);
+    expect(topicCloudWords([topic(1, { posts: 11, titlePosts: 2 })], '30')).toEqual([]);
     // The left ranking over the same answer still lists the body-mention words.
     const { default: RealRanking } = await vi.importActual<{ default: () => Promise<Parameters<typeof renderToString>[0]> }>(
       '@/app/_home/HomeTopics',
@@ -557,7 +557,7 @@ describe('masthead cloud: the local 30-day topic ranking only', () => {
 
   test('malformed cloudItems are a failed read, not a shorter cloud', async () => {
     stubs.cloud = false;
-    const pool = Array.from({ length: 61 }, (_, i) => topic(i + 1));
+    const pool = Array.from({ length: 101 }, (_, i) => topic(i + 1));
     for (const body of [
       { ...topics(pool.slice(0, 8)), cloudItems: pool },
       { ...topics(pool.slice(0, 8)), cloudItems: [topic(1, { posts: '3' })] },

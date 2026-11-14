@@ -410,9 +410,10 @@ export function registerTopicRoutes(app: FastifyInstance, pool: Pool, { rankingR
       return home.get(`rank:${days}:home`, () =>
         cache.get(`rank:${days}:home`, async () => {
           // One ranking read serves both the compact list and the larger masthead cloud, and every
-          // request until the next refresh (shared-snapshot.ts). The cloud draws 30 words but skips
-          // body-mention words (web topicCloudWords), so it gets twice that many ranked candidates.
-          const results = await compactHomeRanking(pool, days, undefined, 60);
+          // request until the next refresh (shared-snapshot.ts). The cloud draws up to 30 words but skips
+          // body-mention words (web topicCloudWords), so it gets the 100 candidates /topics/trending/
+          // already reads: the same query and order, only the LIMIT differs.
+          const results = await compactHomeRanking(pool, days, undefined, 100);
           return {
             ...metadata(),
             cacheSeconds: home.refreshMs / 1000,

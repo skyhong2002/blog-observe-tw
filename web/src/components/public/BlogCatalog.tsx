@@ -227,19 +227,35 @@ export default function BlogCatalogView({
           {data.updatedAt ? `更新於 ${taipei(data.updatedAt)}` : '等待資料更新'} · <MethodLink />
         </p>
       </div>
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-        {[
+      {(() => {
+        const stats = [
           { label: '收錄部落格', value: data.totals.blogs },
           { label: '收錄文章', value: data.totals.posts },
           { label: '已提供網址', value: data.totals.withUrls },
           { label: '作者紀錄', value: data.totals.authors },
-        ].map((item) => (
-          <div key={item.label} className="rounded-xl border border-zinc-300 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">
-            <div className="text-xs text-zinc-600 dark:text-zinc-400">{item.label}</div>
-            <div className="mt-1 text-2xl font-semibold tabular-nums tracking-tight">{item.value.toLocaleString('zh-TW')}</div>
-          </div>
-        ))}
-      </div>
+        ];
+        return (
+          <>
+            {/* Phones: the four totals in one strip, so the list starts on the first screen. */}
+            <dl className="grid grid-cols-4 divide-x divide-zinc-200 rounded-xl border border-zinc-300 bg-white py-2 sm:hidden dark:divide-zinc-800 dark:border-zinc-800 dark:bg-zinc-900">
+              {stats.map((item) => (
+                <div key={item.label} className="min-w-0 px-2 text-center">
+                  <dt className="truncate text-xs text-zinc-600 dark:text-zinc-400">{item.label}</dt>
+                  <dd className="text-base font-semibold tabular-nums">{item.value.toLocaleString('zh-TW')}</dd>
+                </div>
+              ))}
+            </dl>
+            <div className="hidden grid-cols-2 gap-3 sm:grid md:grid-cols-4">
+              {stats.map((item) => (
+                <div key={item.label} className="rounded-xl border border-zinc-300 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">
+                  <div className="text-xs text-zinc-600 dark:text-zinc-400">{item.label}</div>
+                  <div className="mt-1 text-2xl font-semibold tabular-nums tracking-tight">{item.value.toLocaleString('zh-TW')}</div>
+                </div>
+              ))}
+            </div>
+          </>
+        );
+      })()}
       {(() => {
         const sourceChips = (
           <FilterChips
@@ -358,36 +374,48 @@ export default function BlogCatalogView({
         <>
           {rows.length > 0 && (
             <>
-              {/* Phones: one card per blog (name, address, tags, counts) instead of a sideways-scrolling table. */}
-              <ul aria-busy={busy} className={`space-y-2 sm:hidden ${busy ? 'opacity-60' : ''}`}>
+              {/* Phones: one compact row per blog instead of a sideways-scrolling table: the name (the row's tap target)
+                with its article count, then the address, latest post and tags on one line. */}
+              <ul
+                data-list="blogs"
+                aria-busy={busy}
+                className={`divide-y divide-zinc-200 rounded-xl border border-zinc-200 bg-white sm:hidden dark:divide-zinc-800 dark:border-zinc-800 dark:bg-zinc-900 ${busy ? 'opacity-60' : ''}`}
+              >
                 {rows.map((blog) => (
-                  <li key={blog.slug} className="rounded-xl border border-zinc-200 bg-white p-3.5 dark:border-zinc-800 dark:bg-zinc-900">
-                    <Link
-                      {...blogLink(blog.slug, blog.canonicalPath)}
-                      className="flex min-w-0 items-center gap-2 font-medium text-zinc-900 dark:text-zinc-100"
-                    >
-                      <span className="shrink-0">
-                        <BlogIcon media={blog.slug} iconUrl={blog.iconUrl} title={blog.name} />
-                      </span>
-                      <span className="min-w-0 break-words text-base leading-snug">
-                        <Highlight text={blog.name} words={words} />
-                      </span>
-                    </Link>
-                    {blog.url && (
-                      <p className="mt-0.5 truncate pl-7 text-sm text-zinc-600 dark:text-zinc-400" title={blog.url}>
-                        <Highlight text={blog.url.replace(/^https?:\/\//, '').replace(/\/$/, '')} words={words} />
-                      </p>
-                    )}
-                    <p className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 pl-7 text-sm text-zinc-600 dark:text-zinc-400">
-                      <span>
+                  <li key={blog.slug} className="px-3 pt-1 pb-2">
+                    <div className="flex items-center justify-between gap-3">
+                      <Link
+                        {...blogLink(blog.slug, blog.canonicalPath)}
+                        className="flex min-h-10 min-w-0 flex-1 items-center gap-2 font-medium text-brand-700 dark:text-brand-400"
+                      >
+                        <span className="shrink-0">
+                          <BlogIcon media={blog.slug} iconUrl={blog.iconUrl} title={blog.name} />
+                        </span>
+                        <span className="min-w-0 truncate text-[15px]" title={blog.name}>
+                          <Highlight text={blog.name} words={words} />
+                        </span>
+                      </Link>
+                      <span className="shrink-0 text-sm text-zinc-600 dark:text-zinc-400">
                         <span className="font-medium tabular-nums text-zinc-900 dark:text-zinc-100">
                           {blog.postCount?.toLocaleString('zh-TW') ?? '—'}
                         </span>{' '}
                         篇
                       </span>
-                      {blog.lastPublishedAt && <span className="tabular-nums">最新 {taipei(blog.lastPublishedAt)}</span>}
+                    </div>
+                    <p className="flex min-w-0 items-center gap-x-2.5 overflow-hidden whitespace-nowrap pl-6 text-[13px] leading-5 text-zinc-600 dark:text-zinc-400">
+                      {blog.url && (
+                        <span className="min-w-0 shrink truncate" title={blog.url}>
+                          <Highlight text={blog.url.replace(/^https?:\/\//, '').replace(/\/$/, '')} words={words} />
+                        </span>
+                      )}
+                      {blog.lastPublishedAt && <span className="shrink-0 tabular-nums">最新 {taipei(blog.lastPublishedAt)}</span>}
                       {(blog.genres ?? []).slice(0, 2).map((g) => (
-                        <Link key={g.value} href={href({ genre: g.value })} scroll={false} className="text-brand-700 dark:text-brand-400">
+                        <Link
+                          key={g.value}
+                          href={href({ genre: g.value })}
+                          scroll={false}
+                          className="shrink-0 text-brand-700 dark:text-brand-400"
+                        >
                           #{g.label}
                         </Link>
                       ))}

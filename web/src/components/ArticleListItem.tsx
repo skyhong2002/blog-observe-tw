@@ -51,7 +51,8 @@ export default function ArticleListItem({
     <li id={article.id ? `article-${article.id}` : undefined} className="scroll-mt-32 py-2.5">
       <article className="flex items-start gap-3">
         <div className="min-w-0 flex-1">
-          <h3 className="text-[15px] font-medium leading-6">
+          {/* Phones: at most two lines of title, one of tags and one of source, so a screen holds more articles. */}
+          <h3 className="text-[15px] font-medium leading-6 max-sm:line-clamp-2">
             {href ? (
               <Link href={href} className="hover:text-brand-700 dark:hover:text-brand-400">
                 {title}
@@ -60,7 +61,7 @@ export default function ArticleListItem({
               title
             )}
           </h3>
-          <PostTags tags={post.tags} total={post.tagCount} max={5} />
+          <PostTags tags={post.tags} total={post.tagCount} max={5} oneLineOnPhones />
           {(snippet || matchSource) && (
             <p className="mt-1 line-clamp-3 text-xs leading-5 text-zinc-600 dark:text-zinc-400">
               {matchSource && (
@@ -96,7 +97,7 @@ export default function ArticleListItem({
               </Link>
             )}
             {article.publishedAt ? <time dateTime={article.publishedAt}>{taipei(article.publishedAt)}</time> : <span>發文日期不明</span>}
-            {article.authors.length > 0 && <span className="max-w-40 truncate">{article.authors.join('、')}</span>}
+            {article.authors.length > 0 && <span className="max-w-40 truncate max-sm:hidden">{article.authors.join('、')}</span>}
             {/* Phones: the title already opens the original; the host would take a line of its own. */}
             <SourceLink url={article.url} showHost className="!min-h-6 !text-[13px] max-sm:hidden" />
           </div>

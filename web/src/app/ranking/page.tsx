@@ -91,8 +91,9 @@ export default async function RankingPage() {
       {data.tags.length ? (
         // The chart and its summary span the page; the top 30 then read in two columns of 15 on a desktop (one column
         // on a phone), so neither column runs on alone under the other.
-        <div className="space-y-5">
-          <section className="grid gap-5 rounded-xl border border-zinc-300 bg-white p-4 sm:p-5 lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-center lg:gap-8 dark:border-zinc-800 dark:bg-zinc-900">
+        // Phones: the ranking first (top 30, then the rest), the chart and its summary after it.
+        <div className="flex flex-col gap-5">
+          <section className="grid gap-5 rounded-xl max-lg:order-3 border border-zinc-300 bg-white p-4 sm:p-5 lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-center lg:gap-8 dark:border-zinc-800 dark:bg-zinc-900">
             <div className="min-w-0">
               <h2 className="mb-3 text-sm font-semibold">前十個標籤 · 參與部落格數</h2>
               <TagCountChartLoader rows={data.tags.slice(0, 10).map((t) => ({ label: t.label, blogCount: t.blogCount }))} />
@@ -122,7 +123,7 @@ export default async function RankingPage() {
             </div>
           </section>
           {/* Phones: the top 30 in one table. Desktops: two columns of 15, so neither column runs on alone. */}
-          <div className="lg:hidden">{rankTable(0, SHOWN, '標籤收錄排行表格，可左右捲動')}</div>
+          <div className="max-lg:order-1 lg:hidden">{rankTable(0, SHOWN, '標籤收錄排行表格，可左右捲動')}</div>
           <div className="hidden items-start gap-5 lg:grid lg:grid-cols-2">
             {[0, HALF].map((from) =>
               data.tags.length > from ? (
@@ -133,7 +134,7 @@ export default async function RankingPage() {
             )}
           </div>
           {data.tags.length > SHOWN && (
-            <details className="group rounded-xl border border-zinc-300 bg-white dark:border-zinc-800 dark:bg-zinc-900">
+            <details className="group rounded-xl border border-zinc-300 bg-white max-lg:order-2 dark:border-zinc-800 dark:bg-zinc-900">
               <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between px-4 text-sm font-medium [&::-webkit-details-marker]:hidden">
                 顯示第 {SHOWN + 1}–{data.tags.length} 名
                 <span aria-hidden="true" className="text-zinc-500 transition-transform group-open:rotate-180">

@@ -12,24 +12,28 @@ export const filterChipClass = (current: boolean, muted = false) =>
       : `bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 ${muted ? 'text-zinc-500 dark:text-zinc-500' : 'text-zinc-700 dark:text-zinc-300'}`
   }`;
 export const filterRowClass = 'flex flex-wrap items-center gap-1.5 text-sm';
-export const filterLabelClass = 'mr-1 text-xs text-zinc-600 dark:text-zinc-400';
+export const filterLabelClass = 'mr-1 shrink-0 whitespace-nowrap text-xs text-zinc-600 dark:text-zinc-400';
 
 export type FilterChip = { href: string; label: string; current?: boolean; title?: string };
 
-/** A row of link chips. `showLabel` prints the row's label when a page has several rows. */
+/** A row of link chips. `showLabel` prints the row's label when a page has several rows. `scroll`: on phones the
+ *  row stays one line and scrolls sideways instead of wrapping into several, so a list below starts higher. */
 export default function FilterChips({
   label,
   items,
   showLabel = false,
+  scroll = false,
   className = '',
 }: {
   label: string;
   items: FilterChip[];
   showLabel?: boolean;
+  scroll?: boolean;
   className?: string;
 }) {
+  const oneLine = scroll ? 'max-sm:-mx-4 max-sm:flex-nowrap max-sm:overflow-x-auto max-sm:px-4 max-sm:[&>*]:shrink-0' : '';
   return (
-    <nav aria-label={label} className={`${filterRowClass} ${className}`}>
+    <nav aria-label={label} className={`${filterRowClass} ${oneLine} ${className}`}>
       {showLabel && <span className={filterLabelClass}>{label}</span>}
       {items.map((item) => (
         <Link

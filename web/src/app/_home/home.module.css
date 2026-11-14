@@ -377,18 +377,3 @@ a.recentPost:hover { color: var(--accent); }
 .mentionQuote a { color: inherit; text-decoration: underline; text-decoration-color: color-mix(in srgb, currentColor 55%, transparent); text-decoration-thickness: 1px; text-underline-offset: 3px; }
 .mentionQuote a:hover, .mentionQuote a:focus-visible { color: var(--ink); text-decoration-color: currentColor; }
 
-/* The one-line introduction under the masthead: what the site is, then three ways in. */
-.intro { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px 24px; margin: 0 auto 28px; padding: 16px 20px; border: 1px solid var(--soft-line); border-radius: 16px; background: var(--panel); }
-.intro p { flex: 1 1 32rem; font-size: 15px; line-height: 1.75; color: var(--ink); }
-.intro strong { font-weight: 600; color: var(--accent); font-variant-numeric: tabular-nums; }
-.introLinks { display: flex; flex-wrap: wrap; gap: 8px; }
-.introLinks a { display: inline-flex; align-items: center; min-height: 40px; padding: 0 16px; border-radius: 999px; border: 1px solid var(--line); background: var(--panel); font-size: 14px; color: var(--ink); white-space: nowrap; }
-.introLinks a:first-child { border-color: var(--accent); background: var(--accent); color: #fff; }
-.introLinks a:first-child:hover { color: #fff; background: var(--color-brand-800); }
-.introLinks a:not(:first-child):hover { border-color: var(--accent); color: var(--accent); }
-@media (max-width: 640px) {
-  .intro { padding: 14px 16px; margin-bottom: 20px; }
-  .introLinks { width: 100%; }
-  .introLinks a { flex: 1 1 auto; justify-content: center; padding: 0 12px; }
-}
-:global([data-theme="dark"]) .introLinks a:first-child { border-color: var(--color-brand-700); background: var(--color-brand-700); color: #fff; }

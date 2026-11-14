@@ -60,18 +60,6 @@ export default async function HomePage() {
           </StateNotice>
         ) : (
           <>
-            {/* What this is and where to start, in one line, before the three columns. */}
-            <section aria-label="關於部落格觀察" className={styles.intro}>
-              <p>
-                收錄 <strong>{data.totals.blogs.toLocaleString('zh-TW')}</strong>{' '}
-                個臺灣與華文的個人部落格，追蹤它們的新文章，整理大家共同在寫的話題，以及部落格之間的引用。點標題就回到作者的網站閱讀。
-              </p>
-              <nav aria-label="從這裡開始" className={styles.introLinks}>
-                <Link href="/articles/">看最新文章</Link>
-                <Link href="/blogs/">逛部落格目錄</Link>
-                <Link href="/topics/">大家在寫什麼</Link>
-              </nav>
-            </section>
             <div className={styles.columns}>
               <aside className={styles.left} aria-label="部落格觀察與最近共同話題">
                 <div className={styles.sectionHeading}>

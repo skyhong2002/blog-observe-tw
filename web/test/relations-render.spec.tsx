@@ -962,14 +962,17 @@ describe("F3's method lives in the footer's one 本頁的資料來源與計算�
       ).toEqual(own ? ['資料來源', own] : ['資料來源']);
       expect($('#method').text(), pathname).not.toContain('引用占比');
     }
-    // The homepage carries its own citation-row method instead, still without the F3 share paragraphs.
+    // The homepage carries its own citation-row method instead, still without the F3 share paragraphs. Its notes
+    // open with what the site is (folded here, not on the first screen).
     const $ = footerOnly('/');
     expect(methodBlocks($).length).toBe(1);
     expect(
       $('#method h3')
         .map((_, el) => $(el).text())
         .get(),
-    ).toEqual(['資料來源', '首頁的部落格引用與話題']);
+    ).toEqual(['部落格觀察', '資料來源', '首頁的部落格引用與話題']);
+    expect($('#method p').first().text()).toContain('首頁最上方的文字雲是近 30');
+    expect($('#method p').first().find('a[href="/articles/"]').length).toBe(1);
     expect($('#method').text()).not.toContain('引用占比');
   });
 

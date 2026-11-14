@@ -13,12 +13,14 @@ export type CloudTopic = Pick<Topic, 'id' | 'label' | 'canonicalPath' | 'posts' 
 /** The one approved provenance: canonical terms of the shared tag vocabulary. */
 export const CLOUD_SOURCE = 'tag-vocabulary';
 /**
- * A cloud draws what articles are about. A word whose period articles mostly name it only in the body
- * (fewer than a third in the title) is a passing mention, so it keeps its ranking row but is not drawn.
- * The same 1/3 as the backend's background gate (DISPLAY_GATE.background.maximumTitleShare), applied
- * to this period's counts; it judges counts, never a word. Rows without titlePosts are not judged.
+ * A cloud draws what articles are about. A word whose period articles almost always name it only in the body
+ * (fewer than a fifth in the title) is a passing mention, so it keeps its ranking row but is not drawn. A fifth,
+ * not the background gate's long-term third (DISPLAY_GATE.background.maximumTitleShare): at a third the
+ * homepage drew about six words; at a fifth it keeps topics such as 吃到飽 or Steam and still drops words that
+ * are only ever met in passing (電話, 驗證, IG). It judges this period's counts, never a word; rows without
+ * titlePosts are not judged.
  */
-export const CLOUD_MIN_TITLE_SHARE = 1 / 3;
+export const CLOUD_MIN_TITLE_SHARE = 1 / 5;
 const aboutTheWord = (t: CloudTopic) => !Number.isSafeInteger(t.titlePosts) || (t.titlePosts as number) / t.posts >= CLOUD_MIN_TITLE_SHARE;
 export type TopicCloudWord = {
   label: string;

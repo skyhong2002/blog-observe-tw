@@ -233,6 +233,7 @@ function LatestFilters({ filters, genresReady }: { filters: ArticleFilters; genr
       <FilterChips
         label="每站最多"
         showLabel
+        scroll
         items={BLOG_CAPS.map((cap) => ({
           href: articleFiltersHref({ ...filters, maxPerBlog: cap }),
           label: cap ? `${cap} 篇` : '不限',
@@ -243,6 +244,7 @@ function LatestFilters({ filters, genresReady }: { filters: ArticleFilters; genr
         <FilterChips
           label="隱藏標籤"
           showLabel
+          scroll
           items={[
             { href: articleFiltersHref({ ...filters, exclude: [] }), label: '不隱藏', current: !filters.exclude.length },
             ...Object.entries(BLOG_GENRES).map(([genre, label]) => {
