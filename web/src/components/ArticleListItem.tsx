@@ -48,7 +48,7 @@ export default function ArticleListItem({
     </>
   );
   return (
-    <li id={article.id ? `article-${article.id}` : undefined} className="scroll-mt-32 py-2.5">
+    <li id={article.id ? `article-${article.id}` : undefined} className="scroll-mt-32 py-2.5 max-sm:py-2">
       <article className="flex items-start gap-3">
         <div className="min-w-0 flex-1">
           {/* Phones: at most two lines of title, one of tags and one of source, so a screen holds more articles. */}
@@ -86,7 +86,7 @@ export default function ArticleListItem({
               {article.description}
             </p>
           )}
-          <div className="mt-0.5 flex flex-wrap items-center gap-x-2.5 text-[13px] leading-6 text-zinc-600 dark:text-zinc-400">
+          <div className="mt-0.5 flex flex-wrap items-center gap-x-2.5 text-[13px] leading-6 text-zinc-600 max-sm:leading-5 dark:text-zinc-400">
             {showMedia && article.media && (
               <Link
                 {...blogLink(article.media, post.blogCanonicalPath)}
