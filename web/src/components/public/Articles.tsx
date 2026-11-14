@@ -10,7 +10,7 @@ import FooterMethod, { methodHeading } from '@/components/FooterMethod';
 import MethodLink from '@/components/MethodLink';
 import Link from '@/components/NoPrefetchLink';
 import SearchBox from '@/components/SearchBox';
-import SectionTabs from '@/components/SectionTabs';
+import StateNotice from '@/components/StateNotice';
 import { type Post, taipei } from '@/lib/api';
 import {
   type ArticleFilters,
@@ -171,13 +171,17 @@ function SearchResults({ asked, search }: { asked: SearchParams; search: PublicL
     );
   if (search.status !== 'ready')
     return (
-      <div role="status" className="rounded-xl border border-zinc-300 p-6 text-sm text-zinc-600 dark:border-zinc-800 dark:text-zinc-400">
-        <p>搜尋暫時無法使用，請稍後再試。</p>
-        {/* A full load: the same URL would not refetch through the client router. */}
-        <a href={searchHref(asked)} className="mt-3 inline-block text-brand-700 hover:underline dark:text-brand-400">
-          重新搜尋
-        </a>
-      </div>
+      <StateNotice
+        tone="error"
+        role="status"
+        title="搜尋暫時無法使用"
+        actions={[
+          { href: searchHref(asked), label: '重新搜尋', primary: true, external: true },
+          { href: '/articles/', label: '看最新文章' },
+        ]}
+      >
+        這次搜尋沒有完成，通常是伺服器忙碌。稍等一下再試一次。
+      </StateNotice>
     );
   const result = search.data;
   return (
@@ -198,15 +202,21 @@ function SearchResults({ asked, search }: { asked: SearchParams; search: PublicL
           <Pager asked={asked} result={result} />
         </>
       ) : (
-        <div role="status" className="py-8 text-sm text-zinc-600 dark:text-zinc-400">
-          <p>{result.page > 1 ? `「${asked.q}」沒有更多結果了。` : `在搜尋範圍內找不到「${asked.q}」。`}</p>
-          {result.page === 1 && <BlogSuggestion query={asked.q} />}
-          {result.page > 1 && (
-            <Link className="mt-3 inline-block text-brand-700 dark:text-brand-400" href={searchHref({ ...asked, page: 1 })}>
-              ← 回到第 1 頁
-            </Link>
-          )}
-        </div>
+        <StateNotice
+          role="status"
+          title={result.page > 1 ? `「${asked.q}」沒有更多結果了` : `找不到「${asked.q}」`}
+          actions={
+            result.page > 1
+              ? [{ href: searchHref({ ...asked, page: 1 }), label: '← 回到第 1 頁', primary: true }]
+              : [
+                  { href: '/articles/', label: '看最新文章', primary: true },
+                  { href: '/tags/', label: '依標籤瀏覽' },
+                ]
+          }
+          extra={result.page === 1 ? <BlogSuggestion query={asked.q} /> : undefined}
+        >
+          {result.page > 1 ? '前面幾頁已經是全部結果。' : '試試較短或不同的關鍵字；搜尋涵蓋文章標題、摘要與已收錄的正文。'}
+        </StateNotice>
       )}
     </>
   );
@@ -223,6 +233,7 @@ function LatestFilters({ filters, genresReady }: { filters: ArticleFilters; genr
       <FilterChips
         label="每站最多"
         showLabel
+        scroll
         items={BLOG_CAPS.map((cap) => ({
           href: articleFiltersHref({ ...filters, maxPerBlog: cap }),
           label: cap ? `${cap} 篇` : '不限',
@@ -233,6 +244,7 @@ function LatestFilters({ filters, genresReady }: { filters: ArticleFilters; genr
         <FilterChips
           label="隱藏標籤"
           showLabel
+          scroll
           items={[
             { href: articleFiltersHref({ ...filters, exclude: [] }), label: '不隱藏', current: !filters.exclude.length },
             ...Object.entries(BLOG_GENRES).map(([genre, label]) => {
@@ -272,18 +284,11 @@ export default function ArticlesView({
   return (
     <div className="space-y-5 pb-8">
       <header>
-        <h1 className="text-2xl font-semibold">{searching ? '搜尋文章' : '最新文章'}</h1>
-        <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
-          <MethodLink />
+        <h1 className="text-2xl font-semibold tracking-tight">{searching ? `搜尋「${asked.q}」` : '最新文章'}</h1>
+        <p className="mt-1 text-[0.9375rem] leading-7 text-zinc-700 dark:text-zinc-300">
+          {searching ? '在已收錄文章的標題、摘要與正文中搜尋。' : '各部落格剛發表的文章，點標題回到作者的網站閱讀。'} <MethodLink />
         </p>
       </header>
-      <SectionTabs
-        label="文章瀏覽"
-        tabs={[
-          { href: '/articles/', label: '最新文章', current: true },
-          { href: '/tags/', label: '標籤與主題' },
-        ]}
-      />
       <SearchBox
         action="/articles/"
         id="article-query"
@@ -334,10 +339,14 @@ export default function ArticlesView({
                 <ArticleListItem key={post.id ?? post.url} post={post} />
               ))}
             </ul>
+          ) : latest.length ? (
+            <StateNotice title="這批文章都被篩選隱藏了" actions={[{ href: '/articles/', label: '清除篩選', primary: true }]}>
+              放寬「每站最多」或少隱藏幾個標籤，就能看到更多文章。
+            </StateNotice>
           ) : (
-            <p className="py-8 text-zinc-500 dark:text-zinc-400">
-              {latest.length ? '這批文章都被篩選隱藏了，可清除篩選重新瀏覽。' : '目前還沒有收錄文章。'}
-            </p>
+            <StateNotice tone="notice" title="還沒有收錄文章" actions={[{ href: '/blogs/', label: '看部落格目錄', primary: true }]}>
+              部落格發表新文章後會出現在這裡，通常每幾小時更新一次。
+            </StateNotice>
           )}
         </>
       )}

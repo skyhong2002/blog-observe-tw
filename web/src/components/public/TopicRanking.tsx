@@ -6,13 +6,13 @@
 
 import { useSearchParams } from 'next/navigation';
 import { useState } from 'react';
-import FilterChips from '@/components/FilterChips';
 import FooterMethod from '@/components/FooterMethod';
 import MethodLink from '@/components/MethodLink';
 import Link from '@/components/NoPrefetchLink';
 import PendingRows from '@/components/PendingRows';
 import { SectionUnavailable } from '@/components/SectionBoundary';
 import SectionTabs from '@/components/SectionTabs';
+import StateNotice from '@/components/StateNotice';
 import SortIndicator from '@/components/SortIndicator';
 import TableScroller from '@/components/TableScroller';
 import { VocabularySummary } from '@/components/VocabularyNotice';
@@ -58,9 +58,9 @@ export default function TopicRankingView({
           label="話題排行"
           tabs={(['blogs', 'heat'] as const).map((o) => ({ href: periodHref(o, days), label: TOPIC_VIEWS[o].tab, current: o === order }))}
         />
-        <FilterChips
+        <SectionTabs
           label="話題期間"
-          items={PERIODS.map((d) => ({ href: periodHref(order, d), label: `近 ${d} 天`, current: d === days }))}
+          tabs={PERIODS.map((d) => ({ href: periodHref(order, d), label: `近 ${d} 天`, current: d === days }))}
         />
       </div>
       <TopicCloudMasthead
@@ -136,28 +136,46 @@ function TopicRows({ order, days, data }: { order: TopicOrder; days: Period; dat
       </button>
     </th>
   );
+  if (!data.items.length)
+    return data.vocabulary.status === 'ready' ? (
+      <StateNotice
+        title={`近 ${days} 天還沒有共同話題`}
+        actions={
+          days === '90'
+            ? [{ href: '/articles/', label: '看最新文章', primary: true }]
+            : [{ href: periodHref(order, '90'), label: '看近 90 天', primary: true }]
+        }
+      >
+        至少要有兩個部落格寫到同一個話題，才會出現在排行。換一段較長的期間看看。
+      </StateNotice>
+    ) : (
+      <StateNotice tone="notice" title="話題排行還在準備" actions={[{ href: '/articles/', label: '先看最新文章', primary: true }]}>
+        話題要等共同關鍵字整理好才能比對，通常每 15 分鐘更新一次，請稍後再回來看看。
+      </StateNotice>
+    );
   return (
     <>
       <TableScroller card label="共同話題表格，可左右捲動">
         <table className="w-full whitespace-nowrap text-sm">
-          <thead className="bg-zinc-50 text-left text-xs text-zinc-600 dark:bg-zinc-950 dark:text-zinc-400">
+          <thead className="bg-zinc-50 text-left text-xs font-medium text-zinc-700 dark:bg-zinc-950 dark:text-zinc-300">
             <tr>
               {header('rank', '#', `${table.num} w-12`)}
               <th scope="col" className={table.leadHead}>
                 話題
               </th>
-              {order === 'heat' ? header('lift', '升溫倍率', table.num, liftTitle) : null}
-              {header('blogs', '部落格', table.num)}
-              {header('posts', '文章', table.num)}
-              <th scope="col" className={table.num}>
-                標題／僅正文
+              {/* Fixed widths keep the numbers together at the right, next to each other, instead of spread across a wide table. */}
+              {order === 'heat' ? header('lift', '升溫倍率', `${table.num} w-28`, liftTitle) : null}
+              {header('blogs', '部落格', `${table.num} w-24`)}
+              {header('posts', '文章', `${table.num} w-24`)}
+              <th scope="col" className={`${table.num} hidden w-44 sm:table-cell`} title="標題提到這個話題的文章／只在內文提到的文章">
+                標題提到／只在內文
               </th>
             </tr>
           </thead>
           <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
             {rows.map(({ t, rank }) => (
               <tr key={t.id} className={table.row}>
-                <td className={`${table.num} text-xs text-zinc-500 dark:text-zinc-400`}>{rank}</td>
+                <td className={`${table.num} text-xs text-zinc-600 dark:text-zinc-400`}>{rank}</td>
                 <td className={table.lead}>
                   <div className={`${table.leadBox} flex items-baseline gap-2`}>
                     <Link
@@ -179,7 +197,10 @@ function TopicRows({ order, days, data }: { order: TopicOrder; days: Period; dat
                 ) : null}
                 <td className={table.num}>{t.blogs.toLocaleString('zh-TW')}</td>
                 <td className={table.num}>{t.posts.toLocaleString('zh-TW')}</td>
-                <td className={table.num} title={t.matchingReason ? matchingReasonLabel(t.matchingReason) : undefined}>
+                <td
+                  className={`${table.num} hidden sm:table-cell`}
+                  title={t.matchingReason ? matchingReasonLabel(t.matchingReason) : undefined}
+                >
                   {splitText(t)}
                 </td>
               </tr>

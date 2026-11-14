@@ -72,6 +72,22 @@ export default function SiteNavigation({ techEnabled = false }: { techEnabled?: 
         className={`${open ? 'flex' : 'hidden'} absolute inset-x-0 top-full flex-col gap-3 border-b border-zinc-200 bg-white p-3 text-sm shadow-lg dark:border-zinc-800 dark:bg-zinc-950 lg:static lg:flex lg:flex-row lg:items-center lg:gap-0 lg:border-0 lg:bg-transparent lg:p-0 lg:shadow-none lg:dark:bg-transparent`}
         aria-label="主要導覽"
       >
+        {/* Phones: the menu also names the home page, so it always shows where the reader is. */}
+        <div className="flex items-start gap-2 lg:hidden">
+          <p className="w-12 shrink-0 pt-2.5 text-xs leading-5 text-zinc-500 dark:text-zinc-400">首頁</p>
+          <Link
+            href="/"
+            onClick={() => setOpen(false)}
+            aria-current={pathname === '/' ? 'page' : undefined}
+            className={`flex min-h-10 items-center rounded-md px-3 ${
+              pathname === '/'
+                ? 'bg-brand-50 font-semibold text-brand-800 dark:bg-brand-950 dark:text-brand-300'
+                : 'text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800'
+            }`}
+          >
+            部落格觀察
+          </Link>
+        </div>
         {groups.map((group) => (
           <div
             key={group.label}
@@ -79,7 +95,7 @@ export default function SiteNavigation({ techEnabled = false }: { techEnabled?: 
           >
             <p className="w-12 shrink-0 pt-2.5 text-xs leading-5 text-zinc-500 lg:hidden dark:text-zinc-400">{group.label}</p>
             <div className="flex flex-wrap gap-1">
-              {group.links.map(({ href, short }) => {
+              {group.links.map(({ href, short, label }) => {
                 const exact = pathname === href || `${pathname}/` === href;
                 const current =
                   exact ||
@@ -101,7 +117,8 @@ export default function SiteNavigation({ techEnabled = false }: { techEnabled?: 
                         : 'text-zinc-600 hover:bg-zinc-100 hover:text-zinc-950 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100'
                     }`}
                   >
-                    {short}
+                    <span className="lg:hidden">{label}</span>
+                    <span className="hidden lg:inline">{short}</span>
                     <NavPending />
                   </Link>
                 );

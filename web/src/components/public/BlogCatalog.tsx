@@ -14,6 +14,7 @@ import MethodLink from '@/components/MethodLink';
 import Link from '@/components/NoPrefetchLink';
 import ReloadButton from '@/components/public/ReloadButton';
 import { SearchIcon, searchFrame } from '@/components/SearchBox';
+import StateNotice, { stateActionClass } from '@/components/StateNotice';
 import TableScroller from '@/components/TableScroller';
 import { type Catalog, SITE_KIND_LABELS, taipei } from '@/lib/api';
 import { blogLink } from '@/lib/page-links';
@@ -25,6 +26,7 @@ import {
   catalogOpmlPath,
   catalogQueryOf,
   isCatalogBaseline,
+  sourceLabel,
   statusCodeOf,
 } from '@/lib/public-query';
 import { type RobotsStatus, robotsLabel, robotsTone } from '@/lib/robots';
@@ -220,66 +222,131 @@ export default function BlogCatalogView({
     <div className="space-y-5 pb-8">
       <MediaTabs current="media" />
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">部落格與文章數</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">部落格目錄</h1>
         <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
           {data.updatedAt ? `更新於 ${taipei(data.updatedAt)}` : '等待資料更新'} · <MethodLink />
         </p>
       </div>
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-        {[
+      {(() => {
+        const stats = [
           { label: '收錄部落格', value: data.totals.blogs },
           { label: '收錄文章', value: data.totals.posts },
           { label: '已提供網址', value: data.totals.withUrls },
           { label: '作者紀錄', value: data.totals.authors },
-        ].map((item) => (
-          <div key={item.label} className="rounded-xl border border-zinc-300 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">
-            <div className="text-xs text-zinc-600 dark:text-zinc-400">{item.label}</div>
-            <div className="mt-1 text-2xl font-semibold tabular-nums tracking-tight">{item.value.toLocaleString('zh-TW')}</div>
-          </div>
-        ))}
-      </div>
-      <div className="space-y-2">
-        <FilterChips
-          label="收錄狀態"
-          items={[
-            { href: href({ status: null }), label: '全部狀態', current: !query.status },
-            ...statuses.map(({ value, count }) => ({
-              href: href({ status: statusCodeOf(value) }),
-              label: `${value} ${count}`,
-              current: query.status === statusCodeOf(value),
-            })),
-          ]}
-        />
-        {/* traffic.observe.tw's tags, several per blog (標籤 on each blog page), not the imported category. */}
-        <FilterChips
-          label="標籤"
-          items={[
-            { href: href({ genre: null }), label: '全部標籤', current: !query.genre },
-            ...genres.map(({ value, label, count }) => ({
-              href: href({ genre: value }),
-              label: `${label} ${count}`,
-              current: query.genre === value,
-            })),
-          ]}
-        />
-        {/* Who runs the blog, from the homepage and the named authors (catalog.js siteKind); absent from an older gateway. */}
-        {kinds.length > 0 && (
+        ];
+        return (
+          <>
+            {/* Phones: the four totals in one strip, so the list starts on the first screen. */}
+            <dl className="grid grid-cols-4 divide-x divide-zinc-200 rounded-xl border border-zinc-300 bg-white py-2 sm:hidden dark:divide-zinc-800 dark:border-zinc-800 dark:bg-zinc-900">
+              {stats.map((item) => (
+                <div key={item.label} className="min-w-0 px-2 text-center">
+                  <dt className="truncate text-xs text-zinc-600 dark:text-zinc-400">{item.label}</dt>
+                  <dd className="text-base font-semibold tabular-nums">{item.value.toLocaleString('zh-TW')}</dd>
+                </div>
+              ))}
+            </dl>
+            <div className="hidden grid-cols-2 gap-3 sm:grid md:grid-cols-4">
+              {stats.map((item) => (
+                <div key={item.label} className="rounded-xl border border-zinc-300 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">
+                  <div className="text-xs text-zinc-600 dark:text-zinc-400">{item.label}</div>
+                  <div className="mt-1 text-2xl font-semibold tabular-nums tracking-tight">{item.value.toLocaleString('zh-TW')}</div>
+                </div>
+              ))}
+            </div>
+          </>
+        );
+      })()}
+      {(() => {
+        const sourceChips = (
           <FilterChips
-            label="經營者"
+            label="收錄來源"
+            showLabel
             items={[
-              { href: href({ kind: null }), label: '全部經營者', current: !query.kind },
-              // An empty kind is left out unless it is the one asked for.
-              ...kinds
-                .filter(({ value, count }) => count > 0 || query.kind === value)
-                .map(({ value, count }) => ({
-                  href: href({ kind: value }),
-                  label: `${SITE_KIND_LABELS[value] ?? value} ${count}`,
-                  current: query.kind === value,
-                })),
+              { href: href({ status: null }), label: '全部', current: !query.status },
+              ...statuses.map(({ value, count }) => ({
+                href: href({ status: statusCodeOf(value) }),
+                label: `${sourceLabel(value)} ${count}`,
+                title: value,
+                current: query.status === statusCodeOf(value),
+              })),
             ]}
           />
-        )}
-      </div>
+        );
+        // traffic.observe.tw's tags, several per blog (標籤 on each blog page), not the imported category.
+        const genreChips = (
+          <FilterChips
+            label="標籤"
+            showLabel
+            items={[
+              { href: href({ genre: null }), label: '全部', current: !query.genre },
+              ...genres.map(({ value, label, count }) => ({
+                href: href({ genre: value }),
+                label: `${label} ${count}`,
+                current: query.genre === value,
+              })),
+            ]}
+          />
+        );
+        // Who runs the blog, from the homepage and the named authors (catalog.js siteKind); absent from an older gateway.
+        const kindChips =
+          kinds.length > 0 ? (
+            <FilterChips
+              label="經營者"
+              showLabel
+              items={[
+                { href: href({ kind: null }), label: '全部', current: !query.kind },
+                // An empty kind is left out unless it is the one asked for.
+                ...kinds
+                  .filter(({ value, count }) => count > 0 || query.kind === value)
+                  .map(({ value, count }) => ({
+                    href: href({ kind: value }),
+                    label: `${SITE_KIND_LABELS[value] ?? value} ${count}`,
+                    current: query.kind === value,
+                  })),
+              ]}
+            />
+          ) : null;
+        const applied = [query.genre, query.status, query.kind].filter(Boolean).length;
+        return (
+          <>
+            {/* Phones: every filter behind one button, so the list starts on the first screen. */}
+            <details
+              className="group rounded-xl border border-zinc-300 bg-white sm:hidden dark:border-zinc-800 dark:bg-zinc-900"
+              open={applied > 0}
+            >
+              <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between px-4 text-sm font-medium [&::-webkit-details-marker]:hidden">
+                <span>
+                  篩選
+                  {applied > 0 && <span className="ml-1.5 rounded-full bg-brand-700 px-2 py-0.5 text-xs text-white">已套用 {applied}</span>}
+                </span>
+                <span aria-hidden="true" className="text-zinc-500 transition-transform group-open:rotate-180">
+                  ▾
+                </span>
+              </summary>
+              <div className="space-y-3 border-t border-zinc-200 p-4 dark:border-zinc-800">
+                {genreChips}
+                {kindChips}
+                {sourceChips}
+              </div>
+            </details>
+            <div className="hidden space-y-2 sm:block">
+              {genreChips}
+              <details className="group" open={Boolean(query.status || query.kind)}>
+                <summary className="inline-flex min-h-9 cursor-pointer list-none items-center gap-1 text-sm text-zinc-600 hover:text-brand-700 dark:text-zinc-400 dark:hover:text-brand-400 [&::-webkit-details-marker]:hidden">
+                  更多篩選：經營者、收錄來源
+                  <span aria-hidden="true" className="transition-transform group-open:rotate-180">
+                    ▾
+                  </span>
+                </summary>
+                <div className="mt-2 space-y-2">
+                  {kindChips}
+                  {sourceChips}
+                </div>
+              </details>
+            </div>
+          </>
+        );
+      })()}
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
           <SearchBox q={q} />
@@ -305,91 +372,164 @@ export default function BlogCatalogView({
       </div>
       {ready ? (
         <>
-          <TableScroller card label="部落格與文章數表格，可左右捲動">
-            <table aria-busy={busy} className={`w-full min-w-[64rem] whitespace-nowrap text-sm ${busy ? 'opacity-60' : ''}`}>
-              <thead className="bg-zinc-50 text-left text-xs text-zinc-600 dark:bg-zinc-950 dark:text-zinc-400">
-                <tr>
-                  <Th col="name" label="部落格" className={table.leadHead} />
-                  <th scope="col" className={table.cell}>
-                    標籤
-                  </th>
-                  <Th col="posts" label="已收錄文章" className="text-right" />
-                  <Th col="authors" label="作者" className="text-right" />
-                  <Th col="latest" label="最新文章" />
-                  <Th col="crawl" label="抓取成功" />
-                  <th scope="col" className={table.cell}>
-                    <abbr title="這個網站的 robots.txt 對本站爬蟲寫了什麼（只公開顯示，不影響抓取），滑過可看細節" className="no-underline">
-                      robots.txt
-                    </abbr>
-                  </th>
-                  <Th col="status" label="狀態" />
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
+          {rows.length > 0 && (
+            <>
+              {/* Phones: one compact row per blog instead of a sideways-scrolling table: the name (the row's tap target)
+                with its article count, then the address, latest post and tags on one line. */}
+              <ul
+                data-list="blogs"
+                aria-busy={busy}
+                className={`divide-y divide-zinc-200 rounded-xl border border-zinc-200 bg-white sm:hidden dark:divide-zinc-800 dark:border-zinc-800 dark:bg-zinc-900 ${busy ? 'opacity-60' : ''}`}
+              >
                 {rows.map((blog) => (
-                  // Every cell sits on the row's text baseline, so names, URLs, counts and dates of different sizes line up.
-                  <tr key={blog.slug} className={`${table.row} [&>td]:align-baseline`}>
-                    <td className={table.lead}>
-                      {/* One line per row: name keeps its width, the URL takes what is left and is the first to truncate. */}
-                      <div className={`${table.leadBox} flex items-baseline gap-2`}>
+                  <li key={blog.slug} className="px-3 pt-1 pb-2">
+                    <div className="flex items-center justify-between gap-3">
+                      <Link
+                        {...blogLink(blog.slug, blog.canonicalPath)}
+                        className="flex min-h-10 min-w-0 flex-1 items-center gap-2 font-medium text-brand-700 dark:text-brand-400"
+                      >
+                        <span className="shrink-0">
+                          <BlogIcon media={blog.slug} iconUrl={blog.iconUrl} title={blog.name} />
+                        </span>
+                        <span className="min-w-0 truncate text-[15px]" title={blog.name}>
+                          <Highlight text={blog.name} words={words} />
+                        </span>
+                      </Link>
+                      <span className="shrink-0 text-sm text-zinc-600 dark:text-zinc-400">
+                        <span className="font-medium tabular-nums text-zinc-900 dark:text-zinc-100">
+                          {blog.postCount?.toLocaleString('zh-TW') ?? '—'}
+                        </span>{' '}
+                        篇
+                      </span>
+                    </div>
+                    <p className="flex min-w-0 items-center gap-x-2.5 overflow-hidden whitespace-nowrap pl-6 text-[13px] leading-5 text-zinc-600 dark:text-zinc-400">
+                      {blog.url && (
+                        <span className="min-w-0 shrink truncate" title={blog.url}>
+                          <Highlight text={blog.url.replace(/^https?:\/\//, '').replace(/\/$/, '')} words={words} />
+                        </span>
+                      )}
+                      {blog.lastPublishedAt && <span className="shrink-0 tabular-nums">最新 {taipei(blog.lastPublishedAt)}</span>}
+                      {(blog.genres ?? []).slice(0, 2).map((g) => (
                         <Link
-                          {...blogLink(blog.slug, blog.canonicalPath)}
-                          className="flex min-w-0 items-baseline gap-1.5 font-medium text-brand-700 hover:underline dark:text-brand-400"
+                          key={g.value}
+                          href={href({ genre: g.value })}
+                          scroll={false}
+                          className="shrink-0 text-brand-700 dark:text-brand-400"
                         >
-                          <span className="shrink-0 self-center">
-                            <BlogIcon media={blog.slug} iconUrl={blog.iconUrl} title={blog.name} />
-                          </span>
-                          <span className={`${table.leadText} sm:max-w-60`} title={blog.name}>
-                            <Highlight text={blog.name} words={words} />
-                          </span>
+                          #{g.label}
                         </Link>
-                        {blog.url && (
-                          <span
-                            className={`${table.leadExtra} ${table.leadText} shrink-[999] text-xs text-zinc-500 sm:max-w-40 dark:text-zinc-400`}
-                            title={blog.url}
-                          >
-                            <Highlight text={blog.url.replace(/^https?:\/\//, '').replace(/\/$/, '')} words={words} />
-                          </span>
-                        )}
-                      </div>
-                    </td>
-                    <td className={`${table.cell} text-xs`}>
-                      <span className="flex gap-x-2">
-                        {(blog.genres ?? []).slice(0, 3).map((g) => (
-                          <Link
-                            key={g.value}
-                            href={href({ genre: g.value })}
-                            scroll={false}
-                            className="text-brand-700 hover:underline dark:text-brand-400"
-                          >
-                            {g.label}
-                          </Link>
-                        ))}
-                        {(blog.genres?.length ?? 0) > 3 && <span className="text-zinc-500">+{(blog.genres?.length ?? 0) - 3}</span>}
-                      </span>
-                    </td>
-                    <td className={table.num}>{blog.postCount?.toLocaleString('zh-TW') ?? '—'}</td>
-                    {/* No author named anywhere (feed or homepage) is not zero authors. */}
-                    <td className={table.num}>{blog.authorCount ? blog.authorCount.toLocaleString('zh-TW') : '—'}</td>
-                    <td className={`${table.cell} text-xs tabular-nums text-zinc-500`}>{taipei(blog.lastPublishedAt)}</td>
-                    <td className={`${table.cell} text-xs tabular-nums text-zinc-500`}>{taipei(blog.lastCrawlSuccessAt)}</td>
-                    <RobotsCell robots={blog.robots} />
-                    <td className={`${table.cell} text-xs`}>
-                      <span className="block max-w-40 truncate" title={blog.statusLabel ?? '待核對'}>
-                        {blog.statusLabel ?? '待核對'}
-                      </span>
-                    </td>
-                  </tr>
+                      ))}
+                    </p>
+                  </li>
                 ))}
-              </tbody>
-            </table>
-          </TableScroller>
-          {!rows.length && (
-            <div className="py-8 text-zinc-500">
-              <p>{q ? `沒有符合「${q}」的部落格。` : '沒有符合條件的部落格。'}</p>
-              {q && <BlogSuggestion query={q} />}
-            </div>
+              </ul>
+              <div className="hidden sm:block">
+                <TableScroller card label="部落格目錄表格，可左右捲動">
+                  <table aria-busy={busy} className={`w-full min-w-[64rem] whitespace-nowrap text-sm ${busy ? 'opacity-60' : ''}`}>
+                    <thead className="bg-zinc-50 text-left text-xs text-zinc-600 dark:bg-zinc-950 dark:text-zinc-400">
+                      <tr>
+                        <Th col="name" label="部落格" className={table.leadHead} />
+                        <th scope="col" className={table.cell}>
+                          標籤
+                        </th>
+                        <Th col="posts" label="已收錄文章" className="text-right" />
+                        <Th col="authors" label="作者" className="text-right" />
+                        <Th col="latest" label="最新文章" />
+                        <Th col="crawl" label="抓取成功" />
+                        <th scope="col" className={table.cell}>
+                          <abbr
+                            title="這個網站的 robots.txt 對本站爬蟲寫了什麼（只公開顯示，不影響抓取），滑過可看細節"
+                            className="no-underline"
+                          >
+                            robots.txt
+                          </abbr>
+                        </th>
+                        {/* Where a blog came from is also a filter (更多篩選) and on its page: the column waits for very wide screens,
+                          so the table fits a 1440 window without scrolling sideways. */}
+                        <Th col="status" label="收錄來源" className="hidden 2xl:table-cell" />
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
+                      {rows.map((blog) => (
+                        // Every cell sits on the row's text baseline, so names, URLs, counts and dates of different sizes line up.
+                        <tr key={blog.slug} className={`${table.row} [&>td]:align-baseline`}>
+                          <td className={table.lead}>
+                            {/* One line per row: name keeps its width, the URL takes what is left and is the first to truncate. */}
+                            <div className={`${table.leadBox} flex items-baseline gap-2`}>
+                              <Link
+                                {...blogLink(blog.slug, blog.canonicalPath)}
+                                className="flex min-w-0 items-baseline gap-1.5 font-medium text-brand-700 hover:underline dark:text-brand-400"
+                              >
+                                <span className="shrink-0 self-center">
+                                  <BlogIcon media={blog.slug} iconUrl={blog.iconUrl} title={blog.name} />
+                                </span>
+                                <span className={`${table.leadText} sm:max-w-60`} title={blog.name}>
+                                  <Highlight text={blog.name} words={words} />
+                                </span>
+                              </Link>
+                              {blog.url && (
+                                <span
+                                  className={`${table.leadExtra} ${table.leadText} shrink-[999] text-xs text-zinc-500 sm:max-w-40 dark:text-zinc-400`}
+                                  title={blog.url}
+                                >
+                                  <Highlight text={blog.url.replace(/^https?:\/\//, '').replace(/\/$/, '')} words={words} />
+                                </span>
+                              )}
+                            </div>
+                          </td>
+                          <td className={`${table.cell} text-xs`}>
+                            <span className="flex gap-x-2">
+                              {(blog.genres ?? []).slice(0, 3).map((g) => (
+                                <Link
+                                  key={g.value}
+                                  href={href({ genre: g.value })}
+                                  scroll={false}
+                                  className="text-brand-700 hover:underline dark:text-brand-400"
+                                >
+                                  {g.label}
+                                </Link>
+                              ))}
+                              {(blog.genres?.length ?? 0) > 3 && <span className="text-zinc-500">+{(blog.genres?.length ?? 0) - 3}</span>}
+                            </span>
+                          </td>
+                          <td className={table.num}>{blog.postCount?.toLocaleString('zh-TW') ?? '—'}</td>
+                          {/* No author named anywhere (feed or homepage) is not zero authors. */}
+                          <td className={table.num}>{blog.authorCount ? blog.authorCount.toLocaleString('zh-TW') : '—'}</td>
+                          <td className={`${table.cell} text-xs tabular-nums text-zinc-500`}>{taipei(blog.lastPublishedAt)}</td>
+                          <td className={`${table.cell} text-xs tabular-nums text-zinc-500`}>{taipei(blog.lastCrawlSuccessAt)}</td>
+                          <RobotsCell robots={blog.robots} />
+                          <td className={`${table.cell} hidden text-xs 2xl:table-cell`}>
+                            <span className="block max-w-40 truncate" title={blog.statusLabel ?? '待核對'}>
+                              {sourceLabel(blog.statusLabel)}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </TableScroller>
+              </div>
+            </>
           )}
+          {!rows.length &&
+            (data.totals.blogs === 0 && !q ? (
+              <StateNotice tone="notice" title="目錄還沒有部落格">
+                收錄的部落格會在這裡依最新文章排序。你知道值得收錄的部落格嗎？可以先推薦給我們。
+                <div className="pt-3">
+                  <Link href="/queue/#add" className={stateActionClass(true)}>
+                    推薦部落格
+                  </Link>
+                </div>
+              </StateNotice>
+            ) : (
+              <StateNotice
+                title={q ? `沒有符合「${q}」的部落格` : '沒有符合這些篩選的部落格'}
+                actions={[{ href: '/blogs/', label: '清除搜尋與篩選', primary: true }]}
+                extra={q ? <BlogSuggestion query={q} /> : undefined}
+              >
+                {q ? '試試較短的關鍵字、部落格網址的一部分，或換成英文名稱。' : '放寬或移除篩選條件，就能看到更多部落格。'}
+              </StateNotice>
+            ))}
           <nav aria-label="部落格分頁" className="flex justify-between text-sm">
             {page > 1 ? (
               <Link className="py-2 text-brand-700 dark:text-brand-400" href={href({ page: String(page - 1) })}>
@@ -415,10 +555,9 @@ export default function BlogCatalogView({
           正在載入符合條件的部落格…
         </p>
       ) : (
-        <div className="rounded-xl border border-zinc-300 p-6 text-sm text-zinc-600 dark:border-zinc-800 dark:text-zinc-400">
-          <p>部落格目錄暫時無法載入，請稍後再試。</p>
-          <ReloadButton />
-        </div>
+        <StateNotice tone="error" title="部落格目錄暫時無法載入" extra={<ReloadButton />}>
+          伺服器這次沒有回應。重新載入通常就能解決；若持續發生，請稍後再試。
+        </StateNotice>
       )}
     </div>
   );

@@ -8,6 +8,7 @@ import BlogIcon from '@/components/BlogIcon';
 import MethodLink from '@/components/MethodLink';
 import Link from '@/components/NoPrefetchLink';
 import SectionTabs from '@/components/SectionTabs';
+import StateNotice, { stateActionClass } from '@/components/StateNotice';
 import type { Blog, Overview, Post, Tag } from '@/lib/api';
 import { blogLink } from '@/lib/page-links';
 import { isSlug, tagApiPath } from '@/lib/public-query';
@@ -26,75 +27,148 @@ export default function TagExplorerView({
   detail: PublicLoad<TagDetail> | null;
 }) {
   const selected = detail?.status === 'ready' ? detail.data.tag : null;
-  const pendingLabel = detail?.status === 'pending' ? tags.find((t) => t.slug === tag)?.label : undefined;
-  const title = selected?.label ?? pendingLabel;
+  const asked = tag ? tags.find((t) => t.slug === tag) : undefined;
+  const title = selected?.label ?? asked?.label;
+  const posts = detail?.status === 'ready' ? (detail.data.posts ?? []) : [];
+  const blogs = detail?.status === 'ready' ? (detail.data.blogs ?? []) : [];
+  const most = Math.max(1, ...tags.map((t) => t.blogCount));
+  const tagChips = (
+    <ul className="flex flex-wrap gap-2">
+      {tags.map((t) => {
+        const current = t.slug === tag;
+        // Wider reach, slightly larger chip: the list reads as a map, not a wall.
+        const weight = t.blogCount / most;
+        return (
+          <li key={t.slug}>
+            <Link
+              href={`/tags/?tag=${encodeURIComponent(t.slug)}`}
+              aria-current={current ? 'page' : undefined}
+              className={`inline-flex min-h-10 items-baseline gap-1.5 rounded-full border px-3.5 py-2 leading-none transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600 ${weight > 0.5 ? 'text-base font-medium' : 'text-sm'} ${
+                current
+                  ? 'border-brand-700 bg-brand-700 text-white'
+                  : 'border-zinc-200 bg-white text-zinc-800 hover:border-brand-600 hover:text-brand-800 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:border-brand-400 dark:hover:text-brand-300'
+              }`}
+            >
+              <span>#{t.label}</span>
+              <span className={`text-xs tabular-nums ${current ? 'text-brand-100' : 'text-zinc-600 dark:text-zinc-400'}`}>
+                {t.blogCount} 站
+              </span>
+            </Link>
+          </li>
+        );
+      })}
+    </ul>
+  );
   return (
     <div className="space-y-5 pb-8">
-      <header>
-        <h1 className="text-2xl font-semibold">{title ? `${title} · 標籤` : '標籤與主題'}</h1>
-        <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
-          <MethodLink />
-        </p>
-      </header>
       <SectionTabs
-        label="文章瀏覽"
+        label="標籤"
         tabs={[
-          { href: '/articles/', label: '最新文章' },
-          { href: '/tags/', label: '標籤與主題', current: true },
+          { href: '/tags/', label: '文章標籤', current: true },
+          { href: '/ranking/', label: '標籤收錄排行' },
         ]}
       />
-      <div className="flex flex-wrap gap-2">
-        {tags.map((t) => (
-          <Link
-            key={t.slug}
-            href={`/tags/?tag=${encodeURIComponent(t.slug)}`}
-            aria-current={t.slug === tag ? 'page' : undefined}
-            className={`rounded-lg border px-3 py-2 text-sm ${t.slug === tag ? 'border-brand-600 text-brand-700 dark:text-brand-400' : 'border-zinc-300 text-zinc-600 dark:border-zinc-700 dark:text-zinc-400'}`}
-          >
-            {t.label}
-            <span className="ml-2 text-xs text-zinc-500">
-              {t.postCount} 篇 · {t.blogCount} 站
-            </span>
-          </Link>
-        ))}
-      </div>
-      {detail?.status === 'ready' && (
-        <section>
-          <h2 className="mb-3 text-lg font-semibold">相關文章與部落格</h2>
-          <ul className="divide-y divide-zinc-200 dark:divide-zinc-800">
-            {detail.data.posts?.map((post) => (
-              <ArticleListItem key={post.id ?? post.url} post={post} />
-            ))}
-          </ul>
-          <ul className="mt-4 space-y-2">
-            {detail.data.blogs?.map((blog) => (
-              <li key={blog.slug}>
-                <Link
-                  {...blogLink(blog.slug, blog.canonicalPath)}
-                  className="inline-flex items-center gap-1.5 text-brand-700 hover:underline dark:text-brand-400"
-                >
-                  <BlogIcon media={blog.slug} title={blog.name} />
-                  {blog.name}
+      {tag === null ? (
+        <>
+          <header>
+            <h1 className="text-2xl font-semibold tracking-tight">文章標籤</h1>
+            <p className="mt-1 text-[0.9375rem] leading-7 text-zinc-700 dark:text-zinc-300">
+              部落格作者替自己文章加上的標籤，依參與的部落格數排列。點一個標籤，看有哪些文章與部落格。 <MethodLink />
+            </p>
+          </header>
+          {tags.length ? (
+            tagChips
+          ) : (
+            <StateNotice tone="notice" title="標籤還在整理中">
+              收錄的文章帶有標籤之後，會依參與的部落格數列在這裡。先去看看最新文章吧。
+              <div className="pt-3">
+                <Link href="/articles/" className={stateActionClass(true)}>
+                  看最新文章
                 </Link>
-              </li>
-            ))}
-          </ul>
-          {!detail.data.posts?.length && !detail.data.blogs?.length && (
-            <p className="py-8 text-zinc-500">此標籤目前沒有公開文章或部落格。</p>
+              </div>
+            </StateNotice>
           )}
-        </section>
+        </>
+      ) : (
+        <>
+          <header className="space-y-2">
+            <Link href="/tags/" className="inline-flex min-h-9 items-center text-sm text-brand-700 hover:underline dark:text-brand-400">
+              ← 所有標籤
+            </Link>
+            <h1 className="text-3xl font-semibold tracking-tight">
+              <span className="text-brand-700 dark:text-brand-400">#</span>
+              {title ?? tag}
+            </h1>
+            {asked && (
+              <p className="text-[0.9375rem] text-zinc-700 dark:text-zinc-300">
+                <span className="font-medium tabular-nums">{asked.blogCount.toLocaleString('zh-TW')}</span> 個部落格、
+                <span className="font-medium tabular-nums">{asked.postCount.toLocaleString('zh-TW')}</span> 篇文章用過這個標籤 ·{' '}
+                <MethodLink />
+              </p>
+            )}
+          </header>
+          {detail?.status === 'ready' &&
+            (posts.length || blogs.length ? (
+              <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_20rem]">
+                <section className="min-w-0 rounded-2xl border border-zinc-200 bg-white px-4 dark:border-zinc-800 dark:bg-zinc-900">
+                  <h2 className="border-b border-zinc-200 py-3 text-base font-semibold dark:border-zinc-800">最近的文章</h2>
+                  <ul className="divide-y divide-zinc-200 dark:divide-zinc-800">
+                    {posts.map((post) => (
+                      <ArticleListItem key={post.id ?? post.url} post={post} />
+                    ))}
+                  </ul>
+                </section>
+                {blogs.length > 0 && (
+                  <aside className="h-fit rounded-2xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">
+                    <h2 className="mb-3 text-base font-semibold">寫過這個標籤的部落格</h2>
+                    <ul className="space-y-1">
+                      {blogs.map((blog) => (
+                        <li key={blog.slug}>
+                          <Link
+                            {...blogLink(blog.slug, blog.canonicalPath)}
+                            className="flex min-h-10 items-center gap-2 rounded-lg px-2 text-[0.9375rem] text-zinc-800 hover:bg-brand-50 hover:text-brand-800 dark:text-zinc-200 dark:hover:bg-zinc-800 dark:hover:text-brand-300"
+                          >
+                            <BlogIcon media={blog.slug} title={blog.name} />
+                            <span className="min-w-0 truncate">{blog.name}</span>
+                          </Link>
+                        </li>
+                      ))}
+                    </ul>
+                  </aside>
+                )}
+              </div>
+            ) : (
+              <StateNotice title="這個標籤目前沒有公開文章" actions={[{ href: '/tags/', label: '看所有標籤', primary: true }]}>
+                用過它的文章可能已被作者移除。換一個標籤看看。
+              </StateNotice>
+            ))}
+          {detail?.status === 'pending' && (
+            <p role="status" aria-busy="true" className="py-8 text-zinc-600 dark:text-zinc-400">
+              正在載入「{title ?? tag}」的文章…
+            </p>
+          )}
+          {(detail?.status === 'missing' || detail?.status === 'error') && (
+            <StateNotice
+              tone={detail.status === 'error' ? 'error' : 'empty'}
+              title={detail.status === 'error' ? '這個標籤暫時無法載入' : '找不到這個標籤'}
+              actions={[{ href: '/tags/', label: '看所有標籤', primary: true }]}
+            >
+              {detail.status === 'error' ? '請稍後重新整理一次。' : '它可能已經沒有公開文章，或網址打錯了。'}
+            </StateNotice>
+          )}
+          {tags.length > 0 && (
+            <details className="group rounded-2xl border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
+              <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between px-4 text-sm font-medium [&::-webkit-details-marker]:hidden">
+                換一個標籤（共 {tags.length} 個）
+                <span aria-hidden="true" className="text-zinc-500 transition-transform group-open:rotate-180">
+                  ▾
+                </span>
+              </summary>
+              <div className="border-t border-zinc-200 p-4 dark:border-zinc-800">{tagChips}</div>
+            </details>
+          )}
+        </>
       )}
-      {detail?.status === 'pending' && (
-        <p role="status" aria-busy="true" className="py-8 text-zinc-500">
-          正在載入標籤文章…
-        </p>
-      )}
-      {(detail?.status === 'missing' || detail?.status === 'error') && (
-        <p role="status" className="py-8 text-zinc-500">
-          找不到此公開標籤，或暫時無法載入。請回到標籤列表重試。
-        </p>
-      )}
-      {!tags.length && <p className="py-8 text-zinc-500">標籤資料整理中。</p>}
     </div>
   );
 }

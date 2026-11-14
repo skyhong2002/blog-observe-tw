@@ -92,22 +92,23 @@ async function FooterStats() {
 
 export default function SiteFooter({ notes }: { notes?: React.ReactNode }) {
   return (
-    <footer className="mt-14 text-sm text-zinc-600 dark:text-zinc-400">
+    <footer className="mt-10 text-sm sm:mt-14 text-zinc-600 dark:text-zinc-400">
       <FooterMethod notes={notes} />
 
-      <div className={`${band} mt-10 pt-12 pb-6`}>
-        <div className="grid grid-cols-1 gap-10 lg:grid-cols-[minmax(0,1fr)_auto] lg:gap-20">
-          <div className="space-y-5">
+      {/* Phones: a compact band, so a short page does not end in a footer taller than its content. */}
+      <div className={`${band} mt-8 pt-8 pb-5 sm:mt-10 sm:pt-12 sm:pb-6`}>
+        <div className="grid grid-cols-1 gap-7 sm:gap-10 lg:grid-cols-[minmax(0,1fr)_auto] lg:gap-20">
+          <div className="space-y-4 sm:space-y-5">
             <Link href="/" aria-label="部落格觀察 首頁" className="inline-block text-zinc-900 dark:text-zinc-100">
-              <Wordmark className="h-9 w-auto" />
+              <Wordmark className="h-7 w-auto sm:h-9" />
             </Link>
             <div className="space-y-1.5">
               <p className="text-base font-medium text-zinc-900 dark:text-zinc-100">每一種生活，各自怎麼寫。</p>
-              <p className="leading-7">
+              <p className="hidden leading-7 sm:block">
                 追蹤部落格的文章、作者與標籤，<span className="whitespace-nowrap">持續閱讀不同的生活。</span>
               </p>
             </div>
-            <div className="min-h-10 sm:min-h-5" data-vital-region="footer-stats">
+            <div className="min-h-5" data-vital-region="footer-stats">
               <Suspense fallback={null}>
                 <FooterStats />
               </Suspense>
@@ -129,7 +130,7 @@ export default function SiteFooter({ notes }: { notes?: React.ReactNode }) {
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-x-6 gap-y-8 sm:max-w-md sm:gap-x-16 lg:max-w-none">
+          <div className="grid grid-cols-2 gap-x-6 gap-y-6 sm:max-w-md sm:gap-y-8 sm:gap-x-16 lg:max-w-none">
             {COLUMNS.map((col) => (
               <nav key={col.label} aria-label={col.label}>
                 <h2 className="mb-2.5 text-xs font-semibold tracking-wide text-zinc-900 dark:text-zinc-100">{col.label}</h2>
@@ -160,7 +161,7 @@ export default function SiteFooter({ notes }: { notes?: React.ReactNode }) {
           </div>
         </div>
 
-        <div className="mt-12 flex flex-col gap-3 border-t border-zinc-200 pt-5 text-xs leading-6 sm:flex-row sm:items-center sm:justify-between dark:border-zinc-800">
+        <div className="mt-8 flex flex-col gap-2 border-t border-zinc-200 pt-4 text-xs leading-6 sm:mt-12 sm:gap-3 sm:pt-5 sm:flex-row sm:items-center sm:justify-between dark:border-zinc-800">
           <p>
             © 2026 部落格觀察 · 程式碼以{' '}
             <a

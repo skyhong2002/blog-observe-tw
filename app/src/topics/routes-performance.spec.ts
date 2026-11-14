@@ -39,8 +39,8 @@ describe('fresh topic ranking coverage', () => {
       expect(response.json()).not.toHaveProperty('vocabulary');
       expect(queries).toHaveLength(1);
       expect(queries[0]).not.toContain('ROW_NUMBER');
-      // 60 cloud candidates (+1 truncation probe); the left list still sends 8.
-      expect(queries[0]).toContain('LIMIT 61');
+      // 100 cloud candidates (+1 truncation probe), as /topics/trending/ reads; the left list still sends 8.
+      expect(queries[0]).toContain('LIMIT 101');
       expect(response.json().items.length).toBeLessThanOrEqual(8);
       // Term tables are read once per (term, blog), and the window posts drive the index join.
       expect(queries[0]).toContain('GROUP BY m.snapshot_id,m.term_id,p.blog_id');

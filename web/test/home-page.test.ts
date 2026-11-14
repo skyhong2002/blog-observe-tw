@@ -115,3 +115,12 @@ test('theme: topic and history secondary text has a dark variant', () => {
   assert.ok(source('components/public/TopicRanking.tsx').includes("' text-xs text-zinc-500 dark:text-zinc-400'"));
   assert.doesNotMatch(source('components/public/TopicDetail.tsx'), /text-zinc-500 dark:text-zinc-400 dark:text-/);
 });
+
+test('home: what the site is sits in the folded method notes, not on the first screen', () => {
+  // Review feedback on PR #7, as tag.observe.tw's home: the masthead cloud is followed by the columns directly.
+  const page = source('app/page.tsx');
+  assert.doesNotMatch(page, /styles\.intro|關於部落格觀察"|從這裡開始/);
+  assert.doesNotMatch(source('app/_home/home.module.css'), /\.intro\b|\.introLinks\b/);
+  const method = source('components/FooterMethod.tsx');
+  assert.match(method, /pathname === '\/' \? \([\s\S]*?<h3 className=\{heading\}>部落格觀察<\/h3>[\s\S]*?<h3 className=\{heading\}>資料來源<\/h3>/);
+});

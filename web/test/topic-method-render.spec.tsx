@@ -405,12 +405,17 @@ describe('topic ranking', () => {
     ]);
   });
 
-  test('an empty ranking leaves the table empty, says no reason inline, and keeps one block after it', () => {
+  test('an empty ranking shows one empty-state card instead of an empty table, and keeps one block after it', () => {
     const $ = render(<TopicRankingView order="heat" days="30" load={ready({ ...ranking, items: [], coverage: undefined })} />, '/topics/');
     const block = expectOnePageBlock($);
-    expect($('tbody tr').length).toBe(0);
+    expect($('table').length).toBe(0);
     expect($.text()).not.toContain('這段期間尚無跨至少');
-    expect(position($, $('table'))).toBeLessThan(position($, block));
+    const notice = $('section h2')
+      .filter((_, el) => /話題/.test($(el).text()))
+      .first()
+      .closest('section');
+    expect(notice.length).toBe(1);
+    expect(position($, notice)).toBeLessThan(position($, block));
     expectLongNotesInsideOnly($);
   });
 
@@ -495,7 +500,7 @@ describe('the two rankings', () => {
       $('thead th')
         .map((_, th) => $(th).text().replace(/[▲▼↕]/g, ''))
         .get(),
-    ).toEqual(['#', '話題', '部落格', '文章', '標題／僅正文']);
+    ).toEqual(['#', '話題', '部落格', '文章', '標題提到／只在內文']);
     expect($.text()).toContain('依期間內寫到這個詞的部落格數排序');
   });
   test('/topics/trending/ (heat): keeps the period across tabs and shows the rise column', () => {
@@ -510,7 +515,7 @@ describe('the two rankings', () => {
       $('thead th')
         .map((_, th) => $(th).text().replace(/[▲▼↕]/g, ''))
         .get(),
-    ).toEqual(['#', '話題', '升溫倍率', '部落格', '文章', '標題／僅正文']);
+    ).toEqual(['#', '話題', '升溫倍率', '部落格', '文章', '標題提到／只在內文']);
     expect($.text()).toContain('排行依熱度乘上');
   });
 });

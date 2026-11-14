@@ -3,7 +3,7 @@
 // One view for the prerendered 7-day relation map and the browser's ?days=30|90; see app/relations/page.tsx.
 
 import { useSearchParams } from 'next/navigation';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import BlogIcon from '@/components/BlogIcon';
 import BlogRelationGraph from '@/components/BlogRelationGraph';
 import { filterChipClass, filterRowClass } from '@/components/FilterChips';
@@ -23,25 +23,52 @@ import { asIs, type PublicLoad, usePublicJson } from '@/lib/use-public-json';
 export default function RelationMapView({ days, load }: { days: Period; load: PublicLoad<Relations> }) {
   return (
     <div className="space-y-5 pb-8">
+      {/* Same top row as the topic rankings: the section's tabs on the left, the period on the right. */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <RelationTabs current="relations" className="" />
+        <SectionTabs
+          label="觀察期間"
+          tabs={[7, 30, 90].map((d) => ({ href: `/relations/?days=${d}`, label: `近 ${d} 天`, current: String(d) === days }))}
+        />
+      </div>
       <header>
-        <RelationTabs current="relations" />
-        <h1 className="text-2xl font-semibold">部落格關係圖</h1>
-        <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
-          誰在文章中提到誰 · <MethodLink />
+        <h1 className="text-2xl font-semibold tracking-tight">引用關係圖</h1>
+        <p className="mt-1 text-[0.9375rem] text-zinc-700 dark:text-zinc-300">
+          部落格在文章正文裡連到其他部落格，就是一次引用；箭頭指向被引用的一方。 <MethodLink />
         </p>
       </header>
-      <SectionTabs
-        label="觀察期間"
-        tabs={[7, 30, 90].map((d) => ({ href: `/relations/?days=${d}`, label: `近 ${d} 天`, current: String(d) === days }))}
-      />
       {load.status === 'ready' ? (
         <RelationDetails data={load.data} />
       ) : load.status === 'pending' ? (
         <>
-          <p role="status" aria-busy="true" className="text-zinc-500">
+          <p role="status" aria-busy="true" className="text-zinc-600 dark:text-zinc-400">
             正在載入近 {days} 天的關係資料…
           </p>
-          <PendingRows />
+          {/* The same shape as the loaded page: the graph's frame, then the two ranking lists. */}
+          <div
+            aria-hidden="true"
+            className="relative flex aspect-[4/3] max-h-[34rem] w-full items-center justify-center overflow-hidden rounded-xl border border-zinc-300 bg-white sm:aspect-[16/9] dark:border-zinc-800 dark:bg-zinc-900"
+          >
+            {[
+              [22, 30, 5],
+              [48, 44, 7],
+              [70, 28, 4],
+              [36, 68, 4],
+              [62, 70, 5],
+              [82, 56, 3],
+              [14, 60, 3],
+            ].map(([x, y, r]) => (
+              <span
+                key={`${x}-${y}`}
+                className="absolute rounded-full bg-zinc-200 motion-safe:animate-pulse dark:bg-zinc-800"
+                style={{ left: `${x}%`, top: `${y}%`, width: `${r * 0.5}rem`, height: `${r * 0.5}rem` }}
+              />
+            ))}
+          </div>
+          <div className="grid gap-4 md:grid-cols-2">
+            <PendingRows rows={5} />
+            <PendingRows rows={5} />
+          </div>
         </>
       ) : (
         <SectionUnavailable label="關係資料" />
@@ -85,8 +112,16 @@ function graphFor(data: Relations, view: GraphView) {
 }
 
 function RelationDetails({ data }: { data: Relations }) {
-  const [showAll, setShowAll] = useState({ most: false, mutual: false });
+  const [showAll, setShowAll] = useState({ most: false, mutual: false, links: false });
   const [view, setView] = useState<GraphView>('all');
+  // A crowded map is unreadable (a phone sooner than a desktop): start on a narrower view that still has a real
+  // network (3+ articles, else mutual mentions, each kept only with enough blogs); the chips switch back.
+  useEffect(() => {
+    const phone = window.matchMedia('(max-width: 639px)').matches;
+    if (data.nodes.length <= (phone ? 40 : 80)) return;
+    const narrower = (['repeat', 'mutual'] as const).find((key) => graphFor(data, key).nodes.length >= (phone ? 8 : 12));
+    if (narrower) setView(narrower);
+  }, [data]);
   const graph = useMemo(() => graphFor(data, view), [data, view]);
   const nodes = new Map(data.nodes.map((n) => [n.id, n]));
   const name = (id: number) => nodes.get(id)?.name ?? `部落格 #${id}`;
@@ -110,7 +145,7 @@ function RelationDetails({ data }: { data: Relations }) {
     const n = nodes.get(id);
     return n ? (
       <Link
-        className="inline-flex h-6 min-w-0 max-w-full items-center gap-1.5 rounded-full border border-zinc-300 pr-2.5 pl-1.5 text-xs leading-none text-zinc-900 hover:border-brand-700 dark:border-zinc-800 dark:text-zinc-100 dark:hover:border-brand-400"
+        className="inline-flex h-7 min-w-0 max-w-full items-center gap-1.5 rounded-full border border-zinc-300 pr-3 pl-1.5 text-sm leading-none text-zinc-900 hover:border-brand-700 dark:border-zinc-800 dark:text-zinc-100 dark:hover:border-brand-400"
         {...blogLink(n.slug, n.canonicalPath)}
         title={n.name}
       >
@@ -121,6 +156,21 @@ function RelationDetails({ data }: { data: Relations }) {
       <span className="text-xs">部落格 #{id}</span>
     );
   };
+  const strongest = useMemo(() => [...data.edges].sort((a, b) => b.count - a.count), [data.edges]);
+  const linkRow = (e: Relations['edges'][number]) => (
+    <li key={`${e.sourceBlogId}:${e.targetBlogId}`} className="min-w-0 break-words py-2 text-sm">
+      {blog(e.sourceBlogId)} → {blog(e.targetBlogId)}{' '}
+      <span className="whitespace-nowrap tabular-nums text-zinc-600 dark:text-zinc-400">
+        · {e.count} 篇 · {shareLabel} {sharePercent(e.share)}
+      </span>
+    </li>
+  );
+  // When the right column's lists are short (a quiet week), the strongest links fill it up to about the left list's
+  // length instead of leaving a hole beside it; a long right column keeps them folded. Rough row heights in px.
+  const leftHeight = Math.min(LIST_PREVIEW, data.mostMentioned.length) * 37 + 60;
+  const rightHeight = Math.min(LIST_PREVIEW, data.mutual.length) * 54 + 290;
+  const fit = Math.floor((leftHeight - rightHeight) / 37);
+  const linkRows = fit >= 4 ? Math.min(fit, strongest.length) : 0;
   return (
     <>
       {data.edges.length > 0 && (
@@ -139,23 +189,36 @@ function RelationDetails({ data }: { data: Relations }) {
                 </button>
               ))}
             </div>
-            <span role="status" className="text-xs tabular-nums text-zinc-500 dark:text-zinc-400">
-              {graph.nodes.length} 個部落格 · {graph.edges.length} 條連結
+            {/* A narrower view says how much of the period it draws, so the lists below (always the whole period) add up. */}
+            <span role="status" className="text-sm tabular-nums text-zinc-700 dark:text-zinc-300">
+              {view === 'all' ? (
+                <>
+                  {graph.nodes.length} 個部落格 · {graph.edges.length} 條連結
+                </>
+              ) : (
+                <>
+                  圖上 {graph.nodes.length}／{data.nodes.length} 個部落格 · {graph.edges.length}／{data.edges.length} 條連結
+                </>
+              )}
             </span>
           </div>
           <BlogRelationGraph nodes={graph.nodes} edges={graph.edges} />
         </section>
       )}
       {/* min-w-0: a grid item is otherwise as wide as its widest row, and two long chips pushed the page sideways. */}
-      <div className="grid gap-5 lg:grid-cols-2">
+      <div className="grid items-start gap-5 lg:grid-cols-2">
         <section className="min-w-0 rounded-xl border border-zinc-300 p-4 dark:border-zinc-800">
-          <h2 className="font-semibold">最常被提及</h2>
+          <div className="flex items-baseline justify-between gap-3">
+            <h2 className="font-semibold">最常被提及</h2>
+            <span className="text-sm tabular-nums text-zinc-700 dark:text-zinc-300">共 {data.mostMentioned.length} 個部落格</span>
+          </div>
           <ol className="mt-3 divide-y divide-zinc-200 dark:divide-zinc-800">
             {(showAll.most ? data.mostMentioned : data.mostMentioned.slice(0, LIST_PREVIEW)).map((r, i) => (
-              <li className="flex items-center gap-3 py-2.5 text-sm" key={r.blogId}>
-                <span className="w-6 shrink-0 text-right text-xs tabular-nums text-zinc-500 dark:text-zinc-400">{i + 1}</span>
+              // Phones: the counts drop under the name, so the name keeps the row's width instead of a "…".
+              <li className="flex flex-wrap items-center gap-x-3 gap-y-1 py-2.5 text-sm sm:flex-nowrap" key={r.blogId}>
+                <span className="w-6 shrink-0 text-right text-sm font-medium tabular-nums text-zinc-600 dark:text-zinc-400">{i + 1}</span>
                 <span className="min-w-0 flex-1">{chip(r.blogId)}</span>
-                <span className="shrink-0 text-xs tabular-nums text-zinc-600 dark:text-zinc-400">
+                <span className="w-full shrink-0 pl-9 text-sm tabular-nums text-zinc-700 sm:w-auto sm:pl-0 dark:text-zinc-300">
                   {r.incomingBlogs} 個部落格提及 · {r.mentions} 篇
                 </span>
               </li>
@@ -163,52 +226,79 @@ function RelationDetails({ data }: { data: Relations }) {
           </ol>
           <MoreButton total={data.mostMentioned.length} open={showAll.most} onClick={() => setShowAll((s) => ({ ...s, most: !s.most }))} />
         </section>
-        <section className="min-w-0 rounded-xl border border-zinc-300 p-4 dark:border-zinc-800">
-          <h2 className="font-semibold">互相提及</h2>
-          {/* Same pills as the homepage's citation cards. Each direction is its own articles and dates (see the foot's
+        {/* The right column takes the short lists and the reading notes, so the two columns end near each other. */}
+        <div className="min-w-0 space-y-5">
+          <section className="min-w-0 rounded-xl border border-zinc-300 p-4 dark:border-zinc-800">
+            <div className="flex items-baseline justify-between gap-3">
+              <h2 className="font-semibold">互相提及</h2>
+              <span className="text-sm tabular-nums text-zinc-700 dark:text-zinc-300">共 {data.mutual.length} 組</span>
+            </div>
+            {/* Same pills as the homepage's citation cards. Each direction is its own articles and dates (see the foot's
               引用與交流), so the counts stay per direction and the pair is never called a same-time exchange. */}
-          <ol className="mt-3 divide-y divide-zinc-200 dark:divide-zinc-800">
-            {(showAll.mutual ? data.mutual : data.mutual.slice(0, LIST_PREVIEW)).map((r) => (
-              <li className="py-2.5" key={`${r.sourceBlogId}:${r.targetBlogId}`}>
-                {/* Chips wrap rather than cut a name short; the arrows read from the first chip to the second. */}
-                <p className="flex min-w-0 flex-wrap items-center gap-1.5">
-                  {chip(r.sourceBlogId)}
-                  <span aria-hidden="true" className="text-xs text-zinc-500">
-                    ⇄
-                  </span>
-                  <span className="sr-only">與</span>
-                  {chip(r.targetBlogId)}
-                </p>
-                <p className="mt-1 text-xs tabular-nums text-zinc-600 dark:text-zinc-400">
-                  <span title={`${name(r.sourceBlogId)} 提及 ${name(r.targetBlogId)}`}>
-                    <span aria-hidden="true">→</span>
-                    <span className="sr-only">{name(r.sourceBlogId)} 提及對方</span> {r.forwardCount} 篇
-                  </span>
-                  <span aria-hidden="true"> · </span>
-                  <span title={`${name(r.targetBlogId)} 提及 ${name(r.sourceBlogId)}`}>
-                    <span aria-hidden="true">←</span>
-                    <span className="sr-only">{name(r.targetBlogId)} 提及對方</span> {r.reverseCount} 篇
-                  </span>
-                </p>
-              </li>
-            ))}
-          </ol>
-          <MoreButton total={data.mutual.length} open={showAll.mutual} onClick={() => setShowAll((s) => ({ ...s, mutual: !s.mutual }))} />
-        </section>
+            <ol className="mt-3 divide-y divide-zinc-200 dark:divide-zinc-800">
+              {(showAll.mutual ? data.mutual : data.mutual.slice(0, LIST_PREVIEW)).map((r) => (
+                <li className="py-2.5" key={`${r.sourceBlogId}:${r.targetBlogId}`}>
+                  {/* Chips wrap rather than cut a name short; the arrows read from the first chip to the second. */}
+                  <p className="flex min-w-0 flex-wrap items-center gap-1.5">
+                    {chip(r.sourceBlogId)}
+                    <span aria-hidden="true" className="text-xs text-zinc-500">
+                      ⇄
+                    </span>
+                    <span className="sr-only">與</span>
+                    {chip(r.targetBlogId)}
+                  </p>
+                  <p className="mt-1 text-sm tabular-nums text-zinc-700 dark:text-zinc-300">
+                    <span title={`${name(r.sourceBlogId)} 提及 ${name(r.targetBlogId)}`}>
+                      <span aria-hidden="true">→</span>
+                      <span className="sr-only">{name(r.sourceBlogId)} 提及對方</span> {r.forwardCount} 篇
+                    </span>
+                    <span aria-hidden="true"> · </span>
+                    <span title={`${name(r.targetBlogId)} 提及 ${name(r.sourceBlogId)}`}>
+                      <span aria-hidden="true">←</span>
+                      <span className="sr-only">{name(r.targetBlogId)} 提及對方</span> {r.reverseCount} 篇
+                    </span>
+                  </p>
+                </li>
+              ))}
+            </ol>
+            <MoreButton total={data.mutual.length} open={showAll.mutual} onClick={() => setShowAll((s) => ({ ...s, mutual: !s.mutual }))} />
+          </section>
+          <section className="rounded-xl border border-zinc-300 p-4 dark:border-zinc-800">
+            <h2 className="font-semibold">怎麼讀這張圖</h2>
+            <ul className="mt-2 list-disc space-y-1.5 pl-5 text-[0.9375rem] leading-7 text-zinc-700 dark:text-zinc-300">
+              <li>每個圖示是一個部落格；被越多部落格提及，圖示越大。</li>
+              <li>箭頭從寫文章的部落格，指向它在正文裡連到的部落格。</li>
+              <li>滑過（手機上點一下）一個部落格，只看它的連結；拖曳或捏合可以移動縮放，「重設縮放」回到全貌。</li>
+            </ul>
+          </section>
+          {linkRows > 0 ? (
+            <section className="min-w-0 rounded-xl border border-zinc-300 p-4 dark:border-zinc-800">
+              <div className="flex items-baseline justify-between gap-3">
+                <h2 className="font-semibold">圖中連結明細</h2>
+                <span className="text-sm tabular-nums text-zinc-700 dark:text-zinc-300">共 {data.edges.length} 條</span>
+              </div>
+              <ul className="mt-3 divide-y divide-zinc-200 dark:divide-zinc-800">
+                {(showAll.links ? strongest : strongest.slice(0, linkRows)).map(linkRow)}
+              </ul>
+              {strongest.length > linkRows && (
+                <button
+                  type="button"
+                  aria-expanded={showAll.links}
+                  onClick={() => setShowAll((s) => ({ ...s, links: !s.links }))}
+                  className="mt-2 inline-flex min-h-9 items-center rounded-full border border-zinc-300 px-3 text-xs text-zinc-700 hover:border-brand-700 dark:border-zinc-700 dark:text-zinc-300 dark:hover:border-brand-400"
+                >
+                  {showAll.links ? `只看前 ${linkRows} 條` : `顯示全部 ${strongest.length} 條`}
+                </button>
+              )}
+            </section>
+          ) : (
+            <details className="rounded-xl border border-zinc-300 p-4 dark:border-zinc-800">
+              <summary className="cursor-pointer text-sm font-medium">圖中連結明細（{data.edges.length} 條）</summary>
+              <ul className="mt-3 divide-y divide-zinc-200 dark:divide-zinc-800">{strongest.map(linkRow)}</ul>
+            </details>
+          )}
+        </div>
       </div>
-      <details className="rounded-xl border border-zinc-300 p-4 dark:border-zinc-800">
-        <summary className="cursor-pointer text-sm font-medium">圖中連結明細（{data.edges.length} 條）</summary>
-        <ul className="mt-3 divide-y divide-zinc-200 dark:divide-zinc-800">
-          {data.edges.map((e) => (
-            <li key={`${e.sourceBlogId}:${e.targetBlogId}`} className="min-w-0 break-words py-2 text-sm">
-              {blog(e.sourceBlogId)} → {blog(e.targetBlogId)}{' '}
-              <span className="whitespace-nowrap tabular-nums text-zinc-600 dark:text-zinc-400">
-                · {e.count} 篇 · {shareLabel} {sharePercent(e.share)}
-              </span>
-            </li>
-          ))}
-        </ul>
-      </details>
     </>
   );
 }

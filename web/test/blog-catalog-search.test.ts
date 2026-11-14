@@ -21,7 +21,7 @@ test('/blogs/ search shows what matched and keeps the previous rows while loadin
   assert.match(catalog, /<Highlight text=\{blog\.name\} words=\{words\} \/>/);
   assert.match(catalog, /normalize\('NFKC'\)/);
   assert.match(catalog, /符合「\$\{q\}」的部落格 \$\{total\} 個/);
-  assert.match(catalog, /沒有符合「\$\{q\}」的部落格。/);
+  assert.match(catalog, /沒有符合「\$\{q\}」的部落格`/);
   assert.match(catalog, /status="ready" busy \/>/);
   // Phones: 16px text so iOS does not zoom into the box.
   assert.match(catalog, /text-base sm:text-sm/);

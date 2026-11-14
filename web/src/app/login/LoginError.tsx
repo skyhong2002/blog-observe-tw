@@ -1,14 +1,16 @@
 'use client';
 
 import { useSearchParams } from 'next/navigation';
+import StateNotice from '@/components/StateNotice';
 
 /** The reason the gateway's /auth/google/callback sent the reader back here, if any. */
 export default function LoginError() {
   const error = useSearchParams().get('error');
   if (!error) return null;
+  const cancelled = error === 'cancelled';
   return (
-    <p role="status" className="rounded-lg border border-zinc-300 p-4 text-sm dark:border-zinc-700">
-      {error === 'cancelled' ? '你已取消 Google 登入，可以稍後再試。' : '登入未完成，請重新開始。'}
-    </p>
+    <StateNotice tone={cancelled ? 'notice' : 'error'} role="status" title={cancelled ? '你取消了 Google 登入' : '登入沒有完成'}>
+      {cancelled ? '沒關係，準備好了再按一次下面的按鈕就行。' : 'Google 沒有把登入結果交回來，可能是逾時或瀏覽器擋了 Cookie。請再試一次。'}
+    </StateNotice>
   );
 }

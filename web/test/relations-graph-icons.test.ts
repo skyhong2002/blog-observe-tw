@@ -15,10 +15,12 @@ test('relation graph: blogs drawn as their icons (first-character glyph without 
 test('relation lists keep each icon and name on one line', () => {
   const map = read('components/public/RelationMap.tsx');
   assert.match(map, /className="inline-flex min-w-0 items-center gap-1\.5/);
-  assert.match(map, /<li className="flex items-center gap-3 py-2\.5 text-sm"/);
+  // The row wraps on phones (counts under the name), one line from sm up.
+  assert.match(map, /<li className="flex flex-wrap items-center gap-x-3 gap-y-1 py-2\.5 text-sm sm:flex-nowrap"/);
   assert.match(map, /rounded-full border border-zinc-300/);
-  // Phones: both list cards may shrink below their widest pair of chips (no sideways page scroll).
-  assert.equal(map.match(/<section className="min-w-0 rounded-xl border border-zinc-300 p-4/g)?.length, 2);
+  // Phones: the list cards (most mentioned, mutual, and the links card a quiet period opens) may shrink below their
+  // widest pair of chips (no sideways page scroll).
+  assert.equal(map.match(/<section className="min-w-0 rounded-xl border border-zinc-300 p-4/g)?.length, 3);
   assert.doesNotMatch(map, /<p className="mt-1 text-xs text-zinc-500">期間內兩個方向/);
 });
 
