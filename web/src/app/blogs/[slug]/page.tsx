@@ -52,6 +52,7 @@ export default async function BlogDetailPage({ params }: Props) {
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: serializeJsonLd(breadcrumb) }} />
       <SourceProfile
         blog={{ ...blog, canonicalPath: page.canonicalPath }}
+        beforeContent={<BlogRelations slug={blog.slug} />}
         cloud={
           <Suspense fallback={<MediaWordCloudPending />}>
             <BlogTopicCloud slug={blog.slug} />
@@ -71,7 +72,6 @@ export default async function BlogDetailPage({ params }: Props) {
         }
       />
       <BlogMentions slug={blog.slug} />
-      <BlogRelations slug={blog.slug} />
       <BlogTopics slug={blog.slug} />
       <BlogInference slug={blog.slug} />
     </>

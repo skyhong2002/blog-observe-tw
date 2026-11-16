@@ -41,7 +41,18 @@ function Row({ term, children }: { term: string; children: ReactNode }) {
 }
 const recorded = (value?: string | null) => (value ? <RelativeTime value={value} /> : null);
 
-export default function SourceProfile({ blog, sidebar, cloud }: { blog: Blog; sidebar?: ReactNode; cloud?: ReactNode }) {
+export default function SourceProfile({
+  blog,
+  sidebar,
+  cloud,
+  beforeContent,
+}: {
+  blog: Blog;
+  sidebar?: ReactNode;
+  cloud?: ReactNode;
+  /** Content that should be visible before the long article list (for example, the blog's relationships). */
+  beforeContent?: ReactNode;
+}) {
   const allPosts = blog.posts ?? [];
   const authors = blog.authors ?? [];
   const tags = blog.tags ?? [];
@@ -92,6 +103,7 @@ export default function SourceProfile({ blog, sidebar, cloud }: { blog: Blog; si
           { href: '#source', label: '來源資料' },
         ]}
       />
+      {beforeContent}
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-[minmax(0,1fr)_19rem] lg:gap-6">
         <MediaSidebar label="部落格資料、內文來源、流量與作者">
           <section id="source" className="rounded-lg border border-zinc-200 p-3 text-xs dark:border-zinc-800">
