@@ -38,7 +38,10 @@ const oneOf =
     values.includes(value as string);
 /** A ranked topic row: the counts lists and word clouds show, and its provenance (the two accepted source kinds). */
 const topicSource = oneOf('rss-category', 'tag-vocabulary');
-const topicItems = (value: unknown) => rows(value, { id: text, label: text, source: topicSource, posts: count, blogs: count });
+/** The full rankings' optional blogList: the blogs a row counts (slug and name); absent on older gateways. */
+const topicBlogList = optional((value) => rows(value, { slug: text, name: text }));
+const topicItems = (value: unknown) =>
+  rows(value, { id: text, label: text, source: topicSource, posts: count, blogs: count, blogList: topicBlogList });
 const nonEmpty = (value: unknown) => typeof value === 'string' && value.trim().length > 0;
 const positive = (value: unknown) => Number.isSafeInteger(value) && (value as number) > 0;
 /**

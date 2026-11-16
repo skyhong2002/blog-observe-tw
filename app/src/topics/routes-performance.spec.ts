@@ -134,6 +134,65 @@ describe('fresh topic ranking coverage', () => {
       await app.close();
     }
   });
+  it("full rankings list each row's blogs from the same ranking read; the home snapshot does not", async () => {
+    const queries: Array<{ sql: string; params: unknown[] }> = [];
+    const pool = {
+      query: async (sql: string, params: unknown[] = []) => {
+        queries.push({ sql, params });
+        if (sql.includes('topic_gate AS')) return [[{ n: 5 }]];
+        // Blog 9 was hidden after the ranking was read: it is dropped, never shown as an unnamed icon.
+        if (sql.includes('per_blog AS'))
+          return [
+            [
+              { ...topicRow('tag:a', 3), blog_ids: '7,3,9' },
+              { ...topicRow('tag:b', 2), blog_ids: '3,5' },
+            ],
+          ];
+        if (sql.includes('FROM blogs WHERE'))
+          return [
+            [
+              { id: 3, slug: 'c', name: 'C' },
+              { id: 5, slug: 'e', name: 'E' },
+              { id: 7, slug: 'g', name: 'G' },
+            ],
+          ];
+        if (sql.includes('SELECT s.id,s.manifest')) return [[]];
+        if (sql.includes('datedPosts')) return [[{ datedPosts: 10, bodyObservedPosts: 7 }]];
+        if (sql.includes('unknownDatePosts')) return [[{ unknownDatePosts: 2 }]];
+        return [[{ n: 0 }]];
+      },
+    } as unknown as Pool;
+    const app = Fastify();
+    registerTopicRoutes(app, pool);
+    try {
+      const full = await app.inject('/api/topics?days=30');
+      const ranked = queries.filter((q) => q.sql.includes('per_blog AS') && !q.sql.includes('topic_gate AS'));
+      expect(ranked).toHaveLength(1);
+      // The same rows COUNT(*) counts, most articles on the topic first.
+      expect(ranked[0].sql).toContain('GROUP_CONCAT(blog_id ORDER BY IF(window_high_frequency,title_n,n) DESC,blog_id');
+      const names = queries.filter((q) => q.sql.includes('FROM blogs WHERE'));
+      expect(names).toHaveLength(1);
+      expect(names[0].sql).toContain("status='verified'");
+      expect(names[0].params).toEqual([[7, 3, 9, 5]]);
+      expect(full.json().items.map((t: { blogList: unknown }) => t.blogList)).toEqual([
+        [
+          { slug: 'g', name: 'G' },
+          { slug: 'c', name: 'C' },
+        ],
+        [
+          { slug: 'c', name: 'C' },
+          { slug: 'e', name: 'E' },
+        ],
+      ]);
+      queries.length = 0;
+      const home = await app.inject('/api/topics?days=30&view=home');
+      expect(queries).toHaveLength(1);
+      expect(queries[0].sql).not.toContain('GROUP_CONCAT');
+      expect(home.json().cloudItems[0]).not.toHaveProperty('blogList');
+    } finally {
+      await app.close();
+    }
+  });
   it('full rankings are served from the snapshot, one entry per period and order', async () => {
     let reads = 0;
     const pool = {

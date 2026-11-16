@@ -518,6 +518,34 @@ describe('the two rankings', () => {
     ).toEqual(['#', '話題', '升溫倍率', '部落格', '文章', '標題提到／只在內文']);
     expect($.text()).toContain('排行依熱度乘上');
   });
+  test("a gateway that lists each row's blogs: one linked icon per counted blog, between the name and the numbers", () => {
+    const withBlogs: Topics = {
+      ...topics,
+      items: [
+        {
+          ...topics.items[0],
+          blogList: [
+            { slug: 'g', name: '小 G' },
+            { slug: 'c', name: 'C 的部落格' },
+          ],
+        },
+        { ...topics.items[1], blogList: [] },
+      ],
+    };
+    const $ = render(<TopicRankingView order="blogs" days="30" load={ready(withBlogs)} />, '/topics/');
+    expect(
+      $('thead th')
+        .map((_, th) => $(th).text().replace(/[▲▼↕]/g, ''))
+        .get(),
+    ).toEqual(['#', '話題', '寫過的部落格', '部落格', '文章', '標題提到／只在內文']);
+    const first = $('tbody tr').first().find('ul[aria-label="寫過的部落格"] a');
+    expect(first.map((_, a) => [[$(a).attr('href'), $(a).attr('aria-label')]]).get()).toEqual([
+      ['/blogs/g/', '小 G'],
+      ['/blogs/c/', 'C 的部落格'],
+    ]);
+    // Desktops only: phones keep the narrow table.
+    expect($('thead th').eq(2).attr('class')).toContain('hidden lg:table-cell');
+  });
 });
 
 describe('framework error and 404 pages', () => {

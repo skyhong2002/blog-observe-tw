@@ -233,7 +233,15 @@ const ORDER_SQL: Record<RankingOrder, string> = {
   heat: 'rank_score DESC,score DESC,blogs DESC,posts DESC,topic_id',
   blogs: 'blogs DESC,score DESC,posts DESC,topic_id',
 };
-export async function compactHomeRanking(pool: Pool, days: number, now = new Date(), requestedLimit = 30, order: RankingOrder = 'heat') {
+export async function compactHomeRanking(
+  pool: Pool,
+  days: number,
+  now = new Date(),
+  requestedLimit = 30,
+  order: RankingOrder = 'heat',
+  /** The full rankings also list each row's blogs (blogList); the home snapshot does not need them. */
+  withBlogs = false,
+) {
   const limit = Math.min(100, Math.max(1, Math.floor(requestedLimit)));
   const [rows] = await pool.query<RowDataPacket[]>(
     `WITH ${freshPosts(false)}, ${nativeLabelCte},
@@ -261,19 +269,41 @@ export async function compactHomeRanking(pool: Pool, days: number, now = new Dat
        MAX(baseline_total) baseline_total,MAX(baseline_matched) baseline_matched,
        (SELECT COUNT(*) FROM scoped_posts) recent_total,
        ${HEAT_SQL} heat,${HEAT_SQL}*LOG2(1+COUNT(*)) rank_score
+       ${withBlogs ? `,GROUP_CONCAT(blog_id ORDER BY IF(window_high_frequency,title_n,n) DESC,blog_id SEPARATOR ',') blog_ids` : ''}
      FROM qualified WHERE title_n>0 OR NOT window_high_frequency
      GROUP BY topic_id,label,source HAVING COUNT(*)>=2
      ORDER BY ${ORDER_SQL[order]} LIMIT ${limit + 1}`,
     [...range(days, now), SOURCE, FREQUENCY_POLICY.version],
   );
-  return { items: rows.slice(0, limit).map(item), truncated: rows.length > limit };
+  const kept = rows.slice(0, limit);
+  if (!withBlogs) return { items: kept.map(item), truncated: rows.length > limit };
+  // The blogs counted in each row, most articles on the topic first: the same rows COUNT(*) counts, so a row's
+  // icons and its 部落格 number always agree. One primary-key read for their names, once per snapshot.
+  const ids = (r: RowDataPacket) =>
+    String(r.blog_ids ?? '')
+      .split(',')
+      .filter(Boolean)
+      .map(Number);
+  const wanted = [...new Set(kept.flatMap(ids))];
+  const names = new Map<number, { slug: string; name: string }>();
+  if (wanted.length) {
+    const [blogs] = await pool.query<RowDataPacket[]>(`SELECT id,slug,name FROM blogs WHERE status='verified' AND id IN (?)`, [wanted]);
+    for (const b of blogs) names.set(Number(b.id), { slug: b.slug, name: b.name });
+  }
+  return {
+    items: kept.map((r) => ({
+      ...item(r),
+      blogList: ids(r).flatMap((id) => (names.has(id) ? [names.get(id) as { slug: string; name: string }] : [])),
+    })),
+    truncated: rows.length > limit,
+  };
 }
 /** The /topics/ rankings: by blogs (/topics/) or ordered like the homepage (heat × breadth, HEAT_SQL; /topics/trending/). It replaced
  * `ranking(…, 100, now, true)`, whose `evidence` CTE MariaDB re-evaluated for every reference (four times,
  * seconds per request). Items come from the compact projection; matchedPosts counts window posts with at least one surviving match: a title match, or
  * a body match on a term whose baseline allows body evidence and whose window gate did not close. */
 export async function fullRanking(pool: Pool, days: number, now = new Date(), order: RankingOrder = 'heat') {
-  const results = await compactHomeRanking(pool, days, now, 100, order);
+  const results = await compactHomeRanking(pool, days, now, 100, order, true);
   const [[matched]] = await pool.query<RowDataPacket[]>(
     `WITH ${freshPosts(false)}, ${termBlogCtes}, topic_gate AS (
        SELECT term_id,MAX(body_allowed) body_allowed,SUM(n) matched_posts,COUNT(*) blogs,SUM(n>=2) twice_sources,MAX(n) peak_posts

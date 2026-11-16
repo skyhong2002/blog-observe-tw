@@ -6,17 +6,18 @@
 
 import { useSearchParams } from 'next/navigation';
 import { useState } from 'react';
+import BlogIcon from '@/components/BlogIcon';
 import FooterMethod from '@/components/FooterMethod';
 import MethodLink from '@/components/MethodLink';
 import Link from '@/components/NoPrefetchLink';
 import PendingRows from '@/components/PendingRows';
 import { SectionUnavailable } from '@/components/SectionBoundary';
 import SectionTabs from '@/components/SectionTabs';
-import StateNotice from '@/components/StateNotice';
 import SortIndicator from '@/components/SortIndicator';
+import StateNotice from '@/components/StateNotice';
 import TableScroller from '@/components/TableScroller';
 import { VocabularySummary } from '@/components/VocabularyNotice';
-import { topicLink } from '@/lib/page-links';
+import { blogHref, topicLink } from '@/lib/page-links';
 import { PERIODS, type Period, periodOf, TOPICS_PERIOD, type TopicOrder, topicsApiPath } from '@/lib/public-query';
 import { table } from '@/lib/table-styles';
 import type { CloudVisual } from '@/lib/tag-visuals';
@@ -153,6 +154,8 @@ function TopicRows({ order, days, data }: { order: TopicOrder; days: Period; dat
         話題要等共同關鍵字整理好才能比對，通常每 15 分鐘更新一次，請稍後再回來看看。
       </StateNotice>
     );
+  // Older gateways send no blogList: the column is left out rather than shown empty.
+  const showBlogs = rows.some(({ t }) => t.blogList !== undefined);
   return (
     <>
       <TableScroller card label="共同話題表格，可左右捲動">
@@ -163,6 +166,12 @@ function TopicRows({ order, days, data }: { order: TopicOrder; days: Period; dat
               <th scope="col" className={table.leadHead}>
                 話題
               </th>
+              {/* Desktops: the blogs each topic counts, as icons, in the space between the name and the numbers. */}
+              {showBlogs ? (
+                <th scope="col" className={`${table.cell} hidden lg:table-cell`}>
+                  寫過的部落格
+                </th>
+              ) : null}
               {/* Fixed widths keep the numbers together at the right, next to each other, instead of spread across a wide table. */}
               {order === 'heat' ? header('lift', '升溫倍率', `${table.num} w-28`, liftTitle) : null}
               {header('blogs', '部落格', `${table.num} w-24`)}
@@ -190,6 +199,11 @@ function TopicRows({ order, days, data }: { order: TopicOrder; days: Period; dat
                     ) : null}
                   </div>
                 </td>
+                {showBlogs ? (
+                  <td className={`${table.cell} hidden whitespace-normal lg:table-cell`}>
+                    <BlogIconRow blogs={t.blogList ?? []} />
+                  </td>
+                ) : null}
                 {order === 'heat' ? (
                   <td className={`${table.num}${t.lift == null ? ' text-xs text-zinc-500 dark:text-zinc-400' : ''}`} title={liftTitle}>
                     {formatLift(t.lift)}
@@ -241,5 +255,25 @@ export function TopicRankingFromUrl({
       load={load ?? (baseline ? { status: 'ready', data: baseline } : { status: 'pending' })}
       visuals={visuals}
     />
+  );
+}
+
+/** Every blog a topic counts, as linked icons in one wrapping row (the most articles on the topic first). */
+function BlogIconRow({ blogs }: { blogs: NonNullable<Topics['items'][number]['blogList']> }) {
+  return (
+    <ul aria-label="寫過的部落格" className="flex flex-wrap items-center gap-1 py-0.5">
+      {blogs.map((b) => (
+        <li key={b.slug}>
+          <Link
+            href={blogHref(b.slug)}
+            title={b.name}
+            aria-label={b.name}
+            className="block rounded-sm focus-visible:outline-2 focus-visible:outline-brand-600"
+          >
+            <BlogIcon media={b.slug} title={b.name} size={16} />
+          </Link>
+        </li>
+      ))}
+    </ul>
   );
 }
