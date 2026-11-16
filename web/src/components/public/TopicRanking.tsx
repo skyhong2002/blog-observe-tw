@@ -5,8 +5,8 @@
 // Each opens like the homepage, its title in the middle of its own ranking's word cloud; see app/topics/(ranking)/page.tsx.
 
 import { useSearchParams } from 'next/navigation';
-import { useState } from 'react';
-import FilterChips from '@/components/FilterChips';
+import { useEffect, useRef, useState } from 'react';
+import BlogIcon from '@/components/BlogIcon';
 import FooterMethod from '@/components/FooterMethod';
 import MethodLink from '@/components/MethodLink';
 import Link from '@/components/NoPrefetchLink';
@@ -14,9 +14,10 @@ import PendingRows from '@/components/PendingRows';
 import { SectionUnavailable } from '@/components/SectionBoundary';
 import SectionTabs from '@/components/SectionTabs';
 import SortIndicator from '@/components/SortIndicator';
+import StateNotice from '@/components/StateNotice';
 import TableScroller from '@/components/TableScroller';
 import { VocabularySummary } from '@/components/VocabularyNotice';
-import { topicLink } from '@/lib/page-links';
+import { blogHref, topicLink } from '@/lib/page-links';
 import { PERIODS, type Period, periodOf, TOPICS_PERIOD, type TopicOrder, topicsApiPath } from '@/lib/public-query';
 import { table } from '@/lib/table-styles';
 import type { CloudVisual } from '@/lib/tag-visuals';
@@ -58,9 +59,9 @@ export default function TopicRankingView({
           label="話題排行"
           tabs={(['blogs', 'heat'] as const).map((o) => ({ href: periodHref(o, days), label: TOPIC_VIEWS[o].tab, current: o === order }))}
         />
-        <FilterChips
+        <SectionTabs
           label="話題期間"
-          items={PERIODS.map((d) => ({ href: periodHref(order, d), label: `近 ${d} 天`, current: d === days }))}
+          tabs={PERIODS.map((d) => ({ href: periodHref(order, d), label: `近 ${d} 天`, current: d === days }))}
         />
       </div>
       <TopicCloudMasthead
@@ -136,28 +137,55 @@ function TopicRows({ order, days, data }: { order: TopicOrder; days: Period; dat
       </button>
     </th>
   );
+  if (!data.items.length)
+    return data.vocabulary.status === 'ready' ? (
+      <StateNotice
+        title={`近 ${days} 天還沒有共同話題`}
+        actions={
+          days === '90'
+            ? [{ href: '/articles/', label: '看最新文章', primary: true }]
+            : [{ href: periodHref(order, '90'), label: '看近 90 天', primary: true }]
+        }
+      >
+        至少要有兩個部落格寫到同一個話題，才會出現在排行。換一段較長的期間看看。
+      </StateNotice>
+    ) : (
+      <StateNotice tone="notice" title="話題排行還在準備" actions={[{ href: '/articles/', label: '先看最新文章', primary: true }]}>
+        話題要等共同關鍵字整理好才能比對，通常每 15 分鐘更新一次，請稍後再回來看看。
+      </StateNotice>
+    );
+  // Older gateways send no blogList: the column is left out rather than shown empty.
+  const showBlogs = rows.some(({ t }) => t.blogList !== undefined);
   return (
     <>
       <TableScroller card label="共同話題表格，可左右捲動">
         <table className="w-full whitespace-nowrap text-sm">
-          <thead className="bg-zinc-50 text-left text-xs text-zinc-600 dark:bg-zinc-950 dark:text-zinc-400">
+          <thead className="bg-zinc-50 text-left text-xs font-medium text-zinc-700 dark:bg-zinc-950 dark:text-zinc-300">
             <tr>
               {header('rank', '#', `${table.num} w-12`)}
               <th scope="col" className={table.leadHead}>
                 話題
               </th>
-              {order === 'heat' ? header('lift', '升溫倍率', table.num, liftTitle) : null}
-              {header('blogs', '部落格', table.num)}
-              {header('posts', '文章', table.num)}
-              <th scope="col" className={table.num}>
-                標題／僅正文
+              {/* Desktops: the blogs each topic counts, as icons, in the space between the name and the numbers. */}
+              {showBlogs ? (
+                // w-full: this column takes the table's spare width; the icon line fits itself into it.
+                <th scope="col" className={`${table.cell} hidden w-full lg:table-cell`}>
+                  寫過的部落格
+                </th>
+              ) : null}
+              {/* Fixed widths keep the numbers together at the right, next to each other, instead of spread across a wide table. */}
+              {order === 'heat' ? header('lift', '升溫倍率', `${table.num} w-28`, liftTitle) : null}
+              {header('blogs', '部落格', `${table.num} w-24`)}
+              {header('posts', '文章', `${table.num} w-24`)}
+              <th scope="col" className={`${table.num} hidden w-44 sm:table-cell`} title="標題提到這個話題的文章／只在內文提到的文章">
+                標題提到／只在內文
               </th>
             </tr>
           </thead>
           <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
             {rows.map(({ t, rank }) => (
               <tr key={t.id} className={table.row}>
-                <td className={`${table.num} text-xs text-zinc-500 dark:text-zinc-400`}>{rank}</td>
+                <td className={`${table.num} text-xs text-zinc-600 dark:text-zinc-400`}>{rank}</td>
                 <td className={table.lead}>
                   <div className={`${table.leadBox} flex items-baseline gap-2`}>
                     <Link
@@ -172,6 +200,11 @@ function TopicRows({ order, days, data }: { order: TopicOrder; days: Period; dat
                     ) : null}
                   </div>
                 </td>
+                {showBlogs ? (
+                  <td className={`${table.cell} hidden lg:table-cell`}>
+                    <BlogIconRow blogs={t.blogList ?? []} />
+                  </td>
+                ) : null}
                 {order === 'heat' ? (
                   <td className={`${table.num}${t.lift == null ? ' text-xs text-zinc-500 dark:text-zinc-400' : ''}`} title={liftTitle}>
                     {formatLift(t.lift)}
@@ -179,7 +212,10 @@ function TopicRows({ order, days, data }: { order: TopicOrder; days: Period; dat
                 ) : null}
                 <td className={table.num}>{t.blogs.toLocaleString('zh-TW')}</td>
                 <td className={table.num}>{t.posts.toLocaleString('zh-TW')}</td>
-                <td className={table.num} title={t.matchingReason ? matchingReasonLabel(t.matchingReason) : undefined}>
+                <td
+                  className={`${table.num} hidden sm:table-cell`}
+                  title={t.matchingReason ? matchingReasonLabel(t.matchingReason) : undefined}
+                >
                   {splitText(t)}
                 </td>
               </tr>
@@ -220,5 +256,54 @@ export function TopicRankingFromUrl({
       load={load ?? (baseline ? { status: 'ready', data: baseline } : { status: 'pending' })}
       visuals={visuals}
     />
+  );
+}
+
+/** Icon pitch in the row: a 16px icon and a 4px gap. */
+const ICON_STEP = 20;
+
+/**
+ * Every blog a topic counts, as linked icons on one line (the most articles on the topic first). When they do not
+ * all fit, the line ends in "…" (its title says how many more), so a row never grows to two lines. The width is
+ * measured in the browser; before that the line is simply clipped.
+ */
+function BlogIconRow({ blogs }: { blogs: NonNullable<Topics['items'][number]['blogList']> }) {
+  const box = useRef<HTMLDivElement>(null);
+  const [fits, setFits] = useState<number | null>(null);
+  useEffect(() => {
+    const node = box.current;
+    if (!node) return;
+    const measure = () => setFits(Math.max(1, Math.floor((node.clientWidth + 4) / ICON_STEP)));
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, []);
+  // The "…" takes one icon's place.
+  const shown = fits !== null && blogs.length > fits ? blogs.slice(0, Math.max(0, fits - 1)) : blogs;
+  const more = blogs.length - shown.length;
+  return (
+    // w-0 min-w-full: the line never widens the table; it takes the column the table gives it.
+    <div ref={box} className="w-0 min-w-full overflow-hidden">
+      <ul aria-label={`寫過的部落格，共 ${blogs.length} 個`} className="flex flex-nowrap items-center gap-1 py-0.5">
+        {shown.map((b) => (
+          <li key={b.slug} className="shrink-0">
+            <Link
+              href={blogHref(b.slug)}
+              title={b.name}
+              aria-label={b.name}
+              className="block rounded-sm focus-visible:outline-2 focus-visible:outline-brand-600"
+            >
+              <BlogIcon media={b.slug} iconUrl={b.iconUrl} title={b.name} size={16} />
+            </Link>
+          </li>
+        ))}
+        {more > 0 && (
+          <li className="w-4 shrink-0 text-center leading-4 text-zinc-600 dark:text-zinc-400" title={`還有 ${more} 個部落格`}>
+            …
+          </li>
+        )}
+      </ul>
+    </div>
   );
 }

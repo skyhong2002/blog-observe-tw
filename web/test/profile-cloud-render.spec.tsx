@@ -182,7 +182,16 @@ describe('profile topic cloud', () => {
       authors: [],
       tags: [{ slug: 'rss-noise', label: '未分類', postCount: 99 }],
     } as unknown as Blog;
-    const $ = load(renderToString(<SourceProfile blog={blog} cloud={<div data-slot="cloud">slot</div>} />));
+    const $ = load(
+      renderToString(
+        <SourceProfile
+          blog={blog}
+          beforeContent={<section id="relations">引用與交流</section>}
+          cloud={<div data-slot="cloud">slot</div>}
+        />,
+      ),
+    );
+    expect($.html().indexOf('id="relations"')).toBeLessThan($.html().indexOf('data-slot="cloud"'));
     expect($('[data-slot="cloud"]').length).toBe(1);
     expect($('section[aria-label="文章文字雲"], section[aria-label="話題文字雲"]').length).toBe(0);
     expect($('svg a[href^="/tags/"]').length).toBe(0);

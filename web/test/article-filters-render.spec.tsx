@@ -101,7 +101,7 @@ describe('latest article preferences: server rendering', () => {
     );
     expect(filtered).toContain('這批文章都被篩選隱藏了');
     const empty = renderToString(<ArticlesView genreStatus="ready" asked={NO_SEARCH} latest={[]} search={null} />);
-    expect(empty).toContain('目前還沒有收錄文章');
+    expect(empty).toContain('還沒有收錄文章');
   });
   test('an unavailable or older gateway disables genre exclusions while still applying the per-blog cap', () => {
     const $ = load(

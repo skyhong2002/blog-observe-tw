@@ -22,17 +22,34 @@ export function SectionUnavailable({ label, className, onRetry }: { label?: stri
       role="status"
       className={
         className ??
-        'rounded-lg border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm text-zinc-600 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-400'
+        'flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-[0.9375rem] text-red-900 dark:border-red-900/70 dark:bg-red-950/40 dark:text-red-100'
       }
     >
-      <p>{label ? `${label}暫時無法載入，請稍後再試。` : '暫時無法載入，請稍後再試。'}</p>
-      <button
-        type="button"
-        onClick={onRetry ?? (() => window.location.reload())}
-        className="mt-1.5 text-brand-700 hover:underline dark:text-brand-400"
+      <svg
+        aria-hidden="true"
+        width="18"
+        height="18"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        className="mt-1 shrink-0 text-red-600 dark:text-red-300"
       >
-        重新載入
-      </button>
+        <path d="M12 3 2.5 20h19L12 3Z" />
+        <path d="M12 10v4.5M12 17.5h.01" />
+      </svg>
+      <div className="min-w-0">
+        <p>{label ? `${label}暫時無法載入，請稍後再試。` : '暫時無法載入，請稍後再試。'}</p>
+        <button
+          type="button"
+          onClick={onRetry ?? (() => window.location.reload())}
+          className="mt-1.5 inline-flex min-h-9 items-center rounded-full border border-red-300 bg-white px-3 text-sm font-medium text-red-800 hover:bg-red-100 dark:border-red-800 dark:bg-red-950 dark:text-red-100 dark:hover:bg-red-900"
+        >
+          重新載入
+        </button>
+      </div>
     </div>
   );
 }

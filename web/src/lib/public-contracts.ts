@@ -38,7 +38,10 @@ const oneOf =
     values.includes(value as string);
 /** A ranked topic row: the counts lists and word clouds show, and its provenance (the two accepted source kinds). */
 const topicSource = oneOf('rss-category', 'tag-vocabulary');
-const topicItems = (value: unknown) => rows(value, { id: text, label: text, source: topicSource, posts: count, blogs: count });
+/** The full rankings' optional blogList: the blogs a row counts (slug and name); absent on older gateways. */
+const topicBlogList = optional((value) => rows(value, { slug: text, name: text, iconUrl: optional((v) => v === null || text(v)) }));
+const topicItems = (value: unknown) =>
+  rows(value, { id: text, label: text, source: topicSource, posts: count, blogs: count, blogList: topicBlogList });
 const nonEmpty = (value: unknown) => typeof value === 'string' && value.trim().length > 0;
 const positive = (value: unknown) => Number.isSafeInteger(value) && (value as number) > 0;
 /**
@@ -251,9 +254,9 @@ const homeTopicRow = {
   titlePosts: optional(count),
   heat: optional((v) => typeof v === 'number' && Number.isFinite(v) && v > 0),
 };
-/** Candidates for the masthead cloud, a longer slice of the same ranked pool (at most 60, of which the cloud
+/** Candidates for the masthead cloud, a longer slice of the same ranked pool (at most 100, of which the cloud
  * draws 30 after skipping body-mention words); absent on older gateways. */
-const HOME_CLOUD_LIMIT = 60;
+const HOME_CLOUD_LIMIT = 100;
 const homeTopics = (raw: unknown) => {
   if (
     !shape(raw, {

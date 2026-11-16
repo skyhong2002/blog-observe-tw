@@ -1,6 +1,8 @@
 import type { FastifyInstance } from 'fastify';
 import type { Pool, RowDataPacket } from 'mysql2/promise';
 import { SharedSnapshot, SNAPSHOT_REFRESH_MS } from '../shared-snapshot.ts';
+import { iconManifest } from '../v1/favicon-routes.ts';
+import { iconUrl } from '../v1/icons.ts';
 import { topicBodyHash, topicBodyJoins } from './body.ts';
 import { TopicResponseCache } from './cache.ts';
 import { backgroundExcludedSql, DISPLAY_GATE, nativeLabelCte, nativeLabelJoin, windowGateCtes, windowGateSql } from './display-gate.ts';
@@ -233,7 +235,15 @@ const ORDER_SQL: Record<RankingOrder, string> = {
   heat: 'rank_score DESC,score DESC,blogs DESC,posts DESC,topic_id',
   blogs: 'blogs DESC,score DESC,posts DESC,topic_id',
 };
-export async function compactHomeRanking(pool: Pool, days: number, now = new Date(), requestedLimit = 30, order: RankingOrder = 'heat') {
+export async function compactHomeRanking(
+  pool: Pool,
+  days: number,
+  now = new Date(),
+  requestedLimit = 30,
+  order: RankingOrder = 'heat',
+  /** The full rankings also list each row's blogs (blogList); the home snapshot does not need them. */
+  withBlogs = false,
+) {
   const limit = Math.min(100, Math.max(1, Math.floor(requestedLimit)));
   const [rows] = await pool.query<RowDataPacket[]>(
     `WITH ${freshPosts(false)}, ${nativeLabelCte},
@@ -261,19 +271,46 @@ export async function compactHomeRanking(pool: Pool, days: number, now = new Dat
        MAX(baseline_total) baseline_total,MAX(baseline_matched) baseline_matched,
        (SELECT COUNT(*) FROM scoped_posts) recent_total,
        ${HEAT_SQL} heat,${HEAT_SQL}*LOG2(1+COUNT(*)) rank_score
+       ${withBlogs ? `,GROUP_CONCAT(blog_id ORDER BY IF(window_high_frequency,title_n,n) DESC,blog_id SEPARATOR ',') blog_ids` : ''}
      FROM qualified WHERE title_n>0 OR NOT window_high_frequency
      GROUP BY topic_id,label,source HAVING COUNT(*)>=2
      ORDER BY ${ORDER_SQL[order]} LIMIT ${limit + 1}`,
     [...range(days, now), SOURCE, FREQUENCY_POLICY.version],
   );
-  return { items: rows.slice(0, limit).map(item), truncated: rows.length > limit };
+  const kept = rows.slice(0, limit);
+  if (!withBlogs) return { items: kept.map(item), truncated: rows.length > limit };
+  // The blogs counted in each row, most articles on the topic first: the same rows COUNT(*) counts, so a row's
+  // icons and its 部落格 number always agree. One primary-key read for their names, once per snapshot.
+  const ids = (r: RowDataPacket) =>
+    String(r.blog_ids ?? '')
+      .split(',')
+      .filter(Boolean)
+      .map(Number);
+  const wanted = [...new Set(kept.flatMap(ids))];
+  type ListedBlog = { slug: string; name: string; iconUrl: string | null };
+  const names = new Map<number, ListedBlog>();
+  if (wanted.length) {
+    const [[blogs], icons] = await Promise.all([
+      pool.query<RowDataPacket[]>(`SELECT id,slug,name FROM blogs WHERE status='verified' AND id IN (?)`, [wanted]),
+      iconManifest(),
+    ]);
+    // The same icon address as the directory and the homepage (catalog.js, overview.js).
+    for (const b of blogs) names.set(Number(b.id), { slug: b.slug, name: b.name, iconUrl: iconUrl(b.slug, icons) });
+  }
+  return {
+    items: kept.map((r) => ({
+      ...item(r),
+      blogList: ids(r).flatMap((id) => (names.has(id) ? [names.get(id) as ListedBlog] : [])),
+    })),
+    truncated: rows.length > limit,
+  };
 }
 /** The /topics/ rankings: by blogs (/topics/) or ordered like the homepage (heat × breadth, HEAT_SQL; /topics/trending/). It replaced
  * `ranking(…, 100, now, true)`, whose `evidence` CTE MariaDB re-evaluated for every reference (four times,
  * seconds per request). Items come from the compact projection; matchedPosts counts window posts with at least one surviving match: a title match, or
  * a body match on a term whose baseline allows body evidence and whose window gate did not close. */
 export async function fullRanking(pool: Pool, days: number, now = new Date(), order: RankingOrder = 'heat') {
-  const results = await compactHomeRanking(pool, days, now, 100, order);
+  const results = await compactHomeRanking(pool, days, now, 100, order, true);
   const [[matched]] = await pool.query<RowDataPacket[]>(
     `WITH ${freshPosts(false)}, ${termBlogCtes}, topic_gate AS (
        SELECT term_id,MAX(body_allowed) body_allowed,SUM(n) matched_posts,COUNT(*) blogs,SUM(n>=2) twice_sources,MAX(n) peak_posts
@@ -410,9 +447,10 @@ export function registerTopicRoutes(app: FastifyInstance, pool: Pool, { rankingR
       return home.get(`rank:${days}:home`, () =>
         cache.get(`rank:${days}:home`, async () => {
           // One ranking read serves both the compact list and the larger masthead cloud, and every
-          // request until the next refresh (shared-snapshot.ts). The cloud draws 30 words but skips
-          // body-mention words (web topicCloudWords), so it gets twice that many ranked candidates.
-          const results = await compactHomeRanking(pool, days, undefined, 60);
+          // request until the next refresh (shared-snapshot.ts). The cloud draws up to 30 words but skips
+          // body-mention words (web topicCloudWords), so it gets the 100 candidates /topics/trending/
+          // already reads: the same query and order, only the LIMIT differs.
+          const results = await compactHomeRanking(pool, days, undefined, 100);
           return {
             ...metadata(),
             cacheSeconds: home.refreshMs / 1000,

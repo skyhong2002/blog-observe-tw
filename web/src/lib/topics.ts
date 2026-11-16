@@ -105,6 +105,8 @@ export type Topic = {
   heat?: number;
   matchingRule?: MatchingRule;
   matchingReason?: string | null;
+  /** The full rankings: every blog the row counts, most articles on the topic first. Absent on older gateways. */
+  blogList?: Array<{ slug: string; name: string; iconUrl?: string | null }>;
 };
 /** /api/topics/:id — one topic's blogs and articles in a period. */
 export type TopicDetail = {

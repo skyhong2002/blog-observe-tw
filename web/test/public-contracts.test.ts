@@ -460,19 +460,19 @@ test('contracts: topic rows carry valid counts and provenance; a sent display ga
   );
 });
 
-test('contracts: optional home cloudItems are the same row shape, at most 60 candidates, with an optional boolean cloudTruncated', () => {
+test('contracts: optional home cloudItems are the same row shape, at most 100 candidates, with an optional boolean cloudTruncated', () => {
   const row = { id: 'tag:1', label: '旅行', source: 'tag-vocabulary', score: 1, posts: 2, blogs: 2 };
-  const sixty = Array.from({ length: 60 }, (_, i) => ({ ...row, id: `tag:${i}` }));
+  const full = Array.from({ length: 100 }, (_, i) => ({ ...row, id: `tag:${i}` }));
   for (const patch of [
     {},
     { cloudItems: [] },
-    { cloudItems: sixty, cloudTruncated: true },
-    { cloudItems: sixty.slice(0, 9) },
+    { cloudItems: full, cloudTruncated: true },
+    { cloudItems: full.slice(0, 9) },
     { cloudItems: [{ ...row, titlePosts: 1 }] },
   ])
     assert.equal(validPublicPayload('homeTopics', { ...(EMPTY.homeTopics as object), ...patch }), true, JSON.stringify(patch).slice(0, 60));
   for (const patch of [
-    { cloudItems: [...sixty, row] },
+    { cloudItems: [...full, row] },
     { cloudItems: [{ ...row, titlePosts: '1' }] },
     { cloudItems: [{ ...row, posts: '2' }] },
     { cloudItems: [{ ...row, blogs: -1 }] },

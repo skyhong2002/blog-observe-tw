@@ -31,7 +31,7 @@ export default function AboutPage() {
           部落格有不同的更新步調。我們分開顯示最後發文與抓取成功時間，歷史文章也可匯入。標籤排行先依參與部落格數，再依已收錄文章數排列，不是升溫、品質或人氣評分。
         </p>
         <p className="text-sm leading-7 text-zinc-600 dark:text-zinc-400">
-          話題排行只使用新文易數的共同關鍵字，比對文章標題與清理後的正文：標題出現的權重高於只在正文出現，同一篇只算一次，同站多篇逐篇遞減。單一字元、純數字或日期、雜訊與沿用來源排除清單的詞不參與比對；在上游宣布完整快照之前，共同關鍵字只涵蓋部分文章觀測窗口，不代表完整詞庫。
+          話題排行用姊妹站新文易數整理的共同關鍵字，比對文章標題與正文：出現在標題的權重高於只在正文出現，同一篇只算一次，同一個部落格寫了很多篇時逐篇遞減。單一字元、純數字、日期和雜訊詞不列入。這份關鍵字目前只來自部分文章，還不是完整的詞彙表。
         </p>
       </section>
       <section className="space-y-2">
@@ -46,7 +46,7 @@ export default function AboutPage() {
           Google 登入用於建立帳號與管理追蹤。你可以透過個人 RSS 閱讀追蹤內容，或匯出 OPML 到自己的閱讀器。完整文章仍由原站提供。
         </p>
         <Link href="/my/" className="inline-block text-sm text-brand-700 hover:underline dark:text-brand-400">
-          管理我的閱讀 →
+          管理我的追蹤 →
         </Link>
       </section>
       <section className="space-y-2">

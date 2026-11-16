@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from 'next';
 import PublicRefresh from '@/components/PublicRefresh';
+import { RelativeTimeProvider } from '@/components/RelativeTime';
 import SiteAnalytics from '@/components/SiteAnalytics';
 import SiteFooter from '@/components/SiteFooter';
 import SiteHeader from '@/components/SiteHeader';
@@ -52,7 +53,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         {/* Only this boolean reaches the client; the env itself stays on the server. */}
         <SiteHeader techEnabled={techPublicEnabled()} />
         <main id="blog-main" className="mx-auto max-w-6xl px-4 py-6">
-          {children}
+          <RelativeTimeProvider initialNow={Date.now()}>{children}</RelativeTimeProvider>
         </main>
         <div className="mx-auto max-w-6xl px-4">
           <SiteFooter />

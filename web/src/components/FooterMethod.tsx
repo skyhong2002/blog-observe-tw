@@ -18,6 +18,23 @@ export const RELATIONS_METHOD = /^\/(blogs\/[^/]+|relations)\/?$/;
 function sectionsFor(pathname: string) {
   return (
     <>
+      {pathname === '/' ? (
+        // What the site is, for a first visit: folded here with the rest of the page's notes (as tag.observe.tw's
+        // home does), not on the first screen. The collection count is the footer band's own line.
+        <>
+          <h3 className={heading}>部落格觀察</h3>
+          <p>
+            首頁最上方的文字雲是近 30
+            天大家共同在寫的話題。部落格觀察收錄臺灣與華文的個人部落格，追蹤它們的新文章，整理大家共同在寫的話題與部落格之間的引用；點文章標題就回到作者的網站閱讀。
+            <Link href="/articles/" className={`${inlineLink} ml-1`}>
+              看最新文章 →
+            </Link>
+            <Link href="/blogs/" className={`${inlineLink} ml-2`}>
+              逛部落格目錄 →
+            </Link>
+          </p>
+        </>
+      ) : null}
       <h3 className={heading}>資料來源</h3>
       <p>
         從部落格公開的 RSS、Atom 與 sitemap 收錄文章標題、摘要及原文連結，保留來源與發現路徑。部落格更新頻率不同，不以最近發文日期判定失效。
@@ -59,7 +76,7 @@ function sectionsFor(pathname: string) {
           </p>
           <p>
             文字雲只畫文章的主題：近 30
-            天提到某個詞的文章裡，標題有寫到它的不到三分之一，表示多半只是在正文順帶提到，這個詞仍留在排行，但不畫進文字雲。
+            天提到某個詞的文章裡，標題有寫到它的不到五分之一，表示幾乎都只是在正文順帶提到，這個詞仍留在排行，但不畫進文字雲。
           </p>
           <p>
             排行另略過背景詞：在長期基準期間大多只出現在正文、標題少有提及，又沒有任何部落格在自己文章的標籤或分類寫明的詞。長期基準與近 30

@@ -14,7 +14,7 @@ export default async function HomeTopicCloud() {
   // tag's pictures are optional decoration: tagCloudVisuals never throws and is cached per process.
   const [topics, visuals] = await Promise.all([serverHomeTopics(), tagCloudVisuals()]);
   if (!topics) return <HomeTopicCloudFromBrowser visuals={[...visuals]} />;
-  // cloudItems: the same ranked pool, up to 60 candidates for 30 words, in this one response; older gateways send
+  // cloudItems: the same ranked pool, up to 100 candidates for 30 words, in this one response; older gateways send
   // only the left list's items.
   const words = topicCloudWords(topics.cloudItems ?? topics.items, '30', 30, visuals);
   return words.length ? <MastheadWords words={words} /> : null;

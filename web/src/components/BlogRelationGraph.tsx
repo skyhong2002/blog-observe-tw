@@ -18,7 +18,7 @@ const LABEL_WIDTH_NARROW = 96,
 const ICON_WAIT_MS = 2500;
 const LABELLED_MENTIONS = 2;
 // The most-mentioned blogs keep their names even in a crowd, drawn over other icons (with a halo) if need be.
-const MUST_LABEL = 5;
+const MUST_LABEL = 3;
 type GraphData = { count(): number; getItemLayout(i: number): unknown };
 /** The icon URLs that actually load within ICON_WAIT_MS; a node whose icon fails keeps the green dot. */
 function loadedIcons(urls: string[]): Promise<Set<string>> {
@@ -87,8 +87,8 @@ export default function BlogRelationGraph({ nodes, edges }: { nodes: RelationNod
       const narrow = isNarrow();
       return {
         fontFamily: getComputedStyle(document.body).fontFamily,
-        fontSize: narrow ? 13 : 12,
-        lineHeight: narrow ? 16 : 15,
+        fontSize: 13,
+        lineHeight: 16,
         width: narrow ? LABEL_WIDTH_NARROW : LABEL_WIDTH,
       };
     };
@@ -123,10 +123,13 @@ export default function BlogRelationGraph({ nodes, edges }: { nodes: RelationNod
               label: {
                 show: true,
                 position: 'bottom',
-                color: dark ? '#d4d4d8' : '#3f3f46',
-                // A halo in the page background keeps a name readable where it crosses edges or icons.
+                color: dark ? '#e4e4e7' : '#27272a',
+                // A plate and a halo in the page background keep a name readable where it crosses edges or icons.
+                backgroundColor: dark ? 'rgba(24,24,27,0.85)' : 'rgba(255,255,255,0.88)',
+                borderRadius: 3,
+                padding: [1, 2],
                 textBorderColor: dark ? '#18181b' : '#ffffff',
-                textBorderWidth: 3,
+                textBorderWidth: 2,
                 overflow: 'break',
                 ...labelStyle(),
               },
@@ -175,7 +178,8 @@ export default function BlogRelationGraph({ nodes, edges }: { nodes: RelationNod
           rank: incoming.get(n.id) ?? 0,
           wanted: (incoming.get(n.id) ?? 0) >= LABELLED_MENTIONS,
         })),
-        { maxWidth: style.width, lineHeight: style.lineHeight, gap: 5, pad: 2, width, height, mustShow: MUST_LABEL },
+        // Phones: only the top name may be drawn over other icons; the rest appear only where they fit.
+        { maxWidth: style.width, lineHeight: style.lineHeight, gap: 5, pad: 2, width, height, mustShow: isNarrow() ? 1 : MUST_LABEL },
       );
       placed = { points, sides };
       render();
@@ -225,21 +229,24 @@ export default function BlogRelationGraph({ nodes, edges }: { nodes: RelationNod
       chart.dispose();
     };
   }, [nodes, edges]);
+  // The reset button sits above the canvas, never over a node or its name.
   return (
-    <div className="relative">
+    <div>
+      <div className="mb-1 flex justify-end">
+        <button
+          type="button"
+          onClick={() => reset.current()}
+          className="inline-flex min-h-9 items-center rounded-full border border-zinc-300 bg-white px-3 text-sm text-zinc-700 hover:border-brand-700 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:border-brand-400"
+        >
+          重設縮放
+        </button>
+      </div>
       <div
         ref={ref}
         className="h-[520px] w-full lg:h-[600px]"
         role="img"
         aria-label="部落格正文提及關係圖；箭頭指向被提及的部落格，詳細資料列於下方表格"
       />
-      <button
-        type="button"
-        onClick={() => reset.current()}
-        className="absolute top-0 right-0 inline-flex min-h-9 items-center rounded-full border border-zinc-300 bg-white/90 px-3 text-xs text-zinc-700 hover:border-brand-700 dark:border-zinc-700 dark:bg-zinc-900/90 dark:text-zinc-300 dark:hover:border-brand-400"
-      >
-        重設縮放
-      </button>
     </div>
   );
 }

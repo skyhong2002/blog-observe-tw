@@ -14,7 +14,7 @@ type Fresh = { key: string; label: string };
 
 const card = 'rounded-xl border border-zinc-300 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900';
 const primary =
-  'inline-flex min-h-10 shrink-0 items-center rounded-lg bg-brand-700 px-4 text-sm text-white hover:bg-brand-800 disabled:cursor-not-allowed disabled:opacity-60';
+  'inline-flex min-h-10 shrink-0 items-center rounded-lg bg-brand-700 px-4 text-sm text-white hover:bg-brand-800 disabled:cursor-not-allowed disabled:bg-zinc-200 disabled:text-zinc-600 dark:disabled:bg-zinc-800 dark:disabled:text-zinc-400';
 const secondary =
   'inline-flex min-h-9 shrink-0 items-center rounded-lg border border-zinc-300 px-3 text-sm hover:border-brand-600 hover:text-brand-700 disabled:opacity-60 dark:border-zinc-700 dark:hover:border-brand-400 dark:hover:text-brand-400';
 const danger =
@@ -45,6 +45,8 @@ export default function ApiKeyManager({ example }: { example: string }) {
   const csrf = useRef('');
   const [fresh, setFresh] = useState<Fresh | null>(null);
   const [copied, setCopied] = useState(false);
+  const [exampleCopied, setExampleCopied] = useState(false);
+  const command = `curl -s \\\n  -H 'x-api-key: <你的 API 金鑰>' \\\n  'https://weblog.tw${example}'`;
   const [label, setLabel] = useState('');
   const [busy, setBusy] = useState<string | null>(null);
   const [confirming, setConfirming] = useState<string | null>(null);
@@ -176,6 +178,16 @@ export default function ApiKeyManager({ example }: { example: string }) {
     </div>
   );
 
+  // Signed out, the page is about signing in to keep a reading list: the developer section shrinks to one line.
+  if (state === 'login')
+    return (
+      <p id="api-keys" className="scroll-mt-24 border-t border-zinc-200 pt-5 text-sm text-zinc-600 dark:border-zinc-800 dark:text-zinc-400">
+        開發者：登入後可以在這裡建立 API 金鑰。{' '}
+        <a href="/api/" className="font-medium text-brand-700 hover:underline dark:text-brand-400">
+          API 文件 →
+        </a>
+      </p>
+    );
   return (
     <section
       id="api-keys"
@@ -201,14 +213,6 @@ export default function ApiKeyManager({ example }: { example: string }) {
         <p role="alert" className="py-4 text-sm text-zinc-500">
           {message ?? '暫時無法取得 API 金鑰，請稍後重新整理。'}
         </p>
-      )}
-      {state === 'login' && (
-        <div className={card}>
-          <p className="text-sm text-zinc-600 dark:text-zinc-400">登入後即可建立與管理 API 金鑰。</p>
-          <a href="/login/?next=/my" className={`${primary} mt-3`}>
-            登入
-          </a>
-        </div>
       )}
 
       {state === 'ready' && (
@@ -263,8 +267,9 @@ export default function ApiKeyManager({ example }: { example: string }) {
                         </span>
                         <code className="shrink-0 font-mono text-xs text-zinc-500">{k.prefix}…</code>
                       </p>
-                      <p className="truncate text-xs text-zinc-500">
-                        建立於 {time(k.createdAt) ?? '—'} · {used ? `最後使用 ${used}` : '尚未使用'}
+                      <p className="flex flex-wrap gap-x-2 text-sm text-zinc-600 dark:text-zinc-400">
+                        <span className="whitespace-nowrap">建立於 {time(k.createdAt) ?? '—'}</span>
+                        <span className="whitespace-nowrap">{used ? `最後使用 ${used}` : '尚未使用'}</span>
                       </p>
                     </div>
                     {confirming === k.id ? (
@@ -295,6 +300,7 @@ export default function ApiKeyManager({ example }: { example: string }) {
               <label className="flex min-w-0 flex-1 flex-col gap-1 text-sm">
                 <span className="text-zinc-600 dark:text-zinc-400">金鑰名稱（例如用途或專案）</span>
                 <input
+                  aria-describedby="api-key-name-hint"
                   value={label}
                   onChange={(e) => setLabel(e.target.value)}
                   maxLength={60}
@@ -307,14 +313,34 @@ export default function ApiKeyManager({ example }: { example: string }) {
                 {busy === 'create' ? '建立中…' : '建立金鑰'}
               </button>
             </form>
+          ) : null}
+          {keys.length < max ? (
+            <p id="api-key-name-hint" className="-mt-2 text-sm text-zinc-600 dark:text-zinc-400">
+              {label.trim() ? `還可以建立 ${max - keys.length} 把。` : '先輸入名稱，就能建立金鑰。'}
+            </p>
           ) : (
             <p className="text-sm text-zinc-500">已達 {max} 把上限，撤銷一把後才能再建立。</p>
           )}
 
-          <div className="space-y-1">
-            <p className="text-sm font-medium">使用方式</p>
-            <pre className="overflow-x-auto rounded-md bg-zinc-900 p-3 text-[13px] leading-relaxed text-zinc-100 dark:bg-zinc-900/80">
-              <code>{`curl -s -H 'x-api-key: <你的 API 金鑰>' 'https://weblog.tw${example}'`}</code>
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-sm font-medium">使用方式</p>
+              <button
+                type="button"
+                className={secondary}
+                onClick={() => {
+                  void navigator.clipboard?.writeText(command).then(
+                    () => setExampleCopied(true),
+                    () => undefined,
+                  );
+                }}
+              >
+                {exampleCopied ? '已複製' : '複製指令'}
+              </button>
+            </div>
+            {/* One argument per line, never broken inside the URL; a long URL scrolls sideways. */}
+            <pre className="overflow-x-auto whitespace-pre rounded-md bg-zinc-900 p-3 text-[13px] leading-relaxed text-zinc-100 dark:bg-zinc-900/80">
+              <code>{command}</code>
             </pre>
           </div>
         </>

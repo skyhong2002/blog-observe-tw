@@ -83,7 +83,7 @@ test('displayTitle: every public article-title consumer goes through the shared 
   // The homepage no longer lists articles with summaries (no hero/story, so no plainText): its titles are the
   // recent-blog sidebar and the body-citation rows, both through displayTitle (rendered in home-title-render.spec).
   const page = source('app/page.tsx');
-  assert.match(page, /import \{ displayTitle, taipei \} from '@\/lib\/api';/);
+  assert.match(page, /import \{ displayTitle \} from '@\/lib\/api';/);
   assert.match(page, /const title = displayTitle\(latest\?\.title\)\.trim\(\) \|\| '未提供標題';/);
   assert.doesNotMatch(page, /\{(lead|post|latest)\??\.title\}/);
   const mentions = source('app/_home/HomeMentions.tsx');

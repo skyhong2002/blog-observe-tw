@@ -5,8 +5,10 @@ import BlogIcon from '@/components/BlogIcon';
 import BlogTagLine from '@/components/BlogTagLine';
 import Link from '@/components/NoPrefetchLink';
 import ProfilePostsView, { ProfilePostsFromUrl } from '@/components/public/ProfilePosts';
-import { type Blog, taipei } from '@/lib/api';
+import RelativeTime from '@/components/RelativeTime';
+import type { Blog } from '@/lib/api';
 import { blogHref } from '@/lib/page-links';
+import { sourceLabel } from '@/lib/public-query';
 import FollowButton from './follow-button';
 import MediaSidebar from './MediaSidebar';
 import MethodLink from './MethodLink';
@@ -37,13 +39,24 @@ function Row({ term, children }: { term: string; children: ReactNode }) {
     </>
   );
 }
-const recorded = (value?: string | null) => (value ? taipei(value) : null);
+const recorded = (value?: string | null) => (value ? <RelativeTime value={value} /> : null);
 
-export default function SourceProfile({ blog, sidebar, cloud }: { blog: Blog; sidebar?: ReactNode; cloud?: ReactNode }) {
+export default function SourceProfile({
+  blog,
+  sidebar,
+  cloud,
+  beforeContent,
+}: {
+  blog: Blog;
+  sidebar?: ReactNode;
+  cloud?: ReactNode;
+  /** Content that should be visible before the long article list (for example, the blog's relationships). */
+  beforeContent?: ReactNode;
+}) {
   const allPosts = blog.posts ?? [];
   const authors = blog.authors ?? [];
   const tags = blog.tags ?? [];
-  const owner = { slug: blog.slug, name: blog.name, canonicalPath: blog.canonicalPath };
+  const owner = { slug: blog.slug, name: blog.name, canonicalPath: blog.canonicalPath, url: blog.url };
   return (
     <div className="pb-4">
       <nav aria-label="麵包屑" className="mb-3 text-xs text-zinc-500 dark:text-zinc-400">
@@ -64,7 +77,7 @@ export default function SourceProfile({ blog, sidebar, cloud }: { blog: Blog; si
           </div>
           <p className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-zinc-500 dark:text-zinc-400">
             {/* How the blog was collected only; its tags have their own line below (tag.observe.tw's layout). */}
-            <span>{blog.statusLabel ?? '待核對'}</span>
+            <span title={blog.statusLabel ?? undefined}>{sourceLabel(blog.statusLabel)}</span>
             <span>·</span>
             <MethodLink />
           </p>
@@ -73,10 +86,10 @@ export default function SourceProfile({ blog, sidebar, cloud }: { blog: Blog; si
         <dl className="flex gap-5 text-right sm:gap-7">
           <div>
             {/* The blog's whole collection; 本頁收錄 (the 50 listed) read like its total (1,011 for wiwi.blog). */}
-            <dt className="text-[11px] text-zinc-500 dark:text-zinc-400">{blog.postCount === undefined ? '本頁收錄' : '收錄文章'}</dt>
+            <dt className="text-xs text-zinc-600 dark:text-zinc-400">{blog.postCount === undefined ? '本頁收錄' : '收錄文章'}</dt>
             <dd className="mt-0.5 text-xl font-semibold tabular-nums">
               {(blog.postCount ?? allPosts.length).toLocaleString('zh-TW')}
-              <span className="ml-1 text-[10px] font-normal text-zinc-500">篇</span>
+              <span className="ml-1 text-xs font-normal text-zinc-600 dark:text-zinc-400">篇</span>
             </dd>
           </div>
         </dl>
@@ -90,6 +103,7 @@ export default function SourceProfile({ blog, sidebar, cloud }: { blog: Blog; si
           { href: '#source', label: '來源資料' },
         ]}
       />
+      {beforeContent}
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-[minmax(0,1fr)_19rem] lg:gap-6">
         <MediaSidebar label="部落格資料、內文來源、流量與作者">
           <section id="source" className="rounded-lg border border-zinc-200 p-3 text-xs dark:border-zinc-800">

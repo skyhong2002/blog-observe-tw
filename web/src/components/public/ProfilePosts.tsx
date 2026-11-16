@@ -8,16 +8,30 @@ import { useSearchParams } from 'next/navigation';
 import ArticleListItem from '@/components/ArticleListItem';
 import Link from '@/components/NoPrefetchLink';
 import SearchBox from '@/components/SearchBox';
+import StateNotice from '@/components/StateNotice';
 import type { Post } from '@/lib/api';
 import { blogHref } from '@/lib/page-links';
 import { profileQueryOf } from '@/lib/public-query';
 
-type Owner = { slug: string; name: string; canonicalPath?: string };
+type Owner = { slug: string; name: string; canonicalPath?: string; url?: string | null };
 
 export default function ProfilePostsView({ blog, posts: allPosts, query }: { blog: Owner; posts: Post[]; query: string }) {
   const posts = query
     ? allPosts.filter((post) => `${post.title} ${post.summary ?? ''}`.toLocaleLowerCase().includes(query.toLocaleLowerCase()))
     : allPosts;
+  if (!allPosts.length)
+    return (
+      <StateNotice
+        tone="notice"
+        title="還沒有收錄這個部落格的文章"
+        actions={[
+          ...(blog.url && /^https?:\/\//.test(blog.url) ? [{ href: blog.url, label: '到原站閱讀 ↗', primary: true, external: true }] : []),
+          { href: '/blogs/', label: '看其他部落格' },
+        ]}
+      >
+        我們已經收錄這個部落格，但還沒讀到它的公開文章。新文章出現在它的 RSS 之後，通常幾小時內就會列在這裡。
+      </StateNotice>
+    );
   return (
     <>
       <SearchBox
@@ -60,7 +74,14 @@ export default function ProfilePostsView({ blog, posts: allPosts, query }: { blo
           ))}
         </ul>
       ) : (
-        <p className="py-8 text-zinc-600 dark:text-zinc-400">{query ? '沒有符合搜尋條件的文章。' : '尚未收錄文章。'}</p>
+        <StateNotice
+          title={`這頁的文章沒有提到「${query}」`}
+          actions={[
+            { href: `/articles/?${new URLSearchParams({ q: query, blog: blog.slug })}`, label: '搜尋這個部落格的內文', primary: true },
+          ]}
+        >
+          這裡只比對本頁文章的標題與摘要；搜尋內文可以找到更早的文章。
+        </StateNotice>
       )}
     </>
   );

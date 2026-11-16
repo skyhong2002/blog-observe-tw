@@ -60,7 +60,8 @@ describe('blog tag line', () => {
   test('keeps the collection line to itself and puts the shown tags on their own line with 編輯標籤', () => {
     const $ = page({ status: 'ready', items: [item('個人', '個人'), item('diary', '日記'), item('news', '新聞', false)] });
     const first = $('header p').first().text();
-    expect(first).toContain('BlogBlog.Club 名單自動收錄');
+    // The gateway's label in a reader's words (sourceLabel), as in the directory.
+    expect(first).toContain('來自 BlogBlog.Club 名單');
     expect(first).not.toMatch(/個人|日記/);
     const line = $('[aria-label="標籤"]');
     expect(line.children().first().text()).toBe('標籤');

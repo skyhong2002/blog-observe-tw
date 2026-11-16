@@ -1,5 +1,5 @@
 // Sidebar section in the SourceProfile 部落格資料 style (tag /media/[media]/ sidebar, afe0a65).
-import { taipei } from '@/lib/api';
+import RelativeTime from '@/components/RelativeTime';
 import {
   completenessLabel,
   contentStatusText,
@@ -62,9 +62,13 @@ export default async function BlogContentSources({ slug }: { slug: string }) {
         )}
         {row('取得方式', blog.lastMethod && sourceText[blog.lastMethod])}
         {row('平台', platform)}
-        {row('最近成功', blog.lastSuccessAt && taipei(blog.lastSuccessAt), 'tabular-nums')}
+        {row('最近成功', blog.lastSuccessAt && <RelativeTime value={blog.lastSuccessAt} />, 'tabular-nums')}
         {/* An attempt is shown only when it did not succeed (a later failure, or never a success). */}
-        {row('最近嘗試', blog.lastAttemptAt !== blog.lastSuccessAt && blog.lastAttemptAt && taipei(blog.lastAttemptAt), 'tabular-nums')}
+        {row(
+          '最近嘗試',
+          blog.lastAttemptAt !== blog.lastSuccessAt && blog.lastAttemptAt && <RelativeTime value={blog.lastAttemptAt} />,
+          'tabular-nums',
+        )}
       </dl>
       {sources.length > 0 && (
         <>
