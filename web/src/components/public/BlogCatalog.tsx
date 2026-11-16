@@ -13,10 +13,11 @@ import MediaTabs from '@/components/MediaTabs';
 import MethodLink from '@/components/MethodLink';
 import Link from '@/components/NoPrefetchLink';
 import ReloadButton from '@/components/public/ReloadButton';
+import RelativeTime from '@/components/RelativeTime';
 import { SearchIcon, searchFrame } from '@/components/SearchBox';
 import StateNotice, { stateActionClass } from '@/components/StateNotice';
 import TableScroller from '@/components/TableScroller';
-import { type Catalog, SITE_KIND_LABELS, taipei } from '@/lib/api';
+import { type Catalog, SITE_KIND_LABELS } from '@/lib/api';
 import { blogLink } from '@/lib/page-links';
 import {
   type CatalogFilters,
@@ -224,7 +225,14 @@ export default function BlogCatalogView({
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">部落格目錄</h1>
         <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
-          {data.updatedAt ? `更新於 ${taipei(data.updatedAt)}` : '等待資料更新'} · <MethodLink />
+          {data.updatedAt ? (
+            <>
+              <RelativeTime value={data.updatedAt} /> 更新
+            </>
+          ) : (
+            '等待資料更新'
+          )}{' '}
+          · <MethodLink />
         </p>
       </div>
       {(() => {
@@ -408,7 +416,11 @@ export default function BlogCatalogView({
                           <Highlight text={blog.url.replace(/^https?:\/\//, '').replace(/\/$/, '')} words={words} />
                         </span>
                       )}
-                      {blog.lastPublishedAt && <span className="shrink-0 tabular-nums">最新 {taipei(blog.lastPublishedAt)}</span>}
+                      {blog.lastPublishedAt && (
+                        <span className="shrink-0 tabular-nums">
+                          最新 <RelativeTime value={blog.lastPublishedAt} />
+                        </span>
+                      )}
                       {(blog.genres ?? []).slice(0, 2).map((g) => (
                         <Link
                           key={g.value}
@@ -495,8 +507,12 @@ export default function BlogCatalogView({
                           <td className={table.num}>{blog.postCount?.toLocaleString('zh-TW') ?? '—'}</td>
                           {/* No author named anywhere (feed or homepage) is not zero authors. */}
                           <td className={table.num}>{blog.authorCount ? blog.authorCount.toLocaleString('zh-TW') : '—'}</td>
-                          <td className={`${table.cell} text-xs tabular-nums text-zinc-500`}>{taipei(blog.lastPublishedAt)}</td>
-                          <td className={`${table.cell} text-xs tabular-nums text-zinc-500`}>{taipei(blog.lastCrawlSuccessAt)}</td>
+                          <td className={`${table.cell} text-xs tabular-nums text-zinc-500`}>
+                            <RelativeTime value={blog.lastPublishedAt} />
+                          </td>
+                          <td className={`${table.cell} text-xs tabular-nums text-zinc-500`}>
+                            <RelativeTime value={blog.lastCrawlSuccessAt} />
+                          </td>
                           <RobotsCell robots={blog.robots} />
                           <td className={`${table.cell} hidden text-xs 2xl:table-cell`}>
                             <span className="block max-w-40 truncate" title={blog.statusLabel ?? '待核對'}>

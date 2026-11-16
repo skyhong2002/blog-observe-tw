@@ -5,7 +5,8 @@ import BlogIcon from '@/components/BlogIcon';
 import BlogTagLine from '@/components/BlogTagLine';
 import Link from '@/components/NoPrefetchLink';
 import ProfilePostsView, { ProfilePostsFromUrl } from '@/components/public/ProfilePosts';
-import { type Blog, taipei } from '@/lib/api';
+import RelativeTime from '@/components/RelativeTime';
+import type { Blog } from '@/lib/api';
 import { blogHref } from '@/lib/page-links';
 import { sourceLabel } from '@/lib/public-query';
 import FollowButton from './follow-button';
@@ -38,7 +39,7 @@ function Row({ term, children }: { term: string; children: ReactNode }) {
     </>
   );
 }
-const recorded = (value?: string | null) => (value ? taipei(value) : null);
+const recorded = (value?: string | null) => (value ? <RelativeTime value={value} /> : null);
 
 export default function SourceProfile({ blog, sidebar, cloud }: { blog: Blog; sidebar?: ReactNode; cloud?: ReactNode }) {
   const allPosts = blog.posts ?? [];

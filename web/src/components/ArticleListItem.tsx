@@ -2,8 +2,9 @@ import ArticleThumbnail from '@/components/ArticleThumbnail';
 import BlogIcon from '@/components/BlogIcon';
 import Link from '@/components/NoPrefetchLink';
 import PostTags from '@/components/PostTags';
+import RelativeTime from '@/components/RelativeTime';
 import SourceLink from '@/components/SourceLink';
-import { displayTitle, type Post, plainText, taipei } from '@/lib/api';
+import { displayTitle, type Post, plainText } from '@/lib/api';
 import { blogLink } from '@/lib/page-links';
 import { contextSourceText, MISSING, type SearchEvidence } from '@/lib/search';
 
@@ -96,7 +97,7 @@ export default function ArticleListItem({
                 {article.mediaTitle}
               </Link>
             )}
-            {article.publishedAt ? <time dateTime={article.publishedAt}>{taipei(article.publishedAt)}</time> : <span>發文日期不明</span>}
+            {article.publishedAt ? <RelativeTime value={article.publishedAt} /> : <span>發文日期不明</span>}
             {article.authors.length > 0 && <span className="max-w-40 truncate max-sm:hidden">{article.authors.join('、')}</span>}
             {/* Phones: the title already opens the original; the host would take a line of its own. */}
             <SourceLink url={article.url} showHost className="!min-h-6 !text-[13px] max-sm:hidden" />

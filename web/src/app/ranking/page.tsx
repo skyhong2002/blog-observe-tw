@@ -1,10 +1,10 @@
 import MethodLink from '@/components/MethodLink';
 import Link from '@/components/NoPrefetchLink';
+import RelativeTime from '@/components/RelativeTime';
 import SectionTabs from '@/components/SectionTabs';
 import StateNotice from '@/components/StateNotice';
 import TableScroller from '@/components/TableScroller';
 import TagCountChartLoader from '@/components/TagCountChartLoader';
-import { taipei } from '@/lib/api';
 import { isPlatformDefaultTag } from '@/lib/platform-tags';
 import { overview } from '@/lib/public-api';
 import { staticPageMetadata } from '@/lib/seo';
@@ -85,7 +85,14 @@ export default async function RankingPage() {
       <header>
         <h1 className="text-2xl font-semibold">標籤收錄排行</h1>
         <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
-          {data.updatedAt ? `更新於 ${taipei(data.updatedAt)}` : '等待資料更新'} · <MethodLink />
+          {data.updatedAt ? (
+            <>
+              <RelativeTime value={data.updatedAt} /> 更新
+            </>
+          ) : (
+            '等待資料更新'
+          )}{' '}
+          · <MethodLink />
         </p>
       </header>
       {data.tags.length ? (

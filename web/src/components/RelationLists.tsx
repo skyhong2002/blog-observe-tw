@@ -1,6 +1,7 @@
+import RelativeTime from '@/components/RelativeTime';
 import { taipei } from '@/lib/api';
 import { blogLink } from '@/lib/page-links';
-import { dayText, type RelationEdge, type RelationNode, shareExplanation, shareLabel, sharePercent } from '@/lib/relations';
+import { type RelationEdge, type RelationNode, shareExplanation, shareLabel, sharePercent } from '@/lib/relations';
 import BlogIcon from './BlogIcon';
 import Link from './NoPrefetchLink';
 export default function RelationLists({
@@ -45,9 +46,7 @@ export default function RelationLists({
                   </small>
                   {e.lastMentionAt ? (
                     <small className="block whitespace-nowrap text-xs text-zinc-500">
-                      {e.firstMentionAt && dayText(e.firstMentionAt) !== dayText(e.lastMentionAt)
-                        ? `${dayText(e.firstMentionAt)}–${dayText(e.lastMentionAt)}`
-                        : `最近 ${dayText(e.lastMentionAt)}`}
+                      最近 <RelativeTime value={e.lastMentionAt} />
                     </small>
                   ) : null}
                   {/* Each direction keeps its own article dates; years apart is still "both ways", never a same-time exchange. */}

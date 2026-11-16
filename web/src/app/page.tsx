@@ -4,9 +4,10 @@ import { Suspense } from 'react';
 import BlogIcon from '@/components/BlogIcon';
 import Link from '@/components/NoPrefetchLink';
 import PostTags from '@/components/PostTags';
+import RelativeTime from '@/components/RelativeTime';
 import SectionBoundary from '@/components/SectionBoundary';
 import StateNotice from '@/components/StateNotice';
-import { displayTitle, taipei } from '@/lib/api';
+import { displayTitle } from '@/lib/api';
 import { recentBlogRows } from '@/lib/home';
 import { externalHref } from '@/lib/images';
 import { blogLink } from '@/lib/page-links';
@@ -28,7 +29,13 @@ export const metadata = staticPageMetadata('/');
 export default async function HomePage() {
   const data = await homeOverview();
   const recentBlogs = recentBlogRows(data, 10);
-  const updated = data.updatedAt ? `${taipei(data.updatedAt)} 更新` : '等待資料更新';
+  const updated = data.updatedAt ? (
+    <>
+      <RelativeTime value={data.updatedAt} /> 更新
+    </>
+  ) : (
+    '等待資料更新'
+  );
   return (
     <>
       {/* Static site facts; serializeJsonLd escapes '<'. */}
@@ -105,7 +112,7 @@ export default async function HomePage() {
                                 <BlogIcon media={blog.slug} title={blog.name} />
                                 <span>{blog.name}</span>
                               </Link>
-                              {publishedAt && <time dateTime={publishedAt}>{taipei(publishedAt)}</time>}
+                              {publishedAt && <RelativeTime value={publishedAt} />}
                             </p>
                             {latest ? (
                               href ? (

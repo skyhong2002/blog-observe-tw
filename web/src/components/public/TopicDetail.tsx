@@ -8,6 +8,7 @@ import { useState } from 'react';
 import BlogIcon from '@/components/BlogIcon';
 import FooterMethod from '@/components/FooterMethod';
 import Link from '@/components/NoPrefetchLink';
+import RelativeTime from '@/components/RelativeTime';
 import SectionTabs from '@/components/SectionTabs';
 import { VocabularySummary } from '@/components/VocabularyNotice';
 import { displayTitle, taipei } from '@/lib/api';
@@ -117,7 +118,12 @@ function HistoryList({ history }: { history: Pick<TopicHistory, 'articles'> }) {
           <ArticleTitle url={a.url} title={a.title} />
           <p className="mt-2 text-xs text-zinc-500 dark:text-zinc-400">
             <Link {...blogLink(a.blogSlug, a.blogCanonicalPath)}>{a.blogName}</Link>
-            {a.publishedAt ? ` · ${taipei(a.publishedAt)}` : null}
+            {a.publishedAt ? (
+              <>
+                {' '}
+                · <RelativeTime value={a.publishedAt} />
+              </>
+            ) : null}
           </p>
           <p
             className={`mt-1 text-xs ${a.evidenceState === 'pending' ? 'font-medium text-zinc-700 dark:text-zinc-300' : 'text-zinc-500 dark:text-zinc-400'}`}
@@ -281,7 +287,7 @@ export default function TopicDetailView({
                     <li className="py-4" key={a.id}>
                       <ArticleTitle url={a.url} title={a.title} />
                       <p className="mt-2 text-xs text-zinc-500 dark:text-zinc-400">
-                        <Link {...blogLink(a.blogSlug, a.blogCanonicalPath)}>{a.blogName}</Link> · {taipei(a.publishedAt)}
+                        <Link {...blogLink(a.blogSlug, a.blogCanonicalPath)}>{a.blogName}</Link> · <RelativeTime value={a.publishedAt} />
                       </p>
                     </li>
                   ))}

@@ -9,7 +9,8 @@
 import BlogIcon from '@/components/BlogIcon';
 import Link from '@/components/NoPrefetchLink';
 import PostTags from '@/components/PostTags';
-import { displayTitle, type HomeMention, type HomeMentions, taipei } from '@/lib/api';
+import RelativeTime from '@/components/RelativeTime';
+import { displayTitle, type HomeMention, type HomeMentions } from '@/lib/api';
 import { externalHref } from '@/lib/images';
 import { blogLink } from '@/lib/page-links';
 import HomeMentionsFromBrowser from './HomeMentionsFromBrowser';
@@ -75,7 +76,7 @@ export function MentionCardView({ card }: { card: MentionCard }) {
             {m.sourceBlogName}
           </Link>
           <span aria-hidden="true">·</span>
-          {m.publishedAt ? <time dateTime={m.publishedAt}>{taipei(m.publishedAt)}</time> : <span>發文日期不明</span>}
+          {m.publishedAt ? <RelativeTime value={m.publishedAt} /> : <span>發文日期不明</span>}
         </p>
         <h3>
           {original ? (

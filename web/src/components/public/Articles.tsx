@@ -9,9 +9,10 @@ import FilterChips from '@/components/FilterChips';
 import FooterMethod, { methodHeading } from '@/components/FooterMethod';
 import MethodLink from '@/components/MethodLink';
 import Link from '@/components/NoPrefetchLink';
+import RelativeTime from '@/components/RelativeTime';
 import SearchBox from '@/components/SearchBox';
 import StateNotice from '@/components/StateNotice';
-import { type Post, taipei } from '@/lib/api';
+import type { Post } from '@/lib/api';
 import {
   type ArticleFilters,
   articleFiltersHref,
@@ -117,7 +118,12 @@ function Coverage({ result }: { result: SearchResult }) {
       <p>{historicalBodyText(body, wholeBody)}</p>
       <p>
         結果只顯示短片段，全文請至原站閱讀。
-        {result.generatedAt && ` ${taipei(result.generatedAt)} 更新。`}
+        {result.generatedAt && (
+          <>
+            {' '}
+            <RelativeTime value={result.generatedAt} /> 更新。
+          </>
+        )}
       </p>
       {body?.status === 'partial' ? (
         <details className="group">

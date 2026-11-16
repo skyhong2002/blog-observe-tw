@@ -107,7 +107,7 @@ export function MastheadWords({ words }: { words: TopicCloudWord[] }) {
 /** The home page's opening: the site mark in the middle of the topic cloud. The mark, tagline and edition line
  *  render at once; `cloud` is an optional streamed slot (a Suspense around HomeTopicCloud), so the masthead never
  *  waits for the topic read. SiteHeader hides its own wordmark while #masthead is in view. */
-export default function MastheadCloud({ edition, cloud }: { edition: string; cloud?: ReactNode }) {
+export default function MastheadCloud({ edition, cloud }: { edition: ReactNode; cloud?: ReactNode }) {
   return (
     <div className={styles.mastheadCloud}>
       <div className={styles.mastheadCloudFrame} style={frameVars} data-vital-region="home-growth-cloud">

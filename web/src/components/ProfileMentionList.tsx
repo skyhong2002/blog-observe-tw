@@ -1,6 +1,7 @@
 // One blog's citing articles as rows (the blog page's 最近被這些部落格提到 and /blogs/<key>/mentions/). No server-only
 // imports: the full list's client loader (app/blogs/[slug]/mentions/MoreMentions.tsx) renders it too.
-import { displayTitle, taipei } from '@/lib/api';
+import RelativeTime from '@/components/RelativeTime';
+import { displayTitle } from '@/lib/api';
 import { blogLink } from '@/lib/page-links';
 import { externalHref } from '@/lib/relations';
 import BlogIcon from './BlogIcon';
@@ -46,7 +47,7 @@ export function MentionList({ items }: { items: ProfileMention[] }) {
               ) : (
                 <span className="min-w-0">〈{title}〉</span>
               )}
-              {item.publishedAt && <span className={`text-xs tabular-nums ${muted}`}>{taipei(item.publishedAt)}</span>}
+              {item.publishedAt && <span className={`text-xs tabular-nums ${muted}`}><RelativeTime value={item.publishedAt} /></span>}
             </div>
             {item.quote && <p className={`line-clamp-2 text-sm ${muted}`}>{item.quote}</p>}
           </li>
