@@ -5,7 +5,7 @@
 // Each opens like the homepage, its title in the middle of its own ranking's word cloud; see app/topics/(ranking)/page.tsx.
 
 import { useSearchParams } from 'next/navigation';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import BlogIcon from '@/components/BlogIcon';
 import FooterMethod from '@/components/FooterMethod';
 import MethodLink from '@/components/MethodLink';
@@ -168,7 +168,8 @@ function TopicRows({ order, days, data }: { order: TopicOrder; days: Period; dat
               </th>
               {/* Desktops: the blogs each topic counts, as icons, in the space between the name and the numbers. */}
               {showBlogs ? (
-                <th scope="col" className={`${table.cell} hidden lg:table-cell`}>
+                // w-full: this column takes the table's spare width; the icon line fits itself into it.
+                <th scope="col" className={`${table.cell} hidden w-full lg:table-cell`}>
                   寫過的部落格
                 </th>
               ) : null}
@@ -200,7 +201,7 @@ function TopicRows({ order, days, data }: { order: TopicOrder; days: Period; dat
                   </div>
                 </td>
                 {showBlogs ? (
-                  <td className={`${table.cell} hidden whitespace-normal lg:table-cell`}>
+                  <td className={`${table.cell} hidden lg:table-cell`}>
                     <BlogIconRow blogs={t.blogList ?? []} />
                   </td>
                 ) : null}
@@ -258,22 +259,51 @@ export function TopicRankingFromUrl({
   );
 }
 
-/** Every blog a topic counts, as linked icons in one wrapping row (the most articles on the topic first). */
+/** Icon pitch in the row: a 16px icon and a 4px gap. */
+const ICON_STEP = 20;
+
+/**
+ * Every blog a topic counts, as linked icons on one line (the most articles on the topic first). When they do not
+ * all fit, the line ends in "…" (its title says how many more), so a row never grows to two lines. The width is
+ * measured in the browser; before that the line is simply clipped.
+ */
 function BlogIconRow({ blogs }: { blogs: NonNullable<Topics['items'][number]['blogList']> }) {
+  const box = useRef<HTMLDivElement>(null);
+  const [fits, setFits] = useState<number | null>(null);
+  useEffect(() => {
+    const node = box.current;
+    if (!node) return;
+    const measure = () => setFits(Math.max(1, Math.floor((node.clientWidth + 4) / ICON_STEP)));
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, []);
+  // The "…" takes one icon's place.
+  const shown = fits !== null && blogs.length > fits ? blogs.slice(0, Math.max(0, fits - 1)) : blogs;
+  const more = blogs.length - shown.length;
   return (
-    <ul aria-label="寫過的部落格" className="flex flex-wrap items-center gap-1 py-0.5">
-      {blogs.map((b) => (
-        <li key={b.slug}>
-          <Link
-            href={blogHref(b.slug)}
-            title={b.name}
-            aria-label={b.name}
-            className="block rounded-sm focus-visible:outline-2 focus-visible:outline-brand-600"
-          >
-            <BlogIcon media={b.slug} iconUrl={b.iconUrl} title={b.name} size={16} />
-          </Link>
-        </li>
-      ))}
-    </ul>
+    // w-0 min-w-full: the line never widens the table; it takes the column the table gives it.
+    <div ref={box} className="w-0 min-w-full overflow-hidden">
+      <ul aria-label={`寫過的部落格，共 ${blogs.length} 個`} className="flex flex-nowrap items-center gap-1 py-0.5">
+        {shown.map((b) => (
+          <li key={b.slug} className="shrink-0">
+            <Link
+              href={blogHref(b.slug)}
+              title={b.name}
+              aria-label={b.name}
+              className="block rounded-sm focus-visible:outline-2 focus-visible:outline-brand-600"
+            >
+              <BlogIcon media={b.slug} iconUrl={b.iconUrl} title={b.name} size={16} />
+            </Link>
+          </li>
+        ))}
+        {more > 0 && (
+          <li className="w-4 shrink-0 text-center leading-4 text-zinc-600 dark:text-zinc-400" title={`還有 ${more} 個部落格`}>
+            …
+          </li>
+        )}
+      </ul>
+    </div>
   );
 }

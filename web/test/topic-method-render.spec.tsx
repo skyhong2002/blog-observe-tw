@@ -538,13 +538,19 @@ describe('the two rankings', () => {
         .map((_, th) => $(th).text().replace(/[▲▼↕]/g, ''))
         .get(),
     ).toEqual(['#', '話題', '寫過的部落格', '部落格', '文章', '標題提到／只在內文']);
-    const first = $('tbody tr').first().find('ul[aria-label="寫過的部落格"] a');
+    const first = $('tbody tr').first().find('ul[aria-label^="寫過的部落格"] a');
     expect(first.map((_, a) => [[$(a).attr('href'), $(a).attr('aria-label')]]).get()).toEqual([
       ['/blogs/g/', '小 G'],
       ['/blogs/c/', 'C 的部落格'],
     ]);
     // Desktops only: phones keep the narrow table.
-    expect($('thead th').eq(2).attr('class')).toContain('hidden lg:table-cell');
+    expect($('thead th').eq(2).attr('class')).toContain('lg:table-cell');
+    expect($('thead th').eq(2).attr('class')).toMatch(/(^| )hidden( |$)/);
+    // One line: the row never wraps; the browser trims it to what fits and ends it in "…".
+    const line = $('tbody tr').first().find('ul[aria-label^="寫過的部落格"]');
+    expect(line.attr('aria-label')).toBe('寫過的部落格，共 2 個');
+    expect(line.attr('class')).toContain('flex-nowrap');
+    expect(line.parent().attr('class')).toContain('overflow-hidden');
   });
 });
 
