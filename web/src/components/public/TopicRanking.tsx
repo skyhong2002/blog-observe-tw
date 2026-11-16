@@ -270,7 +270,7 @@ function BlogIconRow({ blogs }: { blogs: NonNullable<Topics['items'][number]['bl
             aria-label={b.name}
             className="block rounded-sm focus-visible:outline-2 focus-visible:outline-brand-600"
           >
-            <BlogIcon media={b.slug} title={b.name} size={16} />
+            <BlogIcon media={b.slug} iconUrl={b.iconUrl} title={b.name} size={16} />
           </Link>
         </li>
       ))}

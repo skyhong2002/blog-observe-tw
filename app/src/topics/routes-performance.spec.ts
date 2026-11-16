@@ -176,12 +176,12 @@ describe('fresh topic ranking coverage', () => {
       expect(names[0].params).toEqual([[7, 3, 9, 5]]);
       expect(full.json().items.map((t: { blogList: unknown }) => t.blogList)).toEqual([
         [
-          { slug: 'g', name: 'G' },
-          { slug: 'c', name: 'C' },
+          { slug: 'g', name: 'G', iconUrl: null },
+          { slug: 'c', name: 'C', iconUrl: null },
         ],
         [
-          { slug: 'c', name: 'C' },
-          { slug: 'e', name: 'E' },
+          { slug: 'c', name: 'C', iconUrl: null },
+          { slug: 'e', name: 'E', iconUrl: null },
         ],
       ]);
       queries.length = 0;

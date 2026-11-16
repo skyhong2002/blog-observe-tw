@@ -1,6 +1,8 @@
 import type { FastifyInstance } from 'fastify';
 import type { Pool, RowDataPacket } from 'mysql2/promise';
 import { SharedSnapshot, SNAPSHOT_REFRESH_MS } from '../shared-snapshot.ts';
+import { iconManifest } from '../v1/favicon-routes.ts';
+import { iconUrl } from '../v1/icons.ts';
 import { topicBodyHash, topicBodyJoins } from './body.ts';
 import { TopicResponseCache } from './cache.ts';
 import { backgroundExcludedSql, DISPLAY_GATE, nativeLabelCte, nativeLabelJoin, windowGateCtes, windowGateSql } from './display-gate.ts';
@@ -285,15 +287,20 @@ export async function compactHomeRanking(
       .filter(Boolean)
       .map(Number);
   const wanted = [...new Set(kept.flatMap(ids))];
-  const names = new Map<number, { slug: string; name: string }>();
+  type ListedBlog = { slug: string; name: string; iconUrl: string | null };
+  const names = new Map<number, ListedBlog>();
   if (wanted.length) {
-    const [blogs] = await pool.query<RowDataPacket[]>(`SELECT id,slug,name FROM blogs WHERE status='verified' AND id IN (?)`, [wanted]);
-    for (const b of blogs) names.set(Number(b.id), { slug: b.slug, name: b.name });
+    const [[blogs], icons] = await Promise.all([
+      pool.query<RowDataPacket[]>(`SELECT id,slug,name FROM blogs WHERE status='verified' AND id IN (?)`, [wanted]),
+      iconManifest(),
+    ]);
+    // The same icon address as the directory and the homepage (catalog.js, overview.js).
+    for (const b of blogs) names.set(Number(b.id), { slug: b.slug, name: b.name, iconUrl: iconUrl(b.slug, icons) });
   }
   return {
     items: kept.map((r) => ({
       ...item(r),
-      blogList: ids(r).flatMap((id) => (names.has(id) ? [names.get(id) as { slug: string; name: string }] : [])),
+      blogList: ids(r).flatMap((id) => (names.has(id) ? [names.get(id) as ListedBlog] : [])),
     })),
     truncated: rows.length > limit,
   };
